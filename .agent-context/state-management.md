@@ -1,0 +1,42 @@
+# State Management
+
+Two kinds of state, two homes. Putting state in the wrong place is the most common
+source of bugs and re-renders — be deliberate. (There is intentionally **no TanStack
+Query / server-cache layer** — see below.)
+
+## 1. Persistent domain data → **Local DB (Dexie)**
+
+- Accounts, transactions, categories, budgets, obligations — anything synced and persisted.
+- The **source of truth for the UI**. Read reactively (`useLiveQuery`).
+- Never duplicate this into Zustand. Derive views from the DB query instead.
+- See [data-layer-and-sync.md](data-layer-and-sync.md).
+
+## 2. Client / UI state → **Zustand**
+
+- Ephemeral or UI-only state that isn't server data: theme, **direction (RTL/LTR)**,
+  current session/user summary, sidebar/sheet open state, active filters, wizard steps,
+  toasts, sync status indicator.
+- Small, focused stores — one per concern, not a single mega-store (single responsibility).
+- Co-locate feature-specific stores under `features/<feature>/stores/`; truly global stores
+  (theme, direction, session) live in `src/stores/`.
+- Select narrowly (`useStore(s => s.x)`) to avoid needless re-renders. Keep actions in the
+  store; components call them.
+- Persist only what should survive reload (e.g. theme, direction) via Zustand `persist`.
+  Do **not** persist domain data here — that's the DB's job.
+
+## Server data → handled by the data layer, not a cache library
+
+- There is **no TanStack Query**. Synced domain data lives in the local DB; the sync engine
+  (`src/db/`) handles push/pull and online/offline status. See
+  [data-layer-and-sync.md](data-layer-and-sync.md).
+- The few remote-only calls (auth) use the HTTP client in `src/lib/` + the session Zustand
+  store — no server-cache layer needed.
+- Why: a server cache over a local-first DB is a redundant second cache; two caches of the
+  same entities drift apart. One source of truth, always.
+
+## Rules of thumb
+
+- "Is it persisted and synced?" → Local DB.
+- "Is it UI/ephemeral or a global toggle?" → Zustand.
+- "Is it a one-off remote call (auth)?" → HTTP client in `src/lib/` + session store.
+- Derive, don't duplicate. If two stores can disagree, you've created a bug.

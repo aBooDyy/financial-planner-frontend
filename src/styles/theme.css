@@ -1,0 +1,173 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+/* Dark theme activates when <html> carries the `dark` class (set by the theme store). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Single source of truth for the Means design tokens. Tokens are referenced as runtime
+ * CSS variables so light/dark swaps happen by toggling a class on <html> — components
+ * never branch on theme, they just use `fp-` utilities. `@theme inline` makes Tailwind
+ * emit utilities that point at the variable instead of copying its value.
+ */
+@theme inline {
+  --color-fp-canvas: var(--fp-canvas);
+  --color-fp-bg: var(--fp-bg);
+  --color-fp-surface: var(--fp-surface);
+  --color-fp-surface-2: var(--fp-surface-2);
+  --color-fp-border: var(--fp-border);
+  --color-fp-border-strong: var(--fp-border-strong);
+  --color-fp-text: var(--fp-text);
+  --color-fp-text-2: var(--fp-text-2);
+  --color-fp-text-3: var(--fp-text-3);
+  --color-fp-accent: var(--fp-accent);
+  --color-fp-accent-ink: var(--fp-accent-ink);
+  --color-fp-accent-soft: var(--fp-accent-soft);
+  --color-fp-danger: var(--fp-danger);
+
+  --shadow-fp: var(--fp-shadow);
+  --font-sans: 'Hanken Grotesk', system-ui, sans-serif;
+
+  /*
+   * shadcn/ui semantic tokens, bridged onto the fp- palette so installed shadcn
+   * components render in the Means design and flip with the theme for free (the
+   * bridge vars below point at fp- vars, which already swap under `.dark`).
+   */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
+:root {
+  --fp-canvas: #edebe6;
+  --fp-bg: #faf8f4;
+  --fp-surface: #ffffff;
+  --fp-surface-2: #f5f3ee;
+  --fp-border: #e9e5dd;
+  --fp-border-strong: #dad5ca;
+  --fp-text: #1b1a17;
+  --fp-text-2: #6e6a60;
+  --fp-text-3: #a39e92;
+  --fp-accent: #1f9d6b;
+  --fp-accent-ink: #0e6b47;
+  --fp-accent-soft: rgba(31, 157, 107, 0.1);
+  --fp-danger: #b42318;
+  --fp-shadow:
+    0 1px 2px rgba(20, 18, 12, 0.05), 0 12px 30px -18px rgba(20, 18, 12, 0.22);
+
+  /* shadcn bridge → fp- palette. Defined once; theme-flips because the fp- vars do. */
+  --background: var(--fp-bg);
+  --foreground: var(--fp-text);
+  --card: var(--fp-surface);
+  --card-foreground: var(--fp-text);
+  --popover: var(--fp-surface);
+  --popover-foreground: var(--fp-text);
+  --primary: var(--fp-accent);
+  --primary-foreground: #ffffff;
+  --secondary: var(--fp-surface-2);
+  --secondary-foreground: var(--fp-text);
+  --muted: var(--fp-surface-2);
+  --muted-foreground: var(--fp-text-2);
+  --accent: var(--fp-surface-2);
+  --accent-foreground: var(--fp-text);
+  --destructive: var(--fp-danger);
+  --destructive-foreground: #ffffff;
+  --border: var(--fp-border);
+  --input: var(--fp-border-strong);
+  --ring: var(--fp-accent);
+  --radius: 0.75rem;
+}
+
+.dark {
+  --fp-canvas: #0c0d0f;
+  --fp-bg: #141619;
+  --fp-surface: #1b1e22;
+  --fp-surface-2: #23272d;
+  --fp-border: #2a2f36;
+  --fp-border-strong: #363c45;
+  --fp-text: #eceef1;
+  --fp-text-2: #9aa1ac;
+  --fp-text-3: #6a727d;
+  --fp-accent: #2fbd8b;
+  --fp-accent-ink: #7fe6be;
+  --fp-accent-soft: rgba(47, 189, 139, 0.14);
+  --fp-danger: #f2998e;
+  --fp-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.4), 0 18px 40px -22px rgba(0, 0, 0, 0.7);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--fp-bg);
+  color: var(--fp-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--fp-border-strong);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@keyframes fp-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Editor entrances: a bottom sheet rising on mobile, a popped card on desktop. */
+@keyframes fp-sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes fp-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

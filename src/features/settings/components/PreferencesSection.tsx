@@ -1,0 +1,161 @@
+import { SUPPORTED_CURRENCIES } from '#/lib/currency'
+import type { CurrencyCode } from '#/lib/currency'
+import { DATE_FORMAT_OPTIONS } from '#/lib/date'
+import type { DateFormat } from '#/lib/date'
+import { useThemeStore } from '#/stores/theme'
+import type { ThemePreference } from '#/stores/theme'
+import { usePreferencesStore } from '#/stores/preferences'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '#/components/ui/select'
+import { SectionHeader } from './SectionHeader'
+import { SettingRow } from './SettingRow'
+import { Segmented } from './Segmented'
+import { Toggle } from './Toggle'
+
+const CARD =
+  'overflow-hidden rounded-2xl border border-fp-border bg-fp-surface shadow-fp'
+const SELECT =
+  'shrink-0 w-auto cursor-pointer rounded-[11px] border-fp-border-strong px-3 py-2.5 text-[14px] font-semibold text-fp-text'
+
+const DEFAULT_ACCOUNT_NONE = '__none__'
+
+type Wallet = { id: string; name: string }
+
+type Props = {
+  base: CurrencyCode
+  onBaseChange: (code: CurrencyCode) => void
+  wallets: Wallet[]
+}
+
+export function PreferencesSection({ base, onBaseChange, wallets }: Props) {
+  const preference = useThemeStore((s) => s.preference)
+  const setPreference = useThemeStore((s) => s.setPreference)
+  const p = usePreferencesStore()
+
+  return (
+    <div className="flex flex-col gap-4">
+      <SectionHeader
+        title="Preferences"
+        subtitle="How Means looks and behaves on this device."
+      />
+      <div className={CARD}>
+        <SettingRow label="Appearance" desc="Theme used across Means.">
+          <Segmented<ThemePreference>
+            value={preference}
+            onChange={setPreference}
+            options={[
+              { value: 'light', label: 'Light' },
+              { value: 'dark', label: 'Dark' },
+              { value: 'system', label: 'System' },
+            ]}
+          />
+        </SettingRow>
+
+        <SettingRow
+          label="Base currency"
+          desc="Everything is totalled in this currency."
+        >
+          <Select
+            value={base}
+            onValueChange={(v) => onBaseChange(v as CurrencyCode)}
+          >
+            <SelectTrigger className={`${SELECT} font-bold`}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SUPPORTED_CURRENCIES.map((c) => (
+                <SelectItem key={c} value={c}>
+                  {c}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </SettingRow>
+
+        <SettingRow label="Number format" desc="Thousands and decimal style.">
+          <Segmented
+            value={p.numberFormat}
+            onChange={p.setNumberFormat}
+            options={[
+              { value: '1,234.56', label: '1,234.56' },
+              { value: '1.234,56', label: '1.234,56' },
+            ]}
+          />
+        </SettingRow>
+
+        <SettingRow label="Date format" desc="How specific dates are shown.">
+          <Select
+            value={p.dateFormat}
+            onValueChange={(v) => p.setDateFormat(v as DateFormat)}
+          >
+            <SelectTrigger className={`${SELECT} tabular-nums`}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {DATE_FORMAT_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </SettingRow>
+
+        <SettingRow
+          label="Week starts on"
+          desc="Used by the spending calendar."
+        >
+          <Segmented
+            value={p.weekStart}
+            onChange={p.setWeekStart}
+            options={[
+              { value: 'Sunday', label: 'Sunday' },
+              { value: 'Monday', label: 'Monday' },
+            ]}
+          />
+        </SettingRow>
+
+        <SettingRow
+          label="Default account"
+          desc="Pre-selected when adding a transaction."
+        >
+          <Select
+            value={p.defaultAccountId ?? DEFAULT_ACCOUNT_NONE}
+            onValueChange={(v) =>
+              p.setDefaultAccountId(v === DEFAULT_ACCOUNT_NONE ? null : v)
+            }
+          >
+            <SelectTrigger className={`${SELECT} max-w-[200px] truncate`}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={DEFAULT_ACCOUNT_NONE}>None</SelectItem>
+              {wallets.map((w) => (
+                <SelectItem key={w.id} value={w.id}>
+                  {w.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </SettingRow>
+
+        <SettingRow
+          label="Hide empty wallets"
+          desc="Keep zero-balance wallets out of lists."
+          last
+        >
+          <Toggle
+            on={p.hideEmptyWallets}
+            onChange={() => p.setHideEmptyWallets(!p.hideEmptyWallets)}
+            label="Hide empty wallets"
+          />
+        </SettingRow>
+      </div>
+    </div>
+  )
+}
