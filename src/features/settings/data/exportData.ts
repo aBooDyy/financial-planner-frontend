@@ -1,4 +1,6 @@
 import { db } from '#/db/db'
+import { buildCatalog } from '#/features/categories/data/catalog'
+import { toMajor } from '#/lib/currency'
 
 /**
  * Export the user's data straight from the local-first DB — no server round-trip needed. CSV
@@ -9,7 +11,12 @@ import { db } from '#/db/db'
 const live = <T extends { deleted?: number }>(rows: T[]): T[] =>
   rows.filter((r) => r.deleted === undefined || r.deleted === 0)
 
-function download(filename: string, mime: string, content: string): void {
+/** Hand the browser a file. Shared with the importer's *Download skipped rows*. */
+export function download(
+  filename: string,
+  mime: string,
+  content: string,
+): void {
   const blob = new Blob([content], { type: mime })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -33,12 +40,14 @@ export async function exportCsv(): Promise<void> {
     db.categories.toArray(),
   ])
   const walletName = new Map(nodes.map((n) => [n.id, n.name]))
-  const categoryName = new Map(categories.map((c) => [c.slug, c.name]))
+  // Resolved through the catalog, so a child is named under its own parent and a slug the
+  // user has since deleted still exports as the label its rows were filed under.
+  const catalog = buildCatalog(categories)
 
   const header = [
     'date',
     'type',
-    'amount_minor',
+    'amount',
     'currency',
     'category',
     'subcategory',
@@ -51,10 +60,14 @@ export async function exportCsv(): Promise<void> {
       [
         t.date,
         t.type,
-        t.amount,
+        toMajor(t.amount, t.currency),
         t.currency,
-        categoryName.get(t.category) ?? t.category,
-        t.subcategory ?? '',
+        t.category === null ? '' : catalog.get(t.category).name,
+        t.category === null
+          ? ''
+          : (catalog.sub(t.category, t.subcategory)?.name ??
+            t.subcategory ??
+            ''),
         walletName.get(t.walletId) ?? t.walletId,
         t.note ?? '',
       ]
