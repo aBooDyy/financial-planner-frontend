@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatDate, parseISODate } from './date'
+import { formatDate, formatRelativeTime, parseISODate } from './date'
 
 const d = new Date(2026, 5, 6) // 6 June 2026 — single digits to check zero-padding
 
@@ -37,5 +37,40 @@ describe('parseISODate', () => {
     expect(parseISODate('')).toBeNull()
     expect(parseISODate('2026-7-1')).toBeNull()
     expect(parseISODate('not-a-date')).toBeNull()
+  })
+})
+
+describe('formatRelativeTime', () => {
+  const now = new Date('2026-09-21T12:00:00Z')
+  const ago = (ms: number) => new Date(now.getTime() - ms).toISOString()
+
+  it('speaks in the largest unit the gap clears', () => {
+    expect(formatRelativeTime(ago(45 * 1000), 'en-US', now)).toBe('now')
+    expect(formatRelativeTime(ago(5 * 60_000), 'en-US', now)).toBe(
+      '5 minutes ago',
+    )
+    expect(formatRelativeTime(ago(3 * 3_600_000), 'en-US', now)).toBe(
+      '3 hours ago',
+    )
+    expect(formatRelativeTime(ago(2 * 86_400_000), 'en-US', now)).toBe(
+      '2 days ago',
+    )
+    expect(formatRelativeTime(ago(20 * 86_400_000), 'en-US', now)).toBe(
+      '2 weeks ago',
+    )
+    expect(formatRelativeTime(ago(70 * 86_400_000), 'en-US', now)).toBe(
+      '2 months ago',
+    )
+  })
+
+  it('carries the locale’s own wording', () => {
+    expect(formatRelativeTime(ago(2 * 86_400_000), 'ar', now)).not.toBe(
+      '2 days ago',
+    )
+  })
+
+  it('returns null rather than “Invalid Date” for unreadable input', () => {
+    expect(formatRelativeTime('', 'en-US', now)).toBeNull()
+    expect(formatRelativeTime('not-a-date', 'en-US', now)).toBeNull()
   })
 })

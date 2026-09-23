@@ -23,6 +23,42 @@ export const parseISODate = (iso: string): Date | null => {
   return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
 }
 
+/** Largest-first, so the first unit a gap clears is the one it is spoken in. */
+const RELATIVE_UNITS: ReadonlyArray<[Intl.RelativeTimeFormatUnit, number]> = [
+  ['year', 365 * 24 * 3600],
+  ['month', 30 * 24 * 3600],
+  ['week', 7 * 24 * 3600],
+  ['day', 24 * 3600],
+  ['hour', 3600],
+  ['minute', 60],
+]
+
+/**
+ * How long ago something happened, in words — "3 days ago", "last month". For facts whose
+ * *recency* is the point (a template's last use, an import, a scan). A calendar date that
+ * a person might look up or compare is still `formatDate`.
+ *
+ * `Intl.RelativeTimeFormat` carries the locale's own wording and word order, so this works
+ * in Arabic without a second string table. Returns null for an unreadable timestamp.
+ */
+export const formatRelativeTime = (
+  iso: string,
+  locale = 'en-US',
+  now: Date = new Date(),
+): string | null => {
+  const then = new Date(iso)
+  const at = then.getTime()
+  if (Number.isNaN(at)) return null
+
+  const seconds = Math.round((at - now.getTime()) / 1000)
+  const format = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' })
+  for (const [unit, size] of RELATIVE_UNITS) {
+    const value = Math.trunc(seconds / size)
+    if (value !== 0) return format.format(value, unit)
+  }
+  return format.format(0, 'second')
+}
+
 export const formatDate = (
   d: Date,
   fmt: DateFormat = DEFAULT_DATE_FORMAT,
