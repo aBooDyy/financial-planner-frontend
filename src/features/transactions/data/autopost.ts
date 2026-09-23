@@ -17,7 +17,20 @@ const MAX_CATCH_UP = 60 // guard against a runaway loop on a far-past due date
 const markerFor = (recurringId: string, due: string): string =>
   `recurring:${recurringId}:${due}`
 
-export async function runAutoPost(today: Date): Promise<void> {
+let inFlight: Promise<void> | null = null
+
+/**
+ * Single-flight: two overlapping runs would each snapshot the posted markers before either
+ * wrote, and post the same occurrence twice. A second caller joins the run in progress.
+ */
+export function runAutoPost(today: Date): Promise<void> {
+  inFlight ??= postDueOccurrences(today).finally(() => {
+    inFlight = null
+  })
+  return inFlight
+}
+
+async function postDueOccurrences(today: Date): Promise<void> {
   const recurrings = (await db.recurrings.toArray()).filter(
     (r) => r.deleted === 0 && r.autopost,
   )

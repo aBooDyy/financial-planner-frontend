@@ -4,7 +4,7 @@ import type { BudgetPeriod } from '#/features/transactions/api/types'
 export const RED = '#E5484D'
 export const AMBER = '#D9882B'
 
-export type RangeMode = 'month' | 'week' | 'day'
+export type RangeMode = 'year' | 'month' | 'week' | 'day'
 
 // Budget period display + the over/at-risk thresholds the burn bar uses.
 export const BUDGET_PERIODS: Record<BudgetPeriod, { label: string }> = {
@@ -14,6 +14,9 @@ export const BUDGET_PERIODS: Record<BudgetPeriod, { label: string }> = {
 }
 
 export const AT_RISK_RATIO = 0.8
+
+// The category slug goal contributions are filed under.
+export const SAVINGS_CATEGORY_ID = 'savings'
 
 // Colors a transaction view falls back to for chart segments without a category color.
 export const NEUTRAL_BORDER = 'var(--border-strong)'

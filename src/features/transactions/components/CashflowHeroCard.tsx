@@ -1,3 +1,4 @@
+import { SegmentedBar } from '#/components/SegmentedBar'
 import { RED } from '#/features/transactions/constants'
 import type { CashflowView } from '#/features/transactions/data/selectors'
 
@@ -74,18 +75,7 @@ export function CashflowHeroCard({ view }: { view: CashflowView }) {
         ))}
       </div>
 
-      <div className="mt-[18px] flex h-[14px] gap-[2px] overflow-hidden rounded-[8px] bg-fp-surface-2">
-        {view.segments.map((s, i) => (
-          <div
-            key={i}
-            style={{
-              width: `${s.pct}%`,
-              minWidth: '2px',
-              background: s.color,
-            }}
-          />
-        ))}
-      </div>
+      <SegmentedBar segments={view.segments} className="mt-[18px]" />
 
       <div className="mt-3 flex flex-wrap items-center gap-2 text-[12.5px] text-fp-text-2">
         <span>{view.txCountStr}</span>

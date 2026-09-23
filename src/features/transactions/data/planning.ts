@@ -6,6 +6,8 @@
 import { FREQUENCIES } from '#/features/goals/constants'
 import type { GoalFrequency } from '#/features/goals/api/types'
 import type { RangeMode } from '#/features/transactions/constants'
+import { toMajor } from '#/lib/currency'
+import type { CurrencyCode } from '#/lib/currency'
 
 export type DateWindow = { start: Date; end: Date }
 
@@ -42,6 +44,18 @@ export const startOfWeek = (d: Date): Date => {
 
 export const dayKey = (d: Date): string => ymd(d)
 
+export const monthKey = (d: Date): string =>
+  `${d.getFullYear()}-${pad(d.getMonth() + 1)}`
+
+/** `"2026-06"` back to the first of that month; anything malformed lands on Jan 1970. */
+export const parseMonthKey = (s: string): Date => {
+  const [y, m] = String(s).split('-')
+  return new Date(Number(y) || 1970, (Number(m) || 1) - 1, 1)
+}
+
+export const sameMonth = (a: Date, b: Date): boolean =>
+  a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth()
+
 export const sameDay = (a: Date, b: Date): boolean =>
   a.getFullYear() === b.getFullYear() &&
   a.getMonth() === b.getMonth() &&
@@ -56,9 +70,15 @@ export const fmtShort = (d: Date): string =>
 export const fmtMonth = (d: Date): string =>
   d.toLocaleString('en-US', { month: 'long', year: 'numeric' })
 
-/** Compact figure for calendar cells: 12 → "12", 1234 → "1.2k", 12345 → "12k". */
-export const fmtK = (value: number): string => {
-  const n = Math.round(value)
+export const fmtMonthShort = (d: Date): string =>
+  d.toLocaleString('en-US', { month: 'short' })
+
+/**
+ * Compact figure for calendar cells, from minor units: 1200 → "12", 123_400 → "1.2k".
+ * Callers hold minor units everywhere, so the major conversion belongs here.
+ */
+export const fmtK = (amountMinor: number, code: CurrencyCode): string => {
+  const n = Math.round(toMajor(amountMinor, code))
   if (n >= 10000) return `${Math.round(n / 1000)}k`
   if (n >= 1000) return `${Math.round(n / 100) / 10}k`
   return `${n}`
@@ -71,6 +91,11 @@ export const windowOf = (anchor: Date, mode: RangeMode): DateWindow => {
     const s = startOfWeek(anchor)
     return { start: s, end: addDays(s, 6) }
   }
+  if (mode === 'year')
+    return {
+      start: new Date(anchor.getFullYear(), 0, 1),
+      end: new Date(anchor.getFullYear(), 11, 31),
+    }
   return {
     start: new Date(anchor.getFullYear(), anchor.getMonth(), 1),
     end: new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0),
