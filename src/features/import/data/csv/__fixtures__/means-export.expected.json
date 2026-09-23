@@ -1,0 +1,51 @@
+{
+  "exercises": "Our own exportCsv() output — the round trip an import has to survive.",
+  "dialect": {
+    "delimiter": ",",
+    "quote": "\"",
+    "encoding": "utf-8",
+    "decimal": ".",
+    "skipRows": 0,
+    "hasHeader": true
+  },
+  "headers": [
+    "date",
+    "type",
+    "amount_minor",
+    "currency",
+    "category",
+    "subcategory",
+    "wallet",
+    "note"
+  ],
+  "rowCount": 5,
+  "columnCount": 8,
+  "dates": {
+    "column": 0,
+    "format": "YYYY-MM-DD",
+    "ambiguous": false,
+    "samples": [
+      {
+        "row": 0,
+        "iso": "2026-06-01"
+      }
+    ]
+  },
+  "amounts": [
+    {
+      "row": 0,
+      "column": 2,
+      "currency": "SAR",
+      "minor": 120000000,
+      "negative": false
+    },
+    {
+      "row": 1,
+      "column": 2,
+      "currency": "SAR",
+      "minor": 1425000,
+      "negative": false
+    }
+  ],
+  "notes": "exportCsv() writes amount_minor while the parser reads major units, so these expectations are the face-value parse and sit 100x above the exported amount. Closing that gap is a mapping decision (a minor-units amount role, or exporting major units) and belongs to phase 5."
+}

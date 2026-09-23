@@ -1,0 +1,41 @@
+{
+  "exercises": "Tab delimiter with a comma inside a description.",
+  "dialect": {
+    "delimiter": "\t",
+    "quote": "\"",
+    "encoding": "utf-8",
+    "decimal": ".",
+    "skipRows": 0,
+    "hasHeader": true
+  },
+  "headers": ["Date", "Description", "Amount", "Currency"],
+  "rowCount": 4,
+  "columnCount": 4,
+  "dates": {
+    "column": 0,
+    "format": "YYYY-MM-DD",
+    "ambiguous": false,
+    "samples": [
+      {
+        "row": 0,
+        "iso": "2026-06-16"
+      }
+    ]
+  },
+  "amounts": [
+    {
+      "row": 0,
+      "column": 2,
+      "currency": "GBP",
+      "minor": 495,
+      "negative": true
+    },
+    {
+      "row": 3,
+      "column": 2,
+      "currency": "GBP",
+      "minor": 12345,
+      "negative": true
+    }
+  ]
+}

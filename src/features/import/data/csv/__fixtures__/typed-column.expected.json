@@ -1,0 +1,41 @@
+{
+  "exercises": "One unsigned Amount column plus a DR/CR type column and a bank reference.",
+  "dialect": {
+    "delimiter": ",",
+    "quote": "\"",
+    "encoding": "utf-8",
+    "decimal": ".",
+    "skipRows": 0,
+    "hasHeader": true
+  },
+  "headers": ["Value date", "Narrative", "Amount", "DR/CR", "Reference"],
+  "rowCount": 5,
+  "columnCount": 5,
+  "dates": {
+    "column": 0,
+    "format": "DD/MM/YYYY",
+    "ambiguous": false,
+    "samples": [
+      {
+        "row": 0,
+        "iso": "2026-06-16"
+      }
+    ]
+  },
+  "amounts": [
+    {
+      "row": 0,
+      "column": 2,
+      "currency": "SAR",
+      "minor": 14250,
+      "negative": false
+    },
+    {
+      "row": 1,
+      "column": 2,
+      "currency": "SAR",
+      "minor": 1200000,
+      "negative": false
+    }
+  ]
+}

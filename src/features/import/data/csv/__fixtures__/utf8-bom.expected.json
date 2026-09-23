@@ -1,0 +1,41 @@
+{
+  "exercises": "A UTF-8 byte-order mark ahead of the header.",
+  "dialect": {
+    "delimiter": ",",
+    "quote": "\"",
+    "encoding": "utf-8",
+    "decimal": ".",
+    "skipRows": 0,
+    "hasHeader": true
+  },
+  "headers": ["Date", "Description", "Amount", "Currency"],
+  "rowCount": 3,
+  "columnCount": 4,
+  "dates": {
+    "column": 0,
+    "format": "YYYY-MM-DD",
+    "ambiguous": false,
+    "samples": [
+      {
+        "row": 0,
+        "iso": "2026-06-16"
+      }
+    ]
+  },
+  "amounts": [
+    {
+      "row": 0,
+      "column": 2,
+      "currency": "EUR",
+      "minor": 1240,
+      "negative": true
+    },
+    {
+      "row": 1,
+      "column": 2,
+      "currency": "EUR",
+      "minor": 280000,
+      "negative": false
+    }
+  ]
+}

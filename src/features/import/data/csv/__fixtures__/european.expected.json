@@ -1,0 +1,59 @@
+{
+  "exercises": "Semicolon delimiter, 1.234,56 comma decimals and DD.MM.YYYY dates.",
+  "dialect": {
+    "delimiter": ";",
+    "quote": "\"",
+    "encoding": "utf-8",
+    "decimal": ",",
+    "skipRows": 0,
+    "hasHeader": true
+  },
+  "headers": ["Buchungstag", "Verwendungszweck", "Betrag", "Waehrung"],
+  "rowCount": 5,
+  "columnCount": 4,
+  "dates": {
+    "column": 0,
+    "format": "DD.MM.YYYY",
+    "ambiguous": false,
+    "samples": [
+      {
+        "row": 0,
+        "iso": "2026-06-16"
+      },
+      {
+        "row": 4,
+        "iso": "2026-06-30"
+      }
+    ]
+  },
+  "amounts": [
+    {
+      "row": 0,
+      "column": 2,
+      "currency": "EUR",
+      "minor": 123456,
+      "negative": true
+    },
+    {
+      "row": 1,
+      "column": 2,
+      "currency": "EUR",
+      "minor": 345000,
+      "negative": false
+    },
+    {
+      "row": 2,
+      "column": 2,
+      "currency": "EUR",
+      "minor": 5990,
+      "negative": true
+    },
+    {
+      "row": 4,
+      "column": 2,
+      "currency": "EUR",
+      "minor": 1234,
+      "negative": false
+    }
+  ]
+}

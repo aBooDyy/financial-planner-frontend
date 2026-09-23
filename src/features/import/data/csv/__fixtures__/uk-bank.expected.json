@@ -1,0 +1,52 @@
+{
+  "exercises": "DD/MM/YYYY proven by a day over 12, Paid in / Paid out columns, a running Balance column and quoted descriptions containing the delimiter.",
+  "dialect": {
+    "delimiter": ",",
+    "quote": "\"",
+    "encoding": "utf-8",
+    "decimal": ".",
+    "skipRows": 0,
+    "hasHeader": true
+  },
+  "headers": ["Date", "Description", "Type", "Paid out", "Paid in", "Balance"],
+  "rowCount": 6,
+  "columnCount": 6,
+  "dates": {
+    "column": 0,
+    "format": "DD/MM/YYYY",
+    "ambiguous": false,
+    "samples": [
+      {
+        "row": 0,
+        "iso": "2026-06-16"
+      },
+      {
+        "row": 5,
+        "iso": "2026-06-30"
+      }
+    ]
+  },
+  "amounts": [
+    {
+      "row": 0,
+      "column": 3,
+      "currency": "GBP",
+      "minor": 4215,
+      "negative": false
+    },
+    {
+      "row": 1,
+      "column": 4,
+      "currency": "GBP",
+      "minor": 245000,
+      "negative": false
+    },
+    {
+      "row": 5,
+      "column": 3,
+      "currency": "GBP",
+      "minor": 123456,
+      "negative": false
+    }
+  ]
+}

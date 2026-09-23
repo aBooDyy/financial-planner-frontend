@@ -1,0 +1,58 @@
+{
+  "exercises": "Arabic headers in windows-1256, a four-line statement preamble, and a separate debit/credit column pair.",
+  "dialect": {
+    "delimiter": ",",
+    "quote": "\"",
+    "encoding": "windows-1256",
+    "decimal": ".",
+    "skipRows": 4,
+    "hasHeader": true
+  },
+  "headers": ["التاريخ", "البيان", "مدين", "دائن", "الرصيد"],
+  "rowCount": 5,
+  "columnCount": 5,
+  "dates": {
+    "column": 0,
+    "format": "DD/MM/YYYY",
+    "ambiguous": false,
+    "samples": [
+      {
+        "row": 0,
+        "iso": "2026-06-16"
+      },
+      {
+        "row": 4,
+        "iso": "2026-06-20"
+      }
+    ]
+  },
+  "amounts": [
+    {
+      "row": 0,
+      "column": 2,
+      "currency": "SAR",
+      "minor": 14250,
+      "negative": false
+    },
+    {
+      "row": 0,
+      "column": 3,
+      "currency": "SAR",
+      "minor": null
+    },
+    {
+      "row": 1,
+      "column": 3,
+      "currency": "SAR",
+      "minor": 1200000,
+      "negative": false
+    },
+    {
+      "row": 4,
+      "column": 3,
+      "currency": "SAR",
+      "minor": 8999,
+      "negative": false
+    }
+  ]
+}

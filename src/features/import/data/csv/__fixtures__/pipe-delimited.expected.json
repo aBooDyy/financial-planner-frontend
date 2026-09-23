@@ -1,0 +1,51 @@
+{
+  "exercises": "Pipe delimiter with a comma inside every description, DD-MMM-YYYY dates and a debit/credit pair.",
+  "dialect": {
+    "delimiter": "|",
+    "quote": "\"",
+    "encoding": "utf-8",
+    "decimal": ".",
+    "skipRows": 0,
+    "hasHeader": true
+  },
+  "headers": ["Posting date", "Details", "Debit", "Credit"],
+  "rowCount": 5,
+  "columnCount": 4,
+  "dates": {
+    "column": 0,
+    "format": "DD-MMM-YYYY",
+    "ambiguous": false,
+    "samples": [
+      {
+        "row": 0,
+        "iso": "2026-06-16"
+      },
+      {
+        "row": 4,
+        "iso": "2026-06-20"
+      }
+    ]
+  },
+  "amounts": [
+    {
+      "row": 0,
+      "column": 2,
+      "currency": "SAR",
+      "minor": 14250,
+      "negative": false
+    },
+    {
+      "row": 0,
+      "column": 3,
+      "currency": "SAR",
+      "minor": null
+    },
+    {
+      "row": 1,
+      "column": 3,
+      "currency": "SAR",
+      "minor": 1200000,
+      "negative": false
+    }
+  ]
+}

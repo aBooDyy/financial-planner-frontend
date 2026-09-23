@@ -1,0 +1,62 @@
+{
+  "exercises": "A per-row currency column mixing a 0-decimal (JPY), a 3-decimal (KWD) and a 2-decimal currency, plus one label that is not an ISO-4217 code.",
+  "dialect": {
+    "delimiter": ",",
+    "quote": "\"",
+    "encoding": "utf-8",
+    "decimal": ".",
+    "skipRows": 0,
+    "hasHeader": true
+  },
+  "headers": ["Date", "Description", "Amount", "Currency"],
+  "rowCount": 5,
+  "columnCount": 4,
+  "dates": {
+    "column": 0,
+    "format": "YYYY-MM-DD",
+    "ambiguous": false,
+    "samples": [
+      {
+        "row": 0,
+        "iso": "2026-06-16"
+      }
+    ]
+  },
+  "amounts": [
+    {
+      "row": 0,
+      "column": 2,
+      "currency": "JPY",
+      "minor": 1234,
+      "negative": true
+    },
+    {
+      "row": 1,
+      "column": 2,
+      "currency": "JPY",
+      "minor": 450000,
+      "negative": false
+    },
+    {
+      "row": 2,
+      "column": 2,
+      "currency": "KWD",
+      "minor": 1234,
+      "negative": true
+    },
+    {
+      "row": 3,
+      "column": 2,
+      "currency": "SAR",
+      "minor": 1850,
+      "negative": true
+    },
+    {
+      "row": 4,
+      "column": 2,
+      "currency": "BTC",
+      "minor": null
+    }
+  ],
+  "notes": "BTC is not in the ISO-4217 config table; the parser refuses to scale an amount under an unlisted code."
+}

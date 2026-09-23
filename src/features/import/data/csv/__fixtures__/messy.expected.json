@@ -1,0 +1,58 @@
+{
+  "exercises": "Ragged rows, a newline inside a quoted field, a blank line, a planted duplicate pair, an N/A amount, a blank account and a future-dated row.",
+  "dialect": {
+    "delimiter": ",",
+    "quote": "\"",
+    "encoding": "utf-8",
+    "decimal": ".",
+    "skipRows": 0,
+    "hasHeader": true
+  },
+  "headers": ["Date", "Description", "Amount", "Account"],
+  "rowCount": 7,
+  "columnCount": 4,
+  "dates": {
+    "column": 0,
+    "format": "YYYY-MM-DD",
+    "ambiguous": false,
+    "samples": [
+      {
+        "row": 0,
+        "iso": "2026-06-16"
+      },
+      {
+        "row": 6,
+        "iso": "2099-01-01"
+      }
+    ]
+  },
+  "amounts": [
+    {
+      "row": 0,
+      "column": 2,
+      "currency": "SAR",
+      "minor": 4200,
+      "negative": true
+    },
+    {
+      "row": 1,
+      "column": 2,
+      "currency": "SAR",
+      "minor": 1000,
+      "negative": true
+    },
+    {
+      "row": 4,
+      "column": 2,
+      "currency": "SAR",
+      "minor": null
+    },
+    {
+      "row": 6,
+      "column": 2,
+      "currency": "SAR",
+      "minor": 9900,
+      "negative": true
+    }
+  ]
+}

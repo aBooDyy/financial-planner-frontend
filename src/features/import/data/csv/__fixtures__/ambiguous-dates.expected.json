@@ -1,0 +1,42 @@
+{
+  "exercises": "Every day is 12 or less, so the column genuinely cannot decide between DD/MM and MM/DD and the locale breaks the tie.",
+  "dialect": {
+    "delimiter": ",",
+    "quote": "\"",
+    "encoding": "utf-8",
+    "decimal": ".",
+    "skipRows": 0,
+    "hasHeader": true
+  },
+  "headers": ["Date", "Description", "Amount"],
+  "rowCount": 5,
+  "columnCount": 3,
+  "dates": {
+    "column": 0,
+    "format": "MM/DD/YYYY",
+    "ambiguous": true,
+    "samples": [
+      {
+        "row": 0,
+        "iso": "2026-03-04"
+      }
+    ]
+  },
+  "amounts": [
+    {
+      "row": 0,
+      "column": 2,
+      "currency": "SAR",
+      "minor": 1200,
+      "negative": true
+    },
+    {
+      "row": 4,
+      "column": 2,
+      "currency": "SAR",
+      "minor": 2175,
+      "negative": true
+    }
+  ],
+  "notes": "The expected format assumes the default en-US locale; a day-first locale must yield DD/MM/YYYY."
+}

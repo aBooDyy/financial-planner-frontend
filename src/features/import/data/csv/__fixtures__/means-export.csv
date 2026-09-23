@@ -1,0 +1,6 @@
+date,type,amount_minor,currency,category,subcategory,wallet,note
+2026-06-01,income,1200000,SAR,Salary,,Al Rajhi Current,June salary
+2026-06-03,spend,14250,SAR,Groceries,Supermarket,Al Rajhi Current,"Carrefour, Riyadh Park"
+2026-06-04,spend,3500,SAR,Transport,Fuel,Visa Card,
+2026-06-09,spend,89900,SAR,Housing,Rent,Al Rajhi Current,Quarterly rent
+2026-06-12,income,25000,SAR,Other,,Cash,Refund

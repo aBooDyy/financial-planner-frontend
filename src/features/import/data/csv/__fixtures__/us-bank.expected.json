@@ -1,0 +1,52 @@
+{
+  "exercises": "MM/DD/YYYY proven by a second component over 12, one signed Amount column, description only.",
+  "dialect": {
+    "delimiter": ",",
+    "quote": "\"",
+    "encoding": "utf-8",
+    "decimal": ".",
+    "skipRows": 0,
+    "hasHeader": true
+  },
+  "headers": ["Date", "Description", "Amount"],
+  "rowCount": 5,
+  "columnCount": 3,
+  "dates": {
+    "column": 0,
+    "format": "MM/DD/YYYY",
+    "ambiguous": false,
+    "samples": [
+      {
+        "row": 0,
+        "iso": "2026-06-16"
+      },
+      {
+        "row": 4,
+        "iso": "2026-12-31"
+      }
+    ]
+  },
+  "amounts": [
+    {
+      "row": 0,
+      "column": 2,
+      "currency": "USD",
+      "minor": 8642,
+      "negative": true
+    },
+    {
+      "row": 1,
+      "column": 2,
+      "currency": "USD",
+      "minor": 312055,
+      "negative": false
+    },
+    {
+      "row": 4,
+      "column": 2,
+      "currency": "USD",
+      "minor": 25000,
+      "negative": false
+    }
+  ]
+}
