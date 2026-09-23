@@ -1,15 +1,17 @@
 import { Plus, Target } from 'lucide-react'
 import type {
   ActivityListView,
+  ActivityRow,
   TxRow,
 } from '#/features/transactions/data/selectors'
 import { Button } from '#/components/ui/button'
 import { CategoryIcon } from './CategoryIcon'
+import { TransferActivityRow } from './TransferActivityRow'
 
 type Props = {
   view: ActivityListView
   onAdd: () => void
-  onRowClick: (id: string) => void
+  onRowClick: (row: ActivityRow) => void
 }
 
 function Row({ row, onClick }: { row: TxRow; onClick: () => void }) {
@@ -22,12 +24,16 @@ function Row({ row, onClick }: { row: TxRow; onClick: () => void }) {
         className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[11px]"
         style={{ background: `${row.color}22`, color: row.color }}
       >
-        <CategoryIcon categoryId={row.categoryId} size={19} />
+        <CategoryIcon
+          categoryId={row.categoryId}
+          subcategoryId={row.subcategoryId}
+          size={19}
+        />
       </div>
       <div className="flex min-w-0 flex-col gap-px">
         <span className="truncate text-[14px] font-semibold">{row.name}</span>
         <span className="flex items-center gap-[6px] text-[12px] text-fp-text-3">
-          {row.subName ?? row.catName}
+          <span className="min-w-0 truncate">{row.catLabel}</span>
           <span className="h-[3px] w-[3px] rounded-full bg-fp-border-strong" />
           <span
             className="h-[7px] w-[7px] rounded-[2px]"
@@ -81,14 +87,22 @@ export function TransactionList({ view, onAdd, onRowClick }: Props) {
                 {g.totalStr}
               </span>
             </div>
-            {g.rows.map((r) => (
-              <Row key={r.id} row={r} onClick={() => onRowClick(r.id)} />
-            ))}
+            {g.rows.map((r) =>
+              r.kind === 'transfer' ? (
+                <TransferActivityRow
+                  key={r.id}
+                  row={r}
+                  onClick={() => onRowClick(r)}
+                />
+              ) : (
+                <Row key={r.id} row={r} onClick={() => onRowClick(r)} />
+              ),
+            )}
           </div>
         ))}
         {view.empty ? (
           <div className="px-4 py-10 text-center text-[13.5px] text-fp-text-3">
-            No transactions in this period — add one with the quick-add panel.
+            {view.emptyText}
           </div>
         ) : null}
       </div>

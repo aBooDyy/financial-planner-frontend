@@ -1,3 +1,4 @@
+import { fromWireCurrency } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
 import type {
   GoalFrequency,
@@ -13,6 +14,16 @@ import { fromWireFreq, toWireFreq } from '#/features/goals/api/types'
 export type TxType = 'spend' | 'income'
 export type TxTypeWire = 'SPEND' | 'INCOME'
 
+/**
+ * A transfer is two ledger rows sharing a `transferId`: the OUT leg debits the source wallet,
+ * the IN leg credits the destination. Only ledger rows carry these — categories, recurring
+ * schedules and imports stay `TxType`.
+ */
+export type TransferLegType = 'transfer_out' | 'transfer_in'
+export type TransferLegTypeWire = 'TRANSFER_OUT' | 'TRANSFER_IN'
+export type TransactionType = TxType | TransferLegType
+export type TransactionTypeWire = TxTypeWire | TransferLegTypeWire
+
 export type BudgetScope = 'category' | 'wallet' | 'overall'
 export type BudgetScopeWire = 'CATEGORY' | 'WALLET' | 'OVERALL'
 
@@ -23,10 +34,21 @@ const TX_TYPE_TO_WIRE: Record<TxType, TxTypeWire> = {
   spend: 'SPEND',
   income: 'INCOME',
 }
+const TRANSACTION_TYPE_TO_WIRE: Record<TransactionType, TransactionTypeWire> = {
+  ...TX_TYPE_TO_WIRE,
+  transfer_out: 'TRANSFER_OUT',
+  transfer_in: 'TRANSFER_IN',
+}
 const TX_TYPE_FROM_WIRE: Record<TxTypeWire, TxType> = {
   SPEND: 'spend',
   INCOME: 'income',
 }
+const TRANSACTION_TYPE_FROM_WIRE: Record<TransactionTypeWire, TransactionType> =
+  {
+    ...TX_TYPE_FROM_WIRE,
+    TRANSFER_OUT: 'transfer_out',
+    TRANSFER_IN: 'transfer_in',
+  }
 const SCOPE_TO_WIRE: Record<BudgetScope, BudgetScopeWire> = {
   category: 'CATEGORY',
   wallet: 'WALLET',
@@ -50,6 +72,15 @@ const PERIOD_FROM_WIRE: Record<BudgetPeriodWire, BudgetPeriod> = {
 
 export const toWireTxType = (t: TxType): TxTypeWire => TX_TYPE_TO_WIRE[t]
 export const fromWireTxType = (w: TxTypeWire): TxType => TX_TYPE_FROM_WIRE[w]
+export const toWireTransactionType = (
+  t: TransactionType,
+): TransactionTypeWire => TRANSACTION_TYPE_TO_WIRE[t]
+export const fromWireTransactionType = (
+  w: TransactionTypeWire,
+): TransactionType => TRANSACTION_TYPE_FROM_WIRE[w]
+
+export const isTransferLeg = (type: TransactionType): type is TransferLegType =>
+  type === 'transfer_out' || type === 'transfer_in'
 export const toWireScope = (s: BudgetScope): BudgetScopeWire => SCOPE_TO_WIRE[s]
 export const fromWireScope = (w: BudgetScopeWire): BudgetScope =>
   SCOPE_FROM_WIRE[w]
@@ -62,16 +93,19 @@ export const fromWirePeriod = (w: BudgetPeriodWire): BudgetPeriod =>
 
 export type Transaction = {
   id: string
-  type: TxType
+  type: TransactionType
   amount: number // minor units, always positive
   currency: CurrencyCode
-  category: string
+  /** Null only on transfer legs. */
+  category: string | null
   subcategory: string | null
   walletId: string
   goalId: string | null
+  merchantId: string | null
   date: string // ISO YYYY-MM-DD
   note: string | null
   source: string | null
+  transferId: string | null
   createdAt: string
   updatedAt: string
   version: string
@@ -112,16 +146,18 @@ export type Recurring = {
 
 export type TransactionWire = {
   id: string
-  type: TxTypeWire
+  type: TransactionTypeWire
   amount: number
   currency: string
-  category: string
+  category: string | null
   subcategory: string | null
   wallet_id: string
   goal_id: string | null
+  merchant_id: string | null
   date: string
   note: string | null
   source: string | null
+  transfer_id: string | null
   created_at: string
   updated_at: string
   version: string
@@ -158,21 +194,115 @@ export type RecurringWire = {
   version: string
 }
 
+/** The server refuses transfer legs here (`spending.transaction.transfer_via_transfers`). */
 export type CreateTransactionWire = {
   id: string
-  type: TxTypeWire
+  type: TransactionTypeWire
   amount: number
   currency: string
-  category: string
+  category: string | null
   subcategory: string | null
   wallet_id: string
   goal_id: string | null
+  merchant_id: string | null
   date: string
   note: string | null
   source: string | null
 }
 export type UpdateTransactionWire = Omit<CreateTransactionWire, 'id'> & {
   version: string
+}
+
+/**
+ * `POST /transfers`. Currencies are not sent — the server takes them from the wallets.
+ * `to_amount` is required iff the two wallets' currencies differ.
+ */
+export type CreateTransferWire = {
+  id: string
+  out_id: string
+  in_id: string
+  from_wallet_id: string
+  to_wallet_id: string
+  amount: number
+  to_amount: number | null
+  date: string
+  note: string | null
+}
+
+/**
+ * `PATCH /transfers/{id}`. For a leg that no longer exists (its wallet was deleted) both its
+ * wallet id and its version are null, and the server ignores that side.
+ */
+export type UpdateTransferWire = Omit<
+  CreateTransferWire,
+  'id' | 'out_id' | 'in_id' | 'from_wallet_id' | 'to_wallet_id'
+> & {
+  from_wallet_id: string | null
+  to_wallet_id: string | null
+  out_version: string | null
+  in_version: string | null
+}
+
+export type TransferWire = {
+  transfer_id: string
+  legs: TransactionWire[]
+}
+
+export type Transfer = {
+  transferId: string
+  legs: Transaction[]
+}
+
+/** What became of one entry of a bulk write. The order mirrors what was sent. */
+export type BulkTransactionResultWire = {
+  id: string
+  status: 'CREATED' | 'ID_TAKEN' | 'INVALID'
+  transaction: TransactionWire | null
+  error_code: string | null
+  error_field: string | null
+}
+
+export type BulkCreateTransactionsWire = {
+  results: BulkTransactionResultWire[]
+  created: number
+  failed: number
+}
+
+export type BulkTransactionResult = {
+  id: string
+  /**
+   * `created` — written. `taken` — the id already exists, so the write already happened.
+   * `invalid` — unusable as posted, and no retry of the same payload can change that.
+   */
+  status: 'created' | 'taken' | 'invalid'
+  /** The row as the server holds it. Absent when the taken id is not the caller's own. */
+  transaction: Transaction | null
+  errorCode: string | null
+}
+
+/** What became of one id of a bulk delete. The order mirrors what was sent. */
+export type BulkDeleteTransactionResultWire = {
+  id: string
+  status: 'DELETED' | 'NOT_FOUND' | 'INVALID'
+  error_code: string | null
+  error_field: string | null
+}
+
+export type BulkDeleteTransactionsWire = {
+  results: BulkDeleteTransactionResultWire[]
+  deleted: number
+  failed: number
+}
+
+export type BulkDeleteResult = {
+  id: string
+  /**
+   * `deleted` — the row is gone. `missing` — nothing of ours stood behind that id, so it
+   * was already gone. `invalid` — not a usable id, and resending it cannot change that.
+   * All three are terminal: there is never anything left to retry.
+   */
+  status: 'deleted' | 'missing' | 'invalid'
+  errorCode: string | null
 }
 
 export type CreateBudgetWire = {
@@ -210,19 +340,55 @@ export type UpdateRecurringWire = Omit<CreateRecurringWire, 'id'> & {
 
 export const toTransaction = (w: TransactionWire): Transaction => ({
   id: w.id,
-  type: fromWireTxType(w.type),
+  type: fromWireTransactionType(w.type),
   amount: w.amount,
-  currency: w.currency as CurrencyCode,
+  currency: fromWireCurrency(w.currency),
   category: w.category,
   subcategory: w.subcategory,
   walletId: w.wallet_id,
   goalId: w.goal_id,
+  merchantId: w.merchant_id ?? null,
   date: w.date,
   note: w.note,
   source: w.source,
+  transferId: w.transfer_id,
   createdAt: w.created_at,
   updatedAt: w.updated_at,
   version: w.version,
+})
+
+export const toTransfer = (w: TransferWire): Transfer => ({
+  transferId: w.transfer_id,
+  legs: w.legs.map(toTransaction),
+})
+
+const BULK_STATUS = {
+  CREATED: 'created',
+  ID_TAKEN: 'taken',
+  INVALID: 'invalid',
+} as const
+
+export const toBulkResult = (
+  w: BulkTransactionResultWire,
+): BulkTransactionResult => ({
+  id: w.id,
+  status: BULK_STATUS[w.status],
+  transaction: w.transaction ? toTransaction(w.transaction) : null,
+  errorCode: w.error_code,
+})
+
+const BULK_DELETE_STATUS = {
+  DELETED: 'deleted',
+  NOT_FOUND: 'missing',
+  INVALID: 'invalid',
+} as const
+
+export const toBulkDeleteResult = (
+  w: BulkDeleteTransactionResultWire,
+): BulkDeleteResult => ({
+  id: w.id,
+  status: BULK_DELETE_STATUS[w.status],
+  errorCode: w.error_code,
 })
 
 export const toBudget = (w: BudgetWire): Budget => ({
@@ -232,7 +398,7 @@ export const toBudget = (w: BudgetWire): Budget => ({
   period: fromWirePeriod(w.period),
   customDays: w.custom_days,
   limit: w.limit_amount,
-  currency: w.currency as CurrencyCode,
+  currency: fromWireCurrency(w.currency),
   createdAt: w.created_at,
   updatedAt: w.updated_at,
   version: w.version,
@@ -243,7 +409,7 @@ export const toRecurring = (w: RecurringWire): Recurring => ({
   name: w.name,
   type: fromWireTxType(w.type),
   amount: w.amount,
-  currency: w.currency as CurrencyCode,
+  currency: fromWireCurrency(w.currency),
   category: w.category,
   subcategory: w.subcategory,
   walletId: w.wallet_id,

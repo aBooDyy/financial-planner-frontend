@@ -1,19 +1,23 @@
+import { SegmentedBar } from '#/components/SegmentedBar'
+import { TransferGlyph } from '#/components/icons/TransferGlyph'
+import { Button } from '#/components/ui/button'
 import type { CurrencyCode } from '#/lib/currency'
 import type { BalancesView } from '#/features/balances/data/selectors'
 
 type Props = {
   view: BalancesView
   base: CurrencyCode
+  /** Mobile-only entry; absent when there aren't two wallets. */
+  onTransfer?: () => void
 }
 
-export function TotalHeroCard({ view, base }: Props) {
+export function TotalHeroCard({ view, base, onTransfer }: Props) {
   return (
     <div className="rounded-[18px] border border-fp-border bg-fp-surface p-5 shadow-fp md:p-7">
       <div className="mb-[10px] flex items-center gap-2">
         <span className="text-[12px] font-bold tracking-[0.04em] text-fp-text-2 uppercase">
           Total liquid cash
         </span>
-        <span className="text-[11.5px] text-fp-text-3">· Updated Jun 2026</span>
       </div>
 
       <div className="flex flex-wrap items-end gap-[10px]">
@@ -44,14 +48,23 @@ export function TotalHeroCard({ view, base }: Props) {
         </div>
       ) : null}
 
-      <div className="mt-[18px] flex h-3 gap-[2px] overflow-hidden rounded-[7px] bg-fp-surface-2">
-        {view.groupBars.map((bar) => (
-          <div
-            key={bar.id}
-            style={{ width: `${Math.max(1, bar.pct)}%`, background: bar.color }}
-          />
-        ))}
-      </div>
+      {onTransfer ? (
+        <Button
+          variant="outline"
+          onClick={onTransfer}
+          title="Transfer money between wallets"
+          className="mt-[14px] w-full gap-[6px] rounded-[12px] py-[11px] text-[14px] font-bold md:hidden"
+        >
+          <TransferGlyph size={16} strokeWidth={2} />
+          Transfer
+        </Button>
+      ) : null}
+
+      <SegmentedBar
+        segments={view.groupBars.map((bar) => ({ ...bar, key: bar.id }))}
+        className="mt-[18px] h-3 rounded-[7px]"
+        minWidth="1%"
+      />
 
       <div className="mt-[13px] flex flex-wrap gap-x-4 gap-y-[6px]">
         {view.groupBars.map((bar) => (

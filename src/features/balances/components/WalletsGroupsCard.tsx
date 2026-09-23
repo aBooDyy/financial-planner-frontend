@@ -1,5 +1,6 @@
 import { Plus } from 'lucide-react'
 import { useState } from 'react'
+import { TransferGlyph } from '#/components/icons/TransferGlyph'
 import { Button } from '#/components/ui/button'
 import type { BalanceRow } from '#/features/balances/data/selectors'
 import { GroupRow } from './GroupRow'
@@ -9,6 +10,8 @@ type Props = {
   rows: BalanceRow[]
   onAddWallet: () => void
   onAddGroup: () => void
+  /** Absent when there aren't two wallets to move money between. */
+  onTransfer?: () => void
   onToggle: (id: string) => void
   onEdit: (id: string) => void
   onDelete: (id: string) => void
@@ -19,6 +22,7 @@ export function WalletsGroupsCard({
   rows,
   onAddWallet,
   onAddGroup,
+  onTransfer,
   onToggle,
   onEdit,
   onDelete,
@@ -36,14 +40,14 @@ export function WalletsGroupsCard({
 
   return (
     <div className="overflow-hidden rounded-[18px] border border-fp-border bg-fp-surface shadow-fp">
-      <div className="flex items-center justify-between gap-[10px] border-b border-fp-border p-4">
-        <div className="flex flex-col">
+      <div className="flex flex-col items-stretch gap-[10px] border-b border-fp-border p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 flex-col">
           <span className="text-[15px] font-bold">Wallets &amp; groups</span>
           <span className="text-[12px] text-fp-text-3">
             Tap any wallet to edit · nest freely
           </span>
         </div>
-        <div className="flex gap-2">
+        <div className="flex shrink-0 gap-2 max-sm:[&>*]:flex-1">
           <Button
             variant="outline"
             onClick={onAddGroup}
@@ -52,6 +56,17 @@ export function WalletsGroupsCard({
             <Plus size={15} strokeWidth={2} />
             New group
           </Button>
+          {onTransfer ? (
+            <Button
+              variant="outline"
+              onClick={onTransfer}
+              title="Transfer money between wallets"
+              className="hidden gap-[5px] rounded-[11px] px-3 py-2 text-[13px] font-bold hover:border-fp-accent md:inline-flex"
+            >
+              <TransferGlyph size={15} strokeWidth={2} />
+              Transfer
+            </Button>
+          ) : null}
           <Button
             onClick={onAddWallet}
             className="gap-[5px] px-[13px] py-[9px] text-[13px]"

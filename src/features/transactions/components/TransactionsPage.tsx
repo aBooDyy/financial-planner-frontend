@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Inbox, Plus } from 'lucide-react'
+import { Link, useNavigate, useSearch } from '@tanstack/react-router'
+import { Download, Inbox, Plus } from 'lucide-react'
 import { MobileTabBar } from '#/components/chrome/MobileTabBar'
 import { TopNav } from '#/components/chrome/TopNav'
-import { startSync } from '#/db/sync'
-import { PendingReviewModal } from '#/features/email-sync/components/PendingReviewModal'
-import { usePendingImports } from '#/features/email-sync/hooks/usePendingImports'
+import { ReviewScanPrompt } from '#/features/email-sync/components/ReviewScanPrompt'
+import { PendingReviewModal } from '#/features/inbound-imports/components/PendingReviewModal'
+import { usePendingImports } from '#/features/inbound-imports/hooks/usePendingImports'
 import { useLogout } from '#/features/auth/hooks/useLogout'
 import { setBaseCurrency } from '#/features/balances/data/mutations'
 import { useSessionStore } from '#/stores/session'
@@ -13,9 +14,12 @@ import { currencySymbol } from '#/lib/currency'
 import { runAutoPost } from '#/features/transactions/data/autopost'
 import {
   addDays,
+  inWindow,
   parseISO,
+  parseMonthKey,
   startOfToday,
   startOfWeek,
+  windowOf,
   ymd,
 } from '#/features/transactions/data/planning'
 import {
@@ -29,7 +33,7 @@ import {
   scopeOptions,
   scopeToValue,
 } from '#/features/transactions/data/selectors'
-import type { Scope } from '#/features/transactions/data/selectors'
+import type { ActivityRow, Scope } from '#/features/transactions/data/selectors'
 import type { RangeMode } from '#/features/transactions/constants'
 import {
   Select,
@@ -62,11 +66,15 @@ const viewSeg = (active: boolean) =>
 export function TransactionsPage() {
   const user = useSessionStore((s) => s.user)
   const logout = useLogout()
-  const { base, data, wallets, goals, transactions } = useTransactions()
+  const { base, data, catalog, wallets, goals, transactions } =
+    useTransactions()
   const dateFormat = usePreferencesStore((s) => s.dateFormat)
-  const editor = useTxEditor(wallets, base)
+  const editor = useTxEditor(wallets, base, data.rates)
   const { imports: pendingImports, count: pendingCount } = usePendingImports()
-  const [reviewOpen, setReviewOpen] = useState(false)
+  const deepLinkedToReview =
+    useSearch({ from: '/transactions' }).review === true
+  const navigate = useNavigate()
+  const [reviewOpen, setReviewOpen] = useState(deepLinkedToReview)
 
   const [view, setView] = useState<View>('activity')
   const [scope, setScope] = useState<Scope>({ type: 'all' })
@@ -77,7 +85,6 @@ export function TransactionsPage() {
   })
   const [calOpen, setCalOpen] = useState(false)
 
-  useEffect(() => startSync(), [])
   // Catch up any due auto-post recurrings once the page mounts.
   useEffect(() => {
     void runAutoPost(startOfToday())
@@ -92,18 +99,25 @@ export function TransactionsPage() {
     const a = parseISO(anchor)
     if (mode === 'day') setAnchor(ymd(addDays(a, dir)))
     else if (mode === 'week') setAnchor(ymd(addDays(a, dir * 7)))
+    else if (mode === 'year')
+      setAnchor(ymd(new Date(a.getFullYear() + dir, 0, 1)))
     else setAnchor(ymd(new Date(a.getFullYear(), a.getMonth() + dir, 1)))
   }
   const changeMode = (next: RangeMode) => {
     const a = parseISO(anchor)
-    const sameMonth =
-      a.getFullYear() === today.getFullYear() &&
-      a.getMonth() === today.getMonth()
-    if (next === 'month')
-      setAnchor(ymd(new Date(a.getFullYear(), a.getMonth(), 1)))
-    else if (next === 'week') setAnchor(ymd(startOfWeek(sameMonth ? today : a)))
-    else setAnchor(ymd(sameMonth ? today : a))
+    // Switching views should never jump away from now: if the period being left already
+    // covers today, re-anchor on today rather than on the period's own start.
+    const at = inWindow(ymd(today), windowOf(a, mode)) ? today : a
+    if (next === 'year') setAnchor(ymd(new Date(at.getFullYear(), 0, 1)))
+    else if (next === 'month')
+      setAnchor(ymd(new Date(at.getFullYear(), at.getMonth(), 1)))
+    else if (next === 'week') setAnchor(ymd(startOfWeek(at)))
+    else setAnchor(ymd(at))
     setMode(next)
+  }
+  const pickMonth = (key: string) => {
+    setMode('month')
+    setAnchor(ymd(parseMonthKey(key)))
   }
   const pickDay = (key: string) => {
     if (mode === 'day' && anchor === key) {
@@ -116,7 +130,14 @@ export function TransactionsPage() {
   }
 
   const options = scopeOptions(data)
-  const cashflow = buildCashflow(data, scope, anchorDate, mode, dateFormat)
+  const cashflow = buildCashflow(
+    data,
+    catalog,
+    scope,
+    anchorDate,
+    mode,
+    dateFormat,
+  )
   const calendar = buildCalendar(
     data,
     scope,
@@ -128,18 +149,31 @@ export function TransactionsPage() {
   )
   const list = buildActivityList(
     data,
+    catalog,
     scope,
     anchorDate,
     mode,
     today,
     dateFormat,
   )
-  const breakdown = buildBreakdown(data, scope, anchorDate, mode, dateFormat)
-  const budgets = buildBudgetsView(data, scope, today)
-  const recurring = buildRecurringView(data, scope, today)
+  const breakdown = buildBreakdown(
+    data,
+    catalog,
+    scope,
+    anchorDate,
+    mode,
+    dateFormat,
+  )
+  const budgets = buildBudgetsView(data, catalog, scope, today)
+  const recurring = buildRecurringView(data, catalog, scope, today)
 
-  const onRowClick = (id: string) => {
-    const t = transactions.find((x) => x.id === id)
+  const onRowClick = (row: ActivityRow) => {
+    if (row.kind === 'transfer') {
+      const legs = transactions.filter((x) => x.transferId === row.id)
+      editor.openEditTransfer(row.id, legs)
+      return
+    }
+    const t = transactions.find((x) => x.id === row.id)
     if (t) editor.openEditTx(t)
   }
   const onEditBudget = (id: string) => {
@@ -150,6 +184,13 @@ export function TransactionsPage() {
     const r = data.recurrings.find((x) => x.id === id && x.deleted === 0)
     if (r) editor.openEditRecurring(r)
   }
+  // Drop `?review=1` on close so a reload doesn't reopen what the user just dismissed.
+  const closeReview = () => {
+    setReviewOpen(false)
+    if (deepLinkedToReview)
+      void navigate({ to: '/transactions', search: {}, replace: true })
+  }
+
   const activeWallet = wallets.length > 0 ? wallets[0] : null
   const activeCurrency: CurrencyCode = activeWallet?.currency ?? base
 
@@ -164,7 +205,7 @@ export function TransactionsPage() {
       />
 
       <div className="flex-1 overflow-auto">
-        <div className="mx-auto grid w-full max-w-[560px] grid-cols-1 items-start gap-4 px-[14px] py-4 pb-[30px] md:max-w-[1240px] md:grid-cols-[minmax(0,1fr)_360px] md:gap-6 md:px-6 md:py-[24px] md:pb-[90px]">
+        <div className="mx-auto grid w-full max-w-[560px] grid-cols-1 items-start gap-4 px-4 py-4 pb-[30px] md:max-w-[1180px] md:grid-cols-[minmax(0,1fr)_360px] md:gap-6 md:px-6 md:py-[24px] md:pb-[90px]">
           {/* Header: view tabs + global account scope */}
           <div className="md:col-span-2 flex flex-wrap items-center gap-[10px]">
             <div className="inline-flex rounded-[13px] border border-fp-border bg-fp-surface-2 p-[3px]">
@@ -194,6 +235,14 @@ export function TransactionsPage() {
                 </span>
               </button>
             ) : null}
+            <Link
+              to="/import"
+              title="Import transactions from your inbox or a file"
+              className="inline-flex items-center gap-2 rounded-[11px] border border-fp-border-strong bg-fp-surface-2 px-[13px] py-[9px] text-[13px] font-semibold text-fp-text hover:border-fp-accent"
+            >
+              <Download size={15} strokeWidth={2} />
+              Import
+            </Link>
             <Select
               value={scopeToValue(scope)}
               onValueChange={(v) => setScope(scopeFromValue(v))}
@@ -227,6 +276,7 @@ export function TransactionsPage() {
                   onPrev={() => stepPeriod(-1)}
                   onNext={() => stepPeriod(1)}
                   onToggleCal={() => setCalOpen((o) => !o)}
+                  onPickMonth={pickMonth}
                   onPickDay={pickDay}
                 />
                 <CashflowHeroCard view={cashflow} />
@@ -262,6 +312,9 @@ export function TransactionsPage() {
                     walletId={activeWallet?.id ?? null}
                     currency={activeCurrency}
                     symbol={currencySymbol(activeCurrency)}
+                    wallets={wallets}
+                    base={base}
+                    rates={data.rates}
                   />
                 </div>
                 <BreakdownCard view={breakdown} />
@@ -298,8 +351,12 @@ export function TransactionsPage() {
           goals={goals}
           onField={editor.setField}
           onType={editor.setType}
+          onSwapTransfer={editor.swapTransferWallets}
+          base={base}
           onCategory={editor.setCategory}
           onGoal={editor.setGoal}
+          onMerchant={editor.setMerchant}
+          onApplySuggestion={editor.applySuggestion}
           onScopeType={editor.setScopeType}
           onSave={() => void editor.save()}
           onDelete={() => void editor.remove()}
@@ -311,7 +368,8 @@ export function TransactionsPage() {
         <PendingReviewModal
           imports={pendingImports}
           wallets={wallets}
-          onClose={() => setReviewOpen(false)}
+          onClose={closeReview}
+          toolbar={<ReviewScanPrompt />}
         />
       ) : null}
     </div>

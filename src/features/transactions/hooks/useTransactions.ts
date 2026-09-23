@@ -3,12 +3,16 @@ import { db } from '#/db/db'
 import { SETTINGS_KEY } from '#/db/types'
 import type { LocalBalanceNode, LocalGoal, LocalTransaction } from '#/db/types'
 import { DEFAULT_BASE_CURRENCY } from '#/features/balances/constants'
+import { useCategoryCatalog } from '#/features/categories/hooks/useCategoryCatalog'
 import type { SpendingData } from '#/features/transactions/data/selectors'
+import { useMergedRates } from '#/lib/config/rates'
+import type { RatesMap } from '#/lib/config/rates'
 import type { CurrencyCode } from '#/lib/currency'
 
 /**
  * Reactive read of every Spending input from the local DB, bundled into the `SpendingData`
- * the pure selectors consume. Wallets/goals are surfaced too so the editor can offer them.
+ * the pure selectors consume, plus the category catalog they resolve names, colours and
+ * icons through. Wallets/goals are surfaced too so the editor can offer them.
  */
 export function useTransactions() {
   const txnRows = useLiveQuery(() => db.transactions.toArray())
@@ -18,6 +22,7 @@ export function useTransactions() {
   const goalRows = useLiveQuery(() => db.goals.toArray())
   const settings = useLiveQuery(() => db.balanceSettings.get(SETTINGS_KEY))
   const rateRows = useLiveQuery(() => db.exchangeRates.toArray())
+  const catalog = useCategoryCatalog()
 
   const loading =
     txnRows === undefined ||
@@ -26,9 +31,8 @@ export function useTransactions() {
     nodeRows === undefined
 
   const base: CurrencyCode = settings?.baseCurrency ?? DEFAULT_BASE_CURRENCY
-  const rates: Partial<Record<string, number>> = Object.fromEntries(
-    (rateRows ?? []).map((r) => [r.currency, r.rate]),
-  )
+  // One rates map: the config's shipped defaults with the user's overrides on top.
+  const rates: RatesMap = useMergedRates(rateRows ?? [])
 
   const nodes: LocalBalanceNode[] = (nodeRows ?? []).filter(
     (n) => n.deleted === 0,
@@ -48,5 +52,5 @@ export function useTransactions() {
     rates,
   }
 
-  return { loading, base, data, wallets, goals, transactions }
+  return { loading, base, data, catalog, wallets, goals, transactions }
 }

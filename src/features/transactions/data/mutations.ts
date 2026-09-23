@@ -70,6 +70,8 @@ export type TransactionDraft = {
   subcategory: string | null
   walletId: string
   goalId: string | null
+  /** Undefined on update means "leave it alone"; null clears the link. */
+  merchantId?: string | null
   date: string
   note: string | null
   source?: string | null
@@ -88,9 +90,11 @@ const buildTransaction = (
   subcategory: draft.subcategory,
   walletId: draft.walletId,
   goalId: draft.goalId,
+  merchantId: draft.merchantId ?? null,
   date: draft.date,
   note: draft.note,
   source: draft.source ?? null,
+  transferId: null,
   createdAt: ts,
   updatedAt: ts,
   version: '',
@@ -143,6 +147,8 @@ export async function updateTransaction(
     subcategory: draft.subcategory,
     walletId: draft.walletId,
     goalId: draft.goalId,
+    merchantId:
+      draft.merchantId !== undefined ? draft.merchantId : existing.merchantId,
     date: draft.date,
     note: draft.note,
     source: draft.source ?? existing.source,
@@ -164,6 +170,80 @@ export async function updateTransaction(
 
 export async function deleteTransaction(id: string): Promise<void> {
   await deleteRecord('transaction', id, db.transactions)
+}
+
+/**
+ * Write many transactions and their outbox creates in **one** Dexie transaction. Rows that
+ * already exist are left as they are, so a retried import writes nothing twice.
+ *
+ * No push is scheduled: the importer commits in chunks and pushes once for the whole batch,
+ * which is the difference between one debounced flush and one per chunk.
+ */
+export async function bulkAddTransactions(
+  entries: ReadonlyArray<{ id: string; draft: TransactionDraft }>,
+): Promise<number> {
+  if (entries.length === 0) return 0
+  const ts = now()
+  return db.transaction('rw', db.transactions, db.outbox, async () => {
+    const existing = new Set(
+      (await db.transactions.bulkGet(entries.map((e) => e.id)))
+        .filter((row) => row !== undefined)
+        .map((row) => row.id),
+    )
+    const rows = entries
+      .filter((entry) => !existing.has(entry.id))
+      .map((entry) => buildTransaction(entry.id, entry.draft, ts))
+    await db.transactions.bulkPut(rows)
+    await db.outbox.bulkAdd(
+      rows.map((tx) => ({
+        op: 'create' as const,
+        entity: 'transaction' as const,
+        id: tx.id,
+        payload: localTransactionToCreateWire(tx),
+        baseVersion: null,
+        createdAt: ts,
+      })),
+    )
+    return rows.length
+  })
+}
+
+/**
+ * Delete many transactions in one Dexie transaction, dropping a row whose create is still
+ * queued outright rather than queueing a delete for something the server never saw. Like
+ * `bulkAddTransactions`, it schedules no push — the caller pushes once.
+ */
+export async function bulkDeleteTransactions(
+  ids: ReadonlyArray<string>,
+): Promise<number> {
+  if (ids.length === 0) return 0
+  const ts = now()
+  return db.transaction('rw', db.transactions, db.outbox, async () => {
+    const queued = await db.outbox
+      .where('[entity+id]')
+      .anyOf(ids.map((id) => ['transaction', id]))
+      .toArray()
+    const neverSynced = new Set(
+      queued.filter((e) => e.op === 'create').map((e) => e.id),
+    )
+    await db.outbox.bulkDelete(
+      queued.map((entry) => entry.seq).filter((seq) => seq !== undefined),
+    )
+    await db.transactions.bulkDelete([...ids])
+    await db.outbox.bulkAdd(
+      ids
+        .filter((id) => !neverSynced.has(id))
+        .map((id) => ({
+          op: 'delete' as const,
+          entity: 'transaction' as const,
+          id,
+          payload: null,
+          baseVersion: null,
+          createdAt: ts,
+        })),
+    )
+    return ids.length
+  })
 }
 
 // --- Budgets -------------------------------------------------------------------------

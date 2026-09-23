@@ -1,5 +1,6 @@
 import { convertMinor, formatMoneyRounded } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
+import { formatShare } from '#/lib/percent'
 import { DEFAULT_DATE_FORMAT, formatDate } from '#/lib/date'
 import type { DateFormat } from '#/lib/date'
 import type {
@@ -9,9 +10,12 @@ import type {
   LocalTransaction,
 } from '#/db/types'
 import { FREQUENCIES } from '#/features/goals/constants'
+import type { TxType } from '#/features/transactions/api/types'
+import { isTransferLeg } from '#/features/transactions/api/types'
 import { AMBER, AT_RISK_RATIO, RED } from '#/features/transactions/constants'
 import type { RangeMode } from '#/features/transactions/constants'
-import { categoryOf } from '#/features/transactions/categories'
+import type { DateWindow } from './planning'
+import type { CategoryCatalog } from '#/features/categories/data/catalog'
 import { walletLiveBalances } from './ledger'
 import {
   addDays,
@@ -19,16 +23,32 @@ import {
   dayKey,
   fmtK,
   fmtMonth,
+  fmtMonthShort,
   fmtShort,
   inWindow,
   midnight,
+  monthKey,
   monthlyFactor,
   parseISO,
   relFuture,
   sameDay,
+  sameMonth,
   startOfWeek,
   windowOf,
 } from './planning'
+
+/** The header caption for a range: "2026", "June 2026", "Jun 1 – Jun 7" or a single date. */
+function rangeLabel(
+  anchor: Date,
+  mode: RangeMode,
+  win: DateWindow,
+  dateFormat: DateFormat,
+): string {
+  if (mode === 'day') return formatDate(anchor, dateFormat)
+  if (mode === 'week') return `${fmtShort(win.start)} – ${fmtShort(win.end)}`
+  if (mode === 'year') return String(anchor.getFullYear())
+  return fmtMonth(anchor)
+}
 
 type RatesMap = Partial<Record<string, number>>
 
@@ -138,12 +158,28 @@ const liveTxns = (data: SpendingData, scope: Scope): LocalTransaction[] => {
 const toBase = (t: LocalTransaction, data: SpendingData): number =>
   convertMinor(t.amount, t.currency, data.base, data.rates)
 
+/** A spend or income row — the only kind any total counts. Transfer legs move money, never earn or spend it. */
+type FlowTxn = LocalTransaction & { type: TxType; category: string }
+
+const isFlow = (t: LocalTransaction): t is FlowTxn =>
+  !isTransferLeg(t.type) && t.category !== null
+
+const flowTxns = (data: SpendingData, scope: Scope): FlowTxn[] =>
+  liveTxns(data, scope).filter(isFlow)
+
 const isContribution = (t: LocalTransaction): boolean =>
   t.type === 'spend' && t.goalId !== null
 
 // --- Cashflow hero -------------------------------------------------------------------
 
-export type CashflowSegment = { color: string; pct: number }
+export type CashflowSegment = {
+  key: string
+  label: string
+  color: string
+  pct: number
+  valueStr: string
+  pctStr: string
+}
 
 export type CashflowView = {
   title: string
@@ -164,13 +200,14 @@ export type CashflowView = {
 
 export function buildCashflow(
   data: SpendingData,
+  catalog: CategoryCatalog,
   scope: Scope,
   anchor: Date,
   mode: RangeMode,
   dateFormat: DateFormat = DEFAULT_DATE_FORMAT,
 ): CashflowView {
   const win = windowOf(anchor, mode)
-  const txns = liveTxns(data, scope).filter((t) => inWindow(t.date, win))
+  const txns = flowTxns(data, scope).filter((t) => inWindow(t.date, win))
 
   let income = 0
   let spent = 0
@@ -191,12 +228,7 @@ export function buildCashflow(
   const sorted = [...byCat.entries()].sort((a, b) => b[1] - a[1])
   const denom = Math.max(outflow, 1)
 
-  const periodLabel =
-    mode === 'day'
-      ? formatDate(anchor, dateFormat)
-      : mode === 'week'
-        ? `${fmtShort(win.start)} – ${fmtShort(win.end)}`
-        : fmtMonth(anchor)
+  const periodLabel = rangeLabel(anchor, mode, win, dateFormat)
 
   return {
     title: 'Cashflow',
@@ -210,15 +242,22 @@ export function buildCashflow(
     pillLabel: net >= 0 ? 'Net positive' : 'Overspending',
     txCount: txns.length,
     txCountStr: `${txns.length} transaction${txns.length === 1 ? '' : 's'}`,
-    segments: sorted.map(([cat, v]) => ({
-      color: categoryOf(cat).color,
-      pct: (v / denom) * 100,
-    })),
+    segments: sorted.map(([cat, v]) => {
+      const pct = (v / denom) * 100
+      return {
+        key: cat,
+        label: catalog.get(cat).name,
+        color: catalog.get(cat).color,
+        pct,
+        valueStr: formatMoneyRounded(v, data.base),
+        pctStr: `${formatShare(pct)} of outflow`,
+      }
+    }),
     topLabel: sorted.length
-      ? `Top: ${categoryOf(sorted[0][0]).name} ${formatMoneyRounded(sorted[0][1], data.base)}`
+      ? `Top: ${catalog.get(sorted[0][0]).name} ${formatMoneyRounded(sorted[0][1], data.base)}`
       : 'No spend yet',
     topColor: sorted.length
-      ? categoryOf(sorted[0][0]).color
+      ? catalog.get(sorted[0][0]).color
       : 'var(--fp-border-strong)',
   }
 }
@@ -236,15 +275,17 @@ export type BreakdownView = {
 
 export function buildBreakdown(
   data: SpendingData,
+  catalog: CategoryCatalog,
   scope: Scope,
   anchor: Date,
   mode: RangeMode,
   dateFormat: DateFormat = DEFAULT_DATE_FORMAT,
 ): BreakdownView {
   const win = windowOf(anchor, mode)
-  const txns = liveTxns(data, scope).filter(
+  const txns = flowTxns(data, scope).filter(
     (t) => inWindow(t.date, win) && t.type === 'spend',
   )
+  // Keyed on the parent slug alone, so a row filed under a child lands in its parent's segment.
   const byCat = new Map<string, number>()
   let outflow = 0
   for (const t of txns) {
@@ -261,25 +302,20 @@ export function buildBreakdown(
     const a0 = (acc / denom) * 100
     acc += v
     const a1 = (acc / denom) * 100
-    stops.push(`${categoryOf(cat).color} ${a0.toFixed(2)}% ${a1.toFixed(2)}%`)
+    stops.push(`${catalog.get(cat).color} ${a0.toFixed(2)}% ${a1.toFixed(2)}%`)
   }
   if (stops.length === 0) stops.push('var(--fp-surface-2) 0% 100%')
 
-  const periodLabel =
-    mode === 'day'
-      ? formatDate(anchor, dateFormat)
-      : mode === 'week'
-        ? `${fmtShort(win.start)} – ${fmtShort(win.end)}`
-        : fmtMonth(anchor)
+  const periodLabel = rangeLabel(anchor, mode, win, dateFormat)
 
   return {
     sub: periodLabel,
     hasData: sorted.length > 0,
-    centerStr: fmtK(outflow),
+    centerStr: fmtK(outflow, data.base),
     gradient: `conic-gradient(${stops.join(',')})`,
     items: sorted.slice(0, 5).map(([cat, v]) => ({
-      name: categoryOf(cat).name,
-      color: categoryOf(cat).color,
+      name: catalog.get(cat).name,
+      color: catalog.get(cat).color,
       pctStr: `${Math.round((v / denom) * 100)}%`,
     })),
   }
@@ -288,11 +324,13 @@ export function buildBreakdown(
 // --- Transaction list (grouped by day) -----------------------------------------------
 
 export type TxRow = {
+  kind: 'tx'
   id: string
   categoryId: string
+  subcategoryId: string | null
   name: string
-  catName: string
-  subName: string | null
+  /** "Dining", or "Dining · Cafés" once the row names a child. */
+  catLabel: string
   color: string
   walletName: string
   walletColor: string
@@ -301,16 +339,168 @@ export type TxRow = {
   amountStr: string
 }
 
-export type DayGroup = { dateLabel: string; totalStr: string; rows: TxRow[] }
+/**
+ * One transfer, however many of its legs are held. `neutral` when the scope holds both
+ * sides; otherwise the side in scope decides whether money left (`out`) or arrived (`in`).
+ */
+export type TransferRow = {
+  kind: 'transfer'
+  id: string
+  name: string
+  fromName: string
+  fromColor: string
+  toName: string
+  toColor: string
+  direction: 'neutral' | 'out' | 'in'
+  amountStr: string
+}
+
+export type ActivityRow = TxRow | TransferRow
+
+export type DayGroup = {
+  dateLabel: string
+  totalStr: string
+  rows: ActivityRow[]
+}
 
 export type ActivityListView = {
   groups: DayGroup[]
   empty: boolean
+  emptyText: string
   countStr: string
+}
+
+const DELETED_ACCOUNT = 'Deleted account'
+// A day holding only transfers has nothing to total.
+const NO_DAY_TOTAL = '—'
+const NO_WALLET_COLOR = 'var(--fp-border-strong)'
+
+type ActivityContext = {
+  data: SpendingData
+  catalog: CategoryCatalog
+  nodeById: Map<string, LocalBalanceNode>
+  inScope: (walletId: string) => boolean
+}
+
+function txRowOf(t: FlowTxn, ctx: ActivityContext): TxRow {
+  const cat = ctx.catalog.get(t.category)
+  const wallet = ctx.nodeById.get(t.walletId)
+  const isInc = t.type === 'income'
+  return {
+    kind: 'tx',
+    id: t.id,
+    categoryId: t.category,
+    subcategoryId: t.subcategory,
+    name: t.note || cat.name,
+    catLabel: ctx.catalog.labelOf(t.category, t.subcategory),
+    color: cat.color,
+    walletName: wallet?.name ?? '',
+    walletColor: wallet?.color ?? NO_WALLET_COLOR,
+    isIncome: isInc,
+    isContribution: isContribution(t),
+    amountStr: `${isInc ? '+' : '−'}${formatMoneyRounded(toBase(t, ctx.data), ctx.data.base)}`,
+  }
+}
+
+/** `null` when neither leg's wallet is in scope. A leg that is gone is never in scope. */
+function transferRowOf(
+  transferId: string,
+  legs: ReadonlyArray<LocalTransaction>,
+  ctx: ActivityContext,
+): TransferRow | null {
+  const out = legs.find((t) => t.type === 'transfer_out')
+  const inn = legs.find((t) => t.type === 'transfer_in')
+  const outIn = out !== undefined && ctx.inScope(out.walletId)
+  const inIn = inn !== undefined && ctx.inScope(inn.walletId)
+  if (!outIn && !inIn) return null
+
+  const side = (leg: LocalTransaction | undefined) => {
+    const wallet = leg ? ctx.nodeById.get(leg.walletId) : undefined
+    return {
+      name: wallet?.name ?? DELETED_ACCOUNT,
+      color: wallet?.color ?? NO_WALLET_COLOR,
+    }
+  }
+  const from = side(out)
+  const to = side(inn)
+  const direction = outIn && inIn ? 'neutral' : outIn ? 'out' : 'in'
+  const shown = direction === 'in' ? inn : out
+  const money = shown
+    ? formatMoneyRounded(toBase(shown, ctx.data), ctx.data.base)
+    : ''
+  const note = (out ?? inn)?.note
+
+  return {
+    kind: 'transfer',
+    id: transferId,
+    name:
+      direction === 'neutral'
+        ? note || 'Transfer'
+        : direction === 'out'
+          ? `Transfer to ${to.name}`
+          : `Transfer from ${from.name}`,
+    fromName: from.name,
+    fromColor: from.color,
+    toName: to.name,
+    toColor: to.color,
+    direction,
+    amountStr:
+      direction === 'neutral'
+        ? money
+        : `${direction === 'out' ? '−' : '+'}${money}`,
+  }
+}
+
+/**
+ * Every live row in the window whose own wallet is in scope, plus — for a transfer — its
+ * partner leg wherever it is, since the scope rules need both sides.
+ */
+function windowRows(
+  data: SpendingData,
+  win: DateWindow,
+  inScope: (walletId: string) => boolean,
+): LocalTransaction[] {
+  const live = data.txns.filter((t) => t.deleted === 0 && inWindow(t.date, win))
+  const touched = new Set(
+    live
+      .filter((t) => t.transferId && inScope(t.walletId))
+      .map((t) => t.transferId),
+  )
+  return live.filter((t) =>
+    t.transferId ? touched.has(t.transferId) : inScope(t.walletId),
+  )
+}
+
+/** Rows of one day: ordinary rows as they are, a transfer's legs collapsed into one row. */
+function dayRows(
+  txns: ReadonlyArray<LocalTransaction>,
+  ctx: ActivityContext,
+): ActivityRow[] {
+  const legsOf = new Map<string, LocalTransaction[]>()
+  for (const t of txns) {
+    if (!t.transferId) continue
+    const legs = legsOf.get(t.transferId)
+    if (legs) legs.push(t)
+    else legsOf.set(t.transferId, [t])
+  }
+  const rows: ActivityRow[] = []
+  const emitted = new Set<string>()
+  for (const t of txns) {
+    if (!t.transferId) {
+      if (isFlow(t)) rows.push(txRowOf(t, ctx))
+      continue
+    }
+    if (emitted.has(t.transferId)) continue
+    emitted.add(t.transferId)
+    const row = transferRowOf(t.transferId, legsOf.get(t.transferId)!, ctx)
+    if (row) rows.push(row)
+  }
+  return rows
 }
 
 export function buildActivityList(
   data: SpendingData,
+  catalog: CategoryCatalog,
   scope: Scope,
   anchor: Date,
   mode: RangeMode,
@@ -318,10 +508,15 @@ export function buildActivityList(
   dateFormat: DateFormat = DEFAULT_DATE_FORMAT,
 ): ActivityListView {
   const win = windowOf(anchor, mode)
-  const nodeById = new Map(data.nodes.map((n) => [n.id, n]))
-  const txns = liveTxns(data, scope)
-    .filter((t) => inWindow(t.date, win))
-    .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id))
+  const ctx: ActivityContext = {
+    data,
+    catalog,
+    nodeById: new Map(data.nodes.map((n) => [n.id, n])),
+    inScope: walletMatcher(scope, data.nodes),
+  }
+  const txns = windowRows(data, win, ctx.inScope).sort(
+    (a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id),
+  )
 
   const byDay = new Map<string, LocalTransaction[]>()
   const order: string[] = []
@@ -335,10 +530,11 @@ export function buildActivityList(
 
   const yesterday = addDays(today, -1)
   const groups: DayGroup[] = order.map((date) => {
-    const rows = byDay.get(date)!
+    const txnsOfDay = byDay.get(date)!
     let spent = 0
     let income = 0
-    for (const t of rows) {
+    for (const t of txnsOfDay) {
+      if (!isFlow(t)) continue
       const v = toBase(t, data)
       if (t.type === 'income') income += v
       else spent += v
@@ -351,56 +547,46 @@ export function buildActivityList(
         : ''
     const totalStr =
       (spent > 0 ? `−${formatMoneyRounded(spent, data.base)}` : '') +
-      (income > 0
-        ? `${spent > 0 ? '  ' : ''}+${formatMoneyRounded(income, data.base)}`
-        : '')
+        (income > 0
+          ? `${spent > 0 ? '  ' : ''}+${formatMoneyRounded(income, data.base)}`
+          : '') || NO_DAY_TOTAL
     return {
       dateLabel: prefix + formatDate(d, dateFormat),
       totalStr,
-      rows: rows.map((t): TxRow => {
-        const cat = categoryOf(t.category)
-        const wallet = nodeById.get(t.walletId)
-        const isInc = t.type === 'income'
-        return {
-          id: t.id,
-          categoryId: t.category,
-          name: t.note || cat.name,
-          catName: cat.name,
-          subName: t.subcategory
-            ? (cat.subs.find((s) => s.id === t.subcategory)?.name ?? null)
-            : null,
-          color: cat.color,
-          walletName: wallet?.name ?? '',
-          walletColor: wallet?.color ?? 'var(--fp-border-strong)',
-          isIncome: isInc,
-          isContribution: isContribution(t),
-          amountStr: `${isInc ? '+' : '−'}${formatMoneyRounded(toBase(t, data), data.base)}`,
-        }
-      }),
+      rows: dayRows(txnsOfDay, ctx),
     }
   })
 
-  const count = txns.length
+  const count = groups.reduce((n, g) => n + g.rows.length, 0)
   const countStr =
-    mode === 'month'
-      ? `${count} in ${fmtMonth(anchor)}`
-      : mode === 'week'
-        ? `${count} this week`
-        : `${count} on ${fmtShort(anchor)}`
+    mode === 'week'
+      ? `${count} this week`
+      : mode === 'day'
+        ? `${count} on ${fmtShort(anchor)}`
+        : `${count} in ${rangeLabel(anchor, mode, win, DEFAULT_DATE_FORMAT)}`
 
-  return { groups, empty: count === 0, countStr }
+  const emptyText =
+    scope.type === 'all'
+      ? 'No transactions in this period — add one with the quick-add panel.'
+      : 'Nothing for this account.'
+
+  return { groups, empty: count === 0, emptyText, countStr }
 }
 
-// --- Days calendar (week strip that unfolds to a month grid) -------------------------
+// --- Calendar (day grid that unfolds to a month; month grid for the year) ------------
 
-export type DayCell = {
+/** One clickable bucket in the calendar: a day in the day grid, a month in the year grid. */
+export type PeriodCell = {
   key: string
-  dayLabel: string
-  inMonth: boolean
-  isToday: boolean
-  isSelected: boolean
-  inWeekWindow: boolean
+  label: string
+  /** Outside the focused month — rendered dimmed. Never true in the year grid. */
+  outside: boolean
+  /** Today, or the running month in the year grid. */
+  isCurrent: boolean
+  /** The one period you picked — a day in day view. Elsewhere only `isCurrent` marks a cell. */
+  isActive: boolean
   hasActivity: boolean
+  hasSpend: boolean
   hasBoth: boolean
   netStr: string
   netPositive: boolean
@@ -409,39 +595,99 @@ export type DayCell = {
   intensity: number // 0..1 spend heat
 }
 
-export type CalendarView = {
-  weekdayLabels: string[]
-  pivotWeek: DayCell[]
-  weeksBefore: DayCell[][]
-  weeksAfter: DayCell[][]
-  caption: string
-  isMonth: boolean
+type CellFlags = Pick<
+  PeriodCell,
+  'key' | 'label' | 'outside' | 'isCurrent' | 'isActive'
+>
+
+const cellOf = (
+  flags: CellFlags,
+  inc: number,
+  spend: number,
+  maxSpend: number,
+  base: CurrencyCode,
+): PeriodCell => {
+  const net = inc - spend
+  return {
+    ...flags,
+    hasActivity: spend > 0 || inc > 0,
+    hasSpend: spend > 0,
+    hasBoth: spend > 0 && inc > 0,
+    netStr: `${net >= 0 ? '+' : '−'}${fmtK(Math.abs(net), base)}`,
+    netPositive: net >= 0,
+    incStr: `+${fmtK(inc, base)}`,
+    spendStr: `−${fmtK(spend, base)}`,
+    intensity: maxSpend > 0 ? spend / maxSpend : 0,
+  }
 }
+
+/** The row that stays visible when a grid is folded shut, plus the rows that fold away. */
+type FoldingRows = {
+  pivotRow: PeriodCell[]
+  rowsBefore: PeriodCell[][]
+  rowsAfter: PeriodCell[][]
+}
+
+export type DayGridView = FoldingRows & {
+  grid: 'days'
+  weekdayLabels: string[]
+  caption: string
+}
+
+export type MonthGridView = FoldingRows & {
+  grid: 'months'
+  caption: string
+}
+
+const MONTHS_PER_ROW = 4
+
+/** Splits cells into rows, with the row holding `pivotIndex` held out as the pivot. */
+function foldAround(
+  cells: PeriodCell[],
+  perRow: number,
+  pivotIndex: number,
+): FoldingRows {
+  const rows: PeriodCell[][] = []
+  for (let i = 0; i < cells.length; i += perRow)
+    rows.push(cells.slice(i, i + perRow))
+  const pivot = Math.floor(pivotIndex / perRow)
+  return {
+    pivotRow: rows[pivot] ?? [],
+    rowsBefore: rows.slice(0, pivot),
+    rowsAfter: rows.slice(pivot + 1),
+  }
+}
+
+export type CalendarView = DayGridView | MonthGridView
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-export function buildCalendar(
+/** Income and spend per ISO day, in base currency. */
+function perDayTotals(txns: FlowTxn[], data: SpendingData) {
+  const spend = new Map<string, number>()
+  const inc = new Map<string, number>()
+  for (const t of txns) {
+    const v = toBase(t, data)
+    const bucket = t.type === 'income' ? inc : spend
+    bucket.set(t.date, (bucket.get(t.date) ?? 0) + v)
+  }
+  return { spend, inc }
+}
+
+function buildDayGrid(
   data: SpendingData,
-  scope: Scope,
+  txns: FlowTxn[],
   anchor: Date,
   mode: RangeMode,
   calOpen: boolean,
   today: Date,
-  dateFormat: DateFormat = DEFAULT_DATE_FORMAT,
-): CalendarView {
-  const txns = liveTxns(data, scope)
-  const perDaySpend = new Map<string, number>()
-  const perDayInc = new Map<string, number>()
-  for (const t of txns) {
-    const v = toBase(t, data)
-    if (t.type === 'income')
-      perDayInc.set(t.date, (perDayInc.get(t.date) ?? 0) + v)
-    else perDaySpend.set(t.date, (perDaySpend.get(t.date) ?? 0) + v)
-  }
+  dateFormat: DateFormat,
+): DayGridView {
+  const { spend: perDaySpend, inc: perDayInc } = perDayTotals(txns, data)
 
   const calY = anchor.getFullYear()
   const calM = anchor.getMonth()
-  const curMonth = calY === today.getFullYear() && calM === today.getMonth()
+  const curMonth = sameMonth(anchor, today)
   const weekStart =
     mode === 'month'
       ? startOfWeek(curMonth ? today : new Date(calY, calM, 1))
@@ -453,77 +699,129 @@ export function buildCalendar(
     if (d.getFullYear() === calY && d.getMonth() === calM && v > cMax) cMax = v
   }
 
-  const win = windowOf(anchor, mode)
-  const cellFor = (d: Date): DayCell => {
+  const cellFor = (d: Date): PeriodCell => {
     const k = dayKey(d)
-    const sp = perDaySpend.get(k) ?? 0
-    const inc = perDayInc.get(k) ?? 0
-    const net = inc - sp
-    return {
-      key: k,
-      dayLabel: String(d.getDate()),
-      inMonth: d.getMonth() === calM,
-      isToday: sameDay(d, today),
-      isSelected: mode === 'day' && dayKey(anchor) === k,
-      inWeekWindow:
-        mode === 'week' &&
-        midnight(d) >= midnight(win.start) &&
-        midnight(d) <= midnight(win.end),
-      hasActivity: sp > 0 || inc > 0,
-      hasBoth: sp > 0 && inc > 0,
-      netStr: `${net >= 0 ? '+' : '−'}${fmtK(Math.abs(net))}`,
-      netPositive: net >= 0,
-      incStr: `+${fmtK(inc)}`,
-      spendStr: `−${fmtK(sp)}`,
-      intensity: cMax > 0 ? sp / cMax : 0,
-    }
-  }
-
-  const pivotWeek = [0, 1, 2, 3, 4, 5, 6].map((i) =>
-    cellFor(addDays(weekStart, i)),
-  )
-
-  const weeksBefore: DayCell[][] = []
-  const weeksAfter: DayCell[][] = []
-  if (mode === 'month') {
-    const gridStart = startOfWeek(new Date(calY, calM, 1))
-    const lastWeekStart = startOfWeek(new Date(calY, calM + 1, 0))
-    const weekCount =
-      Math.round(
-        (midnight(lastWeekStart) - midnight(gridStart)) / (7 * 86_400_000),
-      ) + 1
-    const pivotIndex = Math.round(
-      (midnight(weekStart) - midnight(gridStart)) / (7 * 86_400_000),
+    return cellOf(
+      {
+        key: k,
+        label: String(d.getDate()),
+        outside: d.getMonth() !== calM,
+        isCurrent: sameDay(d, today),
+        isActive: mode === 'day' && dayKey(anchor) === k,
+      },
+      perDayInc.get(k) ?? 0,
+      perDaySpend.get(k) ?? 0,
+      cMax,
+      data.base,
     )
-    for (let w = 0; w < weekCount; w += 1) {
-      if (w === pivotIndex) continue
-      const days = [0, 1, 2, 3, 4, 5, 6].map((i) =>
-        cellFor(addDays(gridStart, w * 7 + i)),
-      )
-      if (w < pivotIndex) weeksBefore.push(days)
-      else weeksAfter.push(days)
-    }
   }
 
+  const weekOf = (start: Date) =>
+    [0, 1, 2, 3, 4, 5, 6].map((i) => cellFor(addDays(start, i)))
+
+  const gridStart = startOfWeek(new Date(calY, calM, 1))
+  const lastWeekStart = startOfWeek(new Date(calY, calM + 1, 0))
+  const weekIndex = (start: Date) =>
+    Math.round((midnight(start) - midnight(gridStart)) / (7 * 86_400_000))
+  const weekCount = weekIndex(lastWeekStart) + 1
+  const pivotIndex = weekIndex(weekStart)
+
+  const rowsBefore: PeriodCell[][] = []
+  const rowsAfter: PeriodCell[][] = []
+  for (let w = 0; w < weekCount; w += 1) {
+    if (w === pivotIndex) continue
+    const days = weekOf(addDays(gridStart, w * 7))
+    if (w < pivotIndex) rowsBefore.push(days)
+    else rowsAfter.push(days)
+  }
+
+  const weekSpan = `${fmtShort(weekStart)} – ${fmtShort(addDays(weekStart, 6))}`
+  const folded = `Week of ${weekSpan} — unfold for ${fmtMonth(anchor)}.`
   let caption: string
-  if (mode === 'day') {
-    caption = `Focused on ${formatDate(anchor, dateFormat)} — tap another day, or switch to Week / Month.`
+  if (calOpen) {
+    caption = `${fmtMonth(anchor)} — tap any day to focus.`
+  } else if (mode === 'day') {
+    caption = `Focused on ${formatDate(anchor, dateFormat)} — tap another day, or unfold the month.`
   } else if (mode === 'week') {
-    caption = `Week of ${fmtShort(weekStart)} – ${fmtShort(addDays(weekStart, 6))} — tap a day to focus it.`
+    caption = `Week of ${weekSpan} — tap a day to focus it.`
   } else {
-    caption = calOpen
-      ? `${fmtMonth(anchor)} — tap any day to focus.`
-      : `Week of ${fmtShort(weekStart)} – ${fmtShort(addDays(weekStart, 6))} — unfold for the full month.`
+    caption = folded
   }
 
   return {
+    grid: 'days',
     weekdayLabels: WEEKDAYS,
-    pivotWeek,
-    weeksBefore,
-    weeksAfter,
+    pivotRow: weekOf(weekStart),
+    rowsBefore,
+    rowsAfter,
     caption,
-    isMonth: mode === 'month',
   }
+}
+
+function buildMonthGrid(
+  data: SpendingData,
+  txns: FlowTxn[],
+  anchor: Date,
+  calOpen: boolean,
+  today: Date,
+): MonthGridView {
+  const year = anchor.getFullYear()
+  const perMonthSpend = new Map<string, number>()
+  const perMonthInc = new Map<string, number>()
+  for (const t of txns) {
+    const d = parseISO(t.date)
+    if (d.getFullYear() !== year) continue
+    const k = monthKey(d)
+    const bucket = t.type === 'income' ? perMonthInc : perMonthSpend
+    bucket.set(k, (bucket.get(k) ?? 0) + toBase(t, data))
+  }
+  const cMax = Math.max(0, ...perMonthSpend.values())
+
+  const months = [...Array(12).keys()].map((m) => {
+    const d = new Date(year, m, 1)
+    const k = monthKey(d)
+    return cellOf(
+      {
+        key: k,
+        label: fmtMonthShort(d),
+        outside: false,
+        isCurrent: sameMonth(d, today),
+        isActive: false,
+      },
+      perMonthInc.get(k) ?? 0,
+      perMonthSpend.get(k) ?? 0,
+      cMax,
+      data.base,
+    )
+  })
+
+  // Fold shut around the running month when we're looking at the current year.
+  const focus = year === today.getFullYear() ? today.getMonth() : 0
+  const rows = foldAround(months, MONTHS_PER_ROW, focus)
+  const span = `${rows.pivotRow[0]?.label} – ${rows.pivotRow[rows.pivotRow.length - 1]?.label}`
+
+  return {
+    grid: 'months',
+    ...rows,
+    caption: calOpen
+      ? `${year} — tap a month to open it.`
+      : `${span} ${year} — unfold for the full year.`,
+  }
+}
+
+export function buildCalendar(
+  data: SpendingData,
+  scope: Scope,
+  anchor: Date,
+  mode: RangeMode,
+  calOpen: boolean,
+  today: Date,
+  dateFormat: DateFormat = DEFAULT_DATE_FORMAT,
+): CalendarView {
+  const txns = flowTxns(data, scope)
+  return mode === 'year'
+    ? buildMonthGrid(data, txns, anchor, calOpen, today)
+    : buildDayGrid(data, txns, anchor, mode, calOpen, today, dateFormat)
 }
 
 // --- Budgets -------------------------------------------------------------------------
@@ -572,9 +870,10 @@ function budgetSpentMinor(
   const matcher = walletMatcher(scope, data.nodes)
   let sum = 0
   for (const t of data.txns) {
-    if (t.deleted || t.type !== 'spend' || t.goalId) continue // savings isn't budget spend
+    if (t.deleted || t.type !== 'spend' || t.goalId) continue // savings and transfers aren't budget spend
     if (!matcher(t.walletId)) continue
     if (!inWindow(t.date, win)) continue
+    // Caps are parent-scoped: the child a row may also name never narrows the match.
     if (budget.scopeType === 'category' && t.category !== budget.target)
       continue
     if (budget.scopeType === 'wallet' && t.walletId !== budget.target) continue
@@ -585,6 +884,7 @@ function budgetSpentMinor(
 
 export function buildBudgetsView(
   data: SpendingData,
+  catalog: CategoryCatalog,
   scope: Scope,
   today: Date,
 ): BudgetsView {
@@ -601,10 +901,10 @@ export function buildBudgetsView(
     let categoryIcon: string | null = null
     let scopeSub = 'Everything combined'
     if (b.scopeType === 'category') {
-      const cat = categoryOf(b.target ?? 'other')
+      const cat = catalog.get(b.target ?? 'other')
       name = cat.name
       color = cat.color
-      categoryIcon = cat.id
+      categoryIcon = cat.slug
       scopeSub = 'Category cap'
     } else if (b.scopeType === 'wallet') {
       const w = nodeById.get(b.target ?? '')
@@ -721,6 +1021,7 @@ export type RecurringView = {
 
 export function buildRecurringView(
   data: SpendingData,
+  catalog: CategoryCatalog,
   scope: Scope,
   today: Date,
 ): RecurringView {
@@ -760,13 +1061,13 @@ export function buildRecurringView(
   const denom = Math.max(monthly, 1)
 
   const rows: RecurringRow[] = sorted.map((r) => {
-    const cat = categoryOf(r.category)
+    const cat = catalog.get(r.category)
     const wallet = nodeById.get(r.walletId)
     return {
       id: r.id,
       name: r.name,
       color: cat.color,
-      categoryIcon: cat.id,
+      categoryIcon: cat.slug,
       catName: cat.name,
       walletName: wallet?.name ?? '',
       walletColor: wallet?.color ?? 'var(--fp-border-strong)',
@@ -784,7 +1085,7 @@ export function buildRecurringView(
   const upcoming = sorted
     .filter((r) => inThisMonth(r.nextDue))
     .map((r): UpcomingItem => {
-      const cat = categoryOf(r.category)
+      const cat = catalog.get(r.category)
       return {
         dateStr: fmtShort(parseISO(r.nextDue)),
         relStr: relFuture(r.nextDue, today),
@@ -809,16 +1110,22 @@ export function buildRecurringView(
       ? `Next: ${next.name} · ${fmtShort(parseISO(next.nextDue))}`
       : 'Nothing scheduled',
     nextColor: next
-      ? categoryOf(next.category).color
+      ? catalog.get(next.category).color
       : 'var(--fp-border-strong)',
-    segments: spend.map((r) => ({
-      color: categoryOf(r.category).color,
-      pct:
-        ((convertMinor(r.amount, r.currency, data.base, data.rates) *
-          monthlyFactor(r.frequency)) /
-          denom) *
-        100,
-    })),
+    segments: spend.map((r) => {
+      const perMonth =
+        convertMinor(r.amount, r.currency, data.base, data.rates) *
+        monthlyFactor(r.frequency)
+      const pct = (perMonth / denom) * 100
+      return {
+        key: r.id,
+        label: r.name,
+        color: catalog.get(r.category).color,
+        pct,
+        valueStr: `${formatMoneyRounded(perMonth, data.base)}/mo`,
+        pctStr: `${formatShare(pct)} of monthly`,
+      }
+    }),
     upcoming,
     upcomingEmpty: upcoming.length === 0,
   }

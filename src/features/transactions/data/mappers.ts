@@ -4,16 +4,19 @@ import type {
   CreateBudgetWire,
   CreateRecurringWire,
   CreateTransactionWire,
+  CreateTransferWire,
   Recurring,
   Transaction,
   UpdateBudgetWire,
   UpdateRecurringWire,
   UpdateTransactionWire,
+  UpdateTransferWire,
 } from '#/features/transactions/api/types'
 import {
   toWireFreq,
   toWirePeriod,
   toWireScope,
+  toWireTransactionType,
   toWireTxType,
 } from '#/features/transactions/api/types'
 
@@ -21,6 +24,7 @@ import {
 
 export const serverTransactionToLocal = (t: Transaction): LocalTransaction => ({
   ...t,
+  merchantId: t.merchantId ?? null,
   dirty: 0,
   deleted: 0,
 })
@@ -29,13 +33,15 @@ export const localTransactionToCreateWire = (
   l: LocalTransaction,
 ): CreateTransactionWire => ({
   id: l.id,
-  type: toWireTxType(l.type),
+  type: toWireTransactionType(l.type),
   amount: l.amount,
   currency: l.currency,
   category: l.category,
   subcategory: l.subcategory,
   wallet_id: l.walletId,
   goal_id: l.goalId,
+  // Always sent: PATCH replaces, so omitting it would silently clear the merchant link.
+  merchant_id: l.merchantId,
   date: l.date,
   note: l.note,
   source: l.source,
@@ -45,17 +51,61 @@ export const localTransactionToUpdateWire = (
   l: LocalTransaction,
 ): UpdateTransactionWire => ({
   version: l.version,
-  type: toWireTxType(l.type),
+  type: toWireTransactionType(l.type),
   amount: l.amount,
   currency: l.currency,
   category: l.category,
   subcategory: l.subcategory,
   wallet_id: l.walletId,
   goal_id: l.goalId,
+  // Always sent: PATCH replaces, so omitting it would silently clear the merchant link.
+  merchant_id: l.merchantId,
   date: l.date,
   note: l.note,
   source: l.source,
 })
+
+// --- Transfers -----------------------------------------------------------------------
+
+/** The two legs of one transfer, as held locally. */
+export type TransferLegs = { out: LocalTransaction; in: LocalTransaction }
+
+/** Whatever is left of a transfer locally — a leg goes when its wallet is deleted. */
+export type HeldLegs = { out?: LocalTransaction; in?: LocalTransaction }
+
+export const transferToCreateWire = (
+  transferId: string,
+  { out, in: inn }: TransferLegs,
+): CreateTransferWire => ({
+  id: transferId,
+  out_id: out.id,
+  in_id: inn.id,
+  from_wallet_id: out.walletId,
+  to_wallet_id: inn.walletId,
+  amount: out.amount,
+  // The server wants it only across currencies, and refuses a differing one within one.
+  to_amount: out.currency === inn.currency ? null : inn.amount,
+  date: out.date,
+  note: out.note,
+})
+
+export const transferToUpdateWire = ({
+  out,
+  in: inn,
+}: HeldLegs): UpdateTransferWire => {
+  const any = (out ?? inn)!
+  return {
+    from_wallet_id: out?.walletId ?? null,
+    to_wallet_id: inn?.walletId ?? null,
+    // A lone IN leg takes `amount` as its own.
+    amount: any.amount,
+    to_amount: out && inn && out.currency !== inn.currency ? inn.amount : null,
+    date: any.date,
+    note: any.note,
+    out_version: out?.version ?? null,
+    in_version: inn?.version ?? null,
+  }
+}
 
 // --- Budgets -------------------------------------------------------------------------
 

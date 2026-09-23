@@ -11,6 +11,7 @@ const wallet = (over: Partial<LocalBalanceNode>): LocalBalanceNode => ({
   parentId: null,
   name: 'Wallet',
   color: '#1F9D6B',
+  icon: null,
   note: null,
   position: 0,
   collapsed: false,
@@ -33,9 +34,11 @@ const tx = (over: Partial<LocalTransaction>): LocalTransaction => ({
   subcategory: null,
   walletId: 'w1',
   goalId: null,
+  merchantId: null,
   date: '2026-06-12',
   note: null,
   source: null,
+  transferId: null,
   createdAt: '',
   updatedAt: '',
   version: '',
@@ -92,6 +95,51 @@ describe('walletLiveBalances', () => {
       tx({ walletId: 'w1', type: 'spend', amount: 50_000, deleted: 1 }),
     ]
     expect(walletLiveBalances(nodes, txns, RATES).w1).toBe(100_000)
+  })
+
+  it('debits the source and credits the destination of a transfer', () => {
+    const nodes = [
+      wallet({ id: 'w1', amount: 100_000 }),
+      wallet({ id: 'w2', amount: 0 }),
+    ]
+    const leg = { category: null, transferId: 'tr1', amount: 40_000 }
+    const txns = [
+      tx({ ...leg, walletId: 'w1', type: 'transfer_out' }),
+      tx({ ...leg, walletId: 'w2', type: 'transfer_in' }),
+    ]
+    expect(walletLiveBalances(nodes, txns, RATES)).toEqual({
+      w1: 60_000,
+      w2: 40_000,
+    })
+  })
+
+  it('moves each leg of a cross-currency transfer in its own wallet currency', () => {
+    const nodes = [
+      wallet({ id: 'w1', amount: 375_000, currency: 'SAR' }),
+      wallet({ id: 'w2', amount: 0, currency: 'USD' }),
+    ]
+    const txns = [
+      tx({
+        walletId: 'w1',
+        type: 'transfer_out',
+        category: null,
+        transferId: 'tr1',
+        amount: 375_000,
+        currency: 'SAR',
+      }),
+      tx({
+        walletId: 'w2',
+        type: 'transfer_in',
+        category: null,
+        transferId: 'tr1',
+        amount: 99_000,
+        currency: 'USD',
+      }),
+    ]
+    expect(walletLiveBalances(nodes, txns, RATES)).toEqual({
+      w1: 0,
+      w2: 99_000,
+    })
   })
 })
 

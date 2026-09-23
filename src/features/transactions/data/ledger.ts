@@ -12,7 +12,8 @@ type RatesMap = Partial<Record<string, number>>
 const live = (txns: LocalTransaction[]): LocalTransaction[] =>
   txns.filter((t) => t.deleted === 0)
 
-const signOf = (t: LocalTransaction): number => (t.type === 'income' ? 1 : -1)
+const signOf = (t: LocalTransaction): number =>
+  t.type === 'income' || t.type === 'transfer_in' ? 1 : -1
 
 const walletCurrencies = (
   nodes: LocalBalanceNode[],
