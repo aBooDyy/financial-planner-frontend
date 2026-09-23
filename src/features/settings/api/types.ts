@@ -1,71 +1,71 @@
-import type { TxType, TxTypeWire } from '#/features/transactions/api/types'
-import { fromWireTxType, toWireTxType } from '#/features/transactions/api/types'
-
 /**
- * Wire/domain types for the Settings entities: user-editable categories, plus the small
- * payloads for editing an exchange rate and the user profile. Categories follow the same
- * lowercase-domain / UPPER_SNAKE-wire convention as the rest of the app.
+ * Wire/domain types for the Settings entities: the user's own currencies, plus the small
+ * payloads for editing an exchange rate and the user profile. Categories live in
+ * `features/categories/api/types.ts`.
  */
 
-// --- Categories ----------------------------------------------------------------------
+// --- Custom currencies ---------------------------------------------------------------
 
-export type Category = {
+export type CustomCurrency = {
   id: string
-  slug: string
+  code: string
   name: string
-  type: TxType
-  color: string
-  position: number
+  symbol: string
+  minorUnit: number
+  /** Units of the reference currency per 1 unit — the same direction as a seed rate. */
+  rate: number
   createdAt: string
   updatedAt: string
   version: string
 }
 
-export type CategoryWire = {
+export type CustomCurrencyWire = {
   id: string
-  slug: string
+  code: string
   name: string
-  type: TxTypeWire
-  color: string
-  position: number
+  symbol: string
+  minor_unit: number
+  rate: string
   created_at: string
   updated_at: string
   version: string
 }
 
-export type CreateCategoryWire = {
+export type CreateCustomCurrencyWire = {
   id: string
-  slug: string
+  code: string
   name: string
-  type: TxTypeWire
-  color: string
-  position: number
+  symbol: string
+  minor_unit: number
+  rate: string
 }
 
-export type UpdateCategoryWire = {
+/** Code and minor unit are fixed at creation: stored amounts are already scaled by one and
+ *  found by the other. */
+export type UpdateCustomCurrencyWire = {
   version: string
   name: string
-  color: string
-  position: number
+  symbol: string
+  rate: string
 }
 
-export const toCategory = (w: CategoryWire): Category => ({
+export const toCustomCurrency = (w: CustomCurrencyWire): CustomCurrency => ({
   id: w.id,
-  slug: w.slug,
+  code: w.code,
   name: w.name,
-  type: fromWireTxType(w.type),
-  color: w.color,
-  position: w.position,
+  symbol: w.symbol,
+  minorUnit: w.minor_unit,
+  rate: Number(w.rate),
   createdAt: w.created_at,
   updatedAt: w.updated_at,
   version: w.version,
 })
 
-export { toWireTxType }
-
 // --- Exchange-rate edit + profile edit payloads --------------------------------------
 
-export type UpdateRateWire = { version: string; rate: string }
+/** `version` is omitted on the first edit of a currency: there is no row to collide with
+ *  yet, and the server creates one (copy-on-write). */
+export type UpdateRateWire = { version?: string; rate: string }
 
 export type UpdateProfileWire = {
   version: string

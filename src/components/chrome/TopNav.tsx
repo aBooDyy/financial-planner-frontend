@@ -2,15 +2,8 @@ import { Link } from '@tanstack/react-router'
 import { MoonStar, Sun } from 'lucide-react'
 import { useThemeStore } from '#/stores/theme'
 import type { User } from '#/features/auth/api/types'
-import { SUPPORTED_CURRENCIES } from '#/lib/currency'
+import { CurrencyPicker } from '#/components/CurrencyPicker'
 import type { CurrencyCode } from '#/lib/currency'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '#/components/ui/select'
 import { AccountMenu } from './AccountMenu'
 import { BrandMark } from './BrandMark'
 import { NAV_SECTIONS } from './sections'
@@ -86,24 +79,13 @@ export function TopNav({ user, active, base, onBaseChange, onSignOut }: Props) {
         <div className="flex-1" />
 
         <div className="flex items-center gap-[9px]">
-          <Select
+          <CurrencyPicker
             value={base}
-            onValueChange={(value) => onBaseChange(value as CurrencyCode)}
-          >
-            <SelectTrigger
-              title="Base currency"
-              className="w-auto rounded-[10px] border-fp-border bg-fp-surface px-2 py-[7px] text-[13px] font-bold text-fp-text"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {SUPPORTED_CURRENCIES.map((code) => (
-                <SelectItem key={code} value={code}>
-                  {code}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onChange={onBaseChange}
+            label="Base currency"
+            align="end"
+            className="w-auto rounded-[10px] border-fp-border bg-fp-surface px-2 py-[7px] text-[13px] font-bold text-fp-text"
+          />
 
           <button
             type="button"

@@ -1,20 +1,23 @@
-import { SUPPORTED_CURRENCIES } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
 
 type Props = {
   rates: Partial<Record<string, number>>
   base: CurrencyCode
+  /** The currencies the user holds — see `heldCurrencies`. */
+  currencies: CurrencyCode[]
 }
 
-export function ExchangeRatesCard({ rates, base }: Props) {
+export function ExchangeRatesCard({ rates, base, currencies }: Props) {
   const baseRate = rates[base] ?? 1
-  const lines = SUPPORTED_CURRENCIES.filter((c) => c !== base).map((c) => {
-    const value = ((rates[c] ?? 0) / baseRate).toLocaleString('en-US', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
+  const lines = currencies
+    .filter((c) => c !== base)
+    .map((c) => {
+      const value = ((rates[c] ?? 0) / baseRate).toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })
+      return `1 ${c} = ${value} ${base}`
     })
-    return `1 ${c} = ${value} ${base}`
-  })
 
   return (
     <div className="rounded-[18px] border border-fp-border bg-fp-surface p-[16px_18px] shadow-fp">

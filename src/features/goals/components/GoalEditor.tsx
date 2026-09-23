@@ -1,4 +1,4 @@
-import { AlertTriangle, Plus, X } from 'lucide-react'
+import { AlertTriangle, Plus } from 'lucide-react'
 import type { LocalBalanceNode, LocalGoalAllocation } from '#/db/types'
 import type { GoalFrequency, GoalKind } from '#/features/goals/api/types'
 import { walletGroupOptions } from '#/features/balances/data/selectors'
@@ -16,32 +16,39 @@ import {
   relUntil,
   startOfToday,
 } from '#/features/goals/data/planning'
+import type { GoalCard } from '#/features/goals/data/selectors'
 import type {
-  AllocationRowDraft,
   EditorDraft,
   EditorState,
 } from '#/features/goals/hooks/useGoalEditor'
-import { parseAmountToMinor, SUPPORTED_CURRENCIES } from '#/lib/currency'
-import type { CurrencyCode } from '#/lib/currency'
+import { amountInputProps, parseAmountToMinor } from '#/lib/currency'
+import { CurrencyPicker } from '#/components/CurrencyPicker'
 import { formatDate } from '#/lib/date'
 import { DateField } from '#/components/DateField'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
-import { ResponsiveDialog } from '#/components/ui/responsive-dialog'
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select'
 import { usePreferencesStore } from '#/stores/preferences'
+import { AllocationRow } from './AllocationRow'
+import { DetailPanel } from './DetailPanel'
+import { GoalSchedule } from './GoalSchedule'
+import { PriorityControl } from './PriorityControl'
+import { FIELD_LABEL, FIELD_LABEL_TEXT } from './styles'
 
 type Props = {
   editing: EditorState
+  // The edited goal's place in the active plan; null for income, new goals and completed goals.
+  card: GoalCard | null
+  rankTotal: number
+  onMoveUp: () => void
+  onMoveDown: () => void
   nodes: LocalBalanceNode[]
   // Live wallet balances + all reserves, so we can warn when a reserve over-draws a wallet.
   walletBalances: Record<string, number>
@@ -65,10 +72,12 @@ type Props = {
   onClose: () => void
 }
 
-const LABEL = 'mb-[6px] block text-[12px] font-semibold text-fp-text-2'
-
 export function GoalEditor({
   editing,
+  card,
+  rankTotal,
+  onMoveUp,
+  onMoveDown,
   nodes,
   walletBalances,
   allocations,
@@ -101,12 +110,23 @@ export function GoalEditor({
       ? 'Target date is in the past'
       : 'Next due date is in the past'
 
-  const title = id ? 'Edit ' : 'New '
   const titleNoun = !isGoal
     ? 'income'
     : kind === 'onetime'
       ? 'goal'
       : KINDS[kind].chip.toLowerCase()
+  const title = id
+    ? draft.name.trim() || (isGoal ? 'Untitled' : 'Income')
+    : `New ${titleNoun}`
+  const subtitle = !id
+    ? isGoal
+      ? 'Fill in the details'
+      : 'Add a stream'
+    : !isGoal
+      ? 'Income stream'
+      : card
+        ? `${card.kindLabel} · ${card.statusLabel}`
+        : `${KINDS[kind].chip} · completed`
 
   const amountLabel = !isGoal
     ? 'Amount'
@@ -152,18 +172,10 @@ export function GoalEditor({
   const hasOverReserve = overReservedNames.length > 0
 
   return (
-    <ResponsiveDialog
-      open
-      onOpenChange={(o) => {
-        if (!o) onClose()
-      }}
-      title={
-        <>
-          {title}
-          {titleNoun}
-        </>
-      }
-      contentClassName="sm:max-w-[460px]"
+    <DetailPanel
+      title={title}
+      subtitle={subtitle}
+      onClose={onClose}
       footer={
         <>
           {id ? (
@@ -176,9 +188,6 @@ export function GoalEditor({
             </Button>
           ) : null}
           <div className="flex-1" />
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
           <Button
             onClick={onSave}
             variant={hasOverReserve ? 'destructive' : 'default'}
@@ -194,11 +203,11 @@ export function GoalEditor({
         </>
       }
     >
-      <div className="flex flex-col gap-[15px]">
+      <div className="flex flex-col gap-[13px]">
         {isGoal && !id ? (
           <div>
-            <Label className={LABEL}>Type</Label>
-            <div className="grid grid-cols-2 gap-2">
+            <Label className={FIELD_LABEL}>Type</Label>
+            <div className="grid grid-cols-2 gap-[7px]">
               {KIND_OPTIONS.map((key) => {
                 const selected = kind === key
                 return (
@@ -206,7 +215,8 @@ export function GoalEditor({
                     key={key}
                     type="button"
                     onClick={() => onKind(key)}
-                    className="flex flex-col items-start gap-[3px] rounded-[12px] border px-3 py-[11px] text-start"
+                    title={KINDS[key].desc}
+                    className="rounded-[10px] border px-[6px] py-[9px] text-[12px] font-bold whitespace-nowrap"
                     style={{
                       borderColor: selected
                         ? 'var(--fp-accent)'
@@ -217,17 +227,9 @@ export function GoalEditor({
                       color: selected
                         ? 'var(--fp-accent-ink)'
                         : 'var(--fp-text)',
-                      boxShadow: selected
-                        ? '0 0 0 3px var(--fp-accent-soft)'
-                        : 'none',
                     }}
                   >
-                    <span className="text-[13px] font-bold">
-                      {KINDS[key].title}
-                    </span>
-                    <span className="text-[11px] leading-[1.3] opacity-75">
-                      {KINDS[key].desc}
-                    </span>
+                    {KINDS[key].title}
                   </button>
                 )
               })}
@@ -236,7 +238,7 @@ export function GoalEditor({
         ) : null}
 
         <div>
-          <Label className={LABEL}>{isGoal ? 'Name' : 'Source'}</Label>
+          <Label className={FIELD_LABEL}>{isGoal ? 'Name' : 'Source'}</Label>
           <Input
             value={draft.name}
             onChange={(e) => onField('name', e.target.value)}
@@ -248,40 +250,29 @@ export function GoalEditor({
           />
         </div>
 
-        <div className="flex gap-[10px]">
-          <div className="flex-1">
-            <Label className={LABEL}>{amountLabel}</Label>
+        <div className="flex gap-2">
+          <div className="min-w-0 flex-1">
+            <Label className={FIELD_LABEL}>{amountLabel}</Label>
             <Input
               value={draft.amount}
               onChange={(e) => onField('amount', e.target.value)}
-              inputMode="decimal"
-              placeholder="0.00"
+              {...amountInputProps(draft.currency)}
               className="tabular-nums"
             />
           </div>
-          <div className="w-[104px]">
-            <Label className={LABEL}>Currency</Label>
-            <Select
+          <div className="w-[96px] flex-none">
+            <Label className={FIELD_LABEL}>Currency</Label>
+            <CurrencyPicker
               value={draft.currency}
-              onValueChange={(v) => onField('currency', v as CurrencyCode)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {SUPPORTED_CURRENCIES.map((code) => (
-                  <SelectItem key={code} value={code}>
-                    {code}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              onChange={(code) => onField('currency', code)}
+              align="end"
+            />
           </div>
         </div>
 
         {(!isGoal || isRecurring) && (
           <div>
-            <Label className={LABEL}>How often</Label>
+            <Label className={FIELD_LABEL}>How often</Label>
             <Select
               value={draft.frequency}
               onValueChange={(v) => onField('frequency', v as GoalFrequency)}
@@ -302,7 +293,7 @@ export function GoalEditor({
 
         {!isGoal ? (
           <div>
-            <Label className={LABEL}>Paid on (day of month)</Label>
+            <Label className={FIELD_LABEL}>Paid on (day of month)</Label>
             <div className="flex items-center gap-3">
               <Input
                 value={draft.day}
@@ -311,7 +302,7 @@ export function GoalEditor({
                 placeholder="27"
                 className="w-[96px] text-center tabular-nums"
               />
-              <span className="text-[12.5px] text-fp-text-3">
+              <span className="text-[12px] text-fp-text-3">
                 Next:{' '}
                 {formatDate(
                   nextPayday(parseInt(draft.day, 10) || 1, today),
@@ -324,12 +315,12 @@ export function GoalEditor({
 
         {hasDueDate ? (
           <div>
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <label className="text-[12px] font-semibold text-fp-text-2">
+            <div className="mb-[6px] flex items-center justify-between gap-2">
+              <label className={FIELD_LABEL_TEXT}>
                 {kind === 'onetime' ? 'Target date' : 'Next due date'}
               </label>
               <span
-                className={`text-[12.5px] font-bold ${
+                className={`text-[11.5px] font-bold whitespace-nowrap ${
                   isPastDue ? 'text-fp-danger' : 'text-fp-text-2'
                 }`}
               >
@@ -359,14 +350,13 @@ export function GoalEditor({
         {isGoal ? (
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <label className="text-[12px] font-semibold text-fp-text-2">
-                Set aside{' '}
-                <span className="font-medium text-fp-text-3">(optional)</span>
+              <label className={FIELD_LABEL_TEXT}>
+                Set aside <span className="normal-case">(optional)</span>
               </label>
               <Button
                 variant="outline"
                 onClick={onAddAllocation}
-                className="gap-1 rounded-[9px] px-2.5 py-1.5 text-[12px] font-semibold text-fp-text-2 hover:text-fp-text"
+                className="h-auto gap-1 rounded-[9px] px-2.5 py-1.5 text-[12px] font-semibold text-fp-text-2 hover:text-fp-text"
               >
                 <Plus size={14} strokeWidth={2.4} /> Add source
               </Button>
@@ -394,15 +384,27 @@ export function GoalEditor({
           </div>
         ) : null}
 
+        {card ? (
+          <PriorityControl
+            rank={card.rank}
+            total={rankTotal}
+            canUp={card.canUp}
+            canDown={card.canDown}
+            onUp={onMoveUp}
+            onDown={onMoveDown}
+          />
+        ) : null}
+
         <div>
-          <Label className={LABEL}>Color tag</Label>
-          <div className="flex flex-wrap gap-[10px]">
+          <Label className={FIELD_LABEL}>Colour</Label>
+          <div className="flex flex-wrap gap-2">
             {GOAL_COLORS.map((color) => (
               <button
                 key={color}
                 type="button"
                 onClick={() => onField('color', color)}
-                className="h-[27px] w-[27px] rounded-[8px] ring-1 ring-black/10"
+                aria-label={`Colour ${color}`}
+                className="h-[26px] w-[26px] rounded-[8px] ring-1 ring-black/10"
                 style={{
                   background: color,
                   outline:
@@ -415,6 +417,8 @@ export function GoalEditor({
             ))}
           </div>
         </div>
+
+        {card?.hasSchedule ? <GoalSchedule card={card} /> : null}
 
         {hasOverReserve ? (
           <div className="flex items-start gap-2 rounded-[11px] border border-fp-danger bg-fp-danger/10 px-3 py-[10px] text-[12.5px] leading-normal text-fp-danger">
@@ -432,91 +436,6 @@ export function GoalEditor({
           </div>
         ) : null}
       </div>
-    </ResponsiveDialog>
-  )
-}
-
-type WalletGroup = ReturnType<typeof walletGroupOptions>[number]
-
-const ALLOC_INPUT =
-  'rounded-[9px] border border-fp-border-strong bg-fp-surface px-2.5 py-2 text-[13px] text-fp-text outline-none focus:border-fp-accent'
-
-function AllocationRow({
-  row,
-  over,
-  walletGroups,
-  onSource,
-  onField,
-  onRemove,
-}: {
-  row: AllocationRowDraft
-  over: boolean
-  walletGroups: WalletGroup[]
-  onSource: (key: string, value: string) => void
-  onField: (
-    key: string,
-    field: 'amount' | 'externalLabel',
-    value: string,
-  ) => void
-  onRemove: (key: string) => void
-}) {
-  const sourceValue =
-    row.source === 'wallet' ? (row.walletId ?? 'external') : 'external'
-  return (
-    <div
-      className={`rounded-[11px] border bg-fp-surface-2 p-2.5 ${
-        over ? 'border-fp-danger' : 'border-fp-border-strong'
-      }`}
-    >
-      <div className="flex items-center gap-2">
-        <div className="relative w-[40%]">
-          <Input
-            value={row.amount}
-            onChange={(e) => onField(row.key, 'amount', e.target.value)}
-            inputMode="decimal"
-            placeholder="0.00"
-            className={`${ALLOC_INPUT} h-auto bg-fp-surface pe-10 tabular-nums`}
-          />
-          <span className="pointer-events-none absolute inset-y-0 inset-e-2.5 flex items-center text-[11px] font-semibold text-fp-text-3">
-            {row.currency}
-          </span>
-        </div>
-        <Select value={sourceValue} onValueChange={(v) => onSource(row.key, v)}>
-          <SelectTrigger className={`${ALLOC_INPUT} h-auto flex-1`}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {walletGroups.map((g, gi) => (
-              <SelectGroup key={gi}>
-                <SelectLabel>{g.label ?? 'Wallets'}</SelectLabel>
-                {g.wallets.map((w) => (
-                  <SelectItem key={w.id} value={w.id}>
-                    {w.name}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            ))}
-            <SelectItem value="external">External source…</SelectItem>
-          </SelectContent>
-        </Select>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => onRemove(row.key)}
-          aria-label="Remove source"
-          className="h-8 w-8 rounded-[9px] bg-fp-surface text-fp-text-3 hover:text-fp-danger"
-        >
-          <X size={15} strokeWidth={2} />
-        </Button>
-      </div>
-      {row.source === 'external' ? (
-        <Input
-          value={row.externalLabel}
-          onChange={(e) => onField(row.key, 'externalLabel', e.target.value)}
-          placeholder="Source name — e.g. Dad’s help, Grant"
-          className={`${ALLOC_INPUT} mt-2 h-auto w-full bg-fp-surface`}
-        />
-      ) : null}
-    </div>
+    </DetailPanel>
   )
 }

@@ -1,4 +1,6 @@
-import { SUPPORTED_CURRENCIES } from '#/lib/currency'
+import { CurrencyPicker } from '#/components/CurrencyPicker'
+import { setBaseCurrency } from '#/features/balances/data/mutations'
+import { useBalances } from '#/features/balances/hooks/useBalances'
 import type { CurrencyCode } from '#/lib/currency'
 import { DATE_FORMAT_OPTIONS } from '#/lib/date'
 import type { DateFormat } from '#/lib/date'
@@ -24,18 +26,14 @@ const SELECT =
 
 const DEFAULT_ACCOUNT_NONE = '__none__'
 
-type Wallet = { id: string; name: string }
-
-type Props = {
-  base: CurrencyCode
-  onBaseChange: (code: CurrencyCode) => void
-  wallets: Wallet[]
-}
-
-export function PreferencesSection({ base, onBaseChange, wallets }: Props) {
+export function PreferencesSection() {
+  const { base, nodes } = useBalances()
   const preference = useThemeStore((s) => s.preference)
   const setPreference = useThemeStore((s) => s.setPreference)
   const p = usePreferencesStore()
+
+  const wallets = nodes.filter((n) => n.kind === 'wallet')
+  const onBaseChange = (code: CurrencyCode) => void setBaseCurrency(code)
 
   return (
     <div className="flex flex-col gap-4">
@@ -60,21 +58,13 @@ export function PreferencesSection({ base, onBaseChange, wallets }: Props) {
           label="Base currency"
           desc="Everything is totalled in this currency."
         >
-          <Select
+          <CurrencyPicker
             value={base}
-            onValueChange={(v) => onBaseChange(v as CurrencyCode)}
-          >
-            <SelectTrigger className={`${SELECT} font-bold`}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {SUPPORTED_CURRENCIES.map((c) => (
-                <SelectItem key={c} value={c}>
-                  {c}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onChange={onBaseChange}
+            label="Base currency"
+            align="end"
+            className={`${SELECT} font-bold`}
+          />
         </SettingRow>
 
         <SettingRow label="Number format" desc="Thousands and decimal style.">

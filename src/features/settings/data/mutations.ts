@@ -1,101 +1,90 @@
 import { db } from '#/db/db'
 import { schedulePush } from '#/db/sync'
-import type { LocalCategory } from '#/db/types'
-import type { TxType } from '#/features/transactions/api/types'
+import type { LocalCustomCurrency, LocalExchangeRate } from '#/db/types'
 import type { CurrencyCode } from '#/lib/currency'
-import { localCategoryToCreateWire, localCategoryToUpdateWire } from './mappers'
-import { slugify } from './slug'
+import type { UpdateRateWire } from '#/features/settings/api/types'
+import {
+  localCustomCurrencyToCreateWire,
+  localCustomCurrencyToUpdateWire,
+} from './mappers'
 
 const now = () => new Date().toISOString()
 const newId = () => crypto.randomUUID()
 
-export type CategoryDraft = {
-  name: string
-  type: TxType
-  color: string
-}
-
-export type CategoryPatch = Partial<{
-  name: string
-  color: string
-  position: number
-}>
-
-const liveCategories = async (): Promise<LocalCategory[]> =>
-  (await db.categories.toArray()).filter((c) => c.deleted === 0)
-
-async function uniqueSlug(name: string): Promise<string> {
-  const base = slugify(name)
-  const taken = new Set((await liveCategories()).map((c) => c.slug))
-  if (!taken.has(base)) return base
-  for (let i = 2; i < 1000; i += 1) {
-    const candidate = `${base}_${i}`
-    if (!taken.has(candidate)) return candidate
-  }
-  return `${base}_${newId().slice(0, 6)}`
-}
-
-async function nextPosition(): Promise<number> {
-  const all = await liveCategories()
-  return all.reduce((max, c) => Math.max(max, c.position), -1) + 1
-}
-
-// --- Outbox helpers ------------------------------------------------------------------
-
-const pending = (entity: 'category' | 'rate', id: string) =>
+const pending = (entity: 'customCurrency' | 'rate', id: string) =>
   db.outbox.where('[entity+id]').equals([entity, id])
 
-async function enqueueCategoryUpsert(category: LocalCategory): Promise<void> {
-  const entries = await pending('category', category.id).toArray()
+// --- Custom currencies ---------------------------------------------------------------
+
+export type CustomCurrencyDraft = {
+  code: string
+  name: string
+  symbol: string
+  minorUnit: number
+}
+
+export type CustomCurrencyPatch = Partial<{
+  name: string
+  symbol: string
+  rate: number
+}>
+
+async function enqueueCustomCurrencyUpsert(
+  currency: LocalCustomCurrency,
+): Promise<void> {
+  const entries = await pending('customCurrency', currency.id).toArray()
   const create = entries.find((e) => e.op === 'create')
   if (create) {
-    create.payload = localCategoryToCreateWire(category)
+    create.payload = localCustomCurrencyToCreateWire(currency)
     await db.outbox.put(create)
     return
   }
   const update = entries.find((e) => e.op === 'update')
-  const payload = localCategoryToUpdateWire(category)
+  const payload = localCustomCurrencyToUpdateWire(currency)
   if (update) {
     update.payload = payload
-    update.baseVersion = category.version
+    update.baseVersion = currency.version
     await db.outbox.put(update)
     return
   }
   await db.outbox.add({
     op: 'update',
-    entity: 'category',
-    id: category.id,
+    entity: 'customCurrency',
+    id: currency.id,
     payload,
-    baseVersion: category.version,
+    baseVersion: currency.version,
     createdAt: now(),
   })
 }
 
-// --- Categories ----------------------------------------------------------------------
-
-export async function createCategory(draft: CategoryDraft): Promise<string> {
+/** Create one of the user's own currencies. `rate` is absolute (units of the reference per
+ *  1 unit), which is what every other rate in the app means. */
+export async function createCustomCurrency(
+  draft: CustomCurrencyDraft,
+  rate: number,
+): Promise<string> {
   const id = newId()
   const ts = now()
-  const category: LocalCategory = {
+  const currency: LocalCustomCurrency = {
     id,
-    slug: await uniqueSlug(draft.name),
+    code: draft.code.trim().toUpperCase(),
     name: draft.name.trim(),
-    type: draft.type,
-    color: draft.color,
-    position: await nextPosition(),
+    symbol: draft.symbol.trim(),
+    minorUnit: draft.minorUnit,
+    rate,
     createdAt: ts,
     updatedAt: ts,
     version: '',
     dirty: 1,
     deleted: 0,
   }
-  await db.transaction('rw', db.categories, db.outbox, async () => {
-    await db.categories.put(category)
+  await db.transaction('rw', db.customCurrencies, db.outbox, async () => {
+    await db.customCurrencies.put(currency)
     await db.outbox.add({
       op: 'create',
-      entity: 'category',
+      entity: 'customCurrency',
       id,
-      payload: localCategoryToCreateWire(category),
+      payload: localCustomCurrencyToCreateWire(currency),
       baseVersion: null,
       createdAt: ts,
     })
@@ -104,37 +93,37 @@ export async function createCategory(draft: CategoryDraft): Promise<string> {
   return id
 }
 
-export async function updateCategory(
+export async function updateCustomCurrency(
   id: string,
-  patch: CategoryPatch,
+  patch: CustomCurrencyPatch,
 ): Promise<void> {
-  const existing = await db.categories.get(id)
+  const existing = await db.customCurrencies.get(id)
   if (!existing) return
-  const category: LocalCategory = {
+  const currency: LocalCustomCurrency = {
     ...existing,
     name: patch.name !== undefined ? patch.name.trim() : existing.name,
-    color: patch.color ?? existing.color,
-    position: patch.position ?? existing.position,
+    symbol: patch.symbol !== undefined ? patch.symbol.trim() : existing.symbol,
+    rate: patch.rate ?? existing.rate,
     updatedAt: now(),
     dirty: 1,
   }
-  await db.transaction('rw', db.categories, db.outbox, async () => {
-    await db.categories.put(category)
-    await enqueueCategoryUpsert(category)
+  await db.transaction('rw', db.customCurrencies, db.outbox, async () => {
+    await db.customCurrencies.put(currency)
+    await enqueueCustomCurrencyUpsert(currency)
   })
   schedulePush()
 }
 
-export async function deleteCategory(id: string): Promise<void> {
-  const entries = await pending('category', id).toArray()
+export async function deleteCustomCurrency(id: string): Promise<void> {
+  const entries = await pending('customCurrency', id).toArray()
   const neverSynced = entries.some((e) => e.op === 'create')
-  await db.transaction('rw', db.categories, db.outbox, async () => {
-    await pending('category', id).delete()
-    await db.categories.delete(id)
+  await db.transaction('rw', db.customCurrencies, db.outbox, async () => {
+    await pending('customCurrency', id).delete()
+    await db.customCurrencies.delete(id)
     if (!neverSynced) {
       await db.outbox.add({
         op: 'delete',
-        entity: 'category',
+        entity: 'customCurrency',
         id,
         payload: null,
         baseVersion: null,
@@ -147,16 +136,28 @@ export async function deleteCategory(id: string): Promise<void> {
 
 // --- Exchange rates ------------------------------------------------------------------
 
-/** Set the user's FX rate for one currency. Copy-on-write: the edit stays local-dirty until
- *  the sync engine pushes it, so a background pull won't clobber it. */
+/**
+ * Set the user's FX rate for one currency. Copy-on-write in both directions: the defaults
+ * live in the app config, so the first edit of a currency *creates* its row — locally and
+ * (with no `version` to check) on the server. The edit stays local-dirty until the sync
+ * engine pushes it, so a background pull won't clobber it.
+ */
 export async function setExchangeRate(
   currency: CurrencyCode,
   rate: number,
 ): Promise<void> {
   const existing = await db.exchangeRates.get(currency)
-  if (!existing) return
-  const next = { ...existing, rate, updatedAt: now(), dirty: 1 as const }
-  const payload = { version: existing.version, rate: String(rate) }
+  const next: LocalExchangeRate = {
+    currency,
+    version: existing?.version ?? '',
+    ...existing,
+    rate,
+    updatedAt: now(),
+    dirty: 1,
+  }
+  const payload: UpdateRateWire = existing?.version
+    ? { version: existing.version, rate: String(rate) }
+    : { rate: String(rate) }
   await db.transaction('rw', db.exchangeRates, db.outbox, async () => {
     await db.exchangeRates.put(next)
     const open = await pending('rate', currency).first()
@@ -169,7 +170,7 @@ export async function setExchangeRate(
         entity: 'rate',
         id: currency,
         payload,
-        baseVersion: existing.version,
+        baseVersion: existing?.version ?? null,
         createdAt: now(),
       })
     }

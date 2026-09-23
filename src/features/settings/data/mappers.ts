@@ -1,19 +1,20 @@
-import type { LocalCategory } from '#/db/types'
+import type { LocalCustomCurrency } from '#/db/types'
 import type {
-  Category,
-  CreateCategoryWire,
-  UpdateCategoryWire,
+  CreateCustomCurrencyWire,
+  CustomCurrency,
+  UpdateCustomCurrencyWire,
 } from '#/features/settings/api/types'
-import { toWireTxType } from '#/features/settings/api/types'
 
-/** Server category → local record (freshly synced: clean, not deleted). */
-export const serverCategoryToLocal = (c: Category): LocalCategory => ({
+/** Server currency → local record (freshly synced: clean, not deleted). */
+export const serverCustomCurrencyToLocal = (
+  c: CustomCurrency,
+): LocalCustomCurrency => ({
   id: c.id,
-  slug: c.slug,
+  code: c.code,
   name: c.name,
-  type: c.type,
-  color: c.color,
-  position: c.position,
+  symbol: c.symbol,
+  minorUnit: c.minorUnit,
+  rate: c.rate,
   createdAt: c.createdAt,
   updatedAt: c.updatedAt,
   version: c.version,
@@ -21,23 +22,22 @@ export const serverCategoryToLocal = (c: Category): LocalCategory => ({
   deleted: 0,
 })
 
-export const localCategoryToCreateWire = (
-  l: LocalCategory,
-): CreateCategoryWire => ({
+export const localCustomCurrencyToCreateWire = (
+  l: LocalCustomCurrency,
+): CreateCustomCurrencyWire => ({
   id: l.id,
-  slug: l.slug,
+  code: l.code,
   name: l.name,
-  type: toWireTxType(l.type),
-  color: l.color,
-  position: l.position,
+  symbol: l.symbol,
+  minor_unit: l.minorUnit,
+  rate: String(l.rate),
 })
 
-// The update is based on the last-synced `version` (optimistic locking base).
-export const localCategoryToUpdateWire = (
-  l: LocalCategory,
-): UpdateCategoryWire => ({
+export const localCustomCurrencyToUpdateWire = (
+  l: LocalCustomCurrency,
+): UpdateCustomCurrencyWire => ({
   version: l.version,
   name: l.name,
-  color: l.color,
-  position: l.position,
+  symbol: l.symbol,
+  rate: String(l.rate),
 })
