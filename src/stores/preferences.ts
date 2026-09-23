@@ -19,6 +19,12 @@ export type NotificationPrefs = {
   goals: boolean
 }
 
+/** How many recently picked currencies the pickers keep at the top of their list. */
+const RECENT_CURRENCY_LIMIT = 6
+
+/** How many recently picked icons the icon picker pins above the manifest's groups. */
+const RECENT_ICON_LIMIT = 8
+
 type PreferencesState = {
   numberFormat: NumberFormat
   dateFormat: DateFormat
@@ -27,6 +33,9 @@ type PreferencesState = {
   hideEmptyWallets: boolean
   autoUpdateRates: boolean
   autoBackup: boolean
+  recentCurrencies: string[]
+  /** Kept as plain strings: a pick can outlive the pack that defined it. */
+  recentIcons: string[]
   notifications: NotificationPrefs
   setNumberFormat: (v: NumberFormat) => void
   setDateFormat: (v: DateFormat) => void
@@ -35,6 +44,8 @@ type PreferencesState = {
   setHideEmptyWallets: (v: boolean) => void
   setAutoUpdateRates: (v: boolean) => void
   setAutoBackup: (v: boolean) => void
+  noteCurrencyUsed: (code: string) => void
+  noteIconUsed: (id: string) => void
   toggleNotification: (key: keyof NotificationPrefs) => void
 }
 
@@ -48,6 +59,8 @@ export const usePreferencesStore = create<PreferencesState>()(
       hideEmptyWallets: false,
       autoUpdateRates: true,
       autoBackup: true,
+      recentCurrencies: [],
+      recentIcons: [],
       notifications: {
         bills: true,
         budget: true,
@@ -62,6 +75,20 @@ export const usePreferencesStore = create<PreferencesState>()(
       setHideEmptyWallets: (hideEmptyWallets) => set({ hideEmptyWallets }),
       setAutoUpdateRates: (autoUpdateRates) => set({ autoUpdateRates }),
       setAutoBackup: (autoBackup) => set({ autoBackup }),
+      noteCurrencyUsed: (code) =>
+        set((s) => ({
+          recentCurrencies: [
+            code,
+            ...s.recentCurrencies.filter((c) => c !== code),
+          ].slice(0, RECENT_CURRENCY_LIMIT),
+        })),
+      noteIconUsed: (id) =>
+        set((s) => ({
+          recentIcons: [id, ...s.recentIcons.filter((i) => i !== id)].slice(
+            0,
+            RECENT_ICON_LIMIT,
+          ),
+        })),
       toggleNotification: (key) =>
         set((s) => ({
           notifications: { ...s.notifications, [key]: !s.notifications[key] },

@@ -1,0 +1,1575 @@
+{
+  "source": {
+    "package": "@phosphor-icons/core",
+    "version": "2.1.1",
+    "weight": "regular",
+    "license": "MIT"
+  },
+  "groups": [
+    { "key": "food", "label": "Food & drink" },
+    { "key": "shopping", "label": "Shopping" },
+    { "key": "home", "label": "Home" },
+    { "key": "bills", "label": "Bills & utilities" },
+    { "key": "transport", "label": "Transport" },
+    { "key": "health", "label": "Health" },
+    { "key": "education", "label": "Education" },
+    { "key": "leisure", "label": "Leisure" },
+    { "key": "travel", "label": "Travel" },
+    { "key": "family", "label": "Family & giving" },
+    { "key": "work", "label": "Work & growth" },
+    { "key": "money", "label": "Money & accounts" },
+    { "key": "admin", "label": "Admin & obligations" },
+    { "key": "nature", "label": "Nature" },
+    { "key": "other", "label": "Other" }
+  ],
+  "icons": [
+    {
+      "id": "fork-knife",
+      "group": "food",
+      "label": "Restaurant",
+      "keywords": ["dining", "eat", "cutlery", "meal"]
+    },
+    {
+      "id": "bowl-food",
+      "group": "food",
+      "label": "Meal bowl",
+      "keywords": ["dining", "lunch", "salad", "food"]
+    },
+    {
+      "id": "bowl-steam",
+      "group": "food",
+      "label": "Hot soup",
+      "keywords": ["soup", "ramen", "noodles", "warm"]
+    },
+    {
+      "id": "cooking-pot",
+      "group": "food",
+      "label": "Home cooking",
+      "keywords": ["cook", "kitchen", "stew", "meal"]
+    },
+    {
+      "id": "pizza",
+      "group": "food",
+      "label": "Pizza",
+      "keywords": ["takeaway", "italian", "slice", "fast food"]
+    },
+    {
+      "id": "hamburger",
+      "group": "food",
+      "label": "Fast food",
+      "keywords": ["burger", "takeaway", "drive-thru", "grill"]
+    },
+    {
+      "id": "bread",
+      "group": "food",
+      "label": "Bakery",
+      "keywords": ["bakery", "loaf", "pastry", "baking"]
+    },
+    {
+      "id": "cookie",
+      "group": "food",
+      "label": "Snacks",
+      "keywords": ["biscuit", "treat", "sweet", "snack"]
+    },
+    {
+      "id": "cake",
+      "group": "food",
+      "label": "Cake",
+      "keywords": ["dessert", "birthday", "bakery", "sweet"]
+    },
+    {
+      "id": "ice-cream",
+      "group": "food",
+      "label": "Ice cream",
+      "keywords": ["dessert", "gelato", "sweet", "treat"]
+    },
+    {
+      "id": "popcorn",
+      "group": "food",
+      "label": "Cinema snacks",
+      "keywords": ["snack", "movie", "cinema", "treat"]
+    },
+    {
+      "id": "coffee",
+      "group": "food",
+      "label": "Coffee",
+      "keywords": ["cafe", "espresso", "latte", "drink"]
+    },
+    {
+      "id": "tea-bag",
+      "group": "food",
+      "label": "Tea",
+      "keywords": ["drink", "herbal", "brew", "hot"]
+    },
+    {
+      "id": "cheers",
+      "group": "food",
+      "label": "Drinks out",
+      "keywords": ["toast", "bar", "celebrate", "night out"]
+    },
+    {
+      "id": "beer-stein",
+      "group": "food",
+      "label": "Beer",
+      "keywords": ["pub", "bar", "alcohol", "drink"]
+    },
+    {
+      "id": "wine",
+      "group": "food",
+      "label": "Wine",
+      "keywords": ["alcohol", "bar", "bottle", "drink"]
+    },
+    {
+      "id": "martini",
+      "group": "food",
+      "label": "Cocktails",
+      "keywords": ["bar", "alcohol", "drink", "nightlife"]
+    },
+    {
+      "id": "carrot",
+      "group": "food",
+      "label": "Vegetables",
+      "keywords": ["produce", "veg", "greengrocer", "fresh"]
+    },
+    {
+      "id": "orange",
+      "group": "food",
+      "label": "Fruit",
+      "keywords": ["produce", "citrus", "fresh", "greengrocer"]
+    },
+    {
+      "id": "avocado",
+      "group": "food",
+      "label": "Fresh produce",
+      "keywords": ["fruit", "healthy", "greens", "organic"]
+    },
+    {
+      "id": "grains",
+      "group": "food",
+      "label": "Pantry staples",
+      "keywords": ["rice", "cereal", "wheat", "dry goods"]
+    },
+    {
+      "id": "fish",
+      "group": "food",
+      "label": "Fish",
+      "keywords": ["seafood", "fishmonger", "protein", "market"]
+    },
+    {
+      "id": "egg",
+      "group": "food",
+      "label": "Eggs",
+      "keywords": ["dairy", "breakfast", "protein", "grocery"]
+    },
+    {
+      "id": "shrimp",
+      "group": "food",
+      "label": "Seafood",
+      "keywords": ["prawn", "shellfish", "fishmonger", "market"]
+    },
+    {
+      "id": "pepper",
+      "group": "food",
+      "label": "Spices",
+      "keywords": ["chili", "seasoning", "condiment", "spice"]
+    },
+    {
+      "id": "knife",
+      "group": "food",
+      "label": "Butcher",
+      "keywords": ["blade", "meat", "chop", "kitchen"]
+    },
+    {
+      "id": "shopping-cart",
+      "group": "shopping",
+      "label": "Groceries",
+      "keywords": ["supermarket", "cart", "shop", "trolley"]
+    },
+    {
+      "id": "shopping-bag",
+      "group": "shopping",
+      "label": "Shopping",
+      "keywords": ["retail", "purchase", "store", "bag"]
+    },
+    {
+      "id": "basket",
+      "group": "shopping",
+      "label": "Convenience store",
+      "keywords": ["shop", "corner store", "basket", "grocery"]
+    },
+    {
+      "id": "storefront",
+      "group": "shopping",
+      "label": "Supermarket",
+      "keywords": ["store", "shop", "retail", "market"]
+    },
+    {
+      "id": "bag",
+      "group": "shopping",
+      "label": "Retail bag",
+      "keywords": ["shop", "purchase", "carry", "store"]
+    },
+    {
+      "id": "tag",
+      "group": "shopping",
+      "label": "Generic category",
+      "keywords": ["label", "price", "tag", "default"]
+    },
+    {
+      "id": "tag-chevron",
+      "group": "shopping",
+      "label": "Discounts",
+      "keywords": ["sale", "price", "label", "offer"]
+    },
+    {
+      "id": "t-shirt",
+      "group": "shopping",
+      "label": "Clothing",
+      "keywords": ["apparel", "clothes", "shirt", "fashion"]
+    },
+    {
+      "id": "hoodie",
+      "group": "shopping",
+      "label": "Casual wear",
+      "keywords": ["clothes", "apparel", "sweatshirt", "fashion"]
+    },
+    {
+      "id": "pants",
+      "group": "shopping",
+      "label": "Trousers",
+      "keywords": ["clothes", "apparel", "jeans", "fashion"]
+    },
+    {
+      "id": "dress",
+      "group": "shopping",
+      "label": "Womenswear",
+      "keywords": ["clothes", "apparel", "fashion", "outfit"]
+    },
+    {
+      "id": "sneaker",
+      "group": "shopping",
+      "label": "Shoes",
+      "keywords": ["footwear", "trainers", "sports", "apparel"]
+    },
+    {
+      "id": "high-heel",
+      "group": "shopping",
+      "label": "Formal shoes",
+      "keywords": ["footwear", "heels", "fashion", "apparel"]
+    },
+    {
+      "id": "eyeglasses",
+      "group": "shopping",
+      "label": "Eyewear",
+      "keywords": ["glasses", "optician", "spectacles", "vision"]
+    },
+    {
+      "id": "sunglasses",
+      "group": "shopping",
+      "label": "Sunglasses",
+      "keywords": ["shades", "eyewear", "summer", "accessories"]
+    },
+    {
+      "id": "watch",
+      "group": "shopping",
+      "label": "Watch",
+      "keywords": ["timepiece", "accessories", "jewellery", "wrist"]
+    },
+    {
+      "id": "diamond",
+      "group": "shopping",
+      "label": "Jewellery",
+      "keywords": ["jewelry", "luxury", "gem", "ring"]
+    },
+    {
+      "id": "scissors",
+      "group": "shopping",
+      "label": "Haircut",
+      "keywords": ["barber", "salon", "grooming", "trim"]
+    },
+    {
+      "id": "sparkle",
+      "group": "shopping",
+      "label": "Beauty",
+      "keywords": ["cosmetics", "skincare", "makeup", "grooming"]
+    },
+    {
+      "id": "package",
+      "group": "shopping",
+      "label": "Parcel",
+      "keywords": ["delivery", "order", "box", "shipment"]
+    },
+    {
+      "id": "truck",
+      "group": "shopping",
+      "label": "Delivery",
+      "keywords": ["shipping", "freight", "courier", "logistics"]
+    },
+    {
+      "id": "house",
+      "group": "home",
+      "label": "Housing",
+      "keywords": ["home", "rent", "property", "residence"]
+    },
+    {
+      "id": "house-line",
+      "group": "home",
+      "label": "Rent",
+      "keywords": ["home", "lease", "housing", "tenancy"]
+    },
+    {
+      "id": "building-apartment",
+      "group": "home",
+      "label": "Apartment",
+      "keywords": ["flat", "building", "rent", "property"]
+    },
+    {
+      "id": "city",
+      "group": "home",
+      "label": "Property taxes",
+      "keywords": ["municipal", "urban", "city", "council"]
+    },
+    {
+      "id": "bed",
+      "group": "home",
+      "label": "Hotel",
+      "keywords": ["sleep", "bedroom", "lodging", "stay"]
+    },
+    {
+      "id": "couch",
+      "group": "home",
+      "label": "Furniture",
+      "keywords": ["sofa", "living room", "home goods", "lounge"]
+    },
+    {
+      "id": "armchair",
+      "group": "home",
+      "label": "Home comfort",
+      "keywords": ["chair", "furniture", "lounge", "seat"]
+    },
+    {
+      "id": "dresser",
+      "group": "home",
+      "label": "Storage furniture",
+      "keywords": ["drawers", "wardrobe", "furniture", "bedroom"]
+    },
+    {
+      "id": "lamp",
+      "group": "home",
+      "label": "Lighting",
+      "keywords": ["light", "lamp", "home", "decor"]
+    },
+    {
+      "id": "door-open",
+      "group": "home",
+      "label": "Moving in",
+      "keywords": ["door", "entrance", "move", "access"]
+    },
+    {
+      "id": "key",
+      "group": "home",
+      "label": "Keys",
+      "keywords": ["lock", "access", "property", "rent"]
+    },
+    {
+      "id": "keyhole",
+      "group": "home",
+      "label": "Security",
+      "keywords": ["lock", "safety", "access", "privacy"]
+    },
+    {
+      "id": "oven",
+      "group": "home",
+      "label": "Kitchen appliance",
+      "keywords": ["cooker", "stove", "appliance", "baking"]
+    },
+    {
+      "id": "washing-machine",
+      "group": "home",
+      "label": "Laundry",
+      "keywords": ["washing", "appliance", "cleaning", "dryer"]
+    },
+    {
+      "id": "bathtub",
+      "group": "home",
+      "label": "Bathroom",
+      "keywords": ["bath", "washroom", "plumbing", "tub"]
+    },
+    {
+      "id": "shower",
+      "group": "home",
+      "label": "Shower",
+      "keywords": ["bathroom", "water", "washing", "plumbing"]
+    },
+    {
+      "id": "toilet",
+      "group": "home",
+      "label": "Sanitary",
+      "keywords": ["bathroom", "plumbing", "washroom", "wc"]
+    },
+    {
+      "id": "broom",
+      "group": "home",
+      "label": "Cleaning",
+      "keywords": ["housekeeping", "sweep", "chores", "tidy"]
+    },
+    {
+      "id": "hammer",
+      "group": "home",
+      "label": "Repairs",
+      "keywords": ["diy", "tool", "fix", "maintenance"]
+    },
+    {
+      "id": "wrench",
+      "group": "home",
+      "label": "Maintenance",
+      "keywords": ["tool", "repair", "plumbing", "fix"]
+    },
+    {
+      "id": "screwdriver",
+      "group": "home",
+      "label": "Handyman",
+      "keywords": ["tool", "diy", "repair", "assembly"]
+    },
+    {
+      "id": "toolbox",
+      "group": "home",
+      "label": "Tools",
+      "keywords": ["diy", "repair", "kit", "maintenance"]
+    },
+    {
+      "id": "paint-roller",
+      "group": "home",
+      "label": "Decorating",
+      "keywords": ["paint", "renovation", "diy", "walls"]
+    },
+    {
+      "id": "paint-brush-household",
+      "group": "home",
+      "label": "Renovation",
+      "keywords": ["paint", "decorate", "diy", "refurbish"]
+    },
+    {
+      "id": "trash",
+      "group": "home",
+      "label": "Waste collection",
+      "keywords": ["bin", "garbage", "rubbish", "disposal"]
+    },
+    {
+      "id": "elevator",
+      "group": "home",
+      "label": "Building services",
+      "keywords": ["lift", "maintenance", "service charge", "building"]
+    },
+    {
+      "id": "stairs",
+      "group": "home",
+      "label": "Stairs",
+      "keywords": ["steps", "building", "climb", "floors"]
+    },
+    {
+      "id": "lightning",
+      "group": "bills",
+      "label": "Electricity",
+      "keywords": ["power", "energy", "utility", "volt"]
+    },
+    {
+      "id": "plug-charging",
+      "group": "bills",
+      "label": "Charging",
+      "keywords": ["power", "socket", "electric", "energy"]
+    },
+    {
+      "id": "solar-panel",
+      "group": "bills",
+      "label": "Solar",
+      "keywords": ["renewable", "energy", "panel", "power"]
+    },
+    {
+      "id": "lightbulb",
+      "group": "bills",
+      "label": "Utilities",
+      "keywords": ["light", "power", "energy", "bulb"]
+    },
+    {
+      "id": "drop",
+      "group": "bills",
+      "label": "Water",
+      "keywords": ["utility", "plumbing", "liquid", "supply"]
+    },
+    {
+      "id": "fire",
+      "group": "bills",
+      "label": "Gas",
+      "keywords": ["heating", "flame", "fuel", "burner"]
+    },
+    {
+      "id": "thermometer",
+      "group": "bills",
+      "label": "Heating",
+      "keywords": ["temperature", "cooling", "climate", "hvac"]
+    },
+    {
+      "id": "wifi-high",
+      "group": "bills",
+      "label": "Internet",
+      "keywords": ["wifi", "broadband", "network", "connection"]
+    },
+    {
+      "id": "cell-tower",
+      "group": "bills",
+      "label": "Mobile network",
+      "keywords": ["telecom", "signal", "carrier", "tower"]
+    },
+    {
+      "id": "broadcast",
+      "group": "bills",
+      "label": "Broadcast",
+      "keywords": ["signal", "radio", "tv", "transmission"]
+    },
+    {
+      "id": "phone",
+      "group": "bills",
+      "label": "Phone bill",
+      "keywords": ["mobile", "call", "telecom", "handset"]
+    },
+    {
+      "id": "television-simple",
+      "group": "bills",
+      "label": "Streaming",
+      "keywords": ["tv", "television", "media", "subscription"]
+    },
+    {
+      "id": "monitor",
+      "group": "bills",
+      "label": "Display",
+      "keywords": ["screen", "computer", "monitor", "desk"]
+    },
+    {
+      "id": "laptop",
+      "group": "bills",
+      "label": "Electronics",
+      "keywords": ["computer", "device", "tech", "hardware"]
+    },
+    {
+      "id": "desktop-tower",
+      "group": "bills",
+      "label": "Computer",
+      "keywords": ["pc", "hardware", "tower", "tech"]
+    },
+    {
+      "id": "printer",
+      "group": "bills",
+      "label": "Printing",
+      "keywords": ["print", "office", "stationery", "paper"]
+    },
+    {
+      "id": "cloud",
+      "group": "bills",
+      "label": "Cloud services",
+      "keywords": ["storage", "saas", "hosting", "online"]
+    },
+    {
+      "id": "hard-drives",
+      "group": "bills",
+      "label": "Storage",
+      "keywords": ["server", "backup", "disk", "hosting"]
+    },
+    {
+      "id": "mailbox",
+      "group": "bills",
+      "label": "Post",
+      "keywords": ["mail", "letters", "postal", "delivery"]
+    },
+    {
+      "id": "newspaper",
+      "group": "bills",
+      "label": "News subscription",
+      "keywords": ["press", "magazine", "media", "paper"]
+    },
+    {
+      "id": "pipe",
+      "group": "bills",
+      "label": "Plumbing",
+      "keywords": ["pipes", "water", "drain", "utility"]
+    },
+    {
+      "id": "car",
+      "group": "transport",
+      "label": "Car",
+      "keywords": ["vehicle", "auto", "drive", "transport"]
+    },
+    {
+      "id": "car-profile",
+      "group": "transport",
+      "label": "Car payment",
+      "keywords": ["vehicle", "auto", "lease", "loan"]
+    },
+    {
+      "id": "taxi",
+      "group": "transport",
+      "label": "Ride-hailing",
+      "keywords": ["cab", "ride", "hire", "taxi"]
+    },
+    {
+      "id": "bus",
+      "group": "transport",
+      "label": "Public transit",
+      "keywords": ["transit", "coach", "commute", "bus"]
+    },
+    {
+      "id": "train",
+      "group": "transport",
+      "label": "Train",
+      "keywords": ["rail", "commute", "transit", "metro"]
+    },
+    {
+      "id": "tram",
+      "group": "transport",
+      "label": "Tram",
+      "keywords": ["light rail", "transit", "streetcar", "commute"]
+    },
+    {
+      "id": "bicycle",
+      "group": "transport",
+      "label": "Cycling",
+      "keywords": ["bike", "bicycle", "commute", "ride"]
+    },
+    {
+      "id": "scooter",
+      "group": "transport",
+      "label": "Scooter",
+      "keywords": ["moped", "micromobility", "ride", "commute"]
+    },
+    {
+      "id": "gas-pump",
+      "group": "transport",
+      "label": "Fuel",
+      "keywords": ["petrol", "gas", "diesel", "refuel"]
+    },
+    {
+      "id": "steering-wheel",
+      "group": "transport",
+      "label": "Driving",
+      "keywords": ["car", "drive", "wheel", "vehicle"]
+    },
+    {
+      "id": "garage",
+      "group": "transport",
+      "label": "Parking",
+      "keywords": ["garage", "car park", "valet", "parking"]
+    },
+    {
+      "id": "traffic-cone",
+      "group": "transport",
+      "label": "Roadworks",
+      "keywords": ["construction", "road", "detour", "cone"]
+    },
+    {
+      "id": "traffic-sign",
+      "group": "transport",
+      "label": "Traffic fines",
+      "keywords": ["sign", "road", "ticket", "penalty"]
+    },
+    {
+      "id": "road-horizon",
+      "group": "transport",
+      "label": "Road trip",
+      "keywords": ["highway", "drive", "journey", "travel"]
+    },
+    {
+      "id": "map-pin",
+      "group": "transport",
+      "label": "Location",
+      "keywords": ["place", "pin", "address", "map"]
+    },
+    {
+      "id": "airplane-takeoff",
+      "group": "transport",
+      "label": "Flights",
+      "keywords": ["flight", "plane", "airline", "travel"]
+    },
+    {
+      "id": "boat",
+      "group": "transport",
+      "label": "Ferry",
+      "keywords": ["ship", "sail", "boat", "marine"]
+    },
+    {
+      "id": "heartbeat",
+      "group": "health",
+      "label": "Health",
+      "keywords": ["medical", "pulse", "vitals", "care"]
+    },
+    {
+      "id": "stethoscope",
+      "group": "health",
+      "label": "Doctor",
+      "keywords": ["clinic", "gp", "medical", "checkup"]
+    },
+    {
+      "id": "pill",
+      "group": "health",
+      "label": "Pharmacy",
+      "keywords": ["medicine", "drugs", "prescription", "tablet"]
+    },
+    {
+      "id": "prescription",
+      "group": "health",
+      "label": "Prescription",
+      "keywords": ["medicine", "pharmacy", "rx", "script"]
+    },
+    {
+      "id": "syringe",
+      "group": "health",
+      "label": "Vaccination",
+      "keywords": ["injection", "shot", "medical", "vaccine"]
+    },
+    {
+      "id": "bandaids",
+      "group": "health",
+      "label": "First aid",
+      "keywords": ["plaster", "injury", "bandage", "care"]
+    },
+    {
+      "id": "first-aid-kit",
+      "group": "health",
+      "label": "Medical kit",
+      "keywords": ["emergency", "aid", "health", "supplies"]
+    },
+    {
+      "id": "hospital",
+      "group": "health",
+      "label": "Hospital",
+      "keywords": ["clinic", "emergency", "medical", "care"]
+    },
+    {
+      "id": "brain",
+      "group": "health",
+      "label": "Mental health",
+      "keywords": ["therapy", "mind", "psychology", "wellbeing"]
+    },
+    {
+      "id": "eye",
+      "group": "health",
+      "label": "Optician",
+      "keywords": ["vision", "eyesight", "glasses", "eyecare"]
+    },
+    {
+      "id": "tooth",
+      "group": "health",
+      "label": "Dentist",
+      "keywords": ["dental", "teeth", "orthodontist", "oral"]
+    },
+    {
+      "id": "barbell",
+      "group": "health",
+      "label": "Fitness",
+      "keywords": ["gym", "workout", "weights", "exercise"]
+    },
+    {
+      "id": "person-simple-run",
+      "group": "health",
+      "label": "Running",
+      "keywords": ["exercise", "jog", "sport", "activity"]
+    },
+    {
+      "id": "virus",
+      "group": "health",
+      "label": "Illness",
+      "keywords": ["infection", "sickness", "germs", "health"]
+    },
+    {
+      "id": "graduation-cap",
+      "group": "education",
+      "label": "Education",
+      "keywords": ["school", "degree", "university", "study"]
+    },
+    {
+      "id": "student",
+      "group": "education",
+      "label": "Tuition",
+      "keywords": ["school", "pupil", "study", "learning"]
+    },
+    {
+      "id": "book-open",
+      "group": "education",
+      "label": "Reading",
+      "keywords": ["book", "study", "literature", "learn"]
+    },
+    {
+      "id": "books",
+      "group": "education",
+      "label": "Books",
+      "keywords": ["library", "textbooks", "reading", "study"]
+    },
+    {
+      "id": "notebook",
+      "group": "education",
+      "label": "Notebook",
+      "keywords": ["stationery", "notes", "study", "journal"]
+    },
+    {
+      "id": "note-pencil",
+      "group": "education",
+      "label": "Notes",
+      "keywords": ["write", "journal", "notes", "edit"]
+    },
+    {
+      "id": "pencil-ruler",
+      "group": "education",
+      "label": "Design study",
+      "keywords": ["drawing", "drafting", "stationery", "design"]
+    },
+    {
+      "id": "backpack",
+      "group": "education",
+      "label": "School supplies",
+      "keywords": ["bag", "school", "pupil", "gear"]
+    },
+    {
+      "id": "chalkboard-teacher",
+      "group": "education",
+      "label": "Teaching",
+      "keywords": ["class", "lesson", "tutor", "school"]
+    },
+    {
+      "id": "exam",
+      "group": "education",
+      "label": "Exams",
+      "keywords": ["test", "assessment", "school", "grading"]
+    },
+    {
+      "id": "certificate",
+      "group": "education",
+      "label": "Courses",
+      "keywords": ["diploma", "certification", "training", "award"]
+    },
+    {
+      "id": "translate",
+      "group": "education",
+      "label": "Language course",
+      "keywords": ["translation", "language", "learn", "words"]
+    },
+    {
+      "id": "microscope",
+      "group": "education",
+      "label": "Science",
+      "keywords": ["lab", "research", "biology", "study"]
+    },
+    {
+      "id": "ruler",
+      "group": "education",
+      "label": "Measurement",
+      "keywords": ["measure", "draft", "stationery", "scale"]
+    },
+    {
+      "id": "game-controller",
+      "group": "leisure",
+      "label": "Gaming",
+      "keywords": ["games", "console", "video game", "play"]
+    },
+    {
+      "id": "film-slate",
+      "group": "leisure",
+      "label": "Movies",
+      "keywords": ["cinema", "film", "video", "production"]
+    },
+    {
+      "id": "film-strip",
+      "group": "leisure",
+      "label": "Film",
+      "keywords": ["movie", "cinema", "reel", "video"]
+    },
+    {
+      "id": "music-notes",
+      "group": "leisure",
+      "label": "Music",
+      "keywords": ["song", "audio", "tune", "melody"]
+    },
+    {
+      "id": "headphones",
+      "group": "leisure",
+      "label": "Audio",
+      "keywords": ["music", "podcast", "listen", "headset"]
+    },
+    {
+      "id": "guitar",
+      "group": "leisure",
+      "label": "Instruments",
+      "keywords": ["music", "band", "guitar", "play"]
+    },
+    {
+      "id": "microphone-stage",
+      "group": "leisure",
+      "label": "Live music",
+      "keywords": ["concert", "gig", "sing", "performance"]
+    },
+    {
+      "id": "mask-happy",
+      "group": "leisure",
+      "label": "Entertainment",
+      "keywords": ["theatre", "fun", "show", "leisure"]
+    },
+    {
+      "id": "ticket",
+      "group": "leisure",
+      "label": "Events",
+      "keywords": ["tickets", "concert", "admission", "show"]
+    },
+    {
+      "id": "palette",
+      "group": "leisure",
+      "label": "Art",
+      "keywords": ["paint", "creative", "hobby", "colours"]
+    },
+    {
+      "id": "camera",
+      "group": "leisure",
+      "label": "Photography",
+      "keywords": ["photo", "camera", "shoot", "picture"]
+    },
+    {
+      "id": "dice-five",
+      "group": "leisure",
+      "label": "Games",
+      "keywords": ["dice", "board game", "chance", "play"]
+    },
+    {
+      "id": "puzzle-piece",
+      "group": "leisure",
+      "label": "Hobbies",
+      "keywords": ["puzzle", "pastime", "jigsaw", "play"]
+    },
+    {
+      "id": "basketball",
+      "group": "leisure",
+      "label": "Basketball",
+      "keywords": ["sport", "ball", "game", "court"]
+    },
+    {
+      "id": "soccer-ball",
+      "group": "leisure",
+      "label": "Football",
+      "keywords": ["soccer", "sport", "ball", "match"]
+    },
+    {
+      "id": "swimming-pool",
+      "group": "leisure",
+      "label": "Swimming",
+      "keywords": ["pool", "swim", "sport", "leisure"]
+    },
+    {
+      "id": "beach-ball",
+      "group": "leisure",
+      "label": "Beach",
+      "keywords": ["summer", "play", "holiday", "leisure"]
+    },
+    {
+      "id": "tent",
+      "group": "travel",
+      "label": "Camping",
+      "keywords": ["outdoors", "campsite", "tent", "nature"]
+    },
+    {
+      "id": "mountains",
+      "group": "travel",
+      "label": "Hiking",
+      "keywords": ["mountain", "outdoors", "trek", "nature"]
+    },
+    {
+      "id": "tree-palm",
+      "group": "travel",
+      "label": "Tropical holiday",
+      "keywords": ["palm", "beach", "vacation", "resort"]
+    },
+    {
+      "id": "island",
+      "group": "travel",
+      "label": "Island getaway",
+      "keywords": ["beach", "vacation", "tropical", "resort"]
+    },
+    {
+      "id": "suitcase-rolling",
+      "group": "travel",
+      "label": "Travel",
+      "keywords": ["trip", "luggage", "vacation", "holiday"]
+    },
+    {
+      "id": "suitcase",
+      "group": "travel",
+      "label": "Luggage",
+      "keywords": ["baggage", "trip", "case", "travel"]
+    },
+    {
+      "id": "compass",
+      "group": "travel",
+      "label": "Activities",
+      "keywords": ["explore", "navigate", "tour", "adventure"]
+    },
+    {
+      "id": "globe",
+      "group": "travel",
+      "label": "International",
+      "keywords": ["world", "global", "abroad", "overseas"]
+    },
+    {
+      "id": "map-trifold",
+      "group": "travel",
+      "label": "Trip planning",
+      "keywords": ["map", "route", "navigate", "travel"]
+    },
+    {
+      "id": "sun",
+      "group": "travel",
+      "label": "Summer",
+      "keywords": ["sunny", "weather", "day", "holiday"]
+    },
+    {
+      "id": "moon-stars",
+      "group": "travel",
+      "label": "Night",
+      "keywords": ["evening", "sleep", "moon", "late"]
+    },
+    {
+      "id": "binoculars",
+      "group": "travel",
+      "label": "Sightseeing",
+      "keywords": ["explore", "tour", "view", "watch"]
+    },
+    {
+      "id": "baby",
+      "group": "family",
+      "label": "Childcare",
+      "keywords": ["infant", "child", "nursery", "kids"]
+    },
+    {
+      "id": "baby-carriage",
+      "group": "family",
+      "label": "Baby gear",
+      "keywords": ["pram", "stroller", "infant", "kids"]
+    },
+    {
+      "id": "users-three",
+      "group": "family",
+      "label": "Family",
+      "keywords": ["people", "household", "group", "relatives"]
+    },
+    {
+      "id": "user",
+      "group": "family",
+      "label": "Personal",
+      "keywords": ["person", "individual", "me", "profile"]
+    },
+    {
+      "id": "handshake",
+      "group": "family",
+      "label": "Consulting",
+      "keywords": ["deal", "agreement", "partner", "client"]
+    },
+    {
+      "id": "hand-heart",
+      "group": "family",
+      "label": "Charity",
+      "keywords": ["donation", "giving", "sadaqah", "support"]
+    },
+    {
+      "id": "heart",
+      "group": "family",
+      "label": "Loved ones",
+      "keywords": ["love", "care", "favourite", "affection"]
+    },
+    {
+      "id": "gift",
+      "group": "family",
+      "label": "Gifts",
+      "keywords": ["present", "birthday", "giving", "occasion"]
+    },
+    {
+      "id": "confetti",
+      "group": "family",
+      "label": "Celebration",
+      "keywords": ["party", "bonus", "festive", "celebrate"]
+    },
+    {
+      "id": "flower",
+      "group": "family",
+      "label": "Flowers",
+      "keywords": ["bouquet", "florist", "gift", "plant"]
+    },
+    {
+      "id": "dog",
+      "group": "family",
+      "label": "Dog",
+      "keywords": ["pet", "puppy", "animal", "vet"]
+    },
+    {
+      "id": "cat",
+      "group": "family",
+      "label": "Cat",
+      "keywords": ["pet", "kitten", "animal", "vet"]
+    },
+    {
+      "id": "paw-print",
+      "group": "family",
+      "label": "Pets",
+      "keywords": ["animal", "pet", "vet", "paw"]
+    },
+    {
+      "id": "bone",
+      "group": "family",
+      "label": "Pet supplies",
+      "keywords": ["dog", "treat", "pet food", "animal"]
+    },
+    {
+      "id": "mosque",
+      "group": "family",
+      "label": "Mosque",
+      "keywords": ["zakat", "islamic", "masjid", "worship"]
+    },
+    {
+      "id": "church",
+      "group": "family",
+      "label": "Church",
+      "keywords": ["tithe", "worship", "religion", "chapel"]
+    },
+    {
+      "id": "star-and-crescent",
+      "group": "family",
+      "label": "Zakat",
+      "keywords": ["islamic", "ramadan", "sadaqah", "charity"]
+    },
+    {
+      "id": "cigarette",
+      "group": "family",
+      "label": "Tobacco",
+      "keywords": ["smoking", "cigarettes", "vice", "nicotine"]
+    },
+    {
+      "id": "briefcase",
+      "group": "work",
+      "label": "Work",
+      "keywords": ["job", "business", "office", "career"]
+    },
+    {
+      "id": "office-chair",
+      "group": "work",
+      "label": "Office",
+      "keywords": ["desk", "workspace", "chair", "work"]
+    },
+    {
+      "id": "presentation-chart",
+      "group": "work",
+      "label": "Presentation",
+      "keywords": ["meeting", "report", "slides", "business"]
+    },
+    {
+      "id": "chart-line-up",
+      "group": "work",
+      "label": "Investment",
+      "keywords": ["growth", "returns", "stocks", "gains"]
+    },
+    {
+      "id": "chart-line-down",
+      "group": "work",
+      "label": "Losses",
+      "keywords": ["decline", "drop", "loss", "downturn"]
+    },
+    {
+      "id": "chart-bar",
+      "group": "work",
+      "label": "Reports",
+      "keywords": ["statistics", "analytics", "bars", "data"]
+    },
+    {
+      "id": "chart-pie-slice",
+      "group": "work",
+      "label": "Breakdown",
+      "keywords": ["share", "portion", "analytics", "pie"]
+    },
+    {
+      "id": "chart-donut",
+      "group": "work",
+      "label": "Allocation",
+      "keywords": ["share", "split", "analytics", "portfolio"]
+    },
+    {
+      "id": "trend-up",
+      "group": "work",
+      "label": "Growth",
+      "keywords": ["increase", "rise", "up", "gain"]
+    },
+    {
+      "id": "trend-down",
+      "group": "work",
+      "label": "Decline",
+      "keywords": ["decrease", "fall", "down", "loss"]
+    },
+    {
+      "id": "percent",
+      "group": "work",
+      "label": "Interest",
+      "keywords": ["rate", "percentage", "yield", "apr"]
+    },
+    {
+      "id": "rocket-launch",
+      "group": "work",
+      "label": "Side project",
+      "keywords": ["startup", "launch", "venture", "growth"]
+    },
+    {
+      "id": "target",
+      "group": "work",
+      "label": "Goal",
+      "keywords": ["objective", "aim", "savings goal", "target"]
+    },
+    {
+      "id": "flag",
+      "group": "work",
+      "label": "Milestone",
+      "keywords": ["marker", "goal", "checkpoint", "flag"]
+    },
+    {
+      "id": "trophy",
+      "group": "work",
+      "label": "Achievement",
+      "keywords": ["award", "win", "prize", "success"]
+    },
+    {
+      "id": "medal",
+      "group": "work",
+      "label": "Reward",
+      "keywords": ["award", "prize", "honour", "badge"]
+    },
+    {
+      "id": "star",
+      "group": "work",
+      "label": "Favourite",
+      "keywords": ["starred", "rating", "highlight", "top"]
+    },
+    {
+      "id": "crown-simple",
+      "group": "work",
+      "label": "Premium",
+      "keywords": ["luxury", "vip", "top tier", "royal"]
+    },
+    {
+      "id": "wallet",
+      "group": "money",
+      "label": "Wallet",
+      "keywords": ["cash", "account", "purse", "money"]
+    },
+    {
+      "id": "piggy-bank",
+      "group": "money",
+      "label": "Savings",
+      "keywords": ["save", "goal", "deposit", "nest egg"]
+    },
+    {
+      "id": "coins",
+      "group": "money",
+      "label": "Cash",
+      "keywords": ["money", "change", "coins", "currency"]
+    },
+    {
+      "id": "hand-coins",
+      "group": "money",
+      "label": "Allowance",
+      "keywords": ["pay", "give", "money", "payout"]
+    },
+    {
+      "id": "money",
+      "group": "money",
+      "label": "Salary",
+      "keywords": ["cash", "income", "banknote", "pay"]
+    },
+    {
+      "id": "money-wavy",
+      "group": "money",
+      "label": "Base pay",
+      "keywords": ["cash", "wage", "income", "banknote"]
+    },
+    {
+      "id": "credit-card",
+      "group": "money",
+      "label": "Card",
+      "keywords": ["credit", "debit", "payment", "bank card"]
+    },
+    {
+      "id": "cardholder",
+      "group": "money",
+      "label": "Card wallet",
+      "keywords": ["credit", "debit", "cards", "payment"]
+    },
+    {
+      "id": "bank",
+      "group": "money",
+      "label": "Bank",
+      "keywords": ["banking", "account", "branch", "institution"]
+    },
+    {
+      "id": "vault",
+      "group": "money",
+      "label": "Safe",
+      "keywords": ["secure", "deposit", "reserve", "vault"]
+    },
+    {
+      "id": "receipt",
+      "group": "money",
+      "label": "Receipt",
+      "keywords": ["bill", "proof", "purchase", "expense"]
+    },
+    {
+      "id": "invoice",
+      "group": "money",
+      "label": "Invoice",
+      "keywords": ["bill", "billing", "statement", "payment"]
+    },
+    {
+      "id": "calculator",
+      "group": "money",
+      "label": "Accounting",
+      "keywords": ["maths", "calculate", "budget", "numbers"]
+    },
+    {
+      "id": "currency-circle-dollar",
+      "group": "money",
+      "label": "Money",
+      "keywords": ["currency", "cash", "dollar", "funds"]
+    },
+    {
+      "id": "currency-dollar",
+      "group": "money",
+      "label": "Dollar",
+      "keywords": ["usd", "currency", "money", "cash"]
+    },
+    {
+      "id": "currency-eur",
+      "group": "money",
+      "label": "Euro",
+      "keywords": ["eur", "currency", "money", "cash"]
+    },
+    {
+      "id": "currency-gbp",
+      "group": "money",
+      "label": "Pound",
+      "keywords": ["gbp", "sterling", "currency", "money"]
+    },
+    {
+      "id": "currency-btc",
+      "group": "money",
+      "label": "Crypto",
+      "keywords": ["bitcoin", "btc", "digital", "currency"]
+    },
+    {
+      "id": "hand-deposit",
+      "group": "money",
+      "label": "Income",
+      "keywords": ["deposit", "incoming", "receive", "earnings"]
+    },
+    {
+      "id": "hand-arrow-up",
+      "group": "money",
+      "label": "Payout",
+      "keywords": ["withdraw", "outgoing", "transfer", "send"]
+    },
+    {
+      "id": "umbrella",
+      "group": "admin",
+      "label": "Insurance",
+      "keywords": ["cover", "policy", "protection", "premium"]
+    },
+    {
+      "id": "shield-check",
+      "group": "admin",
+      "label": "Protection",
+      "keywords": ["secure", "safety", "guarantee", "emergency fund"]
+    },
+    {
+      "id": "scales",
+      "group": "admin",
+      "label": "Legal",
+      "keywords": ["law", "justice", "balance", "court"]
+    },
+    {
+      "id": "gavel",
+      "group": "admin",
+      "label": "Court fees",
+      "keywords": ["law", "legal", "judge", "fine"]
+    },
+    {
+      "id": "file-text",
+      "group": "admin",
+      "label": "Documents",
+      "keywords": ["file", "paper", "record", "form"]
+    },
+    {
+      "id": "scroll",
+      "group": "admin",
+      "label": "Contract",
+      "keywords": ["agreement", "deed", "document", "terms"]
+    },
+    {
+      "id": "stamp",
+      "group": "admin",
+      "label": "Official fees",
+      "keywords": ["seal", "approval", "notary", "government"]
+    },
+    {
+      "id": "clipboard-text",
+      "group": "admin",
+      "label": "Checklist",
+      "keywords": ["list", "tasks", "form", "record"]
+    },
+    {
+      "id": "calendar-dots",
+      "group": "admin",
+      "label": "Schedule",
+      "keywords": ["calendar", "dates", "planning", "month"]
+    },
+    {
+      "id": "calendar-check",
+      "group": "admin",
+      "label": "Due date",
+      "keywords": ["deadline", "scheduled", "calendar", "confirmed"]
+    },
+    {
+      "id": "clock",
+      "group": "admin",
+      "label": "Time",
+      "keywords": ["hours", "schedule", "timing", "duration"]
+    },
+    {
+      "id": "alarm",
+      "group": "admin",
+      "label": "Reminder",
+      "keywords": ["alert", "wake", "notify", "deadline"]
+    },
+    {
+      "id": "repeat",
+      "group": "admin",
+      "label": "Subscriptions",
+      "keywords": ["recurring", "renewal", "loop", "periodic"]
+    },
+    {
+      "id": "arrows-clockwise",
+      "group": "admin",
+      "label": "Refund",
+      "keywords": ["reversal", "return", "refresh", "cycle"]
+    },
+    {
+      "id": "seal-check",
+      "group": "admin",
+      "label": "Membership",
+      "keywords": ["verified", "approved", "badge", "certified"]
+    },
+    {
+      "id": "leaf",
+      "group": "nature",
+      "label": "Eco",
+      "keywords": ["green", "nature", "leaf", "sustainable"]
+    },
+    {
+      "id": "plant",
+      "group": "nature",
+      "label": "Gardening",
+      "keywords": ["plants", "grow", "garden", "sprout"]
+    },
+    {
+      "id": "tree",
+      "group": "nature",
+      "label": "Nature",
+      "keywords": ["tree", "outdoors", "park", "green"]
+    },
+    {
+      "id": "tree-evergreen",
+      "group": "nature",
+      "label": "Seasonal",
+      "keywords": ["pine", "winter", "holiday", "tree"]
+    },
+    {
+      "id": "recycle",
+      "group": "nature",
+      "label": "Recycling",
+      "keywords": ["reuse", "waste", "green", "sustainable"]
+    },
+    {
+      "id": "flower-lotus",
+      "group": "nature",
+      "label": "Wellness",
+      "keywords": ["spa", "yoga", "calm", "selfcare"]
+    },
+    {
+      "id": "folder",
+      "group": "other",
+      "label": "Projects",
+      "keywords": ["folder", "files", "group", "directory"]
+    },
+    {
+      "id": "folders",
+      "group": "other",
+      "label": "Collections",
+      "keywords": ["files", "groups", "directories", "archive"]
+    },
+    {
+      "id": "stack",
+      "group": "other",
+      "label": "Group",
+      "keywords": ["layers", "stack", "collection", "set"]
+    },
+    {
+      "id": "archive",
+      "group": "other",
+      "label": "Archive",
+      "keywords": ["stored", "box", "history", "inactive"]
+    },
+    {
+      "id": "bookmark",
+      "group": "other",
+      "label": "Saved",
+      "keywords": ["bookmark", "mark", "favourite", "keep"]
+    },
+    {
+      "id": "grid-four",
+      "group": "other",
+      "label": "Categories",
+      "keywords": ["grid", "tiles", "layout", "overview"]
+    },
+    {
+      "id": "list",
+      "group": "other",
+      "label": "List",
+      "keywords": ["items", "lines", "index", "listing"]
+    },
+    {
+      "id": "dots-three-circle",
+      "group": "other",
+      "label": "Other",
+      "keywords": ["misc", "more", "uncategorised", "unknown"]
+    },
+    {
+      "id": "question",
+      "group": "other",
+      "label": "Unknown",
+      "keywords": ["help", "unsure", "query", "uncategorised"]
+    },
+    {
+      "id": "circles-three",
+      "group": "other",
+      "label": "Mixed",
+      "keywords": ["groups", "clusters", "assorted", "various"]
+    },
+    {
+      "id": "squares-four",
+      "group": "other",
+      "label": "Apps",
+      "keywords": ["tiles", "grid", "applications", "dashboard"]
+    },
+    {
+      "id": "note",
+      "group": "other",
+      "label": "Note",
+      "keywords": ["memo", "reminder", "text", "jot"]
+    }
+  ]
+}
