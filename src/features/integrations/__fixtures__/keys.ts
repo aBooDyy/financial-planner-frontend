@@ -1,0 +1,56 @@
+import type { LocalIntegrationKey } from '#/db/types'
+import type { IntegrationKeyWire } from '#/features/integrations/api/types'
+
+export const aKey = (
+  over: Partial<LocalIntegrationKey> = {},
+): LocalIntegrationKey => ({
+  id: 'k1',
+  name: 'Tasker — SMS alerts',
+  tokenPrefix: 'fpk_7f3a9c21',
+  status: 'active',
+  expiresAt: null,
+  rotatedAt: null,
+  lastUsedAt: null,
+  requestsCount: 0,
+  rateLimitPerMinute: 60,
+  throttledUntil: null,
+  defaultWalletId: null,
+  defaultCategory: null,
+  defaultSubcategory: null,
+  defaultType: 'spend',
+  defaultCurrency: null,
+  autoConfirm: false,
+  stageUnmatched: true,
+  ruleCount: 0,
+  createdAt: '2026-09-01T00:00:00Z',
+  updatedAt: '2026-09-01T00:00:00Z',
+  version: 'v1',
+  ...over,
+})
+
+export const aKeyWire = (
+  over: Partial<IntegrationKeyWire> = {},
+): IntegrationKeyWire => ({
+  id: 'k1',
+  name: 'Tasker — SMS alerts',
+  token_prefix: 'fpk_7f3a9c21',
+  status: 'ACTIVE',
+  expires_at: null,
+  rotated_at: null,
+  last_used_at: '2026-09-23T10:02:00Z',
+  requests_count: 412,
+  rate_limit_per_minute: 60,
+  throttled_until: null,
+  default_wallet_id: 'w1',
+  default_category: 'groceries',
+  default_subcategory: null,
+  default_type: 'SPEND',
+  default_currency: 'SAR',
+  auto_confirm: false,
+  stage_unmatched: true,
+  rule_count: 2,
+  created_at: '2026-09-01T00:00:00Z',
+  updated_at: '2026-09-02T00:00:00Z',
+  version: 'sha-1',
+  ...over,
+})
