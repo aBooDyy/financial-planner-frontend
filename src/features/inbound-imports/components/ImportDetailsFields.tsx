@@ -1,8 +1,7 @@
-import type { ImportReview } from '#/features/email-sync/hooks/useImportReview'
+import type { ImportReview } from '#/features/inbound-imports/hooks/useImportReview'
 import type { TxType } from '#/features/transactions/api/types'
-import { subcategoriesOf } from '#/features/transactions/categories'
-import type { CurrencyCode } from '#/lib/currency'
-import { SUPPORTED_CURRENCIES } from '#/lib/currency'
+import { amountInputProps } from '#/lib/currency'
+import { CurrencyPicker } from '#/components/CurrencyPicker'
 import { DateField } from '#/components/DateField'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
@@ -26,12 +25,11 @@ const typeBtn = (active: boolean) =>
   }`
 
 /**
- * The values behind one alert — prefilled from the parse, blank when it found none. Account
+ * The values behind one import — prefilled from the parse, blank when it found none. Account
  * and category sit in the row itself; everything else is here.
  */
 export function ImportDetailsFields({ review }: { review: ImportReview }) {
-  const { draft, setField, setType } = review
-  const subs = subcategoriesOf(draft.category)
+  const { draft, subs, setField, setType } = review
   const dateFormat = usePreferencesStore((s) => s.dateFormat)
 
   return (
@@ -54,28 +52,16 @@ export function ImportDetailsFields({ review }: { review: ImportReview }) {
         <Input
           value={draft.amount}
           onChange={(e) => setField('amount', e.target.value)}
-          inputMode="decimal"
-          placeholder="0.00"
+          {...amountInputProps(draft.currency)}
           className="tabular-nums"
         />
       </div>
       <div>
         <Label className={LABEL}>Currency</Label>
-        <Select
+        <CurrencyPicker
           value={draft.currency}
-          onValueChange={(v) => setField('currency', v as CurrencyCode)}
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {SUPPORTED_CURRENCIES.map((c) => (
-              <SelectItem key={c} value={c}>
-                {c}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          onChange={(code) => setField('currency', code)}
+        />
       </div>
 
       <div>
@@ -104,7 +90,9 @@ export function ImportDetailsFields({ review }: { review: ImportReview }) {
           </Label>
           <Select
             value={draft.subcategory ?? NONE}
-            onValueChange={(v) => setField('subcategory', v === NONE ? null : v)}
+            onValueChange={(v) =>
+              setField('subcategory', v === NONE ? null : v)
+            }
           >
             <SelectTrigger>
               <SelectValue />
@@ -112,7 +100,7 @@ export function ImportDetailsFields({ review }: { review: ImportReview }) {
             <SelectContent>
               <SelectItem value={NONE}>—</SelectItem>
               {subs.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
+                <SelectItem key={s.slug} value={s.slug}>
                   {s.name}
                 </SelectItem>
               ))}
@@ -128,7 +116,11 @@ export function ImportDetailsFields({ review }: { review: ImportReview }) {
         <Input
           value={draft.note}
           onChange={(e) => setField('note', e.target.value)}
-          placeholder="Defaults to the email subject"
+          placeholder={
+            review.hasSubject
+              ? 'Defaults to the subject'
+              : 'Defaults to the merchant'
+          }
         />
       </div>
     </div>

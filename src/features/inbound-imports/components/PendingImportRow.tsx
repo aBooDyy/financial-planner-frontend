@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { ChevronDown, Mail, Sparkles } from 'lucide-react'
-import type { LocalBalanceNode, LocalPendingImport } from '#/db/types'
-import type { ImportMerchant } from '#/features/email-sync/api/types'
-import { useImportDetail } from '#/features/email-sync/hooks/useImportDetail'
-import { useImportReview } from '#/features/email-sync/hooks/useImportReview'
-import { categoriesByType } from '#/features/transactions/categories'
+import { Braces, ChevronDown, Mail, Sparkles } from 'lucide-react'
+import type { LocalBalanceNode, LocalInboundImport } from '#/db/types'
+import type { CategoryCatalog } from '#/features/categories/data/catalog'
+import type { ImportMerchant } from '#/features/inbound-imports/api/types'
+import { useImportDetail } from '#/features/inbound-imports/hooks/useImportDetail'
+import { useImportReview } from '#/features/inbound-imports/hooks/useImportReview'
+import { bodyNoun } from '#/features/inbound-imports/data/sources'
 import { formatMoney, parseAmountToMinor } from '#/lib/currency'
 import { Button } from '#/components/ui/button'
 import {
@@ -14,20 +15,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select'
-import { EmailBodyPreview } from './EmailBodyPreview'
+import { BodyPreview } from './BodyPreview'
+import { FixRuleLink } from './FixRuleLink'
 import { ImportDetailsFields } from './ImportDetailsFields'
+import { SourceChip } from './SourceChip'
 
 type Props = {
-  item: LocalPendingImport
+  item: LocalInboundImport
   wallets: LocalBalanceNode[]
+  catalog: CategoryCatalog
 }
 
-const categoryName = (id: string): string =>
-  categoriesByType('spend').find((c) => c.id === id)?.name ??
-  categoriesByType('income').find((c) => c.id === id)?.name ??
-  id
-
-function MerchantHint({ merchant }: { merchant: ImportMerchant }) {
+function MerchantHint({
+  merchant,
+  catalog,
+}: {
+  merchant: ImportMerchant
+  catalog: CategoryCatalog
+}) {
   if (merchant.timesConfirmed === 0) return null
   return (
     <div className="flex items-center gap-[6px] rounded-[10px] bg-fp-accent-soft px-[11px] py-[7px] text-[11.5px] font-semibold text-fp-accent-ink">
@@ -35,7 +40,7 @@ function MerchantHint({ merchant }: { merchant: ImportMerchant }) {
       <span className="min-w-0 truncate">
         {merchant.displayName} — you filed it under{' '}
         {merchant.learnedCategory
-          ? categoryName(merchant.learnedCategory)
+          ? catalog.get(merchant.learnedCategory).name
           : 'a category'}{' '}
         {merchant.timesConfirmed === 1
           ? 'last time'
@@ -45,26 +50,30 @@ function MerchantHint({ merchant }: { merchant: ImportMerchant }) {
   )
 }
 
-export function PendingImportRow({ item, wallets }: Props) {
-  const review = useImportReview(item, wallets)
-  const { draft, busy, error, needsDetails } = review
-  // An alert that parsed empty can't be confirmed as-is — open it on the details it needs.
+export function PendingImportRow({ item, wallets, catalog }: Props) {
+  const review = useImportReview(item, wallets, catalog)
+  const { draft, categories, busy, error, needsDetails } = review
+  // An import that parsed empty can't be confirmed as-is — open it on the details it needs.
   const [open, setOpen] = useState(needsDetails)
   const detail = useImportDetail({ kind: 'import', id: item.id }, open)
 
   const amountMinor = parseAmountToMinor(draft.amount, draft.currency)
-  const categories = categoriesByType(draft.type)
+  const BodyGlyph = item.bodyFormat === 'json' ? Braces : Mail
+  const canFixRule = needsDetails && item.source === 'webhook' && !!item.keyId
 
   return (
     <div className="border-b border-fp-border px-[18px] py-[14px] last:border-b-0">
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
           <div className="truncate text-[14px] font-bold">
-            {draft.merchant || item.senderName || item.senderEmail}
+            {draft.merchant || item.sourceLabel || item.sourceRef}
           </div>
-          <div className="truncate text-[12px] text-fp-text-3">
-            from {item.senderName ?? item.senderEmail}
-            {item.emailDate ? ` · ${item.emailDate}` : ''}
+          <div className="flex min-w-0 items-center gap-[5px] text-[12px] text-fp-text-3">
+            <SourceChip source={item.source} />
+            <span className="truncate">
+              {item.sourceLabel ?? item.sourceRef}
+              {item.occurredOn ? ` · ${item.occurredOn}` : ''}
+            </span>
           </div>
         </div>
         {amountMinor != null && amountMinor > 0 ? (
@@ -86,7 +95,7 @@ export function PendingImportRow({ item, wallets }: Props) {
           </SelectTrigger>
           <SelectContent>
             {categories.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
+              <SelectItem key={c.slug} value={c.slug}>
                 {c.name}
               </SelectItem>
             ))}
@@ -119,9 +128,9 @@ export function PendingImportRow({ item, wallets }: Props) {
         onClick={() => setOpen((o) => !o)}
         className="mt-[10px] flex w-full items-center gap-[7px] text-[12.5px] font-semibold text-fp-text-2"
       >
-        <Mail size={14} strokeWidth={2} />
+        <BodyGlyph size={14} strokeWidth={2} />
         {open ? 'Hide' : 'View'}
-        {item.hasBody ? ' email & details' : ' details'}
+        {item.hasBody ? ` ${bodyNoun(item.bodyFormat)} & details` : ' details'}
         <ChevronDown
           size={14}
           strokeWidth={2.4}
@@ -132,15 +141,24 @@ export function PendingImportRow({ item, wallets }: Props) {
       {open ? (
         <div className="mt-[10px] flex flex-col gap-[11px]">
           {detail.detail?.merchant ? (
-            <MerchantHint merchant={detail.detail.merchant} />
+            <MerchantHint merchant={detail.detail.merchant} catalog={catalog} />
           ) : null}
-          <EmailBodyPreview
+          <BodyPreview
+            format={item.bodyFormat}
             lines={detail.detail?.bodyLines ?? []}
             truncated={detail.detail?.bodyTruncated ?? false}
             loading={detail.loading}
             error={detail.error}
             onUseLine={review.useLine}
+            picking={{
+              target: review.target,
+              onTarget: review.setTarget,
+              onPick: review.pick,
+            }}
           />
+          {canFixRule && item.keyId ? (
+            <FixRuleLink keyId={item.keyId} importId={item.id} />
+          ) : null}
           <ImportDetailsFields review={review} />
         </div>
       ) : null}

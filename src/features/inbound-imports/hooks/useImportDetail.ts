@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { emailSyncApi } from '#/features/email-sync/api/emailSyncApi'
-import type { ImportDetail } from '#/features/email-sync/api/types'
+import { inboundImportsApi } from '#/features/inbound-imports/api/inboundImportsApi'
+import type { ImportDetail } from '#/features/inbound-imports/api/types'
 
-export type ImportDetailSource =
+type ImportDetailSource =
   | { kind: 'import'; id: string }
   | { kind: 'transaction'; id: string }
 
@@ -15,9 +15,9 @@ type State = {
 const IDLE: State = { detail: null, loading: false, error: null }
 
 /**
- * Load the stored email behind an import (or behind the ledger entry it produced). Bodies are
+ * Load the stored body behind an import (or behind the ledger entry it produced). Bodies are
  * fetched per item rather than cached with the list — most imports are never opened.
- * `enabled` keeps the request from firing until the user actually asks to see the email.
+ * `enabled` keeps the request from firing until the user actually asks to see the body.
  */
 export function useImportDetail(
   source: ImportDetailSource | null,
@@ -33,8 +33,8 @@ export function useImportDetail(
     setState({ detail: null, loading: true, error: null })
     const request =
       kind === 'import'
-        ? emailSyncApi.getImport(id)
-        : emailSyncApi.getImportByTransaction(id)
+        ? inboundImportsApi.getImport(id)
+        : inboundImportsApi.getImportByTransaction(id)
     request
       .then((detail) => {
         if (active) setState({ detail, loading: false, error: null })
@@ -44,7 +44,7 @@ export function useImportDetail(
           setState({
             detail: null,
             loading: false,
-            error: 'Could not load the email.',
+            error: 'Could not load the original message.',
           })
       })
     return () => {
