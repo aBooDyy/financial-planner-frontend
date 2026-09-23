@@ -11,6 +11,13 @@ export default defineConfig({
     viteReact(),
     tailwindcss(),
   ],
+  build: {
+    // Rolldown drops `/*! @license … */` banners from emitted chunks unless asked; the
+    // vendored Phosphor notice on the icon paths module has to ship with it.
+    rollupOptions: {
+      output: { comments: { legal: true } },
+    },
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
