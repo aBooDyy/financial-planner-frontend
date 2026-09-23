@@ -1,9 +1,16 @@
+import type { AppConfig } from '#/lib/config/appConfig'
 import type { CurrencyCode } from '#/lib/currency'
 import type { NodeKind } from '#/features/balances/api/types'
 import type { GoalFrequency, GoalKind } from '#/features/goals/api/types'
 import type {
+  ImportSource,
+  ImportTemplateConfig,
+} from '#/features/import/data/types'
+import type { AliasOrigin } from '#/features/merchants/api/types'
+import type {
   BudgetPeriod,
   BudgetScope,
+  TransactionType,
   TxType,
 } from '#/features/transactions/api/types'
 
@@ -16,6 +23,8 @@ export type LocalBalanceNode = {
   parentId: string | null
   name: string
   color: string
+  /** Icon id, or `null` for the wallet/stack default of this kind. */
+  icon: string | null
   note: string | null
   position: number
   collapsed: boolean
@@ -50,12 +59,45 @@ export type LocalExchangeRate = {
   dirty: Flag
 }
 
+// The cached `GET /config` payload, under a constant key. Not user data and not synced
+// through the outbox — it is a per-deploy snapshot kept so the app opens current offline.
+export const APP_CONFIG_KEY = 'me'
+
+export type LocalAppConfig = {
+  id: typeof APP_CONFIG_KEY
+  config: AppConfig
+  fetchedAt: string
+}
+
+/**
+ * A currency the user defined for themselves. Three characters like any ISO code — every
+ * amount column stores a code that wide — and it carries its own `rate` (units of the
+ * reference per 1 unit) because no provider quotes it.
+ */
+export type LocalCustomCurrency = {
+  id: string
+  code: CurrencyCode
+  name: string
+  symbol: string
+  minorUnit: number
+  rate: number
+  createdAt: string
+  updatedAt: string
+  version: string
+  dirty: Flag
+  deleted: Flag
+}
+
 export type LocalCategory = {
   id: string
+  /** `null` = a top-level category; otherwise the parent category's id. */
+  parentId: string | null
   slug: string
   name: string
   type: TxType
   color: string
+  /** Icon id, or `null` for "use the default for my type". Narrowed at the render boundary. */
+  icon: string | null
   position: number
   createdAt: string
   updatedAt: string
@@ -125,16 +167,18 @@ export type LocalGoalAllocation = {
 
 export type LocalTransaction = {
   id: string
-  type: TxType
+  type: TransactionType
   amount: number
   currency: CurrencyCode
-  category: string
+  category: string | null
   subcategory: string | null
   walletId: string
   goalId: string | null
+  merchantId: string | null
   date: string
   note: string | null
   source: string | null
+  transferId: string | null
   createdAt: string
   updatedAt: string
   version: string
@@ -177,6 +221,40 @@ export type LocalRecurring = {
   deleted: Flag
 }
 
+// --- Merchants -----------------------------------------------------------------------
+// A merchant's identity is a *set* of strings, so the aliases live in their own table and
+// sync as their own entity. `normalizedKey` is produced by the shared normaliser and is
+// unique per user server-side — which is what makes the adopt-and-remap branch necessary.
+
+export type LocalMerchant = {
+  id: string
+  displayName: string
+  learnedCategory: string | null
+  learnedSubcategory: string | null
+  learnedType: TxType | null
+  timesSeen: number
+  timesConfirmed: number
+  lastSeenAt: string | null
+  autoCategorize: boolean
+  createdAt: string
+  updatedAt: string
+  version: string
+  dirty: Flag
+  deleted: Flag
+}
+
+export type LocalMerchantAlias = {
+  id: string
+  merchantId: string
+  normalizedKey: string
+  rawSample: string | null
+  origin: AliasOrigin
+  createdAt: string
+  version: string
+  dirty: Flag
+  deleted: Flag
+}
+
 // --- Email sync (server-owned cache) -------------------------------------------------
 // Email sync is inherently online (it talks to Gmail/Graph), so these rows are NOT pushed
 // through the offline outbox. They're a read cache of server truth, refreshed by pulls;
@@ -185,7 +263,6 @@ export type LocalRecurring = {
 export type EmailProvider = 'google' | 'outlook'
 export type ScanFrequency = '15m' | 'hourly' | 'daily'
 export type ConnectionStatus = 'pending_setup' | 'connected'
-export type ImportStatus = 'pending' | 'confirmed' | 'dismissed'
 
 export type TrackedSender = {
   id: string
@@ -210,29 +287,136 @@ export type LocalEmailConnection = {
   version: string
 }
 
-/**
- * A cached pending import. The email body it was parsed from is deliberately not cached —
- * it is fetched per item when the user opens one for review (`emailSyncApi.getImport`).
- */
-export type LocalPendingImport = {
+// --- Integration keys (server-owned cache) --------------------------------------------
+// Keys are server-minted (the secret does not exist until the server makes it), so there is
+// no offline write to queue. The table is a read cache that lets the list render offline.
+
+export type IntegrationKeyStatus = 'active' | 'revoked'
+
+/** A webhook key's settings and usage. The secret is never here — it exists only once. */
+export type LocalIntegrationKey = {
   id: string
-  connectionId: string
+  name: string
+  tokenPrefix: string
+  status: IntegrationKeyStatus
+  expiresAt: string | null
+  rotatedAt: string | null
+  lastUsedAt: string | null
+  requestsCount: number
+  rateLimitPerMinute: number
+  /** When a key over its quota accepts requests again; null while it is not throttled. */
+  throttledUntil: string | null
+  defaultWalletId: string | null
+  defaultCategory: string | null
+  defaultSubcategory: string | null
+  defaultType: TxType
+  defaultCurrency: CurrencyCode | null
+  autoConfirm: boolean
+  stageUnmatched: boolean
+  ruleCount: number
+  createdAt: string
+  updatedAt: string
+  version: string
+}
+
+// --- Inbound imports (server-owned cache) ---------------------------------------------
+// The shared review queue: a row staged by any source (an inbox scan, a webhook) waiting for
+// the user to confirm or dismiss it. A read cache of server truth: no outbox, no dirty flags.
+
+export type ImportStatus = 'pending' | 'confirmed' | 'dismissed'
+export type InboundSource = 'inbox' | 'webhook'
+export type BodyFormat = 'text' | 'json'
+
+/**
+ * A cached pending import. The body it was parsed from is deliberately not cached — it is
+ * fetched per item when the user opens one for review (`inboundImportsApi.getImport`).
+ * At most one of `connectionId` / `keyId` is set, according to `source`: a webhook row keeps
+ * neither once its key is deleted.
+ */
+export type LocalInboundImport = {
+  id: string
+  source: InboundSource
+  connectionId: string | null
+  keyId: string | null
   merchantId: string | null
-  senderEmail: string
-  senderName: string | null
+  /** Inbox: the sender address. Webhook: the key's token prefix. */
+  sourceRef: string | null
+  /** Inbox: the sender's display name. Webhook: the key's name, kept after the key is gone. */
+  sourceLabel: string | null
   subject: string | null
-  emailDate: string | null
+  occurredOn: string | null
   amount: number | null
   currency: CurrencyCode | null
   suggestedMerchant: string | null
   suggestedCategory: string | null
   suggestedSubcategory: string | null
+  /** What the source resolved for the entry; null when it said nothing. */
+  suggestedType: TxType | null
+  suggestedWalletId: string | null
   rawPreview: string | null
   hasBody: boolean
+  bodyFormat: BodyFormat
   status: ImportStatus
   transactionId: string | null
   createdAt: string
   version: string
+}
+
+// --- Import (local batches, synced templates) ----------------------------------------
+
+/**
+ * One commit of imported rows — the unit the hub history lists and undo reverses. Local
+ * only, never synced: the durable fact is each transaction's `source` marker, which is.
+ */
+export type LocalImportBatch = {
+  id: string
+  source: ImportSource
+  label: string
+  templateId: string | null
+  /** Rows the file held, against `importedCount` rows actually written. */
+  rowCount: number
+  importedCount: number
+  skippedDuplicates: number
+  errorCount: number
+  walletIds: string[]
+  createdAt: string
+  /** Kept rather than deleted on undo, so the history keeps the fact that it happened. */
+  undoneAt: string | null
+}
+
+/** A remembered mapping. Null `config` is a blob this client could not parse. */
+export type LocalImportTemplate = {
+  id: string
+  name: string
+  sourceKind: 'csv'
+  signature: string
+  config: ImportTemplateConfig | null
+  lastUsedAt: string | null
+  useCount: number
+  /**
+   * The server refused this name — another template of this user already holds it. Not a
+   * version conflict and not retryable, so the row waits here until it is renamed.
+   */
+  nameConflict: Flag
+  createdAt: string
+  updatedAt: string
+  version: string
+  dirty: Flag
+  deleted: Flag
+}
+
+// --- Delta sync ----------------------------------------------------------------------
+
+/**
+ * Where one entity's incremental pull resumes from, for one user. `id` is
+ * `<userId>:<entity>`: the user half is what stops a sign-out whose wipe failed from
+ * handing the next account a window it was never part of.
+ */
+export type LocalSyncWatermark = {
+  id: string
+  /** The server `as_of` of the last *completed* run — never a mid-run value. */
+  since: string
+  updatedAt: string
 }
 
 export type OutboxOp = 'create' | 'update' | 'delete'
@@ -243,10 +427,15 @@ export type OutboxEntity =
   | 'goal'
   | 'allocation'
   | 'transaction'
+  | 'transfer'
   | 'budget'
   | 'recurring'
   | 'category'
+  | 'customCurrency'
   | 'rate'
+  | 'merchant'
+  | 'merchantAlias'
+  | 'importTemplate'
 
 export type OutboxEntry = {
   seq?: number
