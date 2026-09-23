@@ -24,6 +24,7 @@
   --color-fp-accent-ink: var(--fp-accent-ink);
   --color-fp-accent-soft: var(--fp-accent-soft);
   --color-fp-danger: var(--fp-danger);
+  --color-fp-warn: var(--fp-warn);
 
   --shadow-fp: var(--fp-shadow);
   --font-sans: 'Hanken Grotesk', system-ui, sans-serif;
@@ -68,6 +69,7 @@
   --fp-accent-ink: #0e6b47;
   --fp-accent-soft: rgba(31, 157, 107, 0.1);
   --fp-danger: #b42318;
+  --fp-warn: #b54708;
   --fp-shadow:
     0 1px 2px rgba(20, 18, 12, 0.05), 0 12px 30px -18px rgba(20, 18, 12, 0.22);
 
@@ -108,12 +110,39 @@
   --fp-accent-ink: #7fe6be;
   --fp-accent-soft: rgba(47, 189, 139, 0.14);
   --fp-danger: #f2998e;
+  --fp-warn: #f5b35c;
   --fp-shadow:
     0 1px 2px rgba(0, 0, 0, 0.4), 0 18px 40px -22px rgba(0, 0, 0, 0.7);
 }
 
 * {
   box-sizing: border-box;
+}
+
+/* Tailwind v4's preflight resets interactive elements to the default arrow; put the
+   pointer back so anything clickable reads as clickable. In `base` so a `cursor-*`
+   utility still wins. */
+@layer base {
+  button,
+  summary,
+  label[for],
+  [role='button'],
+  [role='tab'],
+  [role='option'],
+  [role='menuitem'],
+  [role='menuitemcheckbox'],
+  [role='menuitemradio'],
+  [role='switch'],
+  [role='checkbox'],
+  [role='radio'] {
+    cursor: pointer;
+  }
+
+  :disabled,
+  [aria-disabled='true'],
+  [data-disabled] {
+    cursor: default;
+  }
 }
 
 html,

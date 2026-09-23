@@ -28,6 +28,10 @@ type Props = {
   /** Desktop width override (e.g. `sm:max-w-[560px]`). */
   contentClassName?: string
   bodyClassName?: string
+  /** Mobile sheet override (e.g. a full-height sheet for a dense editor). */
+  sheetClassName?: string
+  /** `false` removes every way to close it except the footer's own buttons. */
+  dismissible?: boolean
 }
 
 const CLOSE =
@@ -47,14 +51,21 @@ export function ResponsiveDialog({
   footer,
   contentClassName,
   bodyClassName,
+  sheetClassName,
+  dismissible = true,
 }: Props) {
   const isDesktop = useIsDesktop()
+  const holdOpen = (event: Event) => {
+    if (!dismissible) event.preventDefault()
+  }
 
   if (isDesktop) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
           showCloseButton={false}
+          onEscapeKeyDown={holdOpen}
+          onInteractOutside={holdOpen}
           className={cn(
             'flex max-h-[92vh] flex-col gap-0 overflow-hidden rounded-[20px] border-fp-border bg-fp-surface p-0 shadow-fp sm:max-w-[470px]',
             contentClassName,
@@ -64,9 +75,11 @@ export function ResponsiveDialog({
             <DialogTitle className="text-[18px] font-extrabold tracking-[-0.01em] text-fp-text">
               {title}
             </DialogTitle>
-            <DialogClose className={CLOSE} aria-label="Close">
-              <X size={17} strokeWidth={2} />
-            </DialogClose>
+            {dismissible ? (
+              <DialogClose className={CLOSE} aria-label="Close">
+                <X size={17} strokeWidth={2} />
+              </DialogClose>
+            ) : null}
           </div>
           <DialogDescription
             className={description ? 'px-6 text-fp-text-2' : 'sr-only'}
@@ -87,15 +100,22 @@ export function ResponsiveDialog({
   }
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="max-h-[92%] border-fp-border bg-fp-surface">
+    <Drawer open={open} onOpenChange={onOpenChange} dismissible={dismissible}>
+      <DrawerContent
+        className={cn(
+          'max-h-[92%] border-fp-border bg-fp-surface',
+          sheetClassName,
+        )}
+      >
         <div className="flex items-center justify-between px-[18px] pt-1 pb-3">
           <DrawerTitle className="text-[18px] font-extrabold tracking-[-0.01em] text-fp-text">
             {title}
           </DrawerTitle>
-          <DrawerClose className={CLOSE} aria-label="Close">
-            <X size={17} strokeWidth={2} />
-          </DrawerClose>
+          {dismissible ? (
+            <DrawerClose className={CLOSE} aria-label="Close">
+              <X size={17} strokeWidth={2} />
+            </DrawerClose>
+          ) : null}
         </div>
         <DrawerDescription
           className={description ? 'px-[18px] text-fp-text-2' : 'sr-only'}
