@@ -1,4 +1,5 @@
 import { http } from '#/lib/http'
+import type { UpdateRateWire } from '#/features/settings/api/types'
 import type {
   BalanceNode,
   BalanceNodeWire,
@@ -48,7 +49,7 @@ export const balancesApi = {
 
   updateRate: (
     currency: string,
-    payload: { version: string; rate: string },
+    payload: UpdateRateWire,
   ): Promise<ExchangeRate> =>
     http
       .patch<ExchangeRateWire>(`/exchange-rates/${currency}`, payload)

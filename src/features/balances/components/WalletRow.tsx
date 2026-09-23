@@ -1,5 +1,6 @@
 import { ChevronRight, Pencil, Trash2 } from 'lucide-react'
 import type { MouseEvent } from 'react'
+import { IconChip } from '#/components/icons/IconChip'
 import { Button } from '#/components/ui/button'
 import type { BalanceRow } from '#/features/balances/data/selectors'
 
@@ -11,7 +12,9 @@ type Props = {
   onDelete: (id: string) => void
 }
 
-const ACTION = 'h-7 w-7 rounded-lg text-fp-text-3 hover:bg-fp-bg'
+// the row runs out of width at 320px; below `sm` the chip and this cluster both give some back.
+const ACTION =
+  'size-6 sm:size-7 rounded-lg text-fp-text-3 hover:bg-fp-bg max-sm:[&_svg]:size-[13px]'
 
 const stop = (fn: (id: string) => void, id: string) => (e: MouseEvent) => {
   e.stopPropagation()
@@ -29,17 +32,18 @@ export function WalletRow({
     <>
       <div
         onClick={() => onEdit(row.id)}
-        className="flex cursor-pointer items-center gap-[10px] border-b border-fp-border px-[14px] py-[11px] hover:bg-fp-surface-2"
+        className="flex cursor-pointer items-center gap-[7px] sm:gap-[10px] border-b border-fp-border px-[10px] py-[11px] hover:bg-fp-surface-2 sm:px-[14px]"
       >
         <div
           style={{ marginInlineStart: row.depth * 20 }}
           className="shrink-0"
         />
-        <div
-          className="h-[11px] w-[11px] shrink-0 rounded-[4px] ring-1 ring-black/10"
-          style={{ background: row.color }}
+        <IconChip
+          id={row.icon}
+          color={row.color}
+          className="max-sm:size-7 max-sm:[&>svg]:size-[15px]"
         />
-        <div className="flex min-w-0 flex-col">
+        <div className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-[14px] font-semibold whitespace-nowrap">
             {row.name}
           </span>
@@ -73,7 +77,6 @@ export function WalletRow({
             </button>
           ) : null}
         </div>
-        <div className="flex-1" />
         <div className="flex flex-col items-end">
           <span className="text-[14px] font-bold tabular-nums whitespace-nowrap">
             {row.amountStr}
@@ -124,7 +127,6 @@ export function WalletRow({
               <span className="truncate text-[12.5px] text-fp-text-2">
                 {r.goalName}
               </span>
-              <div className="flex-1" />
               <span className="text-[12.5px] font-semibold tabular-nums text-fp-text-2">
                 {r.amountStr}
               </span>

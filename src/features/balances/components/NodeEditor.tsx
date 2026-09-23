@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { LocalBalanceNode } from '#/db/types'
 import { NODE_COLORS, ROOT_PARENT } from '#/features/balances/constants'
 import { groupParentOptions } from '#/features/balances/data/selectors'
@@ -5,8 +6,11 @@ import type {
   EditorDraft,
   EditorState,
 } from '#/features/balances/hooks/useNodeEditor'
-import { SUPPORTED_CURRENCIES } from '#/lib/currency'
-import type { CurrencyCode } from '#/lib/currency'
+import { amountInputProps } from '#/lib/currency'
+import { CurrencyPicker } from '#/components/CurrencyPicker'
+import { IconChip } from '#/components/icons/IconChip'
+import { IconPicker } from '#/components/icons/IconPicker'
+import { GROUP_ICON, WALLET_ICON, iconIdOr } from '#/lib/icons/fallbacks'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
@@ -45,6 +49,7 @@ export function NodeEditor({
   const { mode, id, draft } = editing
   const isWallet = mode === 'wallet'
   const parentOptions = groupParentOptions(nodes, id)
+  const [pickingIcon, setPickingIcon] = useState(false)
 
   return (
     <ResponsiveDialog
@@ -76,6 +81,21 @@ export function NodeEditor({
       }
     >
       <div className="flex flex-col gap-[15px]">
+        <div className="flex justify-center">
+          <button
+            type="button"
+            aria-label="Change icon"
+            onClick={() => setPickingIcon(true)}
+            className="rounded-[10px] outline-offset-2 focus-visible:outline-2 focus-visible:outline-fp-text"
+          >
+            <IconChip
+              id={iconIdOr(draft.icon, isWallet ? WALLET_ICON : GROUP_ICON)}
+              color={draft.color}
+              size={56}
+            />
+          </button>
+        </div>
+
         <div>
           <Label className={LABEL}>Name</Label>
           <Input
@@ -92,28 +112,17 @@ export function NodeEditor({
               <Input
                 value={draft.amount}
                 onChange={(e) => onField('amount', e.target.value)}
-                inputMode="decimal"
-                placeholder="0.00"
+                {...amountInputProps(draft.currency)}
                 className="tabular-nums"
               />
             </div>
             <div className="w-[106px]">
               <Label className={LABEL}>Currency</Label>
-              <Select
+              <CurrencyPicker
                 value={draft.currency}
-                onValueChange={(v) => onField('currency', v as CurrencyCode)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SUPPORTED_CURRENCIES.map((code) => (
-                    <SelectItem key={code} value={code}>
-                      {code}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={(code) => onField('currency', code)}
+                align="end"
+              />
             </div>
           </div>
         ) : null}
@@ -173,6 +182,14 @@ export function NodeEditor({
           />
         </div>
       </div>
+
+      <IconPicker
+        open={pickingIcon}
+        onOpenChange={setPickingIcon}
+        value={draft.icon}
+        color={draft.color}
+        onSelect={(icon) => onField('icon', icon)}
+      />
     </ResponsiveDialog>
   )
 }

@@ -1,5 +1,9 @@
+import type { RatesMap } from '#/lib/config/rates'
 import { convertMinor, formatMoney } from '#/lib/currency'
+import { formatShare } from '#/lib/percent'
 import type { CurrencyCode } from '#/lib/currency'
+import { GROUP_ICON, WALLET_ICON, iconIdOr } from '#/lib/icons/fallbacks'
+import type { IconId } from '#/lib/icons/catalog.gen'
 import type { LocalBalanceNode } from '#/db/types'
 
 // One goal's claim on a wallet, in the wallet's currency (built by goals/data/reservations).
@@ -24,6 +28,9 @@ export type BalanceRow = {
   depth: number
   name: string
   color: string
+  // Ready to render: a node with no icon, or one the pack no longer defines, resolves to
+  // its kind's default here so no row is ever iconless.
+  icon: IconId
   note: string | null
   collapsed: boolean
   childCount: number
@@ -61,6 +68,7 @@ export type GroupBar = {
   color: string
   valueStr: string
   pct: number
+  pctStr: string
 }
 
 export type BalancesView = {
@@ -81,8 +89,6 @@ export type BalancesView = {
   availableTotalStr: string
 }
 
-type RatesMap = Partial<Record<string, number>>
-
 const plural = (n: number, one: string, many: string) =>
   `${n} ${n === 1 ? one : many}`
 
@@ -97,6 +103,22 @@ function childrenByParent(
   }
   for (const list of map.values()) list.sort((a, b) => a.position - b.position)
   return map
+}
+
+/**
+ * The currencies the user actually has money in (plus the base and any rate they edited).
+ * The currency table is ~155 codes now, so anything that lists rates lists these instead.
+ */
+export function heldCurrencies(
+  base: CurrencyCode,
+  sources: ReadonlyArray<ReadonlyArray<{ currency: CurrencyCode | null }>>,
+): CurrencyCode[] {
+  const held = new Set<CurrencyCode>()
+  for (const rows of sources) {
+    for (const row of rows) if (row.currency) held.add(row.currency)
+  }
+  held.delete(base)
+  return [base, ...[...held].sort()]
 }
 
 export type ParentOption = { id: string; label: string }
@@ -221,15 +243,32 @@ export function buildBalancesView(
   const grand = roots.reduce((sum, n) => sum + baseTotal(n), 0)
   const reservedTotal = roots.reduce((sum, n) => sum + reservedBase(n), 0)
 
-  // Flatten the visible tree (honoring collapse) and tally counts.
-  const rows: BalanceRow[] = []
+  // Totals and counts describe everything the user owns, so they tally the whole tree.
+  // Collapsing a group only hides rows below; it must never change these figures.
   const byCurrency = new Map<CurrencyCode, number>()
   let walletCount = 0
   let groupCount = 0
 
-  const walk = (node: LocalBalanceNode, depth: number) => {
+  const tally = (node: LocalBalanceNode) => {
     if (node.kind === 'group') {
       groupCount += 1
+      for (const child of children.get(node.id) ?? []) tally(child)
+      return
+    }
+    walletCount += 1
+    const currency = node.currency ?? base
+    byCurrency.set(
+      currency,
+      (byCurrency.get(currency) ?? 0) + effectiveAmount(node),
+    )
+  }
+  for (const root of roots) tally(root)
+
+  // Flatten the tree into the rows that are actually visible (honoring collapse).
+  const rows: BalanceRow[] = []
+
+  const walk = (node: LocalBalanceNode, depth: number) => {
+    if (node.kind === 'group') {
       const kids = children.get(node.id) ?? []
       const groupReserved = reservedBase(node)
       const groupAvailable = baseTotal(node) - groupReserved
@@ -239,6 +278,7 @@ export function buildBalancesView(
         depth,
         name: node.name,
         color: node.color,
+        icon: iconIdOr(node.icon, GROUP_ICON),
         note: node.note,
         collapsed: node.collapsed,
         childCount: kids.length,
@@ -259,10 +299,8 @@ export function buildBalancesView(
       return
     }
 
-    walletCount += 1
     const currency = node.currency ?? base
     const amount = effectiveAmount(node)
-    byCurrency.set(currency, (byCurrency.get(currency) ?? 0) + amount)
     const reserved = walletReserved(node)
     const available = amount - reserved
     const reservationRows: ReservationRow[] = (reservations[node.id] ?? []).map(
@@ -279,6 +317,7 @@ export function buildBalancesView(
       depth,
       name: node.name,
       color: node.color,
+      icon: iconIdOr(node.icon, WALLET_ICON),
       note: node.note,
       collapsed: false,
       childCount: 0,
@@ -308,13 +347,17 @@ export function buildBalancesView(
     }))
     .filter((b) => b.value > 0)
     .sort((a, b) => b.value - a.value)
-    .map((b) => ({
-      id: b.id,
-      label: b.label,
-      color: b.color,
-      valueStr: formatMoney(b.value, base),
-      pct: grand > 0 ? (b.value / grand) * 100 : 0,
-    }))
+    .map((b) => {
+      const pct = grand > 0 ? (b.value / grand) * 100 : 0
+      return {
+        id: b.id,
+        label: b.label,
+        color: b.color,
+        valueStr: formatMoney(b.value, base),
+        pct,
+        pctStr: `${formatShare(pct)} of total`,
+      }
+    })
 
   // Multi-currency breakdown, largest base-value first.
   const PALETTE = ['#1F9D6B', '#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B']
@@ -335,7 +378,7 @@ export function buildBalancesView(
       amountStr: formatMoney(b.amount, b.currency),
       baseStr: `≈ ${formatMoney(b.baseVal, base)}`,
       pct: b.pct,
-      pctStr: `${Math.round(b.pct)}%`,
+      pctStr: formatShare(b.pct),
       showBase: b.currency !== base,
     }))
 

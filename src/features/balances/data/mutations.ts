@@ -10,6 +10,7 @@ export type NodeDraft = {
   kind: NodeKind
   name: string
   color: string
+  icon?: string | null
   note: string | null
   parentId: string | null
   amount: number | null
@@ -67,7 +68,19 @@ async function enqueueNodeUpsert(node: LocalBalanceNode): Promise<void> {
 // --- Public mutations ----------------------------------------------------------------
 
 export async function createNode(draft: NodeDraft): Promise<string> {
-  const id = newId()
+  return createNodeWithId(newId(), draft)
+}
+
+/**
+ * Create a node under a caller-supplied id. The importer mints wallet ids while mapping, so
+ * every row carries its final account before anything is written; idempotent, so a retried
+ * commit adds nothing twice.
+ */
+export async function createNodeWithId(
+  id: string,
+  draft: NodeDraft,
+): Promise<string> {
+  if (await db.balanceNodes.get(id)) return id
   const ts = now()
   const node: LocalBalanceNode = {
     id,
@@ -75,6 +88,7 @@ export async function createNode(draft: NodeDraft): Promise<string> {
     parentId: draft.parentId,
     name: draft.name,
     color: draft.color,
+    icon: draft.icon ?? null,
     note: draft.note,
     position: await nextPosition(draft.parentId),
     collapsed: false,
@@ -118,6 +132,7 @@ export async function updateNode(id: string, patch: NodePatch): Promise<void> {
     ...existing,
     name: patch.name ?? existing.name,
     color: patch.color ?? existing.color,
+    icon: patch.icon !== undefined ? patch.icon : existing.icon,
     note: patch.note !== undefined ? patch.note : existing.note,
     parentId: patch.parentId !== undefined ? patch.parentId : existing.parentId,
     collapsed: patch.collapsed ?? existing.collapsed,

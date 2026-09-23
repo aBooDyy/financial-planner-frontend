@@ -11,6 +11,7 @@ function node(over: Partial<LocalBalanceNode>): LocalBalanceNode {
     parentId: null,
     name: 'Node',
     color: '#1F9D6B',
+    icon: null,
     note: null,
     position: 0,
     collapsed: false,
@@ -75,11 +76,33 @@ describe('buildBalancesView', () => {
     expect(collapsed.rows.map((r) => r.id)).toEqual(['g1', 'w3'])
   })
 
+  it('keeps totals, counts and the breakdown independent of collapse', () => {
+    const open = buildBalancesView(sampleTree(false), 'SAR', rates)
+    const collapsed = buildBalancesView(sampleTree(true), 'SAR', rates)
+    expect(collapsed.walletCount).toBe(open.walletCount)
+    expect(collapsed.groupCount).toBe(open.groupCount)
+    expect(collapsed.currencyCount).toBe(open.currencyCount)
+    expect(collapsed.grandTotalStr).toBe(open.grandTotalStr)
+    expect(collapsed.breakdown).toEqual(open.breakdown)
+  })
+
   it('orders the currency breakdown by base value, largest first', () => {
     const view = buildBalancesView(sampleTree(), 'SAR', rates)
     expect(view.breakdown.map((b) => b.currency)).toEqual(['SAR', 'USD'])
     expect(view.breakdown[0].showBase).toBe(false)
     expect(view.breakdown[1].showBase).toBe(true)
+  })
+
+  it('carries a node icon through, defaulting by kind when unset or unknown', () => {
+    const tree = sampleTree()
+    tree[1].icon = 'piggy-bank' // the Checking wallet picked one
+    tree[2].icon = 'not-an-icon' // an id this pack no longer defines
+    const rows = buildBalancesView(tree, 'SAR', rates).rows
+    const iconOf = (id: string) => rows.find((r) => r.id === id)!.icon
+    expect(iconOf('w1')).toBe('piggy-bank')
+    expect(iconOf('w2')).toBe('wallet')
+    expect(iconOf('w3')).toBe('wallet')
+    expect(iconOf('g1')).toBe('stack')
   })
 
   it('excludes soft-deleted nodes', () => {

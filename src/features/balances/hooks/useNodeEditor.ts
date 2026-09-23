@@ -9,12 +9,16 @@ import {
 } from '#/features/balances/data/mutations'
 import type { CurrencyCode } from '#/lib/currency'
 import { minorToInputValue, parseAmountToMinor } from '#/lib/currency'
+import { isIconId } from '#/lib/icons/catalog.gen'
+import type { IconId } from '#/lib/icons/catalog.gen'
 
 export type EditorDraft = {
   name: string
   amount: string
   currency: CurrencyCode
   color: string
+  // `null` is a real choice: it means "use the default for this kind".
+  icon: IconId | null
   note: string
   parentId: string
 }
@@ -37,6 +41,7 @@ export function useNodeEditor(defaultCurrency: CurrencyCode) {
         amount: '',
         currency: defaultCurrency,
         color: NODE_COLORS[0],
+        icon: null,
         note: '',
         parentId: parentId ?? ROOT_PARENT,
       },
@@ -54,6 +59,7 @@ export function useNodeEditor(defaultCurrency: CurrencyCode) {
             : '',
         currency: node.currency ?? defaultCurrency,
         color: node.color,
+        icon: isIconId(node.icon) ? node.icon : null,
         note: node.note ?? '',
         parentId: node.parentId ?? ROOT_PARENT,
       },
@@ -84,6 +90,7 @@ export function useNodeEditor(defaultCurrency: CurrencyCode) {
       await updateNode(id, {
         name: draft.name.trim() || 'Untitled',
         color: draft.color,
+        icon: draft.icon,
         note,
         parentId,
         amount: amount ?? undefined,
@@ -94,6 +101,7 @@ export function useNodeEditor(defaultCurrency: CurrencyCode) {
         kind: mode,
         name: draft.name.trim() || (isWallet ? 'New wallet' : 'New group'),
         color: draft.color,
+        icon: draft.icon,
         note,
         parentId,
         amount,

@@ -1,3 +1,4 @@
+import { fromWireCurrency, fromWireCurrencyOrNull } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
 
 // Internal representation stays lowercase (nice for UI/logic); the wire is the backend's
@@ -26,6 +27,8 @@ export type BalanceNode = {
   parentId: string | null
   name: string
   color: string
+  /** Icon id, or `null` for the wallet/stack default of this kind. */
+  icon: string | null
   note: string | null
   position: number
   collapsed: boolean
@@ -58,6 +61,7 @@ export type BalanceNodeWire = {
   parent_id: string | null
   name: string
   color: string
+  icon: string | null
   note: string | null
   position: number
   collapsed: boolean
@@ -91,6 +95,7 @@ export type CreateNodeWire = {
   parent_id: string | null
   name: string
   color: string
+  icon: string | null
   note: string | null
   position: number
   collapsed: boolean
@@ -102,6 +107,7 @@ export type UpdateNodeWire = {
   version: string
   name: string
   color: string
+  icon: string | null
   note: string | null
   parent_id: string | null
   position: number
@@ -118,25 +124,26 @@ export const toNode = (w: BalanceNodeWire): BalanceNode => ({
   parentId: w.parent_id,
   name: w.name,
   color: w.color,
+  icon: w.icon,
   note: w.note,
   position: w.position,
   collapsed: w.collapsed,
   amount: w.amount,
-  currency: w.currency as CurrencyCode | null,
+  currency: fromWireCurrencyOrNull(w.currency),
   createdAt: w.created_at,
   updatedAt: w.updated_at,
   version: w.version,
 })
 
 export const toSettings = (w: BalanceSettingsWire): BalanceSettings => ({
-  baseCurrency: w.base_currency as CurrencyCode,
+  baseCurrency: fromWireCurrency(w.base_currency),
   createdAt: w.created_at,
   updatedAt: w.updated_at,
   version: w.version,
 })
 
 export const toRate = (w: ExchangeRateWire): ExchangeRate => ({
-  currency: w.currency as CurrencyCode,
+  currency: fromWireCurrency(w.currency),
   rate: Number(w.rate),
   version: w.version,
   updatedAt: w.updated_at,
