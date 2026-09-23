@@ -16,6 +16,8 @@ import {
 } from '#/features/transactions/data/ledger'
 import { allocationsByGoal } from '#/features/goals/data/reservations'
 import { usePreferencesStore } from '#/stores/preferences'
+import { useMergedRates } from '#/lib/config/rates'
+import type { RatesMap } from '#/lib/config/rates'
 import type { CurrencyCode } from '#/lib/currency'
 
 /**
@@ -35,9 +37,8 @@ export function useGoals() {
   const loading =
     incomeRows === undefined || goalRows === undefined || rateRows === undefined
   const base: CurrencyCode = settings?.baseCurrency ?? DEFAULT_BASE_CURRENCY
-  const rates: Partial<Record<string, number>> = Object.fromEntries(
-    (rateRows ?? []).map((r) => [r.currency, r.rate]),
-  )
+  // One rates map: the config's shipped defaults with the user's overrides on top.
+  const rates: RatesMap = useMergedRates(rateRows ?? [])
 
   const income: LocalIncomeStream[] = (incomeRows ?? []).filter(
     (s) => s.deleted === 0,

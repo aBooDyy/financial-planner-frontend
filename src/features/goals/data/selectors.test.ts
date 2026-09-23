@@ -407,3 +407,97 @@ describe('buildGoalsView funding engine', () => {
     expect(view.goalCards.some((c) => c.id === 'car')).toBe(false)
   })
 })
+
+describe('buildGoalsView sections', () => {
+  // Rent is fundable; a 100,000 laptop due in ~7 weeks on 1,000/mo of income is not.
+  const plan = () =>
+    buildGoalsView(
+      [income({ label: 'Salary', amount: m(1000), day: 27 })],
+      [
+        goal({
+          id: 'rent',
+          name: 'Rent',
+          kind: 'recurring',
+          amount: m(500),
+          frequency: 'monthly',
+          nextDue: '2026-07-01',
+          position: 0,
+        }),
+        goal({
+          id: 'laptop',
+          name: 'Laptop',
+          kind: 'onetime',
+          target: m(100000),
+          dueDate: '2026-08-01',
+          position: 1,
+        }),
+      ],
+      base,
+      RATES,
+      TODAY,
+    )
+
+  it('splits goals from obligations and groups each tab by funding status', () => {
+    const view = plan()
+    expect(view.obligationsList.count).toBe(1)
+    expect(view.obligationsList.groups.map((g) => g.title)).toEqual([
+      'On track · 1',
+    ])
+    expect(view.goalsList.groups.map((g) => g.title)).toEqual([
+      'Won’t make it · 1',
+    ])
+    expect(view.goalsList.groups[0].note).toMatch(/^about SR [\d,]+\/mo short$/)
+    expect(view.goalCards.find((c) => c.id === 'rent')?.rowMeta).toBe(
+      'Obligation · every month · Jul 1',
+    )
+  })
+
+  it('summarizes income usage and surfaces only slipping goals as decisions', () => {
+    const view = plan()
+    expect(view.summary.usagePct).toBe(100)
+    expect(view.summary.decisions).toHaveLength(1)
+    expect(view.summary.decisions[0]).toMatchObject({
+      goalId: 'laptop',
+      action: 'Push out',
+    })
+    expect(view.cashflowStr).toBe('SR 1,000 in · SR 1,000 out')
+  })
+
+  it('measures every ledger bar against one denominator', () => {
+    const { ledger, ledgerNet, usageStr } = plan().summary
+    expect(ledger.map((row) => [row.label, row.valueStr])).toEqual([
+      ['Income', 'SR 1,000'],
+      ['Obligations', 'SR 500'],
+      ['Goals', 'SR 500'],
+    ])
+    expect(ledger[0].pct).toBe(100)
+    expect(ledgerNet).toMatchObject({ label: 'Left over', pct: 0 })
+    expect(usageStr).toBe('100% of income committed')
+  })
+
+  it('ranks the priority list by position and notes what is not on track', () => {
+    const { priority, priorityNote } = plan().summary
+    expect(priority.map((row) => [row.num, row.id, row.status])).toEqual([
+      ['1', 'rent', 'green'],
+      ['2', 'laptop', 'red'],
+    ])
+    expect(priority[0].note).toBe('')
+    expect(priority[1].note).toBe('Won’t make it')
+    expect(priorityNote).toBe('1 of 2 on track')
+  })
+
+  it('lists paydays and due dates in the next 60 days, repeating ones included', () => {
+    const { upcoming } = plan().summary
+    expect(upcoming.map((e) => `${e.dateStr} ${e.name}`)).toEqual([
+      'Jun 27 Salary in',
+      'Jul 1 Rent',
+      'Jul 27 Salary in',
+      'Aug 1 Rent',
+      'Aug 1 Laptop',
+    ])
+    expect(upcoming[0]).toMatchObject({
+      amountStr: '+SR 1,000',
+      incoming: true,
+    })
+  })
+})

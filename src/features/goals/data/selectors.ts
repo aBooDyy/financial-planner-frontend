@@ -3,8 +3,13 @@ import { convertMinor, formatMoneyRounded } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
 import { DEFAULT_DATE_FORMAT, formatDate } from '#/lib/date'
 import type { DateFormat } from '#/lib/date'
-import type { GoalKind } from '#/features/goals/api/types'
-import { FREQUENCIES, KINDS, STATUS_COLORS } from '#/features/goals/constants'
+import type { GoalFrequency, GoalKind } from '#/features/goals/api/types'
+import {
+  FREQUENCIES,
+  KINDS,
+  RECURRING_KINDS,
+  STATUS_COLORS,
+} from '#/features/goals/constants'
 import type { FundingStatus } from '#/features/goals/constants'
 import {
   addMonths,
@@ -36,10 +41,14 @@ export type GoalCard = {
   id: string
   rank: number
   kind: GoalKind
+  isObligation: boolean
   name: string
   color: string
   kindLabel: string
   metaStr: string
+  // One-line caption for the dense list row: the plain facts when on track, otherwise what's
+  // holding it back (queued, catching up, slipping).
+  rowMeta: string
   // The monthly set-aside this goal runs at: what you pay now, or — if it's queued behind
   // nearer goals — the rate it will run at once it starts (so the headline is never a bare 0).
   monthlyStr: string
@@ -86,7 +95,22 @@ export type CompletedGoal = {
   metaStr: string
 }
 
-export type CashSegment = { id: string; pct: number; color: string }
+// One bar in the summary's "Every month" ledger. Every row is measured against the same
+// denominator, so the widths compare directly.
+export type LedgerRow = {
+  key: string
+  label: string
+  valueStr: string
+  pct: number
+  color: string
+}
+
+// The ledger's closing line: what income is left once every set-aside is taken.
+export type LedgerNet = {
+  label: string
+  valueStr: string
+  pct: number
+}
 
 export type Suggestion = { text: string; status: FundingStatus }
 
@@ -134,6 +158,60 @@ export type PlanMonth = {
   shares: MonthShare[]
 }
 
+// A block of list rows sharing a funding status, headed by a count and a group note.
+export type GoalGroup = {
+  status: FundingStatus
+  title: string
+  note: string
+  rows: GoalCard[]
+}
+
+// One tab's worth of the plan (goals, or obligations), pre-grouped by status.
+export type GoalList = {
+  count: number
+  subStr: string
+  groups: GoalGroup[]
+}
+
+// A goal in priority order on the summary, with the share of its plan already in motion.
+export type PriorityRow = {
+  id: string
+  num: string
+  name: string
+  note: string
+  status: FundingStatus
+  pct: number
+  amountStr: string
+}
+
+// A slipping goal the summary surfaces for the user to act on.
+export type Decision = {
+  goalId: string
+  text: string
+  action: string
+}
+
+// A dated money movement in the coming weeks: a payday, or a goal/obligation coming due.
+export type UpcomingEvent = {
+  key: string
+  dateStr: string
+  name: string
+  amountStr: string
+  incoming: boolean
+}
+
+export type PlanSummary = {
+  // This month's set-aside as a whole-number share of income (0 when there's no income).
+  usagePct: number
+  usageStr: string
+  ledger: LedgerRow[]
+  ledgerNet: LedgerNet
+  priority: PriorityRow[]
+  priorityNote: string
+  decisions: Decision[]
+  upcoming: UpcomingEvent[]
+}
+
 export type GoalsView = {
   incomeMonthly: number
   totalRequired: number
@@ -152,8 +230,12 @@ export type GoalsView = {
   asOfStr: string
   incomeRows: IncomeRow[]
   goalCards: GoalCard[]
+  goalsList: GoalList
+  obligationsList: GoalList
+  summary: PlanSummary
+  // "SR 15,000 in · SR 13,200 out", the rail's one-line cashflow under the verdict.
+  cashflowStr: string
   monthlyPlan: PlanMonth[]
-  cashSegments: CashSegment[]
   completedGoals: CompletedGoal[]
   verdict: Verdict
   timeline: TimelineItem[]
@@ -318,10 +400,12 @@ export function buildGoalsView(
       id: g.id,
       rank: idx + 1,
       kind: g.kind,
+      isObligation: isObligationKind(g.kind),
       name: g.name,
       color: g.color,
       kindLabel: KINDS[g.kind].chip,
       metaStr: metaFor(g),
+      rowMeta: rowMetaFor(p, today, money),
       monthlyStr: money(headline),
       monthlySubStr:
         plan.startsIn > 0 && status !== 'green'
@@ -378,23 +462,6 @@ export function buildGoalsView(
     })
   }
 
-  // --- Cashflow bar segments (this month's set-asides + slack) ---
-  const denom = Math.max(incomeMonthly, totalNow, 1)
-  const cashSegments: CashSegment[] = planned
-    .filter((p) => p.plan.now > EPS)
-    .map((p) => ({
-      id: p.g.id,
-      pct: (p.plan.now / denom) * 100,
-      color: p.g.color,
-    }))
-  if (leftover > 0.5) {
-    cashSegments.push({
-      id: 'slack',
-      pct: (leftover / denom) * 100,
-      color: 'slack',
-    })
-  }
-
   // --- Completed goals (reference only, out of the plan) ---
   const completedGoals: CompletedGoal[] = [...completed]
     .sort((a, b) => a.position - b.position)
@@ -409,6 +476,82 @@ export function buildGoalsView(
         metaStr: `Saved ${own(g.saved)} of ${own(g.target ?? 0)}`,
       }
     })
+
+  // --- Goals / obligations tabs + the summary section ---
+  const pairs = planned.map((p, i) => ({ p, card: goalCards[i] }))
+  const goalPairs = pairs.filter((x) => !x.card.isObligation)
+  const obligationPairs = pairs.filter((x) => x.card.isObligation)
+  const goalsList = buildList(
+    goalPairs,
+    money,
+    (n, totalStr) => `${n} ${n === 1 ? 'goal' : 'goals'} · ${totalStr}/mo`,
+  )
+  const obligationsList = buildList(
+    obligationPairs,
+    money,
+    (n, totalStr) =>
+      `${n} recurring ${n === 1 ? 'commitment' : 'commitments'} · ${totalStr}/mo`,
+  )
+  // Every ledger bar shares this denominator, so income and what it has to cover compare
+  // directly on one scale.
+  const denom = Math.max(incomeMonthly, totalNow, 1)
+  const pctOf = (v: number) => (v / denom) * 100
+  const obligationsNow = sumNow(obligationPairs.map((x) => x.p))
+  const goalsNow = sumNow(goalPairs.map((x) => x.p))
+  const summary: PlanSummary = {
+    usagePct:
+      incomeMonthly > 0 ? Math.round((totalNow / incomeMonthly) * 100) : 0,
+    usageStr:
+      incomeMonthly > 0
+        ? `${Math.round((totalNow / incomeMonthly) * 100)}% of income committed`
+        : 'no income yet',
+    ledger: [
+      {
+        key: 'income',
+        label: 'Income',
+        valueStr: money(incomeMonthly),
+        pct: pctOf(incomeMonthly),
+        color: 'var(--fp-accent)',
+      },
+      {
+        key: 'obligations',
+        label: 'Obligations',
+        valueStr: money(obligationsNow),
+        pct: pctOf(obligationsNow),
+        color: '#64748B',
+      },
+      {
+        key: 'goals',
+        label: 'Goals',
+        valueStr: money(goalsNow),
+        pct: pctOf(goalsNow),
+        color: '#EC4899',
+      },
+    ],
+    ledgerNet: {
+      label: 'Left over',
+      valueStr: `${money(leftover)} spare`,
+      pct: pctOf(leftover),
+    },
+    priority: goalCards.map((card) => ({
+      id: card.id,
+      num: String(card.rank),
+      name: card.name,
+      note: priorityNoteFor(card),
+      status: card.status,
+      pct: card.status === 'green' ? 100 : card.isOver ? 0 : card.fundedPct,
+      amountStr: card.monthlyStr,
+    })),
+    priorityNote:
+      greenCount === goalCards.length
+        ? `all ${goalCards.length} on track`
+        : `${greenCount} of ${goalCards.length} on track`,
+    decisions: planned
+      .filter((p) => p.status === 'red')
+      .slice(0, 4)
+      .map((p) => decisionFor(p, today, money)),
+    upcoming: buildUpcoming(income, ordered, base, rates, today, money),
+  }
 
   // --- Verdict + suggestions ---
   const verdict = buildVerdict(
@@ -459,8 +602,11 @@ export function buildGoalsView(
     asOfStr: `As of ${formatDate(today, dateFormat)}`,
     incomeRows,
     goalCards,
+    goalsList,
+    obligationsList,
+    summary,
+    cashflowStr: `${money(incomeMonthly)} in · ${money(totalNow)} out`,
     monthlyPlan,
-    cashSegments,
     completedGoals,
     verdict,
     timeline,
@@ -519,6 +665,187 @@ function helperFor(
       : `Catching up → ${money(plan.peak)}/mo`
   }
   return `${track.deadline} ${track.deadline === 1 ? 'mo' : 'mos'} left · on track`
+}
+
+const isObligationKind = (kind: GoalKind): boolean =>
+  RECURRING_KINDS.includes(kind)
+
+const sumNow = (items: Planned[]): number =>
+  items.reduce((a, p) => a + p.plan.now, 0)
+
+/** The one line a priority row adds under the name: why it isn't simply on track. */
+function priorityNoteFor(card: GoalCard): string {
+  if (card.status === 'green') return ''
+  if (card.isOver) return card.statusLabel
+  return card.monthlySubStr
+    ? `${card.statusLabel} · ${card.monthlySubStr}`
+    : card.statusLabel
+}
+
+/** "Jul 1", a day within the next few months. */
+const fmtDay = (d: Date): string =>
+  d.toLocaleString('en-US', { month: 'short', day: 'numeric' })
+
+const lowerFirst = (s: string): string => s.charAt(0).toLowerCase() + s.slice(1)
+
+/** The list row's caption: the plain facts when on track, else the funding helper. */
+function rowMetaFor(
+  p: Planned,
+  today: Date,
+  money: (n: number) => string,
+): string {
+  const { g, status } = p
+  if (status !== 'green') return helperFor(p, today, money)
+  const chip = KINDS[g.kind].chip
+  const pct = Math.round(progressPct(g))
+  if (g.kind === 'onetime')
+    return `${chip} · ${pct}% saved · ${fmtMonth(parseISO(g.dueDate, today))}`
+  if (g.kind === 'openended')
+    return (g.target ?? 0) > 0
+      ? `${chip} · ${pct}% of target`
+      : `${chip} · no deadline`
+  const every = FREQUENCIES[g.frequency ?? 'annual'].every
+  return `${chip} · ${every} · ${fmtDay(parseISO(g.nextDue, today))}`
+}
+
+const GROUP_TITLES: Record<FundingStatus, string> = {
+  green: 'On track',
+  amber: 'Scheduled',
+  red: 'Won’t make it',
+}
+
+function groupNote(
+  status: FundingStatus,
+  members: Planned[],
+  money: (n: number) => string,
+): string {
+  if (status === 'green') return `${money(sumNow(members))}/mo`
+  if (status === 'amber') return 'still on time · funded later'
+  const short = members.reduce((a, p) => a + shortfallOf(p), 0)
+  return `about ${money(short)}/mo short`
+}
+
+function buildList(
+  items: { p: Planned; card: GoalCard }[],
+  money: (n: number) => string,
+  subOf: (count: number, totalStr: string) => string,
+): GoalList {
+  const statuses: FundingStatus[] = ['green', 'amber', 'red']
+  const groups = statuses
+    .map((status) => {
+      const members = items.filter((x) => x.p.status === status)
+      return {
+        status,
+        title: `${GROUP_TITLES[status]} · ${members.length}`,
+        note: groupNote(
+          status,
+          members.map((x) => x.p),
+          money,
+        ),
+        rows: members.map((x) => x.card),
+      }
+    })
+    .filter((group) => group.rows.length > 0)
+  return {
+    count: items.length,
+    subStr: subOf(items.length, money(sumNow(items.map((x) => x.p)))),
+    groups,
+  }
+}
+
+function decisionFor(
+  p: Planned,
+  today: Date,
+  money: (n: number) => string,
+): Decision {
+  return {
+    goalId: p.g.id,
+    text: `${p.g.name} — ${lowerFirst(helperFor(p, today, money))}`,
+    action: p.g.kind === 'onetime' ? 'Push out' : 'Adjust',
+  }
+}
+
+const UPCOMING_DAYS = 60
+const UPCOMING_MAX = 6
+const DAY_MS = 86_400_000
+
+/** Every occurrence of a (possibly repeating) date from today through the upcoming window. */
+function occurrencesWithin(
+  first: Date,
+  frequency: GoalFrequency | null,
+  today: Date,
+): Date[] {
+  const limit = today.getTime() + UPCOMING_DAYS * DAY_MS
+  const at = (n: number): Date => {
+    if (!frequency) return first
+    if (frequency === 'weekly')
+      return new Date(
+        first.getFullYear(),
+        first.getMonth(),
+        first.getDate() + 7 * n,
+      )
+    const step = Math.max(1, Math.round(12 / FREQUENCIES[frequency].perYear))
+    return addMonths(first, n * step)
+  }
+  const out: Date[] = []
+  for (let n = 0; n < 12; n++) {
+    const d = at(n)
+    if (d.getTime() > limit) break
+    if (d.getTime() >= today.getTime()) out.push(d)
+    if (!frequency) break
+  }
+  return out
+}
+
+/** Paydays and due dates in the next 60 days, soonest first. */
+function buildUpcoming(
+  income: LocalIncomeStream[],
+  goals: LocalGoal[],
+  base: CurrencyCode,
+  rates: RatesMap,
+  today: Date,
+  money: (n: number) => string,
+): UpcomingEvent[] {
+  const events: { at: Date; event: UpcomingEvent }[] = []
+  for (const s of income) {
+    const amountStr = `+${money(convertMinor(s.amount, s.currency, base, rates))}`
+    occurrencesWithin(nextPayday(s.day, today), s.frequency, today).forEach(
+      (at, n) =>
+        events.push({
+          at,
+          event: {
+            key: `${s.id}:${n}`,
+            dateStr: fmtDay(at),
+            name: `${s.label} in`,
+            amountStr,
+            incoming: true,
+          },
+        }),
+    )
+  }
+  for (const g of goals) {
+    const due = dueOf(g)
+    if (!due) continue
+    const amount = g.kind === 'onetime' ? (g.target ?? 0) : (g.amount ?? 0)
+    const amountStr = money(convertMinor(amount, g.currency, base, rates))
+    const frequency = g.kind === 'onetime' ? null : (g.frequency ?? 'annual')
+    occurrencesWithin(parseISO(due, today), frequency, today).forEach((at, n) =>
+      events.push({
+        at,
+        event: {
+          key: `${g.id}:${n}`,
+          dateStr: fmtDay(at),
+          name: g.name,
+          amountStr,
+          incoming: false,
+        },
+      }),
+    )
+  }
+  return events
+    .sort((a, b) => a.at.getTime() - b.at.getTime())
+    .slice(0, UPCOMING_MAX)
+    .map((x) => x.event)
 }
 
 /** Month label `n` months from today, e.g. "Aug 2026". */

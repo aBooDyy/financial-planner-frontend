@@ -233,7 +233,8 @@ export function simulatePlan(
   // A one-time / target goal sets how far the plan must reach; recurring obligations and ongoing
   // funds never end, so they extend their schedule to this horizon — that's how their repeating
   // draws stay visible and keep weighing on the other goals up to the last goal's date.
-  const finishes = (t: PlanTrack) => !t.recurs && (!t.steady || t.target > PLAN_EPS)
+  const finishes = (t: PlanTrack) =>
+    !t.recurs && (!t.steady || t.target > PLAN_EPS)
   let coverEnd = 11
   for (const t of tracks) {
     if (!finishes(t)) continue

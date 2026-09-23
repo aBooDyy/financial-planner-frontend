@@ -1,3 +1,4 @@
+import { fromWireCurrency } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
 
 /**
@@ -253,7 +254,7 @@ export const toIncome = (w: IncomeStreamWire): IncomeStream => ({
   id: w.id,
   label: w.label,
   amount: w.amount,
-  currency: w.currency as CurrencyCode,
+  currency: fromWireCurrency(w.currency),
   frequency: fromWireFreq(w.frequency),
   day: w.day,
   color: w.color,
@@ -270,7 +271,7 @@ export const toAllocation = (w: GoalAllocationWire): GoalAllocation => ({
   walletId: w.wallet_id,
   externalLabel: w.external_label,
   amount: w.amount,
-  currency: w.currency as CurrencyCode,
+  currency: fromWireCurrency(w.currency),
   note: w.note,
   position: w.position,
   createdAt: w.created_at,
@@ -282,7 +283,7 @@ export const toGoal = (w: GoalWire): Goal => ({
   id: w.id,
   name: w.name,
   kind: fromWireKind(w.kind),
-  currency: w.currency as CurrencyCode,
+  currency: fromWireCurrency(w.currency),
   color: w.color,
   position: w.position,
   amount: w.amount,

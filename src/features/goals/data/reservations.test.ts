@@ -36,6 +36,7 @@ const wallet = (over: Partial<LocalBalanceNode>): LocalBalanceNode => ({
   parentId: null,
   name: 'Wallet',
   color: '#1F9D6B',
+  icon: null,
   note: null,
   position: 0,
   collapsed: false,
