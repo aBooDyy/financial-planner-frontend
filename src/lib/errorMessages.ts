@@ -1,7 +1,12 @@
 /**
  * Maps the backend's stable error `code` to a user-facing message. This is a stand-in for
  * the future i18n catalog — the contract is that the UI keys off `code`, never the wire
- * `message`. Add a code here when the backend introduces one.
+ * `message`. Add a code here when the backend introduces one, and when the client itself
+ * mints one (the `import.file.*` / `import.row.*` families are read from the file, never
+ * from the wire).
+ *
+ * One map, one language: there is no second locale to keep in step yet. When one arrives,
+ * this module is the seam — the codes stay, the strings move.
  */
 const MESSAGES: Record<string, string> = {
   'auth.credentials.invalid': 'Email or password is incorrect.',
@@ -19,13 +24,99 @@ const MESSAGES: Record<string, string> = {
   'spending.transaction.currency_invalid': 'Choose a supported currency.',
   'spending.transaction.date_invalid': 'Enter a valid date.',
   'spending.transaction.category_required': 'Pick a category.',
-  'email_sync.import.incomplete':
-    'Add the amount and currency from the email below.',
-  'email_sync.import.already_resolved': 'This alert was already reviewed.',
-  'email_sync.import.not_found': 'That alert is no longer available.',
+  'spending.transaction.merchant_invalid': 'Choose one of your merchants.',
+  'merchants.not_found': 'That merchant is no longer available.',
+  'merchants.name_required': 'Give the merchant a name.',
+  'merchants.alias.taken': 'Another merchant already answers to that spelling.',
+  'merchants.alias.invalid':
+    'Add a Latin letter or digit so this merchant can be recognised.',
+  'merchants.alias.not_found': 'That spelling is no longer on file.',
+  'merchants.merge.same': 'Pick a different merchant to merge into.',
+  'merchants.id_taken': 'That merchant already exists.',
+  'inbound.import.incomplete':
+    'Add the amount and currency from the details below.',
+  'inbound.import.already_resolved': 'This import was already reviewed.',
+  'inbound.import.not_found': 'That import is no longer available.',
+  'inbound.import.wallet_invalid': 'Choose one of your accounts.',
   'email_sync.connection.wallet_invalid': 'Choose one of your accounts.',
+  'email_sync.connection.not_found': 'That inbox is no longer connected.',
   'email_sync.provider.fetch_failed':
     'Couldn’t reach your inbox provider. Try again.',
+  'email_sync.provider.not_configured':
+    'That inbox needs reconnecting before it can be scanned.',
+  'email_sync.sync.window_invalid':
+    'Pick a scan window between 1 and 180 days.',
+  'email_sync.sync.limit_invalid':
+    'That scan is too large. Try a shorter window.',
+  // Not a failure: the inbox is being read right now, and nothing asked for is lost.
+  'email_sync.sync.in_progress':
+    'A scan of your inbox is already running. This one will pick up where it leaves off.',
+  'integrations.key.not_found': 'That key no longer exists.',
+  'integrations.key.name_required':
+    'Give the key a name of 120 characters or fewer.',
+  'integrations.key.name_taken': 'You already have a key with that name.',
+  'integrations.key.expiry_invalid': 'Choose an expiry date in the future.',
+  'integrations.key.wallet_invalid': 'Choose one of your accounts.',
+  'integrations.key.currency_invalid': 'Choose a supported currency.',
+  'integrations.key.rate_limit_invalid':
+    'Set a rate limit between 1 and 600 requests a minute.',
+  'integrations.key.auto_confirm_needs_wallet':
+    'Choose a default account first — Means needs to know which account to post to.',
+  'integrations.key.limit_reached':
+    'You’ve reached the most keys you can have. Delete one you no longer use.',
+  'integrations.key.revoked':
+    'That key is revoked. Rotate it or create a new one.',
+  'integrations.rule.invalid': 'That rule couldn’t be saved.',
+  'integrations.rule.path_invalid':
+    'That path isn’t valid. Use a form like $.data.amount.',
+  'integrations.rule.regex_invalid': 'That pattern isn’t a valid expression.',
+  'integrations.rule.field_unknown': 'Means doesn’t know that field.',
+  'integrations.rule.limit_reached':
+    'This key has the most rules it can hold. Remove one first.',
+  'integrations.auth.missing': 'This endpoint needs an integration key.',
+  'integrations.auth.invalid': 'That integration key isn’t valid.',
+  'integrations.auth.expired': 'That integration key has expired.',
+  'integrations.auth.revoked': 'That integration key was revoked.',
+  'integrations.payload.invalid': 'The request body isn’t valid JSON.',
+  'integrations.payload.too_large': 'The request body is too large.',
+  'integrations.rate.limited': 'Too many requests. Wait a moment and try again.',
+  'import.file.empty': 'That file has no rows in it.',
+  'import.file.too_large': 'That file is too big. Split it by date range.',
+  'import.file.too_many_rows':
+    'That file has too many rows. Split it by date range.',
+  'import.file.single_column':
+    'Only one column was found. Check the separator in Adjust.',
+  'import.file.unreadable': 'That file couldn’t be read as a CSV.',
+  'import.file.cancelled': 'Reading the file was cancelled.',
+  'import.row.date_unreadable': 'This date can’t be read.',
+  'import.row.date_ambiguous':
+    'This column could be day-first or month-first — check the format.',
+  'import.row.date_implausible':
+    'That date looks wrong. Check it before importing.',
+  'import.row.amount_unreadable': 'This amount can’t be read.',
+  'import.row.amount_ambiguous':
+    'This row has both a money-in and a money-out amount.',
+  'import.row.amount_missing': 'This row has no amount.',
+  'import.row.amount_zero': 'This row’s amount is zero.',
+  'import.row.currency_unsupported': 'That currency isn’t recognised.',
+  'import.row.currency_mismatch':
+    'This row’s currency differs from the account’s.',
+  'import.row.wallet_unresolved':
+    'This row has no account. Mark the account column in Columns, match its value in Values, or set an account for rows with none.',
+  'import.row.category_defaulted': 'Category guessed — no match in the file.',
+  'import.row.type_defaulted':
+    'Money in or out was guessed — that word isn’t mapped yet.',
+  'import.row.ragged': 'This row has fewer columns than the header.',
+  'import.template.not_found': 'That template is no longer available.',
+  'import.template.name_required':
+    'Give the template a name (120 characters or fewer).',
+  'import.template.name_taken': 'You already have a template with that name.',
+  'import.template.signature_invalid':
+    'That file’s columns can’t be recognised, so the mapping can’t be saved.',
+  'import.template.config_invalid': 'That mapping is too large to save.',
+  'import.template.source_invalid':
+    'That template is for a different kind of file.',
+  'import.template.id_taken': 'That template already exists.',
 }
 
 export const messageForCode = (

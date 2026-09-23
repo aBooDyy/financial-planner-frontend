@@ -1,4 +1,6 @@
-export type FieldError = { field: string; code: string }
+// `value` carries the datum the caller needs to recover from the error — today only the
+// winning merchant id on `merchants.alias.taken`. Omitted from the wire when unset.
+export type FieldError = { field: string; code: string; value?: string }
 
 /**
  * Typed transport error carrying the backend's stable `code` (the i18n key) and optional
@@ -28,5 +30,9 @@ export class ApiError extends Error {
 
   fieldError(field: string): string | undefined {
     return this.details.find((d) => d.field === field)?.code
+  }
+
+  fieldValue(field: string): string | undefined {
+    return this.details.find((d) => d.field === field)?.value
   }
 }
