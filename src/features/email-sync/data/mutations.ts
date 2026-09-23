@@ -2,16 +2,16 @@ import { db } from '#/db/db'
 import { emailSyncApi } from '#/features/email-sync/api/emailSyncApi'
 import type {
   EmailConnection,
-  PendingImport,
   RuleDraftWire,
   ScanFrequency,
+  ScanOptions,
   SyncResult,
 } from '#/features/email-sync/api/types'
 import { toWireFrequency } from '#/features/email-sync/api/types'
-import type { TxType } from '#/features/transactions/api/types'
-import { toWireTxType } from '#/features/transactions/api/types'
-import { pullConnections, pullPendingImports } from './cache'
-import { connectionToLocal, transactionToLocal } from './mappers'
+import { dropConnectionImports } from '#/features/inbound-imports/data/cache'
+import { pullInboundImportsDelta } from '#/features/inbound-imports/data/sync'
+import { pullConnections } from './cache'
+import { connectionToLocal } from './mappers'
 
 async function cacheConnection(connection: EmailConnection): Promise<void> {
   await db.emailConnections.put(connectionToLocal(connection))
@@ -59,56 +59,13 @@ export async function updateConnectionSettings(
 
 export async function disconnectConnection(id: string): Promise<void> {
   await emailSyncApi.disconnect(id)
-  await db.transaction('rw', db.emailConnections, db.emailImports, async () => {
-    await db.emailConnections.delete(id)
-    await db.emailImports.where('connectionId').equals(id).delete()
-  })
+  await db.emailConnections.delete(id)
+  await dropConnectionImports(id)
 }
 
 /** Client-triggered scan (on login / on demand), then refresh the caches it touched. */
-export async function runEmailSync(): Promise<SyncResult> {
-  const result = await emailSyncApi.syncAll()
-  await Promise.all([pullPendingImports(), pullConnections()])
+export async function runEmailSync(options?: ScanOptions): Promise<SyncResult> {
+  const result = await emailSyncApi.syncAll(options)
+  await Promise.all([pullInboundImportsDelta(), pullConnections()])
   return result
-}
-
-/**
- * Values the user may supply at confirm time. They override whatever the sync parsed, and
- * are required when it parsed nothing — the user reads them off the stored email body.
- */
-export type ConfirmOverrides = {
-  amount?: number
-  currency?: string
-  date?: string
-  merchant?: string
-  note?: string
-}
-
-export async function confirmImport(
-  item: PendingImport,
-  input: {
-    walletId: string
-    category: string
-    subcategory: string | null
-    type: TxType
-  } & ConfirmOverrides,
-): Promise<void> {
-  const { walletId, category, subcategory, type, ...overrides } = input
-  const { transaction } = await emailSyncApi.confirmImport(item.id, {
-    wallet_id: walletId,
-    category,
-    subcategory,
-    type: toWireTxType(type),
-    ...overrides,
-  })
-  await db.transaction('rw', db.emailImports, db.transactions, async () => {
-    await db.emailImports.delete(item.id)
-    // Reflect the promoted entry in the local ledger immediately (clean, already-synced).
-    await db.transactions.put(transactionToLocal(transaction))
-  })
-}
-
-export async function dismissImport(item: PendingImport): Promise<void> {
-  await emailSyncApi.dismissImport(item.id)
-  await db.emailImports.delete(item.id)
 }

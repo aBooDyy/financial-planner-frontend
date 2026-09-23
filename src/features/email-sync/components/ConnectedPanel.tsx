@@ -1,5 +1,5 @@
 import { Check, Info, Plus } from 'lucide-react'
-import type { LocalEmailConnection, LocalPendingImport } from '#/db/types'
+import type { LocalEmailConnection, LocalInboundImport } from '#/db/types'
 import type { ConnectionSettings } from '#/features/email-sync/data/mutations'
 import type { ScanFrequency } from '#/features/email-sync/api/types'
 import { Toggle } from '#/features/settings/components/Toggle'
@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select'
+import { ScanNowControl } from './ScanNowControl'
 
 const CARD =
   'overflow-hidden rounded-2xl border border-fp-border bg-fp-surface shadow-fp'
@@ -40,7 +41,7 @@ const initials = (name: string): string => {
 type Props = {
   connection: LocalEmailConnection
   walletGroups: WalletGroupOption[]
-  recent: LocalPendingImport[]
+  recent: LocalInboundImport[]
   onSave: (settings: ConnectionSettings) => void
   onDisconnect: () => void
   onConnectAnother: () => void
@@ -88,6 +89,21 @@ export function ConnectedPanel({
         >
           Disconnect
         </Button>
+      </div>
+
+      {/* Manual scan */}
+      <div className={CARD}>
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 px-[18px] py-[15px]">
+          <div className="min-w-0 flex-1">
+            <div className="text-[14.5px] font-semibold">
+              Scan this inbox now
+            </div>
+            <div className="mt-0.5 text-[12.5px] text-fp-text-3">
+              Look for alerts that haven’t been imported yet.
+            </div>
+          </div>
+          <ScanNowControl connectionId={connection.id} />
+        </div>
       </div>
 
       {/* Sync settings */}
@@ -229,10 +245,10 @@ export function ConnectedPanel({
             >
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[13.5px] font-bold">
-                  {r.suggestedMerchant ?? r.senderName ?? r.senderEmail}
+                  {r.suggestedMerchant ?? r.sourceLabel ?? r.sourceRef}
                 </div>
                 <div className="text-[12px] text-fp-text-3">
-                  {r.emailDate ?? ''}
+                  {r.occurredOn ?? ''}
                 </div>
               </div>
               <div className="shrink-0 text-[14px] font-extrabold tabular-nums">

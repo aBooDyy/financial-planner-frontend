@@ -1,21 +1,14 @@
 import type {
   ConnectionStatus,
   EmailProvider,
-  ImportStatus,
   ScanFrequency,
   TrackedSender,
 } from '#/db/types'
-import type {
-  Transaction,
-  TransactionWire,
-} from '#/features/transactions/api/types'
-import { toTransaction } from '#/features/transactions/api/types'
 
 // Re-export the domain enums so the rest of the feature imports them from one place.
 export type {
   ConnectionStatus,
   EmailProvider,
-  ImportStatus,
   ScanFrequency,
   TrackedSender,
 } from '#/db/types'
@@ -29,7 +22,6 @@ export type {
 export type EmailProviderWire = 'GOOGLE' | 'OUTLOOK'
 export type ScanFrequencyWire = 'FIFTEEN_MIN' | 'HOURLY' | 'DAILY'
 export type ConnectionStatusWire = 'PENDING_SETUP' | 'CONNECTED'
-export type ImportStatusWire = 'PENDING' | 'CONFIRMED' | 'DISMISSED'
 
 const PROVIDER_TO_WIRE: Record<EmailProvider, EmailProviderWire> = {
   google: 'GOOGLE',
@@ -53,12 +45,6 @@ const STATUS_FROM_WIRE: Record<ConnectionStatusWire, ConnectionStatus> = {
   PENDING_SETUP: 'pending_setup',
   CONNECTED: 'connected',
 }
-const IMPORT_STATUS_FROM_WIRE: Record<ImportStatusWire, ImportStatus> = {
-  PENDING: 'pending',
-  CONFIRMED: 'confirmed',
-  DISMISSED: 'dismissed',
-}
-
 export const toWireProvider = (p: EmailProvider): EmailProviderWire =>
   PROVIDER_TO_WIRE[p]
 export const fromWireProvider = (w: EmailProviderWire): EmailProvider =>
@@ -69,8 +55,6 @@ export const fromWireFrequency = (w: ScanFrequencyWire): ScanFrequency =>
   FREQ_FROM_WIRE[w]
 export const fromWireStatus = (w: ConnectionStatusWire): ConnectionStatus =>
   STATUS_FROM_WIRE[w]
-export const fromWireImportStatus = (w: ImportStatusWire): ImportStatus =>
-  IMPORT_STATUS_FROM_WIRE[w]
 
 // --- Domain types --------------------------------------------------------------------
 
@@ -101,50 +85,31 @@ export type InboxMessage = {
   likely: boolean
 }
 
-export type PendingImport = {
-  id: string
+/** One inbox the scan could not read. The rest of the scan still ran. */
+export type SyncFailure = {
   connectionId: string
-  merchantId: string | null
-  senderEmail: string
-  senderName: string | null
-  subject: string | null
-  emailDate: string | null
-  amount: number | null
-  currency: string | null
-  suggestedMerchant: string | null
-  suggestedCategory: string | null
-  suggestedSubcategory: string | null
-  rawPreview: string | null
-  /** Whether the stored email body can be fetched (false for pre-0009 rows). */
-  hasBody: boolean
-  status: ImportStatus
-  transactionId: string | null
-  createdAt: string
-  version: string
-}
-
-/** What the user has taught the app about a merchant — shown as context while reviewing. */
-export type ImportMerchant = {
-  id: string
-  displayName: string
-  learnedCategory: string | null
-  learnedSubcategory: string | null
-  timesSeen: number
-  timesConfirmed: number
-}
-
-/** One import plus the email it came from — the review screen reads its values off this. */
-export type ImportDetail = {
-  import: PendingImport
-  bodyLines: string[]
-  bodyTruncated: boolean
-  merchant: ImportMerchant | null
+  code: string
 }
 
 export type SyncResult = {
   syncedConnections: number
+  scannedMessages: number
   newImports: number
   autoConfirmed: number
+  failures: SyncFailure[]
+}
+
+/**
+ * What a caller may ask of a scan. The backend infers "manual" from any field being
+ * present — an empty body is the automatic login scan, which honours `autoSync` and
+ * resumes from each connection's cursor. So a deliberate scan must send at least one.
+ */
+export type ScanOptions = {
+  connectionId?: string
+  /** 1–180. Omitted means "since the last scan". */
+  lookbackDays?: number
+  /** 1–200 messages per connection. */
+  limit?: number
 }
 
 // --- Wire types ----------------------------------------------------------------------
@@ -183,71 +148,23 @@ export type MessageWire = {
   likely: boolean
 }
 
-export type ImportWire = {
-  id: string
-  connection_id: string
-  rule_id: string | null
-  transaction_id: string | null
-  merchant_id: string | null
-  sender_email: string
-  sender_name: string | null
-  subject: string | null
-  email_date: string | null
-  amount: number | null
-  currency: string | null
-  suggested_merchant: string | null
-  suggested_category: string | null
-  suggested_subcategory: string | null
-  raw_preview: string | null
-  has_body: boolean
-  status: ImportStatusWire
-  created_at: string
-  version: string
-}
-
-export type ImportMerchantWire = {
-  id: string
-  display_name: string
-  learned_category: string | null
-  learned_subcategory: string | null
-  times_seen: number
-  times_confirmed: number
-}
-
-export type ImportDetailWire = {
-  email_import: ImportWire
-  body_lines: string[]
-  body_truncated: boolean
-  merchant: ImportMerchantWire | null
-}
-
-/**
- * Confirm payload. The value fields are optional overrides — the only way to promote an
- * import whose parse came back empty, typed by the user off the stored email body.
- */
-export type ConfirmImportWire = {
-  wallet_id: string
-  category: string
-  subcategory: string | null
-  type: 'SPEND' | 'INCOME'
-  amount?: number
-  currency?: string
-  date?: string
-  merchant?: string
-  note?: string
-}
-
 export type AuthorizeUrlWire = { authorize_url: string; state: string }
+export type SyncOptionsWire = {
+  connection_id?: string
+  lookback_days?: number
+  limit?: number
+}
+export type SyncFailureWire = {
+  connection_id: string
+  code: string
+}
 export type SyncResultWire = {
   synced_connections: number
+  scanned_messages: number
   new_imports: number
   auto_confirmed: number
+  failures: SyncFailureWire[]
 }
-export type ConfirmResultWire = {
-  transaction: TransactionWire
-  email_import: ImportWire
-}
-
 export type RuleDraftWire = {
   sender_email: string
   sender_name: string | null
@@ -302,51 +219,20 @@ export const toMessage = (w: MessageWire): InboxMessage => ({
   likely: w.likely,
 })
 
-export const toImport = (w: ImportWire): PendingImport => ({
-  id: w.id,
-  connectionId: w.connection_id,
-  merchantId: w.merchant_id,
-  senderEmail: w.sender_email,
-  senderName: w.sender_name,
-  subject: w.subject,
-  emailDate: w.email_date,
-  amount: w.amount,
-  currency: w.currency,
-  suggestedMerchant: w.suggested_merchant,
-  suggestedCategory: w.suggested_category,
-  suggestedSubcategory: w.suggested_subcategory,
-  rawPreview: w.raw_preview,
-  hasBody: w.has_body,
-  status: fromWireImportStatus(w.status),
-  transactionId: w.transaction_id,
-  createdAt: w.created_at,
-  version: w.version,
-})
-
-export const toImportMerchant = (w: ImportMerchantWire): ImportMerchant => ({
-  id: w.id,
-  displayName: w.display_name,
-  learnedCategory: w.learned_category,
-  learnedSubcategory: w.learned_subcategory,
-  timesSeen: w.times_seen,
-  timesConfirmed: w.times_confirmed,
-})
-
-export const toImportDetail = (w: ImportDetailWire): ImportDetail => ({
-  import: toImport(w.email_import),
-  bodyLines: w.body_lines,
-  bodyTruncated: w.body_truncated,
-  merchant: w.merchant ? toImportMerchant(w.merchant) : null,
-})
-
 export const toSyncResult = (w: SyncResultWire): SyncResult => ({
   syncedConnections: w.synced_connections,
+  scannedMessages: w.scanned_messages,
   newImports: w.new_imports,
   autoConfirmed: w.auto_confirmed,
+  failures: w.failures.map((f) => ({
+    connectionId: f.connection_id,
+    code: f.code,
+  })),
 })
 
-export type ConfirmResult = { transaction: Transaction; import: PendingImport }
-export const toConfirmResult = (w: ConfirmResultWire): ConfirmResult => ({
-  transaction: toTransaction(w.transaction),
-  import: toImport(w.email_import),
+/** Undefined fields are dropped by `JSON.stringify`, so `{}` stays an automatic scan. */
+export const toSyncOptionsWire = (o: ScanOptions): SyncOptionsWire => ({
+  connection_id: o.connectionId,
+  lookback_days: o.lookbackDays,
+  limit: o.limit,
 })

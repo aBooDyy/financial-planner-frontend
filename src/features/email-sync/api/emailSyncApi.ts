@@ -1,36 +1,26 @@
 import { http } from '#/lib/http'
 import type {
   AuthorizeUrlWire,
-  ConfirmImportWire,
-  ConfirmResult,
-  ConfirmResultWire,
   ConnectionWire,
   EmailConnection,
   EmailProvider,
-  ImportDetail,
-  ImportDetailWire,
-  ImportStatus,
-  ImportWire,
   InboxMessage,
   MessageWire,
-  PendingImport,
   RuleDraftWire,
+  ScanOptions,
   SyncResult,
   SyncResultWire,
   UpdateConnectionWire,
 } from './types'
 import {
-  toConfirmResult,
   toConnection,
-  toImport,
-  toImportDetail,
   toMessage,
+  toSyncOptionsWire,
   toSyncResult,
   toWireProvider,
 } from './types'
 
 const CONN = '/email-connections'
-const IMPORTS = '/email-imports'
 
 /**
  * Remote calls for Email sync. Unlike the offline-first features, the UI calls these directly
@@ -71,34 +61,12 @@ export const emailSyncApi = {
       .post<ConnectionWire>(`${CONN}/${id}/rules`, { rules })
       .then(toConnection),
 
-  syncAll: (): Promise<SyncResult> =>
-    http.post<SyncResultWire>(`${CONN}/sync`).then(toSyncResult),
-
-  listImports: (status?: ImportStatus): Promise<PendingImport[]> =>
+  /** No options = the automatic scan the backend has always run; any option makes it manual. */
+  syncAll: (options?: ScanOptions): Promise<SyncResult> =>
     http
-      .get<
-        ImportWire[]
-      >(`${IMPORTS}${status ? `?status=${status.toUpperCase()}` : ''}`)
-      .then((r) => r.map(toImport)),
-
-  /** One import with the email it was derived from — fetched on demand, not in the list. */
-  getImport: (id: string): Promise<ImportDetail> =>
-    http.get<ImportDetailWire>(`${IMPORTS}/${id}`).then(toImportDetail),
-
-  /** The source email behind a ledger entry; rejects for manually entered transactions. */
-  getImportByTransaction: (transactionId: string): Promise<ImportDetail> =>
-    http
-      .get<ImportDetailWire>(`${IMPORTS}/by-transaction/${transactionId}`)
-      .then(toImportDetail),
-
-  confirmImport: (
-    id: string,
-    payload: ConfirmImportWire,
-  ): Promise<ConfirmResult> =>
-    http
-      .post<ConfirmResultWire>(`${IMPORTS}/${id}/confirm`, payload)
-      .then(toConfirmResult),
-
-  dismissImport: (id: string): Promise<PendingImport> =>
-    http.post<ImportWire>(`${IMPORTS}/${id}/dismiss`).then(toImport),
+      .post<SyncResultWire>(
+        `${CONN}/sync`,
+        options ? toSyncOptionsWire(options) : undefined,
+      )
+      .then(toSyncResult),
 }

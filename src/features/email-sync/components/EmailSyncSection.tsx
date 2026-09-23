@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { ArrowRight, Check, Lock, Mail } from 'lucide-react'
 import { Button } from '#/components/ui/button'
 import type { LocalEmailConnection } from '#/db/types'
@@ -10,7 +10,7 @@ import {
 } from '#/features/email-sync/data/mutations'
 import type { ConnectionSettings } from '#/features/email-sync/data/mutations'
 import { useEmailConnections } from '#/features/email-sync/hooks/useEmailConnections'
-import { usePendingImports } from '#/features/email-sync/hooks/usePendingImports'
+import { usePendingImports } from '#/features/inbound-imports/hooks/usePendingImports'
 import { useEmailWizard } from '#/features/email-sync/hooks/useEmailWizard'
 import { SectionHeader } from '#/features/settings/components/SectionHeader'
 import { ConnectedPanel } from './ConnectedPanel'
@@ -96,8 +96,15 @@ export function EmailSyncSection() {
   // Returning from the OAuth redirect leaves a PENDING_SETUP connection; resume its setup.
   const resumeSetup = wizard.actions.resumeSetup
   const wizardIdle = wizard.state.step === 'idle'
+  // Resume fetches the inbox's messages, so it must happen once per connection, not once
+  // per render: `pendingSetup` is a row from a live query and arrives as a new object every
+  // time the table emits, which a plain dependency on it would read as a new connection.
+  const resumedId = useRef<string | null>(null)
   useEffect(() => {
-    if (pendingSetup && wizardIdle) void resumeSetup(pendingSetup)
+    if (!pendingSetup || !wizardIdle) return
+    if (resumedId.current === pendingSetup.id) return
+    resumedId.current = pendingSetup.id
+    void resumeSetup(pendingSetup)
   }, [pendingSetup, wizardIdle, resumeSetup])
 
   const saveSettings =
