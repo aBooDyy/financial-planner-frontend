@@ -1,4 +1,5 @@
 import { db } from '#/db/db'
+import { pullDelta } from '#/db/delta'
 import type { OutboxEntry } from '#/db/types'
 import {
   budgetsApi,
@@ -9,6 +10,7 @@ import type {
   CreateBudgetWire,
   CreateRecurringWire,
   CreateTransactionWire,
+  Transaction,
   UpdateBudgetWire,
   UpdateRecurringWire,
   UpdateTransactionWire,
@@ -50,6 +52,60 @@ async function pushTransactionCreate(entry: OutboxEntry): Promise<void> {
     }
     throw e
   }
+}
+
+/**
+ * Push a run of queued creates as one request. An import queues one entry per row, and a
+ * queue drained a round trip at a time costs two orders of magnitude more than the local
+ * commit it follows.
+ *
+ * The request is all-or-nothing; the *entries* are not. Each is answered on its own terms:
+ * a written row is stored, an id the server already holds is settled from the row it sends
+ * back, and an entry it judges unusable is dropped — the same rule the singular path
+ * applies to a non-network failure. An entry with no answer stays queued.
+ */
+export async function pushTransactionCreates(
+  entries: ReadonlyArray<OutboxEntry>,
+): Promise<void> {
+  const results = await transactionsApi.bulkCreate(
+    entries.map((entry) => entry.payload as CreateTransactionWire),
+  )
+  const byId = new Map(results.map((result) => [result.id, result]))
+  await db.transaction('rw', db.transactions, db.outbox, async () => {
+    for (const entry of entries) {
+      const result = byId.get(entry.id)
+      if (result === undefined) continue
+      if (result.transaction) {
+        await db.transactions.put(serverTransactionToLocal(result.transaction))
+      }
+      await db.outbox.delete(entry.seq)
+    }
+  })
+}
+
+/**
+ * Push a run of queued deletes as one request — the mirror of `pushTransactionCreates`,
+ * and the reason undoing a 2 608-row import is a handful of requests rather than 2 608.
+ *
+ * Every answer is terminal, so a mentioned entry is always dropped: the row is gone,
+ * nothing of ours ever stood behind that id, or the id is unusable and resending it cannot
+ * change that. An entry the response does not mention stays queued, exactly as on the
+ * create side, so a half-answered request leaves the rest to the next drain.
+ */
+export async function pushTransactionDeletes(
+  entries: ReadonlyArray<OutboxEntry>,
+): Promise<void> {
+  const results = await transactionsApi.bulkDelete(
+    entries.map((entry) => entry.id),
+  )
+  const answered = new Set(results.map((result) => result.id))
+  await db.transaction('rw', db.transactions, db.outbox, async () => {
+    for (const entry of entries) {
+      if (!answered.has(entry.id)) continue
+      await db.transactions.delete(entry.id)
+      await db.outbox.delete(entry.seq)
+    }
+  })
 }
 
 async function pushTransactionUpdate(entry: OutboxEntry): Promise<void> {
@@ -292,18 +348,30 @@ export async function pushSpendingEntry(entry: OutboxEntry): Promise<void> {
   return pushRecurringDelete(entry)
 }
 
+/** Server truth for one row — unless the local copy is holding work not yet pushed. */
+async function upsertTransactionFromServer(t: Transaction): Promise<void> {
+  const local = await db.transactions.get(t.id)
+  if (!local || (local.dirty === 0 && local.deleted === 0)) {
+    await db.transactions.put(serverTransactionToLocal(t))
+  }
+}
+
+/**
+ * Drop a row the server no longer has. One holding an unpushed edit stays: its own push
+ * settles it, and the 404 that earns is what finally removes it.
+ */
+async function dropTransactionLocally(id: string): Promise<void> {
+  const local = await db.transactions.get(id)
+  if (local && local.dirty === 0) await db.transactions.delete(id)
+}
+
 export async function pullTransactions(): Promise<void> {
   const server = await transactionsApi.list()
   const ids = new Set(server.map((t) => t.id))
   await db.transaction('rw', db.transactions, async () => {
-    for (const t of server) {
-      const local = await db.transactions.get(t.id)
-      if (!local || (local.dirty === 0 && local.deleted === 0)) {
-        await db.transactions.put(serverTransactionToLocal(t))
-      }
-    }
+    for (const t of server) await upsertTransactionFromServer(t)
     for (const l of await db.transactions.toArray()) {
-      if (l.dirty === 0 && !ids.has(l.id)) await db.transactions.delete(l.id)
+      if (!ids.has(l.id)) await dropTransactionLocally(l.id)
     }
   })
 }
@@ -340,6 +408,40 @@ export async function pullRecurrings(): Promise<void> {
   })
 }
 
+/**
+ * One page of the ledger's delta, under the full pull's rules restricted to its rows.
+ *
+ * Every write is keyed by id, which is what makes the rows a delta deliberately re-delivers
+ * around the watermark free, and a re-run of an interrupted page indistinguishable from the
+ * first.
+ */
+async function applyTransactionChanges(
+  items: ReadonlyArray<Transaction>,
+  deletedIds: ReadonlyArray<string>,
+): Promise<void> {
+  await db.transaction('rw', db.transactions, async () => {
+    for (const t of items) await upsertTransactionFromServer(t)
+    for (const id of deletedIds) await dropTransactionLocally(id)
+  })
+}
+
+/** The ledger's incremental pull — the one collection that grows without bound. */
+export const pullTransactionsDelta = (): Promise<void> =>
+  pullDelta<Transaction>({
+    entity: 'transaction',
+    fetchChanges: transactionsApi.changes,
+    apply: applyTransactionChanges,
+    idOf: (t) => t.id,
+    fullPull: pullTransactions,
+    reconcile: async (delivered) => {
+      await db.transaction('rw', db.transactions, async () => {
+        for (const l of await db.transactions.toArray()) {
+          if (!delivered.has(l.id)) await dropTransactionLocally(l.id)
+        }
+      })
+    },
+  })
+
 export async function pullSpendingAll(): Promise<void> {
-  await Promise.all([pullTransactions(), pullBudgets(), pullRecurrings()])
+  await Promise.all([pullTransactionsDelta(), pullBudgets(), pullRecurrings()])
 }
