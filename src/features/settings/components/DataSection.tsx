@@ -1,6 +1,9 @@
+import { Link } from '@tanstack/react-router'
 import { Button } from '#/components/ui/button'
+import { useLogout } from '#/features/auth/hooks/useLogout'
 import { exportCsv, exportJson } from '#/features/settings/data/exportData'
 import { usePreferencesStore } from '#/stores/preferences'
+import { ImportTemplatesCard } from './ImportTemplatesCard'
 import { SectionHeader } from './SectionHeader'
 import { SettingRow } from './SettingRow'
 import { Toggle } from './Toggle'
@@ -9,9 +12,9 @@ const CARD = 'rounded-2xl border border-fp-border bg-fp-surface shadow-fp'
 const GHOST =
   'rounded-[11px] border-fp-border-strong bg-fp-surface-2 px-[14px] py-[9px] text-[13px] font-semibold text-fp-text hover:border-fp-accent hover:bg-fp-surface-2'
 
-type Props = { onSignOut: () => void }
-
-export function DataSection({ onSignOut }: Props) {
+export function DataSection() {
+  const logout = useLogout()
+  const onSignOut = () => void logout()
   const autoBackup = usePreferencesStore((s) => s.autoBackup)
   const setAutoBackup = usePreferencesStore((s) => s.setAutoBackup)
 
@@ -23,11 +26,15 @@ export function DataSection({ onSignOut }: Props) {
       />
 
       <div className={`${CARD} p-[18px]`}>
-        <div className="text-[15px] font-bold">Export your data</div>
+        <div className="text-[15px] font-bold">Your data</div>
         <div className="mb-[13px] mt-[3px] text-[12.5px] text-fp-text-3">
-          Download all wallets, transactions and budgets.
+          Bring transactions in, or download all wallets, transactions and
+          budgets.
         </div>
         <div className="flex flex-wrap gap-2.5">
+          <Button asChild variant="outline" className={GHOST}>
+            <Link to="/import">Import a file</Link>
+          </Button>
           <Button
             type="button"
             variant="outline"
@@ -46,6 +53,8 @@ export function DataSection({ onSignOut }: Props) {
           </Button>
         </div>
       </div>
+
+      <ImportTemplatesCard />
 
       <div className={`${CARD} overflow-hidden`}>
         <SettingRow

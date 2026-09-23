@@ -34,7 +34,7 @@ function EmailSyncCallback() {
           // Fall through — Settings shows the idle/error state.
         }
       }
-      window.location.assign('/settings?section=email')
+      window.location.assign('/settings/email-sync')
     }
     void finish()
   }, [])

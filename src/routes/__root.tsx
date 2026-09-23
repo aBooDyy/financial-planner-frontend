@@ -1,10 +1,17 @@
 import { useEffect } from 'react'
 import { Outlet, createRootRoute } from '@tanstack/react-router'
+import { Direction } from 'radix-ui'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
+import { useSync } from '#/db/useSync'
 import { useSessionBootstrap } from '#/features/auth/hooks/useSessionBootstrap'
 import { useEmailSyncBootstrap } from '#/features/email-sync/hooks/useEmailSyncBootstrap'
-import { applyStoredDirection } from '#/stores/direction'
+import { PayloadViewContext } from '#/features/inbound-imports/components/payloadView'
+import { ReviewPayloadTree } from '#/features/integrations/components/ReviewPayloadTree'
+import { useAppConfig } from '#/lib/config/useAppConfig'
+import { loadIconPaths } from '#/lib/icons/paths'
+import { useCustomCurrencies } from '#/lib/config/useCustomCurrencies'
+import { applyStoredDirection, useDirectionStore } from '#/stores/direction'
 import { applyStoredTheme } from '#/stores/theme'
 import { TooltipProvider } from '#/components/ui/tooltip'
 
@@ -12,22 +19,38 @@ export const Route = createRootRoute({ component: RootLayout })
 
 function RootLayout() {
   useSessionBootstrap()
+  useAppConfig()
+  useCustomCurrencies()
+  useSync()
   useEmailSyncBootstrap()
+
+  // Radix portals its menus outside the app subtree and falls back to `ltr` unless a
+  // DirectionProvider supplies the direction, so logical utilities inside them need this.
+  const direction = useDirectionStore((s) => s.direction)
 
   useEffect(() => {
     applyStoredTheme()
     applyStoredDirection()
+    // Started here so the icon chunk flies alongside the first local-DB reads.
+    void loadIconPaths()
   }, [])
 
   return (
-    <TooltipProvider>
-      <Outlet />
-      <TanStackDevtools
-        config={{ position: 'bottom-right' }}
-        plugins={[
-          { name: 'Tanstack Router', render: <TanStackRouterDevtoolsPanel /> },
-        ]}
-      />
-    </TooltipProvider>
+    <Direction.Provider dir={direction}>
+      <TooltipProvider>
+        <PayloadViewContext.Provider value={ReviewPayloadTree}>
+          <Outlet />
+        </PayloadViewContext.Provider>
+        <TanStackDevtools
+          config={{ position: 'bottom-right' }}
+          plugins={[
+            {
+              name: 'Tanstack Router',
+              render: <TanStackRouterDevtoolsPanel />,
+            },
+          ]}
+        />
+      </TooltipProvider>
+    </Direction.Provider>
   )
 }

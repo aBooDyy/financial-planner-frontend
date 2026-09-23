@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
-import type { User } from '#/features/auth/api/types'
 import { useProfile } from '#/features/settings/hooks/useProfile'
+import { useSessionStore } from '#/stores/session'
 import { SectionHeader } from './SectionHeader'
 
 const CARD = 'rounded-2xl border border-fp-border bg-fp-surface shadow-fp'
@@ -18,12 +18,13 @@ const initialsOf = (name: string): string =>
     .map((part) => part.charAt(0).toUpperCase())
     .join('') || '·'
 
-type Props = { user: User }
-
-export function AccountSection({ user }: Props) {
-  const [name, setName] = useState(user.name)
-  const [email, setEmail] = useState(user.email)
+export function AccountSection() {
+  const user = useSessionStore((s) => s.user)
+  const [name, setName] = useState(user?.name ?? '')
+  const [email, setEmail] = useState(user?.email ?? '')
   const { save, saving, error, saved } = useProfile()
+
+  if (!user) return null
 
   const memberSince = (() => {
     const d = new Date(user.createdAt)
