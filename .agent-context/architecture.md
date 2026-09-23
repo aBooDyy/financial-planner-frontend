@@ -40,7 +40,8 @@ not a requirement.
    don't reach into each other's internals.
 3. **Shared UI** (`src/components/`) — generic, presentational, theme- and direction-aware
    primitives (Button, Card, Sheet…). No feature/business knowledge.
-4. **Data layer** (`src/db/`) — Dexie schema, local tables, outbox, sync engine.
+4. **Data layer** (`src/db/`) — Dexie schema, local tables, outbox, sync engine, and the delta
+   watermarks the incremental pulls resume from.
 5. **Cross-cutting** (`src/lib/`, `src/stores/`) — http client, i18n, money/date utils,
    global Zustand stores (theme, direction, session).
 

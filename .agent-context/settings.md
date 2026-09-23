@@ -4,11 +4,11 @@ The Settings page (Means `SettingsApp` design) reached from the **avatar menu**
 (`components/chrome/AccountMenu.tsx` → `<Link to="/settings">`), not the nav. Route
 `routes/settings.tsx` → `features/settings/components/SettingsPage`. The page reuses the
 shared shell (`TopNav` / `MobileTabBar`, whose `active` prop is now optional so no nav item
-highlights) and switches six sections via `SettingsRail` (desktop left rail / mobile chips):
-Account, Preferences, Currencies & rates, Categories, Notifications, Data & privacy.
-
-> The design's seventh "Email sync" section is a separate, unbuilt feature and is intentionally
-> omitted from the rail.
+highlights) and lists its panes in `SettingsRail` (desktop left rail / mobile chips): Account,
+Preferences, Currencies & rates, Categories, Merchants, Email sync
+([email-sync.md](email-sync.md)), Integrations ([integrations.md](integrations.md)),
+Notifications, Data & privacy. Each pane is its own route — see
+[routing.md](routing.md#settings-settings).
 
 ## Where each control's state lives
 
@@ -28,30 +28,37 @@ Account, Preferences, Currencies & rates, Categories, Notifications, Data & priv
   `<input type="date">` can't honor a custom format (it renders in the OS locale), so DateField
   overlays the transparent native picker on a styled box that shows `formatDate(value)` — the box
   follows the preference, the picker stays native. Pass `invalid` to flag it (e.g. a past due date).
-- **Currencies & rates** (`CurrenciesSection` + `RateRow`): editable rates, **synced**. The UI
-  edits "1 X = n base"; persisted as the absolute reference rate (`display × baseRate`) via
-  `setExchangeRate`. Auto-update toggle is a preference.
-- **Categories** (`CategoriesSection` + `CategoryRow`): full CRUD over the **synced**,
-  copy-on-write category entity; `useCategories` reads them live with a per-category tx count.
+- **Currencies & rates** (`CurrenciesSection` + `RateRow`): a searchable base-currency picker
+  plus editable rates, **synced**. Rows cover the currencies the user actually holds, not the
+  whole ISO table; each shows an "Edited" badge + the shipped default + **Reset to default**
+  once it differs. The UI edits "1 X = n base"; persisted as the absolute reference rate
+  (`display × baseRate`) via `setExchangeRate`, which is **copy-on-write** — the first edit of
+  a currency creates its row and sends no `version`. Defaults live in `GET /config`
+  ([app-config.md](app-config.md)). Auto-update toggle is a preference.
+- **Categories** (`CategoriesSection`): full CRUD over the **synced**, copy-on-write,
+  **two-level** category tree — the entity, the resolver and the list/editor components all
+  belong to `features/categories/`, and this section only composes them, the same way
+  `MerchantRow` composes `features/merchants/`. A type `Segmented` filters the list;
+  `useCategoryTree` supplies a live per-row transaction count. Everything about the model,
+  the resolved catalog and the subtree delete is in [categories.md](categories.md).
 - **Notifications**: five toggles → `usePreferencesStore`.
-- **Data & privacy**: real **CSV/JSON export** from the local DB (`data/exportData.ts`),
+- **Data & privacy**: Import a file (→ `/import`), real **CSV/JSON export** from the local DB
+  (`data/exportData.ts`), **Import templates** (`ImportTemplatesCard` + `ImportTemplateRow`:
+  rename / delete / see what a saved mapping recognises, and the "needs rebuilding" and
+  "rename to finish syncing" states — see
+  [data-layer-and-sync.md](data-layer-and-sync.md#exception-import-templates-importtemplatename_taken)),
   auto-backup preference, Sign out (real), Delete account (disabled — no backend endpoint).
 
-## Data layer (Dexie v4 + sync)
+## Data layer (Dexie + sync)
 
-- New table `categories: 'id, slug, dirty, deleted'`; `exchangeRates` gained a `dirty` index
-  (rates are now per-user editable, so a background pull must not clobber a local edit —
-  `pullRates` now respects `dirty`, like `pullNodes`). `clearLocalDb` clears categories.
-- `features/settings/`: `api/` (categories + types; profile lives on `authApi`, rate update on
-  `balancesApi`), `data/mappers.ts`, `data/mutations.ts` (createCategory/updateCategory/
-  deleteCategory + setExchangeRate; slug via pure `data/slug.ts`), `data/sync.ts`
-  (`pushSettingsEntry` for outbox entities `category`+`rate`, `pullCategories`). Wired into the
-  shared engine (`db/sync.ts`): new entities route through `pushSettingsEntry`, `pullAll` adds
-  `pullCategories`. Same 409-rebase / 404-drop / network-retry contract as the other features.
-
-## Not yet done
-
-The transactions category picker / chart selectors still resolve presentation (icons,
-subcategories, name/color) from the static `features/transactions/categories.ts` catalog. The
-editable entity is seeded to mirror it (matching slugs), but unifying the picker/selectors to
-read the synced categories is a follow-up.
+- `categories` is a table here (indexed `'id, slug, parentId, dirty, deleted'` — the `parentId`
+  index carries the two-level tree, [categories.md](categories.md)); `exchangeRates` carries a
+  `dirty` index (rates are per-user editable, so a background pull must not clobber a local
+  edit — `pullRates` respects `dirty`, like `pullNodes`). `clearLocalDb` clears both.
+- `features/settings/` keeps the **rate** half: the rate update lives on `balancesApi`,
+  profile on `authApi`, and `data/mutations.ts` owns `setExchangeRate`. The **category**
+  half — `api/`, `data/mappers.ts`, `data/mutations.ts`, `data/sync.ts` and the pure
+  `data/slug.ts` — belongs to `features/categories/`. Both plug into the shared engine
+  (`db/sync.ts`), which routes the `rate` and `customCurrency` outbox entities through
+  `pushSettingsEntry` and `category` through `pushCategoryEntry`, with the same
+  409-rebase / 404-drop / network-retry contract as every other feature.

@@ -12,12 +12,23 @@ relevant file before non-trivial work; update it in the same change when a decis
 pattern changes. Index: [`.agent-context/README.md`](.agent-context/README.md).
 
 - [architecture.md](.agent-context/architecture.md) — local-first SPA model, layers, folder structure.
-- [data-layer-and-sync.md](.agent-context/data-layer-and-sync.md) — local DB (Dexie/IndexedDB), the sync engine, conflict handling.
+- [data-layer-and-sync.md](.agent-context/data-layer-and-sync.md) — local DB (Dexie/IndexedDB), the sync engine (bulk push, delta pull + watermarks), conflict handling, refresh on `401`.
 - [state-management.md](.agent-context/state-management.md) — Zustand stores vs. server cache vs. local DB; who owns what.
-- [routing.md](.agent-context/routing.md) — TanStack Router structure, feature/page routing.
-- [styling-and-theming.md](.agent-context/styling-and-theming.md) — Tailwind, the `fp-` design tokens, light/dark, **RTL/LTR**.
+- [routing.md](.agent-context/routing.md) — TanStack Router structure, feature/page routing, the routed `/settings/*` panes.
+- [icons.md](.agent-context/icons.md) — Icons: the generated Phosphor pack, its manifest + generator, the lazy path/search chunks, `<Icon>`/`IconChip`/`IconPicker`, fallbacks, and the chrome-vs-content rule.
+- [styling-and-theming.md](.agent-context/styling-and-theming.md) — Tailwind, the `fp-` design tokens, light/dark, **RTL/LTR** (incl. Radix's direction provider).
 - [pwa-and-mobile.md](.agent-context/pwa-and-mobile.md) — PWA setup, offline, native-like mobile UX, responsive nav.
-- [email-sync.md](.agent-context/email-sync.md) — Email sync: the connect/map wizard, import review against the stored email, merchant learning.
+- [balances.md](.agent-context/balances.md) — Balances: the first synced entity, money/derivation, the wallets/groups tree.
+- [goals.md](.agent-context/goals.md) — Goals: income streams + ranked goals, the client-side funding engine.
+- [transactions.md](.agent-context/transactions.md) — Spending: ledger + budgets + recurring, derived balances, autopost, transfers between wallets.
+- [settings.md](.agent-context/settings.md) — the Settings page and its routed panes, local preferences.
+- [categories.md](.agent-context/categories.md) — Categories: the two-level synced tree, `buildCatalog` and the `CategoryCatalog` every surface reads, the Settings editor, the subtree delete.
+- [email-sync.md](.agent-context/email-sync.md) — Email sync: the connect/map wizard, on-demand scans, feeding the review queue.
+- [inbound-imports.md](.agent-context/inbound-imports.md) — the shared review queue (`features/inbound-imports/`): review against the stored body, the delta pull, source-agnostic slots.
+- [integrations.md](.agent-context/integrations.md) — Integrations: webhook keys, the shown-once secret, the key editor, the rule editor + payload tester.
+- [import.md](.agent-context/import.md) — Import: the on-device CSV pipeline, saved templates, batches & undo, the review grid's virtualisation contract.
+- [merchants.md](.agent-context/merchants.md) — Merchants: the shared `normalizeKey` port, the scored matcher, adopt-and-remap.
+- [app-config.md](.agent-context/app-config.md) — `GET /config`: open ISO-4217 currencies, the bundled snapshot + cache order, live rates + auto-update opt-out, user-defined currencies, rate precedence, server limits.
 - [conventions.md](.agent-context/conventions.md) — component size, naming, structure, style.
 
 ## Tech stack
@@ -74,6 +85,7 @@ financial-planner-frontend/
     │       ├── stores/         # zustand stores scoped to the feature (if needed)
     │       └── api/            # feature's API calls + contract types
     ├── components/             # shared, generic UI primitives (direction/theme-aware)
+    ├── hooks/                  # shared hooks used by more than one feature
     ├── db/                     # Dexie schema, local tables, sync engine, outbox
     ├── lib/                    # cross-cutting utils (http client, i18n, money, dates)
     ├── stores/                 # global zustand stores (theme, direction, session)
@@ -94,6 +106,8 @@ pnpm build
 pnpm test              # vitest
 pnpm lint / pnpm format
 pnpm generate-routes   # TanStack Router codegen
+pnpm generate-config   # re-derive bundledConfig.ts from the backend's currency table
+pnpm generate-icons    # re-derive src/lib/icons/*.gen.ts from icons.manifest.json
 ```
 
 > Keep this guide and `.agent-context/` current as the frontend takes shape.

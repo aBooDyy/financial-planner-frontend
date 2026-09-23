@@ -25,6 +25,12 @@ Alternatives considered (record if we ever switch):
 
 ## Tables
 
+**The whole schema is declared at a single `this.version(1).stores({...})`.** The app has never
+shipped, so no installed client's database needs walking forward — an upgrade chain here could
+only ever migrate a developer's own browser profile. Adding a table or an index means editing
+that one declaration: the schema is simply whatever it currently says. The first release ends
+that — from then on the next change is `version(2)` carrying a real `.upgrade()`.
+
 - One Dexie table per synced entity (accounts, transactions, categories, budgets,
   obligations…), keyed by the server **id** (use client-generated UUIDs so records exist
   before first sync).
@@ -32,6 +38,20 @@ Alternatives considered (record if we ever switch):
   unsynced local changes), `deleted` (tombstone), `updated_at`.
 - An **`outbox`** table holds pending mutations to push (op, entity, id, payload, base
   version, timestamp).
+- A **`syncState`** table holds one watermark per user per incrementally-pulled entity. It is
+  sync bookkeeping, not user data, and it lives in the database precisely so that wiping the
+  database takes it too — see [Incremental pull](#incremental-pull-the-delta-streams).
+- **`categories`** (indexed `'id, slug, parentId, dirty, deleted'`) is a **tree** in
+  one table — `parentId === null` is a top-level category, anything else is a subcategory of
+  it. `parentId` is indexed because the resolver walks children per parent and the subtree
+  delete reads them. A category row is created with `parentId`/`icon`, and a `balanceNodes` row
+  with `icon`, set to `null` **explicitly**, never left `undefined`: an update wire is built
+  from the row, so an `undefined` drops that key out of the JSON body and the server reads the
+  omission as "clear it". See [categories.md](categories.md).
+- **`customCurrencies`** (outbox entity `'customCurrency'`) is an ordinary
+  synced table with one extra duty: `useCustomCurrencies` mirrors it into the app-config
+  store, because every currency helper (`decimalsFor`, `fromWireCurrency`) is synchronous and
+  reads that store. See [app-config.md](app-config.md#currencies-the-user-defines).
 
 ## Reads
 
@@ -62,20 +82,179 @@ Alternatives considered (record if we ever switch):
 
 ## Sync engine
 
-- **Push**: drain the outbox to the backend. Each mutation includes the **base `version`**.
+- **Push**: drain the outbox to the backend, in `seq` order, a **page of one full wave**
+  (`transactionBulkMax × BULK_CONCURRENCY` entries per queue query, so the page is never the
+  real cap). Each mutation includes the **base `version`**.
+  - **A contiguous run of `transaction` creates goes out as `POST /transactions/bulk`, and of
+    `transaction` deletes as `POST /transactions/bulk-delete`, cut into request-sized batches,
+    four in flight** (`bulkRunLength` + `pushRun` in `db/sync.ts`, `pushTransactionCreates` /
+    `pushTransactionDeletes` in `features/transactions/data/sync.ts`). Only that entity, and
+    only those two ops: an import queues one create per row and they reference
+    wallets/categories/merchants queued _before_ them, never each other, so a batch cannot race
+    its own prerequisite — while a batch of `node` creates could push a child ahead of its
+    parent and earn a 422 the drain would then discard. Every other entry is still a run of one,
+    so ordering between entities is unchanged.
+  - **A run never mixes ops, and that is what keeps a row's create ahead of its delete.**
+    `bulkRunLength` extends a run only while the next entry has the _same_ `op`, so a page
+    holding `create A · create B · delete A · delete B` leaves as two batches in that order.
+    Grouping by entity alone would let a row's delete reach the server before the create it
+    refers to, which answers `NOT_FOUND` and leaves the row standing forever. A test pins the
+    split (`[create, create, delete, delete]` → runs of 2 and 2).
+  - The run is capped at the server's own `limits.transaction_bulk_max` from `GET /config`, so
+    neither side holds its own copy of the number. `flushOutbox()` is the awaitable form;
+    `schedulePush()` is the debounced one.
+  - **The request is all-or-nothing; the entries are not.** The response answers **per
+    item** and each is settled on its own terms: `CREATED` → store the row, drop the entry;
+    `ID_TAKEN` → the write already landed, so store the row the server sends back (the
+    caller's own row, absent when the id belongs to someone else) and drop the entry;
+    `INVALID` → no retry of the same payload can succeed, so drop it — the same rule the
+    singular path applies to a non-network failure. An entry the response does not mention
+    stays queued.
+  - **A delete's answer needs no reading at all.** `DELETED` / `NOT_FOUND` / `INVALID` are all
+    **terminal** — the row is gone, nothing of ours ever stood behind that id, or the id is
+    unusable and resending it cannot change that — so `pushTransactionDeletes` drops every entry
+    the response _mentions_ and leaves the rest queued. There is no version in the request
+    either: a queued delete carries `baseVersion: null`, ownership is the server's guard, and a
+    row edited elsewhere since still deletes. That is the point — the user asked for it to go.
+  - **A failure of the batch endpoint itself is not a per-item verdict.** A network error
+    keeps the whole run queued; any other error (a 500, a fault that judged no entry)
+    **falls back to the singular path for that run**, which isolates the one row the server
+    refused rather than discarding the rest of the batch.
+  - **Batch size and concurrency are separate levers and both were measured.** Batching
+    alone left the client idle through a whole server-side insert before starting the next
+    batch, which independent batches never need to do — the old 6-at-a-time pipelining had
+    that property and the first bulk version dropped it. Against the real database, 4 000
+    rows: **one batch at a time 2 377 ms, four in flight 1 733 ms, eight in flight
+    1 931 ms**. Past four they contend for the connection pool and the event loop, so
+    `BULK_CONCURRENCY` is 4.
+  - History: one request per row, then 6 pipelined — at 20 ms/request a 10 000-row import
+    cost ~319 s, then ~69 s. It is now 10 requests of 1 000 rows, four of them in flight.
+    Undo was the same shape of cost on the way back out and lasted longer: **a measured
+    2 608-row undo spent ~75 s in continuous HTTP as 2 608 `DELETE`s, and now costs 3 requests
+    and 4.0 s**; a 2 603-row import commit is **3 requests, down from 5**. A test drains a
+    2 608-row undo and asserts the batch sizes are `[1000, 1000, 608]`.
   - `2xx` → store the returned record + new `version`, clear `dirty`, remove from outbox.
   - **`409` conflict** → the server row moved on. Reconcile (see below).
   - Network error → keep in outbox, retry with backoff.
-- **Pull**: fetch server changes since the last sync cursor (`updated_at`/`version`) and
-  upsert into local tables, **unless** the local record is `dirty` (then it's a conflict).
+- **Pull**: `pullAll()` fans out to eight collection pulls in one `Promise.all`, single-flight
+  and best-effort (a failed pull just retries on the next trigger). Each upserts into its local table, **unless** the local record
+  is `dirty` (then it's a conflict). Four of the streams read a delta and the rest read the full
+  list — see [Incremental pull](#incremental-pull-the-delta-streams) for which, and
+  why it is not all of them.
 - **Cadence (locked):**
   - **Push is event-driven**: fire right after a local write (debounced ~1s to batch
     bursts). A periodic **30s** flush is only a safety net and **runs only when the outbox
     is non-empty** — nothing to push ⇒ no request at all.
   - **Pull runs always on app enter**, on reconnect, and otherwise on a **longer background
-    interval (5 min)**. Pull is incremental (cursor-based), never a full re-pull.
+    interval (5 min)**. The collections that grow read a delta, so the interval stays cheap as
+    the ledger does not: measured in the browser, the three delta reads of an idle pull weigh
+    **289 / 292 / 296 bytes** between them and no list of rows is fetched to discover that
+    nothing happened. The bounded collections are still read in full on every pull.
+  - A tab regaining focus pulls at most once a minute (`VISIBILITY_PULL_MIN_MS`). Coming
+    back to the app is a hint that data may have moved, not a reason to refetch every
+    collection each time it happens.
   - Push and pull are independent loops; a local write triggers a push, not a pull.
 - Coalesce/debounce; never run overlapping syncs; single-flight each loop.
+
+### Where sync is started
+
+**`startSync()` is mounted exactly once, from the root layout** — `useSync()` (`src/db/useSync.ts`),
+called by `RootLayout` and gated on `session.status === 'authenticated'`. It is the one component
+navigation does not unmount, so the loops live for the session and stop at logout.
+
+**Never start it from a page.** One pull fans out to _every_ collection (12 endpoints today), so a
+page-level `startSync()` refetches the whole dataset on each navigation — opening Balances would
+fetch goals, budgets, recurrings, merchants and import templates. It also restarts the 5-minute
+interval from zero each time, so a user who changes tabs more often than that never gets a
+background pull at all. Both were live bugs: sync was started from five page components until the
+call was hoisted here. `startSync()` now ignores a second concurrent start, and
+`src/db/startSync.test.ts` pins the lifecycle (one pull per start, idempotent, throttled on focus,
+silent after teardown, restartable).
+
+## Incremental pull (the delta streams)
+
+A pull every five minutes is only cheap if it stays cheap as the ledger grows. **Measured
+against a 2 000-row account: an idle delta is 288 bytes and the full pull of the same data is
+854 090 bytes** — about 2 965× — for a question whose answer is almost always "nothing". So the
+collections that grow read a delta instead, resuming from a watermark held in the Dexie table
+`syncState`:
+
+| Stream                      | Entity          | Reached from                                                         |
+| --------------------------- | --------------- | -------------------------------------------------------------------- |
+| `/transactions/changes`     | `transaction`   | `pullTransactionsDelta` → `pullSpendingAll` → `pullAll`              |
+| `/merchants/changes`        | `merchant`      | `pullMerchantsAll` → `pullAll`                                       |
+| `/merchant-aliases/changes` | `merchantAlias` | `pullMerchantsAll` → `pullAll`                                       |
+| `/inbound-imports/changes`  | `inboundImport` | `pullInboundImportsDelta` → `pullAll`, `runEmailSync()`, review open |
+
+**Everything else stays on the full list, deliberately.** Balance nodes, balance settings,
+exchange rates, categories, custom currencies, income streams, goals, goal allocations,
+budgets, recurring schedules, import templates, and the email connections (whose alert rules ride inside the
+connection row). Two reasons, and they are the same reason twice: those collections are bounded
+by how much a person can be bothered to create, and **a full list teaches deletion by absence** —
+whatever we hold and the response does not is gone. A delta cannot say that, which is why the
+server has to keep tombstones for the four above. Paying for a watermark, a paging loop and a
+tombstone table to save a few kilobytes would be buying the machinery without the problem.
+
+Three modules, one per job: `db/changes.ts` (the transport), `db/watermarks.ts` (where a stream
+resumes from), `db/delta.ts` (`pullDelta`, the loop). Each entity supplies a `DeltaSpec` —
+`fetchChanges`, `apply`, `idOf`, `fullPull`, and an optional `reconcile` — and owns its own table
+writes; `pullDelta` writes nothing itself.
+
+- **`since` beside `cursor` is made unrepresentable**, not merely unused:
+  `ChangesQuery = {since, limit} | {cursor, limit}`, and `changesPath` narrows on
+  `'cursor' in query`. A resumed page carries the window inside the cursor, so a `since` sent
+  with it could only contradict it. `retention_days` is received and **dropped at the boundary**:
+  `ChangesPage` has no counterpart for it, because nothing here acts on it.
+- **The watermark is `<userId>:<entity>`** in the Dexie table `syncState` (keyed `id`).
+  The user half is not decoration: sign-out wipes the database, but that wipe is best-effort, and
+  a watermark that outlived its owner would hand the next user of this device a stranger's
+  `since` — whose delta silently omits every row older than it. `clearLocalDb` clears
+  `syncState` for the same reason. With no signed-in user, `readWatermark` answers `null` and
+  `writeWatermark` no-ops, so the worst case is a first sync rather than a wrong one.
+- **Nothing ever back-fills a watermark**, and that is what makes a missing one safe: an entity
+  with no watermark reads its first delta as a **first sync** — the one reading under which any
+  pre-existing rows are reconciled against the server.
+- **The watermark is adopted only when the run finishes.** `pullDelta` follows `cursor` to the
+  end and writes `as_of` on `complete` (and on the `full_resync_required` branch, after the full
+  pull — a snapshot is no older than the `as_of` it came with). A run that dies mid-way leaves
+  the old watermark, restarts from there next time, and re-applies what it already had, which an
+  upsert by id makes free.
+- **A first sync reconciles by absence, exactly like a full pull.** With `since: null` the
+  response carries every live row, so anything local the server did not deliver is gone: each
+  spec's `reconcile` deletes those rows **unless they are dirty**. This is the one thing a
+  watermark-less client cannot learn from tombstones, which only cover the window it never had.
+- **Applying a page never overwrites unpushed work.** An `items` row is upserted unless the local
+  row is `dirty` or `deleted`; a `deleted_ids` id is removed only when the local row is not
+  `dirty`. A queued local write wins and keeps winning — whole-record last-write-wins, below —
+  and the `404` its push earns is what finally drops a row the server has deleted.
+- **Merchants then aliases, sequentially, never together.** A merchant item restates that
+  merchant's _whole_ alias set while the alias stream carries the alias tombstones, so applying
+  the aliases last is what stops a deleted spelling from being written back by its merchant's
+  page. The alias stream has no `reconcile` of its own: on a first sync the merchant stream
+  delivers every merchant with its aliases, and that per-merchant reconciliation already covers
+  them.
+- **`sync.since_invalid` clears the watermark and re-runs as a first sync** — once. Re-sending a
+  watermark the server cannot read would wedge that entity forever, and a first sync is always a
+  correct answer. The guard is keyed on the stable `code`, not on the `422`.
+- **Inbound imports pull on the loop and on their own triggers.** Webhook rows arrive with no
+  client event behind them, so `pullInboundImportsDelta` is part of `pullAll` (start, the
+  five-minute loop, focus, online) and also runs after an inbox scan (`runEmailSync()`) and
+  when the review opens. It is single-flight: overlapping triggers share one run. It is also
+  the one stream whose rows are a server-owned cache with no `dirty` flag, so its apply is a
+  plain upsert that additionally **evicts** anything no longer `pending` — which a
+  pending-only list has no way of expressing.
+- In the browser, the three delta reads of an idle pull are **289 / 292 / 296 bytes** — three
+  requests that say "nothing moved" and fetch no rows to prove it.
+
+`db/delta.test.ts` drives the real ledger spec and pins the whole protocol: the cursor followed
+to the end before `as_of` is adopted, `since` never sent beside a cursor, the next run resuming
+from the stored watermark, an interrupted run adopting nothing and restarting from the old
+watermark, a re-delivered row upserting rather than duplicating, tombstoned ids deleted, a dirty
+row surviving both an update and a tombstone, a first sync dropping local rows it did not
+deliver, `full_resync_required` running the full pull first, a watermark dying with
+`clearLocalDb`, a second user on the same device never reading the first one's, and a refused
+`since` restarting as a first sync. Backend mechanism:
+[sync.md](../../financial-planner-backend/.agent-context/sync.md).
 
 ## Conflict handling (`409` / version mismatch)
 
@@ -95,7 +274,37 @@ Alternatives considered (record if we ever switch):
 
 - Single HTTP client in `src/lib/`. All requests use **`credentials: 'include'`** so the
   **HTTP-only auth cookie** is sent. The app **never** reads the token in JS.
-- On `401`, stop sync, clear session state, route to login. On reconnect/login, resume sync.
+- **A `401` is a renewal, not a sign-out.** The access cookie lives 15 minutes, so the ordinary
+  meaning of a `401` on a protected path is that it aged out while the tab sat in the
+  background. `http.ts` is split for this: `send()` is one fetch and no policy, `request()` is
+  the policy — one `POST /auth/refresh`, then one retry. **The retry sits outside the `try`**, so
+  a second `401` propagates instead of re-entering the refresh; a logical request is at most two
+  wire calls plus a shared refresh, never a loop.
+- **The refresh is single-flight.** A sync wave is a dozen parallel calls and the cookie expires
+  for all of them at once, so whoever finds a refresh running awaits the same promise and retries
+  behind it; the slot is freed before the waiters resume, so the _next_ expiry gets its own
+  refresh. Verified in a browser: **12 parallel `401`s → exactly 1 refresh → 12 retries, all
+  `200`, session alive**, and a test pins the same numbers.
+- **`PUBLIC_AUTH_PATHS` is the list of paths a `401` is the _answer_ for** — `/auth/register`,
+  `/auth/login`, `/auth/logout`, `/auth/refresh`, and the two Google OAuth paths. There a `401`
+  means bad credentials or a spent refresh cookie, and refreshing would recurse or mask it.
+  **`/auth/me` is deliberately _not_ on that list**: reopening the app after 15 idle minutes
+  bootstraps through `GET /auth/me`, and it should renew the session rather than bounce the user
+  to login.
+- **Sign-out has one implementation and one trigger.** `features/auth/endSession.ts` clears the
+  session store (which is what routes every protected route out) and then `clearLocalDb()`; both
+  `useLogout` and `http.ts` go through it. It fires **only when the server explicitly refuses the
+  refresh** — a `401` on `/auth/refresh` itself. A network error or a 5xx leaves the session and
+  the local data alone, because an offline client that wiped its unsynced outbox on a failed
+  refresh would be destroying the user's writes to report a problem it cannot even diagnose. (A
+  retry that still `401`s does not sign out either; it just propagates.) The refresh failure
+  deliberately replaces the caller's `401` with its own — usually `common.network` — which the
+  sync engine already reads as "keep the outbox and back off".
+- `clearLocalDb()` empties all 18 user tables, `syncState` among them, and **keeps `appConfig`**:
+  it holds no user data, and keeping it means the next sign-in already knows the currency table
+  offline. It also bumps `localDbGeneration()` first: a server-owned cache whose pull was already
+  in flight at sign-out (integration keys, the inbound-import queue) compares the generation
+  inside its write transaction and drops the stale answer instead of refilling the wiped table.
 
 **Implemented (auth slice):** `src/lib/http.ts` is the client — base URL from
 `VITE_API_BASE_URL` (default `http://localhost:8000/api/v1`), `credentials: 'include'`,
@@ -111,34 +320,151 @@ user to a `camelCase` `User` at the boundary. Session lives in `src/stores/sessi
 `exchangeRates`, `outbox`, plus optimistic mutations and the `409` rebase-and-retry loop.
 This is the first synced entity; see [balances.md](balances.md) for the concrete realization.
 
+## One entry, two rows: transfers
+
+A transfer between wallets is the one outbox entity whose entry does not map to one local row.
+`entity: 'transfer'` is keyed by the transfer id, and its push (`POST/PATCH/DELETE /transfers`)
+writes **both** ledger legs, which share a `transferId` (indexed on `transactions`). The
+optimistic write puts both legs and the entry in one Dexie transaction; the legs return through
+the ordinary ledger delta, so there is no transfer stream or table. Its update carries a version
+per leg inside the payload (`out_version`/`in_version`) rather than `baseVersion`, and only
+`409 common.conflict` rebases; `409 spending.transfer.id_taken` is settled by a pull. Transfer
+entries are never part of a bulk run. See [transactions.md](transactions.md#transfers-between-wallets).
+
+## Exception: merchant identity (`409 merchants.alias.taken`)
+
+Merchants (`features/merchants/`) sync through the normal outbox, with one branch
+nothing else needs. Merchant identity is a per-user uniqueness constraint on the server, so two
+devices inventing the same merchant offline must converge on one row. When `POST /merchants` is
+refused with `409 merchants.alias.taken`, **nothing was written** — the client-generated id does
+not exist server-side — and the server names the winning merchant in `details[0].value`. The
+client adopts it: local rows are repointed, **still-queued transaction payloads are rewritten in
+place** rather than earning a second op, only already-pushed rows get a `PATCH`, and the temp
+merchant is dropped. `POST /merchants/merge` is the other exception: it is a server-side bulk
+operation, so it is called directly and followed by a pull instead of being queued. Detail in
+[merchants.md](merchants.md).
+
+## Subtree deletes: categories and balance nodes
+
+Two entities are trees — `balanceNodes` (groups holding wallets) and `categories`
+(categories holding subcategories) — and the server deletes a subtree by cascade. The local
+side has to mirror that exactly, and the pattern is the same in both
+(`features/balances/data/mutations.deleteNode`,
+`features/categories/data/mutations.deleteCategory`):
+
+1. Collect the subtree locally. Balances walks to arbitrary depth; categories reads one
+   level, because two is the cap ([categories.md](categories.md)).
+2. In **one** Dexie transaction, **drop every descendant's pending outbox entries** and
+   delete their local rows, then the root's.
+3. Enqueue **one** `delete` op — for the subtree **root only**, and only if the root was
+   ever synced. A root whose `create` is still queued just has its ops dropped; the server
+   never heard of it.
+
+Step 2 is the load-bearing one. A child's queued `create` that outlives its parent's delete
+is pushed **after** the parent is gone and fails forever — a permanently stuck outbox entry
+for a change the user already saw succeed. Dropping those ops inside the same transaction as
+the local delete is what prevents it, and it is covered by explicit tests on both sides.
+
+## Bulk writes: the CSV import
+
+A CSV import is the one place hundreds of rows are written at once, so it bypasses the
+per-row mutations without leaving the pattern (`features/import/data/commit.ts`):
+
+- Entities the mapping promised to create (wallets, categories, merchants) are materialised
+  **first**, through their owning feature's mutations, under the **exact id or slug the rows
+  already carry** — the wizard mints those while mapping, so there is no alias-rewriting step
+  and a failure here leaves nothing imported.
+- Rows are then written in **200-row chunks**, one Dexie transaction per chunk
+  (`bulkAddTransactions` in the transactions slice: `bulkPut` the rows, `bulkAdd` their outbox
+  creates), yielding to the event loop between chunks so a 10 000-row import stays responsive.
+- **One `schedulePush()` at the end** — never one per chunk, or an import becomes hundreds of
+  debounce timers.
+- Every imported row carries `source = 'csv:<batchId>'`, the same convention as the
+  auto-poster's `recurring:<id>:<date>` and the email path's `email:<connection_id>`. Dexie
+  indexes `source`, which is what makes an import findable — and undoable — as a unit.
+- `importBatches` is **local-only** (no outbox, no server table): the durable fact is the
+  marker on the transactions, which _is_ synced, so an import committed on one device can be
+  undone from another.
+- **Undo** deletes through `bulkDeleteTransactions`, which drops a row whose create is still
+  queued outright and queues a `delete` only for rows the server has seen — with
+  `baseVersion: null`, since the bulk delete takes no versions. Those deletes leave as bulk
+  batches like the creates did (**a 2 608-row undo is 3 requests and 4.0 s**), and like
+  `bulkAddTransactions` this function schedules no push: the caller pushes once. A row whose
+  `updatedAt` differs from its `createdAt` has been changed since and is **kept** — our writes
+  set both stamps together and a server create returns them equal, so that difference is the
+  only reliable signal. (Comparing against the batch's own `createdAt` would not work: once a
+  row syncs its `updatedAt` is the server's clock, always later than the local commit stamp.)
+  Wallets, categories and merchants an import created are deliberately kept too.
+
+## Exception: import templates (`import.template.name_taken`)
+
+Saved CSV mappings (`features/import/`, the `importTemplates` table) sync through the
+ordinary outbox — `'importTemplate'` is an `OutboxEntity` with its branch in `db/sync.ts` — with
+three things nothing else does:
+
+- **`config` is an opaque JSON string on the wire**, stored and echoed back by the server
+  byte-for-byte (cap 64 KiB) and never validated by it, so **the pull parses it tolerantly**. A blob
+  that is not JSON, not an object, or missing a part the apply step reads is cached as
+  `config: null` and shown as **"needs rebuilding"** — a corrupt blob is a row to rebuild, not a
+  crash in the apply step. Such a row is still renamable and deletable, because `PATCH` is a true
+  partial: a field that is omitted is left alone, so a mapping this client could not read is never
+  overwritten by the act of renaming it.
+- **`409 import.template.name_taken` is a _name_ conflict, not a version conflict.** Rebasing it
+  would re-send the same refused name forever, so the push **parks** the row (`nameConflict: 1`) and
+  drops the op; Settings → Data & privacy shows the row with "rename it to finish syncing", and
+  renaming re-queues it (a `create` when the row has no `version`, since its create never landed).
+  The same treatment the merchant alias 409 gets: surface, never loop.
+- **A version 409 rebases the patch, not the row.** Because the endpoint is a true partial, the
+  retry re-sends only the fields that op changed on the server's fresh `version` — a rename pushed
+  from here does not undo a use bump made on the phone.
+
+`lastUsedAt` / `useCount` are **client-maintained**: there is no "record a use" endpoint and no
+server-side increment, so a use bump is an ordinary, rebasable `PATCH` queued like any other write.
+
 ## Offline
 
 - Everything works offline: reads from local DB, writes queue in the outbox. On reconnect
   the engine flushes the outbox and pulls updates. Surface a subtle sync/offline indicator.
+- **That indicator does not exist yet**, and it is now owed something: an op the outbox had
+  to _park_ rather than retry (today only a name-conflicted import template) has no global
+  cue and is visible only on its own Settings card. Build the two together — a piece of
+  global chrome whose sole occupant is one parked template would be the wrong shape.
 
-## Exception: Email sync (online-only, server-owned cache)
+## Exception: Email sync and inbound imports (online-only, server-owned cache)
 
-Email sync (`features/email-sync/`, Dexie **v5**: `emailConnections` + `emailImports`) is
-inherently online — it talks to Gmail / Microsoft Graph — so it **deliberately does not use
-the offline outbox**. The Dexie tables are a read cache of server truth: `data/cache.ts` pulls
+Email sync (`features/email-sync/`, Dexie `emailConnections`) and the review queue it
+stages into (`features/inbound-imports/`, Dexie `inboundImports`) are
+server-owned and online-only — email sync talks to Gmail / Microsoft Graph — so they
+**deliberately do not use the offline outbox**. The Dexie tables are a read cache of server truth: `data/cache.ts` pulls
 replace the cached set, and `data/mutations.ts` call the API directly then update the cache
 (toggle / confirm / dismiss / disconnect / saveRules / completeOAuth). No `dirty`/`deleted`
-flags. Connecting is a provider OAuth redirect → frontend callback route
+flags. The staged imports are the exception within the exception: they are read as a **delta**
+(see [Incremental pull](#incremental-pull-the-delta-streams) and
+[inbound-imports.md](inbound-imports.md#refreshing-the-staged-set) for why).
+`pullConnections()` still replaces the whole connection set. Connecting is a provider OAuth
+redirect → frontend callback route
 `/settings/email-sync/callback` → `POST /email-connections/oauth/callback`; the scan is
 client-triggered on login (`useEmailSyncBootstrap` → `POST /email-connections/sync`).
-Confirming a pending import inserts the promoted transaction straight into the local
+Confirming a staged import inserts the promoted transaction straight into the local
 `transactions` ledger (clean, already-synced) so Balances/Spending reflect it immediately.
 
-One thing is **deliberately not cached**: the stored email body behind an import. It is fetched
+**Integration keys** (`features/integrations/`, Dexie `integrationKeys`) follow the same
+exception: server-minted, so a pull replaces the set and mutations call the API then cache —
+with a write generation so an overtaken pull cannot undo a create. The secret is never cached.
+See [integrations.md](integrations.md).
+
+One thing is **deliberately not cached**: the stored body behind an import. It is fetched
 per item when the user opens one (`useImportDetail`), because bodies are large and most imports
-are never opened. See [email-sync.md](email-sync.md).
+are never opened. See [inbound-imports.md](inbound-imports.md).
 
 ## Locked decisions (recap)
 
 - **Local DB**: Dexie (IndexedDB). **No TanStack Query.**
 - **IDs**: client-generated **UUIDs** (records exist before first sync; matches backend PKs).
 - **Push**: event-driven + 30s safety flush only when the outbox is non-empty.
-- **Pull**: always on app enter + reconnect + 5-min background interval, cursor-incremental.
+- **Pull**: always on app enter + reconnect + 5-min background interval. **Delta (cursor +
+  watermark) for the collections that grow, full list for the bounded ones** — the full list is
+  also the first sync and the resync fallback for the delta streams.
 - **Conflicts**: whole-record **last-write-wins, client re-apply** (no field merge).
 - **Money** in the local store matches the wire format exactly: integer minor units +
   ISO-4217 `currency` (root

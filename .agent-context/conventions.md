@@ -11,7 +11,8 @@ minimal non-stale comments).
   component.
 - Presentational components are **dumb**: props in, UI out, no data access, theme/direction
   via tokens and logical utilities.
-- Prefer composition over props explosion. Extract shared pieces into `src/components/`.
+- Prefer composition over props explosion. Extract shared pieces into `src/components/`
+  (e.g. `SegmentedBar`, the stacked proportional bar both hero cards draw).
 - One component per file; file name matches the component.
 - **Use shadcn/ui primitives** from `#/components/ui/*` for anything shadcn provides
   (Button, Input, Select, Switch, Checkbox, Dialog/Drawer, DropdownMenu, Tabs, ToggleGroup,
@@ -56,6 +57,20 @@ minimal non-stale comments).
 
 - All persistence and sync goes through `src/db/`; all HTTP through the single client in
   `src/lib/` (with `credentials: 'include'`). Components never call `fetch` directly.
+- **Never make a `useLiveQuery` result an effect dependency.** A live query re-runs on every
+  write to the tables it touches and hands back freshly deserialized objects, so a row's
+  identity changes even when the row did not. An effect keyed on one re-fires on unrelated
+  writes; if it fetches, that is a request loop. Depend on the identifier (`row?.id`) and
+  latch work that must happen once per row in a ref.
+- **When the work depends on a whole table, stamp it.** Reduce the live rows to a string of
+  `id:version:updatedAt` per row and hold the array in a ref, replacing it only when the stamp
+  changes (`useLiveRows` in `features/import/hooks/useCsvImport.ts`). `version` moves on every
+  write the server acknowledges and `updatedAt` on every write made here, so two emissions
+  sharing a stamp hold the same data — which is what lets an expensive derivation survive a
+  background pull that changed nothing.
+- **App-wide work belongs to the app, not to a page.** Anything whose scope is the whole
+  dataset — the sync loops above all — is mounted once in the root layout. A page mount
+  effect should only ever start work about that page.
 
 ## Money & dates
 

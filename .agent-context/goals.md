@@ -8,7 +8,7 @@ whether the plan is feasible. Domain terms: root
 
 ## Local DB & sync (extends [data-layer-and-sync.md](data-layer-and-sync.md))
 
-- **Dexie** gained two tables in schema **v2** (`src/db/db.ts`): `incomeStreams`, `goals`
+- **Dexie** declares two tables for this slice (`src/db/db.ts`): `incomeStreams`, `goals`
   (both `dirty`/`deleted` flagged, client-generated UUID PKs, **string** sha256 `version`).
   Added to `clearLocalDb()`.
 - The shared **outbox** carries two new `entity` discriminators, `'income'` and `'goal'`.
@@ -18,7 +18,7 @@ whether the plan is feasible. Domain terms: root
 - **Optimistic mutations** (`src/features/goals/data/mutations.ts`): `createIncome`/
   `updateIncome`/`deleteIncome`, `createGoal`/`updateGoal`/`deleteGoal`, plus `setGoalDate`
   (inline date edit) and `swapGoalPositions(id, neighborId)` (priority swap — writes both
-  neighbors' `position`; the list passes the *visible* neighbor's id so a reorder never targets a
+  neighbors' `position`; the list passes the _visible_ neighbor's id so a reorder never targets a
   hidden completed goal).
   Coalesced outbox entries; delete of a never-synced row just drops its queued ops.
 
@@ -59,19 +59,19 @@ whether the plan is feasible. Domain terms: root
   finishing goal's coverage (≥ a 12-month forecast). That's the fix to "recurring obligations
   vanish after their first due": they repeat across the whole horizon, stay visible, and keep
   weighing on other goals' numbers up to the last goal's date (the simulation already kept them
-  competing every cycle via refill; this aligns the *display*). `buildGoalsView` turns the path
+  competing every cycle via refill; this aligns the _display_). `buildGoalsView` turns the path
   into one `ScheduleMonth` per month (`label`, `amountStr`, `muted` for waiting months, `covered`
   at each completion), a one-line `scheduleSummary` (`scheduleSummaryOf`), and a `coverageStr`
-  caption (`coverageLabel`). `GoalCard` renders an **expandable vertical timeline** (shared
-  `Collapsible`, one node/month, scrollable) **for every card and any status**.
+  caption (`coverageLabel`). `GoalSchedule` renders it as an **expandable vertical timeline**
+  (shared `Collapsible`, one node/month, scrollable) inside the detail panel of any active goal.
 - **Monthly plan (`view.monthlyPlan` / `MonthlyPlanCard`).** The cross-goal aggregate: for every
   month across the plan horizon (max of the goals' `plan.schedule` lengths), a `PlanMonth` with the
   month's `total` and `shares` — each goal's set-aside that month (base minor, sorted desc, with a
-  `pct` for the stacked-bar width; `muted` when nothing is set aside). `MonthlyPlanCard` (main
-  column, below the goals list) renders it with a **List/Calendar view switch** (`ToggleGroup`):
+  `pct` for the stacked-bar width; `muted` when nothing is set aside). `MonthlyPlanCard` (Timeline
+  section, below the payments timeline) renders it with a **List/Calendar view switch** (`ToggleGroup`):
   the list shows per-month goal amounts; the calendar shows a year-grouped grid of month cells
   (mini stacked bar + total, per-goal amounts in the cell `title`). A shared goal-color legend sits
-  above both. Month 0's total equals the hero's `setAsideStr`.
+  above both. Month 0's total equals `view.setAsideStr`.
 - **Payments timeline (`view.timeline` / `TimelineCard`).** No longer just final completions: it's
   a forward **coverage forecast** — every point a goal or obligation is covered, in chronological
   order, up to `coverEnd` (the latest goal's date). A finishing goal contributes one milestone; a
@@ -88,10 +88,11 @@ whether the plan is feasible. Domain terms: root
   cashflow-plan verdict, **not** that the target is saved. A goal that has actually met its
   target (`(target ?? 0) > 0 && saved >= target`, contributions/allocations folded in) is
   **completed**: `buildGoalsView` partitions it out of the active plan into `view.completedGoals`
-  (so it draws no income) — but it is **still rendered inline** at the bottom of `GoalsListCard`
-  as a dimmed `CompletedGoalRow` (no ▲▼, keeps edit/delete) so a finished goal never looks
-  deleted. Recurring/sinking have no `target` and never complete. `totalCount`/`horizonStr` count
-  active goals only; `savedGoalsPct` still spans all goals.
+  (so it draws no income) — but it is **still listed** in a "Completed" group at the bottom of
+  the Goals section as a dimmed `CompletedGoalRow` (selectable for edit/delete, no priority
+  controls) so a finished goal never looks deleted. Recurring/sinking have no `target` and
+  never complete. `totalCount`/`horizonStr` count active goals only; `savedGoalsPct` still
+  spans all goals.
 - Kinds & frequencies are lowercase in the domain, mapped to the backend's UPPER_SNAKE wire in
   `api/types.ts` (`toWireKind`/`toWireFreq` etc.); `constants.ts` holds `FREQUENCIES`, `KINDS`,
   `GOAL_COLORS`, and fixed `STATUS_COLORS`.
@@ -104,8 +105,8 @@ Each allocation reserves money from a **wallet** (earmarked in place — the wal
 money but shows it as reserved) or names an **external** source (a gift, someone's help) by
 free-text label.
 
-- **Dexie v6** adds `goalAllocations` (`id, goalId, walletId, dirty, deleted`); `OutboxEntity`
-  gains `'allocation'`. The entity rides the **goals** sync handlers (`data/sync.ts`:
+- **Dexie** declares `goalAllocations` (`id, goalId, walletId, dirty, deleted`); `OutboxEntity`
+  carries `'allocation'`. The entity rides the **goals** sync handlers (`data/sync.ts`:
   `pushAllocationCreate/Update/Delete`, `rebaseAllocation`, `pullAllocations`, wired into
   `pushGoalsEntry` + `pullGoalsAll`; `db/sync.ts` routes `'allocation'` to `pushGoalsEntry`).
   Wire types/mappers in `api/types.ts` + `data/mappers.ts`; client `api/allocationsApi.ts`;
@@ -126,11 +127,50 @@ nodes, rates)` → per-wallet reserve lines (wallet currency) consumed by the Ba
   `useGoals` is the reactive read (`useLiveQuery` → `buildGoalsView`); `useGoalEditor` drives
   the add/edit sheet for both income and goals (kind chips only when creating, since `kind` is
   immutable on update).
-- Components are dumb; `GoalsPage` composes them: `PlanHeroCard` (income − set-aside = leftover
-  - cashflow bar), `IncomeCard`/`IncomeRow`, `GoalsListCard`/`GoalCard` (priority ▲▼, status
-    pill, funded bar, inline date) with completed goals rendered inline below as read-only
-    `CompletedGoalRow`s, and the rail `VerdictCard` + `TimelineCard`. Editor reuses the
-    modal/sheet pattern.
+- **Page shell — the "Goals v3" design (tab card + sections + detail rail).** `GoalsPage` owns
+  the active section (`summary | goals | obligations | income | timeline`, local state) and the
+  selection. Desktop: `SectionTabCard`, a tab strip carried **in a card at the top of the content
+  column** (48px tabs, accent underline on the active one, count pills for goals/obligations) —
+  it replaced the v2 212px side rail, so the content column is the only column. Mobile:
+  `SectionTabs`, a strip under the top bar — deliberately **not** a replacement for the app-wide
+  `MobileTabBar`, so cross-app nav survives on mobile (the design mock had the section tabs take
+  over the bottom bar). Both carry an amber dot on a section holding anything not on track.
+  Switching section closes the editor.
+- **Summary** (`SummarySection`) answers three questions in order: does the month balance, what
+  gets funded first, what actually moves next. `SummaryVerdictCard` (verdict title/sub, primary
+  action, "See timeline"), `MonthlyLedgerCard` ("Every month": Income / Obligations / Goals bars
+  plus a "Left over" closing line, all measured against **one denominator** —
+  `max(income, set-aside)` — so the widths compare, with `summary.usageStr` in the corner),
+  `PriorityCard` ("Funded in priority order": `summary.priority`, ranked by `position`, each row
+  opening its goal), `DecisionsCard` ("Needs a decision": **only red/slipping goals**) and
+  `UpcomingCard` (`summary.upcoming`: paydays + due dates in the next 60 days, repeating ones
+  expanded per occurrence, max 6). The primary action is "Fix the gap" (opens the first
+  decision) when anything slips, else "Review goals". v2's `UsageRing`/`SummaryStatGrid` and the
+  `cashSegments`/`summary.stats` that fed them are gone — the ledger card carries that reading
+  now. Every ledger bar lives in a `flex-1 min-w-0` **track** so its percentage resolves against
+  the track and never the whole row: without it the label column pushed a 100% bar straight past
+  the card edge. A bar narrower than 26% puts its amount **after** the bar rather than inside it,
+  and a zero row drops the bar for plain muted text (the design's flat 2% minimum width turned a
+  first-run account into three colour stubs).
+  The design's dashed "income runs out at #N" cutoff in the priority list is **not** drawn:
+  it assumes a strict top-down cutoff, and time-phased funding defers by deadline instead, so
+  the header note is an on-track count.
+- **Goals / Obligations** (`GoalListSection`): goals vs obligations split by kind
+  (`recurring`/`sinking` are obligations — `GoalCard.isObligation`). `view.goalsList` /
+  `view.obligationsList` arrive **pre-grouped by status** as `GoalGroupCard`s — "On track",
+  "Scheduled" (on time, funded later), "Won't make it" (note = approx. monthly shortfall);
+  empty groups are omitted. The design's two groups ("Funded"/"Short") assumed the old flat
+  top-down engine; with time-phased funding a queued goal isn't short, hence three. Rows
+  (`GoalRow` on the shared `ListRow`: colour spine, name, `rowMeta` caption tinted when not
+  green, saved-progress bar ≥900px, monthly rate) carry **no buttons** — selecting opens the item.
+- **Detail panel** (`DetailPanel` + `GoalEditor`): the editor is no longer a modal. Desktop ≥1120px
+  it's a docked 330px right rail; 768–1119px it overlays the list from the end edge; mobile it's
+  the `ResponsiveDialog` bottom sheet. Esc closes on desktop. It holds every field (kind chips
+  only when creating), sourced allocations (`AllocationRow`), `PriorityControl` (rank of all
+  active goals, Move up/down via `swapGoalPositions` with the active-plan neighbour) and the
+  goal's `GoalSchedule`. Inline date edit on cards is gone — the date lives in the panel.
+- **Income** (`IncomeSection`/`IncomeRow`) and **Timeline** (`TimelineSection` = `TimelineCard` +
+  `MonthlyPlanCard`) reuse the same section header and row patterns.
 - Route `/goals` (guarded like `/balances`). Base currency is the shared `balanceSettings`
   (reuses `setBaseCurrency`). Shared chrome (`src/components/chrome/`) renders with
   `active="goals"`.

@@ -16,6 +16,11 @@ standalone`, and `start_url`.
   - **Data**: the app's data is local-first (Dexie), so the SW mainly handles the shell and
     static assets, not domain data. Don't cache API mutations in the SW — the **outbox** in
     the data layer owns offline writes (see [data-layer-and-sync.md](data-layer-and-sync.md)).
+  - **The icon pack needs no glob.** The two lazy icon chunks (`paths.gen`, `search.gen` —
+    [icons.md](icons.md)) are ordinary content-hashed build output, so the shell precache
+    picks them up with the rest of the bundle and re-downloads them only when the pack
+    changes. Avoiding a hand-maintained precache glob is precisely why the icon data is a
+    generated module rather than a sprite or loose SVGs in `public/` — **don't add one.**
 - Provide an in-app "new version available" prompt on SW update.
 
 ## Offline

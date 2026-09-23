@@ -17,9 +17,12 @@ Routing uses **TanStack Router** with file-based routes under `src/routes/` (cod
   filters/date ranges on the transactions and forecast views).
 - **Local-first loaders**: because data lives in the local DB, route loaders should be thin
   — components read reactively from the DB. Don't block navigation on the network.
-- **Auth guards**: protect authenticated routes via a guarded layout route; on `401`/no
-  session, redirect to `auth/login`. Auth state comes from the session store, backed by the
-  HTTP-only cookie (the app never reads the token).
+- **Auth guards**: protect authenticated routes via a guarded layout route and redirect to
+  `auth/login` on an **anonymous session** — the session store's status, not a raw `401`. A
+  `401` is ordinarily just an expired access cookie that the HTTP client renews behind the
+  scenes ([data-layer-and-sync.md](data-layer-and-sync.md#auth--http)); only `endSession()`
+  turns the session anonymous, and that is what routes the user out. Auth state comes from the
+  session store, backed by the HTTP-only cookie (the app never reads the token).
 - Keep route components small; push UI into feature components and logic into hooks.
 
 ## Navigation chrome
@@ -42,5 +45,37 @@ Routing uses **TanStack Router** with file-based routes under `src/routes/` (cod
   `status`. `RedirectTo` (`src/components/RedirectTo.tsx`) is a tiny imperative-redirect
   helper since TanStack's `redirect()` is loader-only. Revisit toward a guarded layout
   route + `beforeLoad` once more authed areas exist.
+
+## Settings (`/settings/*`)
+
+Every Settings pane is its own route, so a pane is linkable, bookmarkable, and the browser's
+back button moves between them. `routes/settings/route.tsx` is the layout — the session guard
+plus `SettingsLayout` (TopNav, rail, `Outlet`, MobileTabBar) — and each pane is a thin file
+rendering its feature component directly:
+
+`account` · `preferences` · `currencies` · `categories` · `merchants` · `email-sync` ·
+`integrations` · `notifications` · `data`.
+
+- `routes/settings/index.tsx` **redirects** `/settings` → `/settings/account` in
+  `beforeLoad`, so nobody ever sees an empty `Outlet`.
+- `SettingsRail` is a set of `<Link>`s using `activeProps`/`inactiveProps`; the active pane
+  comes from the URL, not component state.
+- The sections became **self-sufficient** when the page that fed them props went away:
+  `AccountSection` reads the session store, `PreferencesSection`/`CurrenciesSection` read
+  `useBalances`, `DataSection` uses `useLogout`. Route files stay wiring-only.
+- **`routes/settings_.email-sync.callback.tsx` keeps its `settings_` escape.** Its URL
+  (`/settings/email-sync/callback`) is what the provider apps whitelist, but it must not
+  render inside the Settings layout — it is a redirect target, not a pane.
+- **Typed search on a pane:** `/settings/integrations` validates `?key=` and `?sample=`
+  (`IntegrationsSearch`) — the deep link the review queue's "Fix the rule" and a
+  transaction's "View key" use. `/transactions?review=1` is the other search-driven entry.
+
+## Import hub (`/import`)
+
+`routes/import.tsx` renders `features/import/components/ImportPage`, guarded exactly like
+`/balances` and `/transactions` (session-store branch + `RedirectTo`). It is **not** a
+`NAV_SECTIONS` entry — it's a sub-page reached from the Spending header (**Import**) and from
+Settings → Data & privacy (**Import a file**), so `TopNav`/`MobileTabBar` render with no
+`active` section, as `/settings/*` does.
 
 > Record concrete route-tree decisions and any guard/loader conventions here as they land.
