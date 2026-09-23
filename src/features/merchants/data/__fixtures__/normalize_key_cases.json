@@ -1,0 +1,100 @@
+{
+  "description": "Shared case table for the merchant identity normaliser. The Python `normalize_key` (app/services/email_sync_services/merchant_rules.py) and the frontend TS port (features/merchants/data/matching.ts) MUST both reproduce this table exactly; it is the only thing keeping the two from drifting.",
+  "algorithm": [
+    "1. lowercase the input (str.lower / String.prototype.toLowerCase)",
+    "2. replace every run of characters outside [a-z0-9] with a single ASCII space (applied AFTER lowercasing, so non-ASCII letters are dropped, and digits are KEPT on purpose: 'carrefour 402' and 'carrefour 118' are different merchants)",
+    "3. trim leading/trailing whitespace",
+    "4. truncate to the first 120 characters (no re-trim afterwards, so a truncated key may end in a space)",
+    "5. FIXED POINT: because step 4 truncates AFTER trimming, a key longer than 120 characters can end in a space (see the last case). The server re-normalises whatever the client sends, which trims that space, so a client must apply the function twice (or trim the result) before it stores or compares the key — otherwise its local key and the server's stored key differ by one trailing space."
+  ],
+  "cases": [
+    {
+      "input": "CARREFOUR HYPERMARKET",
+      "expected": "carrefour hypermarket"
+    },
+    {
+      "input": "Carrefour  Hypermarket!",
+      "expected": "carrefour hypermarket"
+    },
+    {
+      "input": "carrefour hypermarket",
+      "expected": "carrefour hypermarket"
+    },
+    {
+      "input": "NOON.COM",
+      "expected": "noon com"
+    },
+    {
+      "input": "CARREFOUR 402",
+      "expected": "carrefour 402"
+    },
+    {
+      "input": "CARREFOUR 118",
+      "expected": "carrefour 118"
+    },
+    {
+      "input": "  AMAZON.SA  ",
+      "expected": "amazon sa"
+    },
+    {
+      "input": "STC-PAY*TOPUP",
+      "expected": "stc pay topup"
+    },
+    {
+      "input": "McDonald's #1234",
+      "expected": "mcdonald s 1234"
+    },
+    {
+      "input": "TAMIMI MARKETS 4471",
+      "expected": "tamimi markets 4471"
+    },
+    {
+      "input": "UBER   *TRIP",
+      "expected": "uber trip"
+    },
+    {
+      "input": "7-ELEVEN",
+      "expected": "7 eleven"
+    },
+    {
+      "input": "NETFLIX.COM 866-579-7172",
+      "expected": "netflix com 866 579 7172"
+    },
+    {
+      "input": "IKEA\tRIYADH\n",
+      "expected": "ikea riyadh"
+    },
+    {
+      "input": "AL_OTHAIM—MARKET",
+      "expected": "al othaim market"
+    },
+    {
+      "input": "Café Bateel",
+      "expected": "caf bateel"
+    },
+    {
+      "input": "ماركت الثميري",
+      "expected": ""
+    },
+    {
+      "input": "",
+      "expected": ""
+    },
+    {
+      "input": "!!!",
+      "expected": ""
+    },
+    {
+      "input": "   ",
+      "expected": ""
+    },
+    {
+      "input": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "expected": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "input": "SUPERMARKET SUPERMARKET SUPERMARKET SUPERMARKET SUPERMARKET SUPERMARKET SUPERMARKET SUPERMARKET SUPERMARKET SUPERMARKET SUPERMARKET SUPERMARKET",
+      "expected": "supermarket supermarket supermarket supermarket supermarket supermarket supermarket supermarket supermarket supermarket "
+    }
+  ]
+}
