@@ -9,6 +9,8 @@ import type {
 } from '#/db/types'
 import type { CurrencyCode } from '#/lib/currency'
 import type { GoalFrequency, GoalKind } from '#/features/goals/api/types'
+import { requestPlanRecalc } from '#/features/planned/data/recalcRequests'
+import { closeCovered, reopenUnderSettled } from '#/features/planned/data/rows'
 import {
   localAllocationToCreateWire,
   localAllocationToUpdateWire,
@@ -17,6 +19,7 @@ import {
   localIncomeToCreateWire,
   localIncomeToUpdateWire,
 } from './mappers'
+import { startOfToday, ymd } from './planning'
 
 export type IncomeDraft = {
   label: string
@@ -25,6 +28,10 @@ export type IncomeDraft = {
   frequency: GoalFrequency
   day: number
   color: string
+  /** Undefined on update leaves the deposit wallet alone. */
+  walletId?: string | null
+  /** A known payday; undefined on update leaves it alone. */
+  anchorDate?: string | null
 }
 
 export type GoalDraft = {
@@ -38,7 +45,17 @@ export type GoalDraft = {
   frequency: GoalFrequency | null
   nextDue: string | null
   dueDate: string | null
+  /** Undefined keeps the stored value (a new goal: the 1st). */
+  setAsideDay?: number | null
+  /** Undefined keeps the stored value (a new goal: off). */
+  payOnDue?: boolean
 }
+
+/** The stored plan's header, written by the planner when it (re)generates a goal's rows. */
+export type GoalPlanSnapshot = Pick<
+  LocalGoal,
+  'plannedAt' | 'planAmount' | 'planCount' | 'planStart'
+>
 
 const now = () => new Date().toISOString()
 const newId = () => crypto.randomUUID()
@@ -106,6 +123,8 @@ export async function createIncome(draft: IncomeDraft): Promise<string> {
     day: draft.day,
     color: draft.color,
     position: await nextIncomePosition(),
+    walletId: draft.walletId ?? null,
+    anchorDate: draft.anchorDate ?? null,
     createdAt: ts,
     updatedAt: ts,
     // Placeholder until the first sync returns the server's sha256 version.
@@ -142,6 +161,11 @@ export async function updateIncome(
     frequency: patch.frequency ?? existing.frequency,
     day: patch.day ?? existing.day,
     color: patch.color ?? existing.color,
+    walletId: patch.walletId !== undefined ? patch.walletId : existing.walletId,
+    anchorDate:
+      patch.anchorDate !== undefined
+        ? patch.anchorDate
+        : (existing.anchorDate ?? null),
     updatedAt: now(),
     dirty: 1,
   }
@@ -175,6 +199,12 @@ export async function createGoal(draft: GoalDraft): Promise<string> {
     color: draft.color,
     position: await nextGoalPosition(),
     ...kindShape(draft),
+    plannedAt: null,
+    planAmount: null,
+    planCount: null,
+    planStart: null,
+    setAsideDay: draft.setAsideDay ?? null,
+    payOnDue: draft.kind === 'onetime' && (draft.payOnDue ?? false),
     createdAt: ts,
     updatedAt: ts,
     version: '',
@@ -206,11 +236,44 @@ export async function updateGoal(id: string, draft: GoalDraft): Promise<void> {
     currency: draft.currency,
     color: draft.color,
     ...kindShape({ ...draft, kind: existing.kind }),
+    setAsideDay:
+      draft.setAsideDay !== undefined
+        ? draft.setAsideDay
+        : existing.setAsideDay,
+    payOnDue:
+      existing.kind === 'onetime' && (draft.payOnDue ?? existing.payOnDue),
     updatedAt: now(),
     dirty: 1,
   }
   await persistGoal(goal)
+  if (changesPlan(existing, goal)) requestPlanRecalc(id)
 }
+
+/** Record the plan the planner just wrote for this goal (no-op for a vanished goal). */
+export async function setGoalPlanSnapshot(
+  id: string,
+  snapshot: GoalPlanSnapshot,
+): Promise<void> {
+  const existing = await db.goals.get(id)
+  if (!existing || existing.deleted !== 0) return
+  await persistGoal({ ...existing, ...snapshot, updatedAt: now(), dirty: 1 })
+}
+
+const PLAN_FIELDS = [
+  'currency',
+  'amount',
+  'target',
+  'saved',
+  'frequency',
+  'nextDue',
+  'dueDate',
+  'setAsideDay',
+  'payOnDue',
+] as const satisfies ReadonlyArray<keyof LocalGoal>
+
+/** Name / colour / position edits leave the stored plan alone; these rewrite it. */
+export const changesPlan = (before: LocalGoal, after: LocalGoal): boolean =>
+  PLAN_FIELDS.some((field) => before[field] !== after[field])
 
 /** Edit only a goal's due/next-due date (the card's inline date picker). */
 export async function setGoalDate(id: string, iso: string): Promise<void> {
@@ -224,6 +287,7 @@ export async function setGoalDate(id: string, iso: string): Promise<void> {
     dirty: 1,
   }
   await persistGoal(goal)
+  if (changesPlan(existing, goal)) requestPlanRecalc(id)
 }
 
 /**
@@ -271,6 +335,10 @@ export type AllocationDraft = {
   amount: number
   currency: CurrencyCode
   note: string | null
+  /** When it was set aside; a new reservation defaults to today, an edit keeps its date. */
+  date?: string
+  /** The planned set-aside it settles. Undefined on update leaves the link alone. */
+  plannedId?: string | null
 }
 
 const liveAllocations = async (): Promise<LocalGoalAllocation[]> =>
@@ -306,6 +374,8 @@ export async function createAllocation(
     currency: draft.currency,
     note: draft.note,
     position: await nextAllocationPosition(draft.goalId),
+    date: draft.date ?? ymd(startOfToday()),
+    plannedId: draft.plannedId ?? null,
     createdAt: ts,
     updatedAt: ts,
     version: '',
@@ -323,6 +393,7 @@ export async function createAllocation(
       createdAt: ts,
     })
   })
+  await closeCovered([allocation.plannedId])
   schedulePush()
   return id
 }
@@ -339,6 +410,9 @@ export async function updateAllocation(
     amount: draft.amount,
     currency: draft.currency,
     note: draft.note,
+    date: draft.date ?? existing.date,
+    plannedId:
+      draft.plannedId !== undefined ? draft.plannedId : existing.plannedId,
     updatedAt: now(),
     dirty: 1,
   }
@@ -352,11 +426,16 @@ export async function updateAllocation(
       localAllocationToUpdateWire(allocation),
     )
   })
+  await reopenUnderSettled([existing.plannedId])
+  await closeCovered([allocation.plannedId])
   schedulePush()
 }
 
 export async function deleteAllocation(id: string): Promise<void> {
+  const plannedId = (await db.goalAllocations.get(id))?.plannedId
   await deleteRecord('allocation', id, db.goalAllocations)
+  await reopenUnderSettled([plannedId])
+  schedulePush()
 }
 
 // --- Shared helpers ------------------------------------------------------------------

@@ -1,8 +1,6 @@
-import { AlertTriangle, Plus } from 'lucide-react'
-import type { LocalBalanceNode, LocalGoalAllocation } from '#/db/types'
+import { AlertTriangle } from 'lucide-react'
+import type { LocalBalanceNode } from '#/db/types'
 import type { GoalFrequency, GoalKind } from '#/features/goals/api/types'
-import { walletGroupOptions } from '#/features/balances/data/selectors'
-import { reservedByWallet } from '#/features/goals/data/reservations'
 import {
   FREQUENCY_OPTIONS,
   FREQUENCIES,
@@ -12,7 +10,6 @@ import {
 } from '#/features/goals/constants'
 import {
   daysUntil,
-  nextPayday,
   relUntil,
   startOfToday,
 } from '#/features/goals/data/planning'
@@ -21,9 +18,8 @@ import type {
   EditorDraft,
   EditorState,
 } from '#/features/goals/hooks/useGoalEditor'
-import { amountInputProps, parseAmountToMinor } from '#/lib/currency'
+import { amountInputProps } from '#/lib/currency'
 import { CurrencyPicker } from '#/components/CurrencyPicker'
-import { formatDate } from '#/lib/date'
 import { DateField } from '#/components/DateField'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
@@ -36,10 +32,13 @@ import {
   SelectValue,
 } from '#/components/ui/select'
 import { usePreferencesStore } from '#/stores/preferences'
-import { AllocationRow } from './AllocationRow'
+import { DepositWalletField } from './DepositWalletField'
 import { DetailPanel } from './DetailPanel'
 import { GoalSchedule } from './GoalSchedule'
+import { IncomePaydayField } from './IncomePaydayField'
+import { PayOnDueField } from './PayOnDueField'
 import { PriorityControl } from './PriorityControl'
+import { SetAsideDayField } from './SetAsideDayField'
 import { FIELD_LABEL, FIELD_LABEL_TEXT } from './styles'
 
 type Props = {
@@ -50,23 +49,11 @@ type Props = {
   onMoveUp: () => void
   onMoveDown: () => void
   nodes: LocalBalanceNode[]
-  // Live wallet balances + all reserves, so we can warn when a reserve over-draws a wallet.
-  walletBalances: Record<string, number>
-  allocations: LocalGoalAllocation[]
-  rates: Partial<Record<string, number>>
   onField: <TKey extends keyof EditorDraft>(
     field: TKey,
     value: EditorDraft[TKey],
   ) => void
   onKind: (kind: GoalKind) => void
-  onAddAllocation: () => void
-  onRemoveAllocation: (key: string) => void
-  onAllocationSource: (key: string, value: string) => void
-  onAllocationField: (
-    key: string,
-    field: 'amount' | 'externalLabel',
-    value: string,
-  ) => void
   onSave: () => void
   onDelete: () => void
   onClose: () => void
@@ -79,15 +66,8 @@ export function GoalEditor({
   onMoveUp,
   onMoveDown,
   nodes,
-  walletBalances,
-  allocations,
-  rates,
   onField,
   onKind,
-  onAddAllocation,
-  onRemoveAllocation,
-  onAllocationSource,
-  onAllocationField,
   onSave,
   onDelete,
   onClose,
@@ -98,7 +78,13 @@ export function GoalEditor({
   const isRecurring = kind === 'recurring' || kind === 'sinking'
   const today = startOfToday()
   const dateFormat = usePreferencesStore((s) => s.dateFormat)
-  const walletGroups = walletGroupOptions(nodes)
+  // Monthly and weekly bills are paid straight from the month's income, never saved toward.
+  const hasSetAsides =
+    isGoal &&
+    !(
+      kind === 'recurring' &&
+      (draft.frequency === 'monthly' || draft.frequency === 'weekly')
+    )
 
   // Due/target date: a readout in the user's date format (the native picker can't honor it),
   // plus a flag when the date sits in the past.
@@ -136,41 +122,6 @@ export function GoalEditor({
         ? 'Monthly contribution'
         : 'Amount each time'
 
-  // Wallets this goal's draft over-reserves: (reserves from other goals) + (this draft's rows)
-  // exceeding the wallet's live balance. Over-reserving is allowed — we just warn first.
-  const overReservedWallets = (() => {
-    const empty = { names: [] as string[], ids: new Set<string>() }
-    if (!isGoal) return empty
-    const elsewhere = reservedByWallet(
-      allocations.filter((a) => a.goalId !== id),
-      nodes,
-      rates,
-    )
-    const draftByWallet = new Map<string, number>()
-    for (const row of draft.allocations) {
-      if (row.source !== 'wallet' || !row.walletId) continue
-      draftByWallet.set(
-        row.walletId,
-        (draftByWallet.get(row.walletId) ?? 0) +
-          (parseAmountToMinor(row.amount, row.currency) ?? 0),
-      )
-    }
-    const names: string[] = []
-    const ids = new Set<string>()
-    for (const [walletId, drafted] of draftByWallet) {
-      const total = (elsewhere[walletId] ?? 0) + drafted
-      if (total > (walletBalances[walletId] ?? 0) + 0.5) {
-        ids.add(walletId)
-        const node = nodes.find((n) => n.id === walletId)
-        if (node) names.push(node.name)
-      }
-    }
-    return { names, ids }
-  })()
-  const overReservedNames = overReservedWallets.names
-  const overReservedIds = overReservedWallets.ids
-  const hasOverReserve = overReservedNames.length > 0
-
   return (
     <DetailPanel
       title={title}
@@ -188,17 +139,8 @@ export function GoalEditor({
             </Button>
           ) : null}
           <div className="flex-1" />
-          <Button
-            onClick={onSave}
-            variant={hasOverReserve ? 'destructive' : 'default'}
-          >
-            {hasOverReserve
-              ? 'Save anyway'
-              : id
-                ? 'Save'
-                : isGoal
-                  ? 'Add'
-                  : 'Add income'}
+          <Button onClick={onSave}>
+            {id ? 'Save' : isGoal ? 'Add' : 'Add income'}
           </Button>
         </>
       }
@@ -292,25 +234,24 @@ export function GoalEditor({
         )}
 
         {!isGoal ? (
-          <div>
-            <Label className={FIELD_LABEL}>Paid on (day of month)</Label>
-            <div className="flex items-center gap-3">
-              <Input
-                value={draft.day}
-                onChange={(e) => onField('day', e.target.value)}
-                inputMode="numeric"
-                placeholder="27"
-                className="w-[96px] text-center tabular-nums"
-              />
-              <span className="text-[12px] text-fp-text-3">
-                Next:{' '}
-                {formatDate(
-                  nextPayday(parseInt(draft.day, 10) || 1, today),
-                  dateFormat,
-                )}
-              </span>
-            </div>
-          </div>
+          <IncomePaydayField
+            draft={draft}
+            today={today}
+            dateFormat={dateFormat}
+            onDay={(day) => onField('day', day)}
+            onNextPayday={(iso) => {
+              onField('anchorISO', iso)
+              onField('day', String(Number(iso.slice(8, 10))))
+            }}
+          />
+        ) : null}
+
+        {!isGoal ? (
+          <DepositWalletField
+            value={draft.walletId}
+            nodes={nodes}
+            onChange={(v) => onField('walletId', v)}
+          />
         ) : null}
 
         {hasDueDate ? (
@@ -347,41 +288,18 @@ export function GoalEditor({
           </div>
         ) : null}
 
-        {isGoal ? (
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <label className={FIELD_LABEL_TEXT}>
-                Set aside <span className="normal-case">(optional)</span>
-              </label>
-              <Button
-                variant="outline"
-                onClick={onAddAllocation}
-                className="h-auto gap-1 rounded-[9px] px-2.5 py-1.5 text-[12px] font-semibold text-fp-text-2 hover:text-fp-text"
-              >
-                <Plus size={14} strokeWidth={2.4} /> Add source
-              </Button>
-            </div>
-            {draft.allocations.length === 0 ? (
-              <div className="rounded-[11px] border border-dashed border-fp-border-strong px-3 py-3 text-[12px] leading-normal text-fp-text-3">
-                Reserve from a wallet, or add an external source (a gift,
-                someone’s help). Each shows in your wallet breakdown.
-              </div>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {draft.allocations.map((row) => (
-                  <AllocationRow
-                    key={row.key}
-                    row={row}
-                    over={!!row.walletId && overReservedIds.has(row.walletId)}
-                    walletGroups={walletGroups}
-                    onSource={onAllocationSource}
-                    onField={onAllocationField}
-                    onRemove={onRemoveAllocation}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+        {kind === 'onetime' && isGoal ? (
+          <PayOnDueField
+            checked={draft.payOnDue}
+            onChange={(v) => onField('payOnDue', v)}
+          />
+        ) : null}
+
+        {hasSetAsides ? (
+          <SetAsideDayField
+            value={draft.setAsideDay}
+            onChange={(v) => onField('setAsideDay', v)}
+          />
         ) : null}
 
         {card ? (
@@ -419,22 +337,6 @@ export function GoalEditor({
         </div>
 
         {card?.hasSchedule ? <GoalSchedule card={card} /> : null}
-
-        {hasOverReserve ? (
-          <div className="flex items-start gap-2 rounded-[11px] border border-fp-danger bg-fp-danger/10 px-3 py-[10px] text-[12.5px] leading-normal text-fp-danger">
-            <AlertTriangle
-              size={15}
-              strokeWidth={2.2}
-              className="mt-[1px] shrink-0"
-            />
-            <span>
-              {overReservedNames.length === 1
-                ? `That's more than ${overReservedNames[0]} holds`
-                : `That's more than ${overReservedNames.join(' and ')} hold`}{' '}
-              — its available balance will go negative. You can still save it.
-            </span>
-          </div>
-        ) : null}
       </div>
     </DetailPanel>
   )

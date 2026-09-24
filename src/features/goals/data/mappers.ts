@@ -9,6 +9,7 @@ import type {
   CreateIncomeWire,
   Goal,
   GoalAllocation,
+  GoalPlanWire,
   IncomeStream,
   UpdateGoalAllocationWire,
   UpdateGoalWire,
@@ -32,6 +33,8 @@ export const serverIncomeToLocal = (s: IncomeStream): LocalIncomeStream => ({
   day: s.day,
   color: s.color,
   position: s.position,
+  walletId: s.walletId,
+  anchorDate: s.anchorDate,
   createdAt: s.createdAt,
   updatedAt: s.updatedAt,
   version: s.version,
@@ -50,6 +53,8 @@ export const localIncomeToCreateWire = (
   day: l.day,
   color: l.color,
   position: l.position,
+  wallet_id: l.walletId,
+  anchor_date: l.anchorDate ?? null,
 })
 
 // The update is based on the last-synced `version` (optimistic locking base).
@@ -64,9 +69,20 @@ export const localIncomeToUpdateWire = (
   day: l.day,
   color: l.color,
   position: l.position,
+  wallet_id: l.walletId,
+  anchor_date: l.anchorDate ?? null,
 })
 
 // --- Goals ---------------------------------------------------------------------------
+
+const goalPlanWire = (l: LocalGoal): GoalPlanWire => ({
+  planned_at: l.plannedAt,
+  plan_amount: l.planAmount,
+  plan_count: l.planCount,
+  plan_start: l.planStart,
+  set_aside_day: l.setAsideDay,
+  pay_on_due: l.payOnDue,
+})
 
 export const serverGoalToLocal = (g: Goal): LocalGoal => ({
   id: g.id,
@@ -81,6 +97,12 @@ export const serverGoalToLocal = (g: Goal): LocalGoal => ({
   frequency: g.frequency,
   nextDue: g.nextDue,
   dueDate: g.dueDate,
+  plannedAt: g.plannedAt,
+  planAmount: g.planAmount,
+  planCount: g.planCount,
+  planStart: g.planStart,
+  setAsideDay: g.setAsideDay,
+  payOnDue: g.payOnDue,
   createdAt: g.createdAt,
   updatedAt: g.updatedAt,
   version: g.version,
@@ -101,6 +123,7 @@ export const localGoalToCreateWire = (l: LocalGoal): CreateGoalWire => ({
   frequency: l.frequency ? toWireFreq(l.frequency) : null,
   next_due: l.nextDue,
   due_date: l.dueDate,
+  ...goalPlanWire(l),
 })
 
 export const localGoalToUpdateWire = (l: LocalGoal): UpdateGoalWire => ({
@@ -115,6 +138,7 @@ export const localGoalToUpdateWire = (l: LocalGoal): UpdateGoalWire => ({
   frequency: l.frequency ? toWireFreq(l.frequency) : null,
   next_due: l.nextDue,
   due_date: l.dueDate,
+  ...goalPlanWire(l),
 })
 
 // --- Goal allocations ----------------------------------------------------------------
@@ -131,6 +155,8 @@ export const serverAllocationToLocal = (
   currency: a.currency,
   note: a.note,
   position: a.position,
+  date: a.date,
+  plannedId: a.plannedId,
   createdAt: a.createdAt,
   updatedAt: a.updatedAt,
   version: a.version,
@@ -150,6 +176,8 @@ export const localAllocationToCreateWire = (
   currency: l.currency,
   note: l.note,
   position: l.position,
+  date: l.date,
+  planned_id: l.plannedId,
 })
 
 export const localAllocationToUpdateWire = (
@@ -163,4 +191,6 @@ export const localAllocationToUpdateWire = (
   currency: l.currency,
   note: l.note,
   position: l.position,
+  date: l.date,
+  planned_id: l.plannedId,
 })
