@@ -5,6 +5,8 @@ import { useCategoryCatalog } from '#/features/categories/hooks/useCategoryCatal
 import type { TxType } from '#/features/transactions/api/types'
 import type { EditorTxType } from '#/features/transactions/hooks/useTxEditor'
 import { createTransaction } from '#/features/transactions/data/mutations'
+import { quickAddTarget } from '#/features/transactions/data/quickAddMatch'
+import { useQuickAddMatch } from '#/features/transactions/hooks/useQuickAddMatch'
 import { startOfToday, ymd } from '#/features/transactions/data/planning'
 import type { RatesMap } from '#/lib/config/rates'
 import { amountInputProps, parseAmountToMinor } from '#/lib/currency'
@@ -12,6 +14,7 @@ import type { CurrencyCode } from '#/lib/currency'
 import { Button } from '#/components/ui/button'
 import { Icon } from '#/components/icons/Icon'
 import { CategoryPickerDialog } from './CategoryPickerDialog'
+import { QuickAddMatchHint } from './QuickAddMatchHint'
 import { QuickTransferForm } from './QuickTransferForm'
 
 type Props = {
@@ -53,6 +56,7 @@ export function QuickAddCard({
     () => catalog.byType('spend')[0]?.slug ?? 'other',
   )
   const [pickerOpen, setPickerOpen] = useState(false)
+  const match = useQuickAddMatch({ type, amount, currency })
 
   const switchTab = (next: EditorTxType) => {
     setTab(next)
@@ -66,19 +70,26 @@ export function QuickAddCard({
   }
 
   const add = async () => {
-    if (!walletId) return
     const minor = parseAmountToMinor(amount, currency)
     if (!minor || minor <= 0) return
-    await createTransaction({
-      type,
+    const { link } = match
+    const target = quickAddTarget({
       amount: minor,
       currency,
+      walletId,
+      plannedWallet: link?.wallet ?? null,
+      rates: match.rates,
+    })
+    if (!target) return
+    await createTransaction({
+      type,
+      ...target,
       category,
       subcategory: null,
-      walletId,
-      goalId: null,
+      goalId: link?.goalId ?? null,
+      plannedId: link?.plannedId ?? null,
       date: ymd(startOfToday()),
-      note: note.trim() || null,
+      note: note.trim() || link?.name || null,
     })
     setAmount('')
     setNote('')
@@ -146,6 +157,14 @@ export function QuickAddCard({
               <Plus size={20} strokeWidth={2.4} />
             </Button>
           </div>
+
+          {match.hint ? (
+            <QuickAddMatchHint
+              hint={match.hint}
+              linked={match.linked}
+              onLinkedChange={match.setLinked}
+            />
+          ) : null}
 
           <div className="flex flex-wrap gap-[6px]">
             {first.map((c) => {
