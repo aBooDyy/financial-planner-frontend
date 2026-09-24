@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useNavigate, useSearch } from '@tanstack/react-router'
 import { MobileTabBar } from '#/components/chrome/MobileTabBar'
 import { TopNav } from '#/components/chrome/TopNav'
 import { useLogout } from '#/features/auth/hooks/useLogout'
@@ -7,8 +8,10 @@ import { RECURRING_KINDS } from '#/features/goals/constants'
 import { swapGoalPositions } from '#/features/goals/data/mutations'
 import { useGoals } from '#/features/goals/hooks/useGoals'
 import { useGoalEditor } from '#/features/goals/hooks/useGoalEditor'
+import { useGoalDetail } from '#/features/goals/hooks/useGoalDetail'
 import { useSessionStore } from '#/stores/session'
 import type { CurrencyCode } from '#/lib/currency'
+import { GoalDetailPanel } from './detail/GoalDetailPanel'
 import { GoalEditor } from './GoalEditor'
 import { GoalListSection } from './GoalListSection'
 import { IncomeSection } from './IncomeSection'
@@ -21,41 +24,77 @@ import { TimelineSection } from './TimelineSection'
 export function GoalsPage() {
   const user = useSessionStore((s) => s.user)
   const logout = useLogout()
-  const {
-    base,
-    rates,
-    income,
-    goals,
-    view,
-    nodes,
-    allocations,
-    walletBalances,
-  } = useGoals()
-  const editor = useGoalEditor(base, nodes, allocations)
+  const { base, income, goals, view, nodes, dueByGoal } = useGoals()
+  const editor = useGoalEditor(base)
+  const detail = useGoalDetail()
   const [section, setSection] = useState<GoalsSection>('summary')
-
-  if (!user) return null
+  const navigate = useNavigate()
+  const linkedGoalId = useSearch({ from: '/goals' }).goal ?? null
+  const linkedGoalFound =
+    linkedGoalId !== null && goals.some((g) => g.id === linkedGoalId)
 
   const { editing } = editor
-  const selectedGoalId = editing?.type === 'goal' ? editing.id : null
+  const editingGoalId = editing?.type === 'goal' ? editing.id : null
+  const selectedGoalId = editing ? editingGoalId : detail.goalId
   const selectedIncomeId = editing?.type === 'income' ? editing.id : null
   const cardIndex = view.goalCards.findIndex((c) => c.id === selectedGoalId)
   const editingCard = cardIndex >= 0 ? view.goalCards[cardIndex] : null
+  const detailGoal = detail.goalId
+    ? (goals.find((g) => g.id === detail.goalId) ?? null)
+    : null
 
-  const goTo = (next: GoalsSection) => {
+  const closePanel = () => {
     editor.close()
+    detail.close()
+  }
+  const goTo = (next: GoalsSection) => {
+    closePanel()
     setSection(next)
   }
   const openGoal = (id: string) => {
     const goal = goals.find((g) => g.id === id)
     if (!goal) return
     setSection(RECURRING_KINDS.includes(goal.kind) ? 'obligations' : 'goals')
-    editor.openEditGoal(goal)
+    editor.close()
+    detail.open(id)
+  }
+  const editGoal = () => {
+    if (detailGoal) editor.openEditGoal(detailGoal)
+  }
+  const addGoal = (kind: 'onetime' | 'recurring') => {
+    detail.close()
+    editor.openAddGoal(kind)
+  }
+  const addIncome = () => {
+    detail.close()
+    editor.openAddIncome()
   }
   const openIncome = (id: string) => {
     const stream = income.find((s) => s.id === id)
-    if (stream) editor.openEditIncome(stream)
+    if (!stream) return
+    detail.close()
+    editor.openEditIncome(stream)
   }
+  const save = async () => {
+    const savedId = await editor.save()
+    if (savedId) detail.open(savedId)
+  }
+  const remove = async () => {
+    await editor.remove()
+    detail.close()
+  }
+
+  // A link from elsewhere (a Balances pot) lands on that goal's detail, once, then drops
+  // the param so a later close is not undone by it.
+  useEffect(() => {
+    if (!linkedGoalId || !linkedGoalFound) return
+    openGoal(linkedGoalId)
+    void navigate({ to: '/goals', search: {}, replace: true })
+    // `openGoal` is rebuilt every render; the link is what should trigger this.
+  }, [linkedGoalId, linkedGoalFound])
+
+  if (!user) return null
+
   // Swap with the neighbour in the active plan, so a reorder never targets a completed goal.
   const moveEditing = (step: -1 | 1) => {
     const neighbor = view.goalCards[cardIndex + step] as
@@ -98,7 +137,8 @@ export function GoalsPage() {
             addLabel="Add goal"
             emptyText="Add a goal — a target by a date, or a fund you grow each month — and the plan works out what to set aside."
             selectedId={selectedGoalId}
-            onAdd={() => editor.openAddGoal('onetime')}
+            dueByGoal={dueByGoal}
+            onAdd={() => addGoal('onetime')}
             onSelect={openGoal}
           />
         )
@@ -111,7 +151,8 @@ export function GoalsPage() {
             addLabel="Add obligation"
             emptyText="Add a recurring bill or cost you have to cover, and the plan sets money aside for each due date."
             selectedId={selectedGoalId}
-            onAdd={() => editor.openAddGoal('recurring')}
+            dueByGoal={dueByGoal}
+            onAdd={() => addGoal('recurring')}
             onSelect={openGoal}
           />
         )
@@ -120,7 +161,7 @@ export function GoalsPage() {
           <IncomeSection
             view={view}
             selectedId={selectedIncomeId}
-            onAdd={editor.openAddIncome}
+            onAdd={addIncome}
             onSelect={openIncome}
           />
         )
@@ -164,18 +205,19 @@ export function GoalsPage() {
             onMoveUp={() => moveEditing(-1)}
             onMoveDown={() => moveEditing(1)}
             nodes={nodes}
-            walletBalances={walletBalances}
-            allocations={allocations}
-            rates={rates}
             onField={editor.setField}
             onKind={editor.setKind}
-            onAddAllocation={editor.addAllocationRow}
-            onRemoveAllocation={editor.removeAllocationRow}
-            onAllocationSource={editor.setAllocationSource}
-            onAllocationField={editor.setAllocationField}
-            onSave={() => void editor.save()}
-            onDelete={() => void editor.remove()}
+            onSave={() => void save()}
+            onDelete={() => void remove()}
             onClose={editor.close}
+          />
+        ) : detailGoal ? (
+          <GoalDetailPanel
+            key={detailGoal.id}
+            goal={detailGoal}
+            nodes={nodes}
+            onEdit={editGoal}
+            onClose={closePanel}
           />
         ) : null}
       </div>

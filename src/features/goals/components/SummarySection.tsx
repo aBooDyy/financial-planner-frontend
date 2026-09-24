@@ -2,6 +2,7 @@ import type { GoalsView } from '#/features/goals/data/selectors'
 import { DecisionsCard } from './DecisionsCard'
 import { MonthlyLedgerCard } from './MonthlyLedgerCard'
 import { PriorityCard } from './PriorityCard'
+import { RecalcAllCard } from './RecalcAllCard'
 import { SummaryVerdictCard } from './SummaryVerdictCard'
 import { UpcomingCard } from './UpcomingCard'
 
@@ -33,6 +34,7 @@ export function SummarySection({
         onPrimary={onPrimary}
         onSeeTimeline={onSeeTimeline}
       />
+      <RecalcAllCard />
       <MonthlyLedgerCard
         rows={summary.ledger}
         net={summary.ledgerNet}

@@ -5,10 +5,12 @@ import { ListRow } from './ListRow'
 type Props = {
   card: GoalCard
   selected: boolean
+  /** Planned items for this goal that are due and still open. */
+  dueCount?: number
   onSelect: (id: string) => void
 }
 
-export function GoalRow({ card, selected, onSelect }: Props) {
+export function GoalRow({ card, selected, dueCount = 0, onSelect }: Props) {
   const status = STATUS_COLORS[card.status]
   const flagged = card.status !== 'green'
   const amountColor = card.isOver
@@ -24,8 +26,15 @@ export function GoalRow({ card, selected, onSelect }: Props) {
       onSelect={() => onSelect(card.id)}
     >
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[13.5px] font-semibold">
-          {card.name}
+        <span className="flex min-w-0 items-center gap-[6px]">
+          <span className="truncate text-[13.5px] font-semibold">
+            {card.name}
+          </span>
+          {dueCount > 0 ? (
+            <span className="flex-none rounded-full bg-fp-warn/10 px-[6px] py-px text-[10px] font-bold whitespace-nowrap text-fp-warn">
+              {dueCount} to confirm
+            </span>
+          ) : null}
         </span>
         <span
           className={`block truncate text-[11px] ${flagged ? 'font-semibold' : 'text-fp-text-3'}`}

@@ -9,12 +9,9 @@ import type {
 } from '#/db/types'
 import { DEFAULT_BASE_CURRENCY } from '#/features/goals/constants'
 import { buildGoalsView } from '#/features/goals/data/selectors'
-import { startOfToday } from '#/features/goals/data/planning'
-import {
-  contributionsByGoal,
-  walletLiveBalances,
-} from '#/features/transactions/data/ledger'
-import { allocationsByGoal } from '#/features/goals/data/reservations'
+import { startOfToday, ymd } from '#/features/goals/data/planning'
+import { dueCountByGoal } from '#/features/goals/data/goalDetail'
+import { goalProgress, progressByGoal } from '#/features/goals/data/progress'
 import { usePreferencesStore } from '#/stores/preferences'
 import { useMergedRates } from '#/lib/config/rates'
 import type { RatesMap } from '#/lib/config/rates'
@@ -32,6 +29,7 @@ export function useGoals() {
   const txnRows = useLiveQuery(() => db.transactions.toArray())
   const allocationRows = useLiveQuery(() => db.goalAllocations.toArray())
   const nodeRows = useLiveQuery(() => db.balanceNodes.toArray())
+  const plannedRows = useLiveQuery(() => db.plannedTransactions.toArray())
   const dateFormat = usePreferencesStore((s) => s.dateFormat)
 
   const loading =
@@ -50,21 +48,26 @@ export function useGoals() {
   const liveAllocations: LocalGoalAllocation[] = (allocationRows ?? []).filter(
     (a) => a.deleted === 0,
   )
-  // Goal-linked transactions raise saved progress (derived, persisted as ledger rows).
-  const contributions = contributionsByGoal(goals, txnRows ?? [], rates)
-  // Sourced reserves (wallet/external) also count toward saved progress.
-  const allocations = allocationsByGoal(liveAllocations, goals, rates)
-  // Live wallet balances (opening + txns), so the editor can warn on over-reserving.
-  const walletBalances = walletLiveBalances(nodes, txnRows ?? [], rates)
+  const today = startOfToday()
+  // Set-asides and goal payments raise progress; paying consumes what was set aside.
+  const progress = goalProgress(
+    goals,
+    liveAllocations,
+    txnRows ?? [],
+    rates,
+    today,
+    plannedRows ?? [],
+  )
+  // Planned items already due and still open, per goal — the list rows' "N to confirm".
+  const dueByGoal = dueCountByGoal(plannedRows ?? [], ymd(today))
   const view = buildGoalsView(
     income,
     goals,
     base,
     rates,
-    startOfToday(),
-    contributions,
+    today,
+    progressByGoal(progress),
     dateFormat,
-    allocations,
   )
 
   return {
@@ -76,6 +79,7 @@ export function useGoals() {
     view,
     nodes,
     allocations: liveAllocations,
-    walletBalances,
+    dueByGoal,
+    progress,
   }
 }

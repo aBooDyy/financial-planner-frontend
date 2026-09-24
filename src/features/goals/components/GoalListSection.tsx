@@ -12,6 +12,7 @@ type Props = {
   addLabel: string
   emptyText: string
   selectedId: string | null
+  dueByGoal: Record<string, number>
   onAdd: () => void
   onSelect: (id: string) => void
 }
@@ -23,6 +24,7 @@ export function GoalListSection({
   addLabel,
   emptyText,
   selectedId,
+  dueByGoal,
   onAdd,
   onSelect,
 }: Props) {
@@ -51,6 +53,7 @@ export function GoalListSection({
               key={card.id}
               card={card}
               selected={card.id === selectedId}
+              dueCount={dueByGoal[card.id] ?? 0}
               onSelect={onSelect}
             />
           ))}

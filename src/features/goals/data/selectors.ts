@@ -14,7 +14,6 @@ import type { FundingStatus } from '#/features/goals/constants'
 import {
   addMonths,
   fmtMonth,
-  nextPayday,
   ordinal,
   parseISO,
   relUntil,
@@ -23,6 +22,7 @@ import {
   ymd,
 } from './planning'
 import type { PlanTrack, TrackPlan } from './planning'
+import { nextPaydayOf, paydaysOf, usesPaydayAnchor } from './paydays'
 
 type RatesMap = Partial<Record<string, number>>
 
@@ -309,69 +309,127 @@ function statusOf(track: PlanTrack, plan: TrackPlan): FundingStatus {
   return plan.fundedNow ? 'green' : 'amber'
 }
 
+/** One active goal with everything the simulation worked out for it. */
+export type GoalPlanEntry = {
+  /** The goal with `saved` already raised by its settled progress. */
+  goal: LocalGoal
+  track: PlanTrack
+  plan: TrackPlan
+  status: FundingStatus
+}
+
+/** The live plan: what the engine makes of every goal from `today`. */
+export type GoalsPlan = {
+  entries: GoalPlanEntry[]
+  /** Goals whose target is met — out of the plan, drawing no income. */
+  completed: LocalGoal[]
+  incomeMonthly: number
+}
+
+/** Monthly income in base minor units. */
+const incomeMonthlyOf = (
+  s: LocalIncomeStream,
+  base: CurrencyCode,
+  rates: RatesMap,
+): number =>
+  (convertMinor(s.amount, s.currency, base, rates) *
+    FREQUENCIES[s.frequency].perYear) /
+  12
+
+/**
+ * Run the funding engine over every active goal. Shared by the Goals view and by the planner
+ * that turns each goal's schedule into planned rows, so both always read the same plan.
+ */
+export function planGoals(
+  income: LocalIncomeStream[],
+  goals: LocalGoal[],
+  base: CurrencyCode,
+  rates: RatesMap,
+  today: Date,
+  // Settled progress beyond each goal's stored baseline (goal currency, minor units).
+  progress: Record<string, number> = {},
+): GoalsPlan {
+  const withProgress = goals.map((g) => ({
+    ...g,
+    saved: g.saved + (progress[g.id] ?? 0),
+  }))
+  // A goal with a target it has fully met is done — it leaves the active plan (so it stops
+  // drawing income). Recurring/sinking have no target and so never "complete".
+  const isComplete = (g: LocalGoal) =>
+    (g.target ?? 0) > 0 && g.saved >= (g.target ?? 0)
+  const ordered = withProgress
+    .filter((g) => !isComplete(g))
+    .sort((a, b) => a.position - b.position)
+  const incomeMonthly = income.reduce(
+    (a, s) => a + incomeMonthlyOf(s, base, rates),
+    0,
+  )
+  const tracks = ordered.map((g) => toTrack(g, base, rates, today))
+  const plans = new Map(
+    simulatePlan(tracks, incomeMonthly, planHorizon(tracks)).map((p) => [
+      p.id,
+      p,
+    ]),
+  )
+  return {
+    entries: ordered.map((goal, i) => {
+      const track = tracks[i]
+      const plan = plans.get(goal.id) as TrackPlan
+      return { goal, track, plan, status: statusOf(track, plan) }
+    }),
+    completed: withProgress.filter(isComplete),
+    incomeMonthly,
+  }
+}
+
 export function buildGoalsView(
   income: LocalIncomeStream[],
   goals: LocalGoal[],
   base: CurrencyCode,
   rates: RatesMap,
   today: Date,
-  // Minor-unit contributions toward each goal (from goal-linked transactions, in the goal's
-  // own currency). Folded into each goal's saved progress. Empty by default.
-  contributions: Record<string, number> = {},
+  // Settled progress toward each goal beyond its stored baseline, in the goal's own currency
+  // (see `goals/data/progress.ts`). Empty by default.
+  progress: Record<string, number> = {},
   dateFormat: DateFormat = DEFAULT_DATE_FORMAT,
-  // Minor-unit sourced allocations toward each goal (wallet or external reserves, in the goal's
-  // own currency). Also folded into saved progress. Empty by default.
-  allocations: Record<string, number> = {},
 ): GoalsView {
   const money = (minor: number) => formatMoneyRounded(Math.round(minor), base)
-  // A goal's saved progress = its stored baseline + sourced allocations + tx contributions.
-  const withContributions = goals.map((g) => ({
-    ...g,
-    saved: g.saved + (allocations[g.id] ?? 0) + (contributions[g.id] ?? 0),
-  }))
-  // A goal with a target it has fully met is done — it leaves the active plan (so it stops
-  // drawing income) and is shown separately for reference. Recurring/sinking have no target
-  // and so never "complete"; they keep recurring.
-  const isComplete = (g: LocalGoal) =>
-    (g.target ?? 0) > 0 && g.saved >= (g.target ?? 0)
-  const activeGoals = withContributions.filter((g) => !isComplete(g))
-  const completed = withContributions.filter(isComplete)
-  const ordered = [...activeGoals].sort((a, b) => a.position - b.position)
-
-  // --- Income, normalized to a monthly base figure ---
-  const incomeMonthlyOf = (s: LocalIncomeStream): number =>
-    (convertMinor(s.amount, s.currency, base, rates) *
-      FREQUENCIES[s.frequency].perYear) /
-    12
-  const incomeMonthly = income.reduce((a, s) => a + incomeMonthlyOf(s), 0)
+  const { entries, completed, incomeMonthly } = planGoals(
+    income,
+    goals,
+    base,
+    rates,
+    today,
+    progress,
+  )
+  const withContributions = [...entries.map((e) => e.goal), ...completed]
+  const activeGoals = entries.map((e) => e.goal)
+  const ordered = activeGoals
 
   const incomeRows: IncomeRow[] = income.map((s) => {
-    const monthly = incomeMonthlyOf(s)
+    const monthly = incomeMonthlyOf(s, base, rates)
     const showOriginal = s.currency !== base || s.frequency !== 'monthly'
-    const pay = nextPayday(s.day, today)
+    const next = formatDate(nextPaydayOf(s, today), dateFormat)
     return {
       id: s.id,
       label: s.label,
       color: s.color,
       subStr: `${formatMoneyRounded(s.amount, s.currency)} ${FREQUENCIES[s.frequency].every}`,
-      payStr: `Paid the ${ordinal(s.day)} · next ${formatDate(pay, dateFormat)}`,
+      payStr: usesPaydayAnchor(s.frequency)
+        ? `Next payday ${next}`
+        : `Paid the ${ordinal(s.day)} · next ${next}`,
       monthlyStr: money(monthly),
       showOriginal,
       originalStr: `${formatMoneyRounded(s.amount, s.currency)}${FREQUENCIES[s.frequency].short}`,
     }
   })
 
-  // --- Time-phased funding (earliest-deadline-first, priority breaks ties) ---
-  const tracks = ordered.map((g) => toTrack(g, base, rates, today))
-  const horizon = planHorizon(tracks)
-  const plans = new Map(
-    simulatePlan(tracks, incomeMonthly, horizon).map((p) => [p.id, p]),
-  )
-  const planned: Planned[] = ordered.map((g, i) => {
-    const track = tracks[i]
-    const plan = plans.get(g.id) as TrackPlan
-    return { g, track, plan, status: statusOf(track, plan) }
-  })
+  const planned: Planned[] = entries.map((e) => ({
+    g: e.goal,
+    track: e.track,
+    plan: e.plan,
+    status: e.status,
+  }))
 
   const totalNow = planned.reduce((a, p) => a + p.plan.now, 0)
   const leftover = Math.max(0, incomeMonthly - totalNow)
@@ -809,19 +867,24 @@ function buildUpcoming(
   const events: { at: Date; event: UpcomingEvent }[] = []
   for (const s of income) {
     const amountStr = `+${money(convertMinor(s.amount, s.currency, base, rates))}`
-    occurrencesWithin(nextPayday(s.day, today), s.frequency, today).forEach(
-      (at, n) =>
-        events.push({
-          at,
-          event: {
-            key: `${s.id}:${n}`,
-            dateStr: fmtDay(at),
-            name: `${s.label} in`,
-            amountStr,
-            incoming: true,
-          },
-        }),
+    const until = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate() + UPCOMING_DAYS,
     )
+    paydaysOf(s, ymd(today), ymd(until)).forEach((iso, n) => {
+      const at = parseISO(iso, today)
+      events.push({
+        at,
+        event: {
+          key: `${s.id}:${n}`,
+          dateStr: fmtDay(at),
+          name: `${s.label} in`,
+          amountStr,
+          incoming: true,
+        },
+      })
+    })
   }
   for (const g of goals) {
     const due = dueOf(g)

@@ -26,6 +26,8 @@ const income = (over: Partial<LocalIncomeStream>): LocalIncomeStream => ({
   day: 1,
   color: '#1F9D6B',
   position: seq,
+  walletId: null,
+  anchorDate: null,
   createdAt: '',
   updatedAt: '',
   version: '',
@@ -47,6 +49,12 @@ const goal = (over: Partial<LocalGoal>): LocalGoal => ({
   frequency: null,
   nextDue: null,
   dueDate: null,
+  plannedAt: null,
+  planAmount: null,
+  planCount: null,
+  planStart: null,
+  setAsideDay: null,
+  payOnDue: false,
   createdAt: '',
   updatedAt: '',
   version: '',
@@ -58,6 +66,29 @@ const goal = (over: Partial<LocalGoal>): LocalGoal => ({
 const base: CurrencyCode = 'SAR'
 
 describe('buildGoalsView funding engine', () => {
+  it('dates a stream’s next payday from its anchor', () => {
+    const view = buildGoalsView(
+      [
+        income({ label: 'Salary', amount: m(12000), day: 31 }),
+        income({
+          label: 'Bonus',
+          amount: m(3000),
+          frequency: 'quarterly',
+          day: 20,
+          anchorDate: '2026-08-20',
+        }),
+      ],
+      [],
+      base,
+      RATES,
+      TODAY,
+    )
+    expect(view.incomeRows.map((r) => r.payStr)).toEqual([
+      'Paid the 31st · next 30/06/2026',
+      'Next payday 20/08/2026',
+    ])
+  })
+
   it('normalizes multi-currency income to a monthly base figure', () => {
     const view = buildGoalsView(
       [
@@ -388,7 +419,10 @@ describe('buildGoalsView funding engine', () => {
     expect(view.setAsideStr).not.toContain('NaN')
   })
 
-  it('folds sourced allocations into a goal’s saved progress', () => {
+  // The trailing `allocations` argument is gone: allocations and goal-linked spends now reach
+  // the view as one settled-progress figure (`goals/data/progress.ts`, max of the two rather
+  // than their sum), passed where `contributions` used to be.
+  it('folds settled progress into a goal’s saved progress', () => {
     const incomes = [income({ label: 'Salary', amount: m(20000), day: 1 })]
     const car = goal({
       id: 'car',
@@ -400,7 +434,7 @@ describe('buildGoalsView funding engine', () => {
       position: 0,
     })
     // Stored saved 2,000 + an allocation of 8,000 = 10,000 → the goal is fully funded.
-    const view = buildGoalsView(incomes, [car], base, RATES, TODAY, {}, 'dmy', {
+    const view = buildGoalsView(incomes, [car], base, RATES, TODAY, {
       car: m(8000),
     })
     expect(view.completedGoals.map((c) => c.id)).toEqual(['car'])

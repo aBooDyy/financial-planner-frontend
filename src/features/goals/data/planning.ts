@@ -76,12 +76,36 @@ export const nextDueDefault = (freq: GoalFrequency, today: Date): string => {
   return ymd(new Date(today.getFullYear(), today.getMonth() + ahead, 1))
 }
 
-/** The next occurrence of a monthly pay day (1–31) on or after today. */
-export const nextPayday = (day: number, today: Date): Date => {
-  const dd = Math.max(1, Math.min(31, day || 1))
-  let month = today.getMonth()
-  if (today.getDate() > dd) month += 1
-  return new Date(today.getFullYear(), month, dd)
+/** Set-asides fall on this day of the month (1–28, so every month has one). */
+export const clampSetAsideDay = (day: number | null | undefined): number =>
+  Math.max(1, Math.min(28, Math.round(day ?? 1) || 1))
+
+/** The first set-aside date on or after today: `day` this month, else next month. */
+export const firstSetAsideDate = (today: Date, day: number): Date => {
+  const d = clampSetAsideDay(day)
+  const month = today.getDate() > d ? today.getMonth() + 1 : today.getMonth()
+  return new Date(today.getFullYear(), month, d)
+}
+
+/** One month of a goal's plan, on the calendar. */
+export type DatedSetAside = { date: string; amount: number }
+
+/**
+ * The engine's month-indexed schedule (index 0 = this month) placed on real dates: month `m`
+ * is set aside `m` months after the first set-aside date. Amounts pass through untouched.
+ */
+export const datedSchedule = (
+  schedule: ReadonlyArray<number>,
+  today: Date,
+  day: number,
+): DatedSetAside[] => {
+  const first = firstSetAsideDate(today, day)
+  return schedule.map((amount, m) => ({
+    date: ymd(
+      new Date(first.getFullYear(), first.getMonth() + m, first.getDate()),
+    ),
+    amount,
+  }))
 }
 
 /**

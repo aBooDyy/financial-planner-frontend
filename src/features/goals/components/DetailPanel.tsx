@@ -29,7 +29,12 @@ export function DetailPanel({
   useEffect(() => {
     if (!isDesktop) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      // A Radix layer (a dialog or menu opened from the panel) that dismissed itself on this
+      // Escape marks it handled; the panel stays.
+      if (e.key !== 'Escape' || e.defaultPrevented) return
+      if (e.target instanceof Element && e.target.closest('[role="dialog"]'))
+        return
+      onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
