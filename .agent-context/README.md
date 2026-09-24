@@ -17,8 +17,12 @@ root product [`.agent-context/`](../../.agent-context/). Keep
   client-side funding engine, and the shared chrome (`src/components/chrome/`).
 - [transactions.md](transactions.md) — the Spending feature: the ledger + budgets + recurring,
   the catalog-taking selectors, client-side derivation of wallet balances & goal contributions,
-  autopost, and transfers between wallets (two linked legs, the `transfer` outbox entity, the
+  settlement links to planned rows, and transfers between wallets (two linked legs, the `transfer` outbox entity, the
   collapsed activity row and its scope rules, exclusion from totals).
+- [planned.md](planned.md) — Planned transactions: the entity and its derived settled amount,
+  deterministic UUIDv5 ids, the generator and reconciler, the app-level planner (fill /
+  recalc + undo, auto-post), settlement mutations, the id-taken sync branch, the hooks the
+  Planned tab and goal detail read, and the Planned tab + confirm dialog components.
 - [categories.md](categories.md) — Categories: the two-level model, the synced tree and its
   Dexie/sync branch, `buildCatalog` and the `CategoryCatalog` every surface reads, the Settings
   list/editor, and the subtree-aware delete.

@@ -8,6 +8,12 @@ Query / server-cache layer** — see below.)
 
 - Accounts, transactions, categories, budgets, obligations — anything synced and persisted.
 - The **source of truth for the UI**. Read reactively (`useLiveQuery`).
+- When many components on one screen need the same large read *and* an expensive derivation
+  of it, share both instead of reading per component: a module-level store over Dexie
+  `liveQuery` (one query per table, opened by the first subscriber, closed by the last),
+  consumed with `useSyncExternalStore`, with the derivation memoised on the arrays' identity.
+  No provider, so it works in any tree and in tests. The planner's `usePlannedData` is the
+  example ([planned.md](planned.md)).
 - Never duplicate this into Zustand. Derive views from the DB query instead.
 - See [data-layer-and-sync.md](data-layer-and-sync.md).
 

@@ -15,6 +15,17 @@ whether the plan is feasible. Domain terms: root
   `src/db/sync.ts` dispatches them to `src/features/goals/data/sync.ts`
   (`pushGoalsEntry` / `pullGoalsAll`), which mirror the balances handlers (LWW, 409
   rebase-retry, 404 drop). `pullAll` and the push drain loop call into it.
+- Income streams carry an optional deposit `walletId` (where a planned payday confirms into)
+  and an optional `anchorDate` (a known payday, below), both always sent on PATCH.
+- **Paydays** (`data/paydays.ts`, pure): `paydaysOf(stream, from, to)` and
+  `nextPaydayOf(stream, today)` — the one source of payday dates for the income rows ("Paid
+  the 27th · next …" / "Next payday …"), the Upcoming card and the planner's generated paydays.
+  Monthly pays on `day` (clamped: 31st → Sep 30) and ignores any anchor. With an `anchorDate`,
+  weekly steps 7 days and quarterly / semi / annual step whole months from it in both
+  directions, each stepped month keeping the anchor's day (clamped, no drift). Without one
+  (streams saved before `0025`, or by an older client), weekly steps from `day` of Jan 2000 and
+  the longer cadences fall in the calendar months divisible by their length (Jan/Apr/Jul/Oct) —
+  both deterministic across devices.
 - **Optimistic mutations** (`src/features/goals/data/mutations.ts`): `createIncome`/
   `updateIncome`/`deleteIncome`, `createGoal`/`updateGoal`/`deleteGoal`, plus `setGoalDate`
   (inline date edit) and `swapGoalPositions(id, neighborId)` (priority swap — writes both
@@ -25,7 +36,7 @@ whether the plan is feasible. Domain terms: root
 ## The funding engine (the brains)
 
 - `src/features/goals/data/planning.ts` — pure, `today`-parameterized date math (parse/format
-  ISO dates, `setAsidesLeft`, `relUntil`, `nextPayday`, `nextDueDefault`) **plus the time-phased
+  ISO dates, `setAsidesLeft`, `relUntil`, `nextDueDefault`) **plus the time-phased
   funding simulation `simulatePlan`** (see below).
 - **Time-phased funding (`simulatePlan`).** The plan is **not** a flat "remaining ÷ months,
   fund top-down by `position`" snapshot anymore. `selectors.ts` translates each active goal into
@@ -97,10 +108,48 @@ whether the plan is feasible. Domain terms: root
   `api/types.ts` (`toWireKind`/`toWireFreq` etc.); `constants.ts` holds `FREQUENCIES`, `KINDS`,
   `GOAL_COLORS`, and fixed `STATUS_COLORS`.
 
+## Progress: set-asides vs payments (`data/progress.ts`)
+
+A goal is raised two ways: **set-asides** (allocations — the money stays in its wallet, marked
+for the goal) and **payments** (goal-linked `spend` transactions — the money leaves). Paying for
+the goal **consumes** what was set aside for it, so they never add up (ADR-3, 05 §3):
+`progress = max(reserved, spent)`, `stillReserved = max(0, reserved − spent)`. `goalProgress(goals,
+allocations, txns, rates, today, planned)` returns both per goal, plus `stillReserved` per wallet
+(a payment releases its own wallet's reservation first, then the others' largest first) and held
+externally. **Recurring obligations apply it per cycle**: a reservation funds the first due date
+strictly after it, a payment pays the first due on or after it (or its planned row's occurrence
+when linked, so a late payment still pays the cycle it was due in); progress is the current
+cycle's. `useGoals` passes `progressByGoal(...)` to `buildGoalsView` as the settled progress
+beyond the stored `saved` baseline. **This replaced `saved + allocations + contributions`**,
+which double-counted "saved then paid" and let a rent goal's saved grow forever;
+`buildGoalsView`'s trailing `allocations` argument is gone.
+
+## The live plan, dated (`planGoals`, `datedSchedule`)
+
+`planGoals(income, goals, base, rates, today, progress)` in `selectors.ts` is the engine run
+`buildGoalsView` itself uses (entries of goal + track + plan + status, completed goals,
+monthly income) — exported so the planner (`features/planned/`) reads the same plan.
+`datedSchedule(schedule, today, day)` in `planning.ts` puts a schedule on the calendar: month
+*m* falls *m* months after the first `setAsideDay` (1–28, default 1) on or after today. The
+algorithm is unchanged.
+
+## The stored plan
+
+Goals carry the stored plan's header — `plannedAt`, `planAmount`, `planCount`, `planStart` —
+plus two planning knobs, `setAsideDay` and `payOnDue` (one-time obligations: also plan the final
+payment). The planner writes the header (`setGoalPlanSnapshot`); a goal created or pulled
+without one gets its first plan silently. `updateGoal` / `setGoalDate` compare before/after
+(`changesPlan`: currency, amount, target, saved, frequency, next due, due date, set-aside day,
+pay-on-due) and on a change file a rewrite request (`planned/data/recalcRequests`) — the plan
+follows the edit, with an undo. The rows themselves are planned transactions: see
+[planned.md](planned.md). All these fields are sent on every goal PATCH (full representation).
+
 ## Sourced allocations (the "Set aside from…" sources)
 
-A goal's saved progress is the sum of **allocations** — sourced reserves — folded in alongside
-goal-linked transaction contributions (the legacy scalar `saved` stays as a zeroable baseline).
+A goal's saved progress comes from **allocations** — sourced reserves — and goal-linked
+payments, by the rule above (the legacy scalar `saved` stays as a zeroable baseline). Each
+allocation is **dated** (`date`, defaulting to today) and may settle a planned set-aside
+(`plannedId`); both are always sent on PATCH.
 Each allocation reserves money from a **wallet** (earmarked in place — the wallet keeps the
 money but shows it as reserved) or names an **external** source (a gift, someone's help) by
 free-text label.
@@ -112,14 +161,16 @@ free-text label.
   Wire types/mappers in `api/types.ts` + `data/mappers.ts`; client `api/allocationsApi.ts`;
   mutations `createAllocation`/`updateAllocation`/`deleteAllocation` in `data/mutations.ts`.
 - **`data/reservations.ts`** — the cross-feature derivation (sibling of `transactions/data/
-ledger.ts`): `allocationsByGoal(allocations, goals, rates)` (goal-currency totals fed to
-  `buildGoalsView`'s trailing `allocations` arg) and `walletReservations(allocations, goals,
-nodes, rates)` → per-wallet reserve lines (wallet currency) consumed by the Balances view.
-- **Editor**: `useGoalEditor(base, nodes, allAllocations)` carries an `allocations` row list in
-  its draft and, on save, **diffs** rows against stored allocations to create/update/delete them
-  (goal id resolved after create). `GoalEditor` renders the rows (amount + wallet/External picker
-  via balances `walletGroupOptions`; label field for external) in place of the old scalar
-  "Already set aside" input. `useGoals` now also returns `nodes` + `allocations` for the editor.
+ledger.ts`): `walletReservations(allocations, goals, nodes, rates, txns?, today?, planned?)` →
+  per-wallet pot lines (one per goal, wallet currency) of what is **still** reserved after goal
+  payments consumed their share — the Balances view's reserved/available. Without the ledger
+  every reservation counts. `allocationsByGoal` (raw totals) and `reservedByWallet` (raw, for
+  the editor's over-reserve warning) remain.
+- **No allocation editor anymore.** The goal editor's "Set aside (optional)" rows (and their
+  over-reserve warning) were replaced by the goal detail's **contributions list** (below): a
+  reservation is now added with "+ Add contribution" or by confirming a planned set-aside, and
+  taken back from its row ("Take it back" → `deleteAllocation`, which re-opens a planned item it
+  settled). `reservedByWallet` stays exported but has no UI caller.
 
 ## UI & wiring
 
@@ -163,12 +214,51 @@ nodes, rates)` → per-wallet reserve lines (wallet currency) consumed by the Ba
   top-down engine; with time-phased funding a queued goal isn't short, hence three. Rows
   (`GoalRow` on the shared `ListRow`: colour spine, name, `rowMeta` caption tinted when not
   green, saved-progress bar ≥900px, monthly rate) carry **no buttons** — selecting opens the item.
-- **Detail panel** (`DetailPanel` + `GoalEditor`): the editor is no longer a modal. Desktop ≥1120px
-  it's a docked 330px right rail; 768–1119px it overlays the list from the end edge; mobile it's
-  the `ResponsiveDialog` bottom sheet. Esc closes on desktop. It holds every field (kind chips
-  only when creating), sourced allocations (`AllocationRow`), `PriorityControl` (rank of all
-  active goals, Move up/down via `swapGoalPositions` with the active-plan neighbour) and the
-  goal's `GoalSchedule`. Inline date edit on cards is gone — the date lives in the panel.
+- **Detail panel** (`DetailPanel`): desktop ≥1120px a docked 330px right rail; 768–1119px it
+  overlays the list from the end edge; mobile the `ResponsiveDialog` bottom sheet. Esc closes it
+  on desktop — unless a Radix layer opened from it (a dialog, a select) already handled that
+  Escape (`defaultPrevented`). Selecting a goal opens its **read view** (`GoalDetailPanel`,
+  below); **Edit** swaps in `GoalEditor`, whose close returns to the read view; saving a goal
+  (new or edited) lands on its read view. Income rows open the editor directly.
+  `useGoalDetail` holds which goal is open and drops that goal's recalc undo when the panel
+  closes or moves to another goal (04 §5).
+- **Goal editor** (`GoalEditor` + `useGoalEditor(base)`): every field (kind chips only when
+  creating), `PayOnDueField` (one-time: also plan the payment on the due date → `payOnDue`),
+  `SetAsideDayField` (day 1–28 set-asides fall on; blank = the 1st; hidden for monthly/weekly
+  bills, which have no set-asides), `PriorityControl` and `GoalSchedule`. Income streams get
+  `DepositWalletField` ("Deposits into" → `walletId`) and `IncomePaydayField`: monthly asks for
+  the day of the month; any other cadence asks for the **Next payday** (a date, defaulting to
+  the stream's next computed payday). `incomeScheduleOf` (in `useGoalEditor`) saves monthly as
+  `day` + `anchorDate: null`, and anything else as `anchorDate` = the picked date (else the
+  stored anchor, else the shown default) with `day` = its day of the month. `save()` resolves with the goal id.
+  Inline date edit on cards is gone — the date lives in the panel.
+- **Goal read view (1a)** — `components/detail/`. `GoalDetailPanel` (container: `useGoalPlan`,
+  dialog state) renders `GoalProgress` (percent; two-segment bar in the goal's colour: solid =
+  settled, striped = due and still open; "SR 4,000 saved · SR 1,500 awaiting confirm" / "SR
+  9,000 left"), `PlanBox` (`PlanCellView` × 2: "Saved plan · Jun 12" vs "From today", or
+  "Previous plan" vs the new one, accent-tinted, right after a rewrite) with `PlanBand`
+  (behind: "Recalculate to X" + "Confirm <Mon>" → `ConfirmPlannedDialog` for the oldest due
+  item; updated: "Plan updated … · Undo"; ahead; the quiet "Plan is X/mo off … · Recalculate"
+  line), and `ContributionsList` (`ContributionRow` + `ContributionMark`: solid goal colour =
+  confirmed, hollow amber = needs confirming, hollow grey = planned; equal future runs
+  collapsed; older confirmed rows beyond the latest 5 behind "Show N earlier"; tap a planned row
+  → confirm dialog, tap a set-aside → "Take it back"). All strings come from the pure
+  `data/goalDetail.ts` (`buildGoalDetail`, tested on the design's worked example). A bill
+  (`recurring`) reads by its current cycle: "Obligation · SR 3,500 due Oct 1", "paid this cycle",
+  its payment as the plan headline ("paid when due"). The add / confirm dialogs render **inside**
+  the panel's children so on mobile they nest in its sheet.
+- **Add contribution (1b)** — `AddContributionDialog` (+ `ContributionModeSwitch`,
+  `ContributionFields`, `useContributionForm`): Paid now | Plan for later, amount in the goal's
+  currency, From (wallets; "External…" for a saving goal paid now; "Decide later" for a later
+  one), date (now: today; later: the next planned date, else a month out). Hint + CTA from the
+  pure `data/contribution.ts`; when a due item exists, paid-now says it settles it. Calls
+  `useGoalPlan().addContribution`. Remounted per opening (a `key`) so it starts clean.
+- **Summary → `RecalcAllCard`** (container over `useRecalcAll`): shown while any goal is off its
+  saved plan; "Recalculate all", then "N plans updated · Undo" (undoes each result).
+- **List rows** carry a small amber "N to confirm" pill (`useGoals().dueByGoal`, from
+  `dueCountByGoal`: open planned rows of that goal dated today or earlier).
+- **`/goals?goal=<id>`** (route `validateSearch`) opens that goal's read view once, then the
+  param is dropped (replace). Balances pots link here.
 - **Income** (`IncomeSection`/`IncomeRow`) and **Timeline** (`TimelineSection` = `TimelineCard` +
   `MonthlyPlanCard`) reuse the same section header and row patterns.
 - Route `/goals` (guarded like `/balances`). Base currency is the shared `balanceSettings`

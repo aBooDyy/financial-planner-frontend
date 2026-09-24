@@ -181,6 +181,10 @@ guarantees a value — which is what lets non-React code read it. Two consumers 
   "n of 10", and `integrationPayloadMaxBytes` refuses an oversized sample payload before it is
   sent to the rule tester. `useIntegrationsConfig()` gives the endpoint card
   `webhookUrl ?? apiOriginUrl(webhookPath)` (the origin the app reaches the API on).
+- **The outbox** batches ledger creates/deletes by `transactionBulkMax` and planned creates by
+  `plannedBulkMax` ([planned.md](planned.md)). `plannedMax` (rows one user may hold) is
+  published for completeness; nothing enforces it client-side yet. Both are optional on the
+  wire, so an older server falls back to the bundled floor.
 
 The one cap that is **not** published is the import template's 64 KiB `config` limit: it is
 hard-coded on both sides (`MAX_CONFIG_BYTES` here, `import_template_rules.py` there) and the

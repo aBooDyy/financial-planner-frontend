@@ -60,7 +60,10 @@ walletDeltas?, reservations?)` builds the flattened tree (honoring collapse), gr
   lines from goals' `walletReservations` — see [goals.md](goals.md)), splits each wallet into
   `reserved`/`available`, with a per-goal `reservations[]` breakdown; groups roll the figures up
   in base currency, and the view exposes `reservedTotal` + `availableTotalStr`. `useBalances`
-  reads `goals` + `goalAllocations` to build the reserves. Wallet money is **earmarked in
+  reads `goals`, `goalAllocations`, the ledger and planned rows to build them: a line is what a
+  goal **still** holds in that wallet after its payments consumed their share (ADR-3 — saved
+  13,000 then paid 13,000 leaves nothing reserved; the payment releases its own wallet first,
+  then the largest pot), one line per goal per wallet. Wallet money is **earmarked in
   place** — the balance and grand total are unchanged; reserving only reclassifies part of a
   wallet as spoken-for. **Over-reserving is allowed**: reserved is _not_ capped at the balance,
   so `available` can go **negative** and the row carries `overReserved` (rendered red). The goal
@@ -92,10 +95,17 @@ walletDeltas?, reservations?)` builds the flattened tree (honoring collapse), gr
   trash button clips. The chip costs horizontal room the row never had; `min-w-0 truncate` on
   the group name fixed clipping from 375px up, and the row overflowed by ~54px _before_ the
   chip, so this is an improvement, not a regression. Fixing it properly means shrinking the
-  chip or the action cluster — a design decision. A wallet with reserves shows
-  an `available · reserved` toggle line and **expands** (collapse state is local to
-  `WalletsGroupsCard`, not synced) to list its per-goal reserve breakdown; `TotalHeroCard` shows
-  the overall available/reserved split when anything is reserved. `ExchangeRatesCard` exists
+  chip or the action cluster — a design decision. **Pots (05 §6, ADR-3).** A wallet
+  holding goal money leads with **available** as its headline (red, captioned "over-reserved",
+  when negative), a secondary "SR 10,000 in bank" line under its name, and its **pot rows shown
+  by default** underneath (`PotRow`: goal colour swatch, name, amount, chevron — no expand
+  state). Its text is `ReservedWalletLines`: two paired lines (name | available, then
+  in-bank | caption) instead of two columns, so the in-bank figure gets the width the short
+  caption leaves, not what the headline amount leaves. Figures are `whitespace-nowrap` and
+  `shrink-0`; a line that still runs out of room wraps (the caption or the "≈ base" part drops
+  to the next line); **only the name truncates** — at 320px included. Tapping a pot navigates to `/goals?goal=<id>`, which opens that goal's read view. A
+  wallet with nothing reserved looks exactly as before. `TotalHeroCard` still shows the overall
+  available / "reserved for goals" split when anything is reserved. `ExchangeRatesCard` exists
   but is **not** mounted on the page (FX editing belongs to Settings). `BaselineTeaserCard`
   reads `useGoals().view.savedGoalsPct` — it shows real saved-toward-target progress once a
   goal with a target exists, and just the message (no bar) otherwise.

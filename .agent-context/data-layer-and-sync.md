@@ -100,6 +100,12 @@ that — from then on the next change is `version(2)` carrying a real `.upgrade(
     Grouping by entity alone would let a row's delete reach the server before the create it
     refers to, which answers `NOT_FOUND` and leaves the row standing forever. A test pins the
     split (`[create, create, delete, delete]` → runs of 2 and 2).
+  - **`planned` creates batch the same way** (`POST /planned-transactions/bulk`, capped at
+    `limits.planned_bulk_max`): the planner's first pass over an account writes dozens. The
+    batchable kinds are one table, `BULK_KINDS` in `db/sync.ts` — entity, op, batch size, push —
+    and a run never spans two kinds. A planned create answered `ID_TAKEN` is benign (another
+    device generated the same occurrence under the same deterministic id) — see
+    [planned.md](planned.md#sync-datasyncts).
   - The run is capped at the server's own `limits.transaction_bulk_max` from `GET /config`, so
     neither side holds its own copy of the number. `flushOutbox()` is the awaitable form;
     `schedulePush()` is the debounced one.
@@ -138,7 +144,7 @@ that — from then on the next change is `version(2)` carrying a real `.upgrade(
   - Network error → keep in outbox, retry with backoff.
 - **Pull**: `pullAll()` fans out to eight collection pulls in one `Promise.all`, single-flight
   and best-effort (a failed pull just retries on the next trigger). Each upserts into its local table, **unless** the local record
-  is `dirty` (then it's a conflict). Four of the streams read a delta and the rest read the full
+  is `dirty` (then it's a conflict). Five of the streams read a delta and the rest read the full
   list — see [Incremental pull](#incremental-pull-the-delta-streams) for which, and
   why it is not all of them.
 - **Cadence (locked):**
@@ -155,6 +161,14 @@ that — from then on the next change is `version(2)` carrying a real `.upgrade(
     collection each time it happens.
   - Push and pull are independent loops; a local write triggers a push, not a pull.
 - Coalesce/debounce; never run overlapping syncs; single-flight each loop.
+
+### The planner's gate (`db/pullState.ts`)
+
+`pullAll` wraps the pulls the planner generates from — goals, spending, planned rows — in one
+`Promise.all` and, when all three came home, bumps `plannerInputsPulled` in a small Zustand
+store. `usePlannedRunner` does nothing until it is non-zero, so a fresh device never generates
+rows the server already holds (harmless with deterministic ids, but noise), and re-runs after
+every successful pull. `clearLocalDb` resets it.
 
 ### Where sync is started
 
@@ -185,6 +199,7 @@ collections that grow read a delta instead, resuming from a watermark held in th
 | `/merchants/changes`        | `merchant`      | `pullMerchantsAll` → `pullAll`                                       |
 | `/merchant-aliases/changes` | `merchantAlias` | `pullMerchantsAll` → `pullAll`                                       |
 | `/inbound-imports/changes`  | `inboundImport` | `pullInboundImportsDelta` → `pullAll`, `runEmailSync()`, review open |
+| `/planned-transactions/changes` | `planned`   | `pullPlannedDelta` → `pullAll` |
 
 **Everything else stays on the full list, deliberately.** Balance nodes, balance settings,
 exchange rates, categories, custom currencies, income streams, goals, goal allocations,
@@ -300,9 +315,10 @@ deliver, `full_resync_required` running the full pull first, a watermark dying w
   retry that still `401`s does not sign out either; it just propagates.) The refresh failure
   deliberately replaces the caller's `401` with its own — usually `common.network` — which the
   sync engine already reads as "keep the outbox and back off".
-- `clearLocalDb()` empties all 18 user tables, `syncState` among them, and **keeps `appConfig`**:
+- `clearLocalDb()` empties all 19 user tables, `syncState` among them, and **keeps `appConfig`**:
   it holds no user data, and keeping it means the next sign-in already knows the currency table
-  offline. It also bumps `localDbGeneration()` first: a server-owned cache whose pull was already
+  offline. It also resets the pull state (so the planner waits for the next user's first pull)
+  and bumps `localDbGeneration()` first: a server-owned cache whose pull was already
   in flight at sign-out (integration keys, the inbound-import queue) compares the generation
   inside its write transaction and drops the stale answer instead of refilling the wiped table.
 
@@ -379,8 +395,8 @@ per-row mutations without leaving the pattern (`features/import/data/commit.ts`)
   creates), yielding to the event loop between chunks so a 10 000-row import stays responsive.
 - **One `schedulePush()` at the end** — never one per chunk, or an import becomes hundreds of
   debounce timers.
-- Every imported row carries `source = 'csv:<batchId>'`, the same convention as the
-  auto-poster's `recurring:<id>:<date>` and the email path's `email:<connection_id>`. Dexie
+- Every imported row carries `source = 'csv:<batchId>'`, the same convention as an
+  auto-posted schedule's `recurring:<id>:<date>` and the email path's `email:<connection_id>`. Dexie
   indexes `source`, which is what makes an import findable — and undoable — as a unit.
 - `importBatches` is **local-only** (no outbox, no server table): the durable fact is the
   marker on the transactions, which _is_ synced, so an import committed on one device can be
