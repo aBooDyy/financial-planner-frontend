@@ -25,6 +25,20 @@ const MESSAGES: Record<string, string> = {
   'spending.transaction.date_invalid': 'Enter a valid date.',
   'spending.transaction.category_required': 'Pick a category.',
   'spending.transaction.merchant_invalid': 'Choose one of your merchants.',
+  'spending.transaction.planned_invalid':
+    'That planned item is no longer available.',
+  'goals.allocation.planned_invalid':
+    'That planned set-aside is no longer available.',
+  // Minted by the planned slice (`PlannedActionError`), and the server's own planned codes.
+  'planned.not_found': 'That planned item is no longer available.',
+  'planned.not_open': 'That planned item is already confirmed or skipped.',
+  'planned.no_wallet': 'Choose the account it comes from or goes into.',
+  'planned.bad_amount': 'Enter an amount above zero.',
+  'planned.has_settlements':
+    'Something is already confirmed against it — close the rest instead.',
+  'planned.not_manual':
+    'Planned items from a goal can be skipped, not deleted.',
+  'planned.origin_gone': 'The goal this belonged to has been deleted.',
   'merchants.not_found': 'That merchant is no longer available.',
   'merchants.name_required': 'Give the merchant a name.',
   'merchants.alias.taken': 'Another merchant already answers to that spelling.',
@@ -79,7 +93,8 @@ const MESSAGES: Record<string, string> = {
   'integrations.auth.revoked': 'That integration key was revoked.',
   'integrations.payload.invalid': 'The request body isn’t valid JSON.',
   'integrations.payload.too_large': 'The request body is too large.',
-  'integrations.rate.limited': 'Too many requests. Wait a moment and try again.',
+  'integrations.rate.limited':
+    'Too many requests. Wait a moment and try again.',
   'import.file.empty': 'That file has no rows in it.',
   'import.file.too_large': 'That file is too big. Split it by date range.',
   'import.file.too_many_rows':

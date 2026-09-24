@@ -7,6 +7,7 @@ import { useSync } from '#/db/useSync'
 import { useSessionBootstrap } from '#/features/auth/hooks/useSessionBootstrap'
 import { useEmailSyncBootstrap } from '#/features/email-sync/hooks/useEmailSyncBootstrap'
 import { PayloadViewContext } from '#/features/inbound-imports/components/payloadView'
+import { usePlannedRunner } from '#/features/planned'
 import { ReviewPayloadTree } from '#/features/integrations/components/ReviewPayloadTree'
 import { useAppConfig } from '#/lib/config/useAppConfig'
 import { loadIconPaths } from '#/lib/icons/paths'
@@ -22,6 +23,7 @@ function RootLayout() {
   useAppConfig()
   useCustomCurrencies()
   useSync()
+  usePlannedRunner()
   useEmailSyncBootstrap()
 
   // Radix portals its menus outside the app subtree and falls back to `ltr` unless a
