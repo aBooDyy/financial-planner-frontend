@@ -24,6 +24,8 @@ type ConfigLimitsWire = {
   integration_keys_max: number
   integration_rules_max: number
   integration_payload_max_bytes: number
+  planned_bulk_max?: number
+  planned_max?: number
 }
 
 export type ConfigWire = {
@@ -71,6 +73,10 @@ export const toAppConfig = (w: ConfigWire): AppConfig => {
       integrationKeysMax: w.limits.integration_keys_max,
       integrationRulesMax: w.limits.integration_rules_max,
       integrationPayloadMaxBytes: w.limits.integration_payload_max_bytes,
+      // Older servers do not publish these; the bundled floor stands in.
+      plannedBulkMax:
+        w.limits.planned_bulk_max ?? BUNDLED_CONFIG.limits.plannedBulkMax,
+      plannedMax: w.limits.planned_max ?? BUNDLED_CONFIG.limits.plannedMax,
     },
     integrations: w.integrations
       ? {

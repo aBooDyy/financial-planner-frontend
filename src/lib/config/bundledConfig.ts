@@ -352,6 +352,8 @@ export const BUNDLED_CONFIG: AppConfig = {
     integrationKeysMax: 20,
     integrationRulesMax: 10,
     integrationPayloadMaxBytes: 65536,
+    plannedBulkMax: 200,
+    plannedMax: 5000,
   },
   integrations: {
     webhookUrl: null,

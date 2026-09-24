@@ -38,6 +38,10 @@ export type ConfigLimits = {
   integrationRulesMax: number
   /** The largest body the webhook endpoint (and the rule tester) accepts, in bytes. */
   integrationPayloadMaxBytes: number
+  /** How many planned rows one `POST /planned-transactions/bulk` may carry. */
+  plannedBulkMax: number
+  /** How many planned rows one user may hold. */
+  plannedMax: number
 }
 
 /** Where integrations post. `webhookUrl` is set only when the deployment names its public origin. */

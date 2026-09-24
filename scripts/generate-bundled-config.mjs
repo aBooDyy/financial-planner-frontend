@@ -25,6 +25,8 @@ const LIMIT_KEYS = [
   ['integration_keys_max', 'integrationKeysMax'],
   ['integration_rules_max', 'integrationRulesMax'],
   ['integration_payload_max_bytes', 'integrationPayloadMaxBytes'],
+  ['planned_bulk_max', 'plannedBulkMax'],
+  ['planned_max', 'plannedMax'],
 ]
 
 const MIN_CURRENCIES = 100
