@@ -1,3 +1,4 @@
+import { useNavigate } from '@tanstack/react-router'
 import { useLogout } from '#/features/auth/hooks/useLogout'
 import { usePreferencesStore } from '#/stores/preferences'
 import { useSessionStore } from '#/stores/session'
@@ -29,6 +30,7 @@ export function BalancesPage() {
   const wallets = transferWallets(nodes, deltas, base)
   const transfer = useTransferDialog(wallets, rates)
   const onTransfer = wallets.length >= 2 ? transfer.openDialog : undefined
+  const navigate = useNavigate()
 
   if (!user) return null
 
@@ -60,6 +62,9 @@ export function BalancesPage() {
               onEdit={openEdit}
               onDelete={(id) => void deleteNode(id)}
               onAddInside={(id) => editor.openAdd('wallet', id)}
+              onOpenGoal={(goalId) =>
+                void navigate({ to: '/goals', search: { goal: goalId } })
+              }
             />
           </div>
 

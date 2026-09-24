@@ -9,6 +9,7 @@ import {
 } from '#/features/balances/data/selectors'
 import { walletDeltas } from '#/features/transactions/data/ledger'
 import { walletReservations } from '#/features/goals/data/reservations'
+import { startOfToday } from '#/features/goals/data/planning'
 import { useMergedRates } from '#/lib/config/rates'
 import type { RatesMap } from '#/lib/config/rates'
 import type { CurrencyCode } from '#/lib/currency'
@@ -24,6 +25,7 @@ export function useBalances() {
   const txnRows = useLiveQuery(() => db.transactions.toArray())
   const goalRows = useLiveQuery(() => db.goals.toArray())
   const allocationRows = useLiveQuery(() => db.goalAllocations.toArray())
+  const plannedRows = useLiveQuery(() => db.plannedTransactions.toArray())
 
   const loading = nodes === undefined || rateRows === undefined
   const base: CurrencyCode = settings?.baseCurrency ?? DEFAULT_BASE_CURRENCY
@@ -35,13 +37,16 @@ export function useBalances() {
   )
   // Transactions are the ledger: fold their signed deltas into wallet balances.
   const deltas = walletDeltas(liveNodes, txnRows ?? [], rates)
-  // Goal allocations earmark part of each wallet: split into reserved vs available.
+  // Goal set-asides earmark part of each wallet — until a goal payment consumes them.
   const liveGoals = (goalRows ?? []).filter((g) => g.deleted === 0)
   const reservations = walletReservations(
     allocationRows ?? [],
     liveGoals,
     liveNodes,
     rates,
+    txnRows ?? [],
+    startOfToday(),
+    plannedRows ?? [],
   )
   const view = buildBalancesView(liveNodes, base, rates, deltas, reservations)
   const held = heldCurrencies(base, [

@@ -1,5 +1,4 @@
 import { Plus } from 'lucide-react'
-import { useState } from 'react'
 import { TransferGlyph } from '#/components/icons/TransferGlyph'
 import { Button } from '#/components/ui/button'
 import type { BalanceRow } from '#/features/balances/data/selectors'
@@ -16,6 +15,7 @@ type Props = {
   onEdit: (id: string) => void
   onDelete: (id: string) => void
   onAddInside: (id: string) => void
+  onOpenGoal: (goalId: string) => void
 }
 
 export function WalletsGroupsCard({
@@ -27,17 +27,8 @@ export function WalletsGroupsCard({
   onEdit,
   onDelete,
   onAddInside,
+  onOpenGoal,
 }: Props) {
-  // Which wallets have their reservation breakdown expanded (UI-only, not persisted).
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  const toggleReservations = (id: string) =>
-    setExpanded((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-
   return (
     <div className="overflow-hidden rounded-[18px] border border-fp-border bg-fp-surface shadow-fp">
       <div className="flex flex-col items-stretch gap-[10px] border-b border-fp-border p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -102,10 +93,9 @@ export function WalletsGroupsCard({
               <WalletRow
                 key={row.id}
                 row={row}
-                expanded={expanded.has(row.id)}
-                onToggleReservations={toggleReservations}
                 onEdit={onEdit}
                 onDelete={onDelete}
+                onOpenGoal={onOpenGoal}
               />
             ),
           )}
