@@ -20,6 +20,7 @@ export function useTransactions() {
   const recurringRows = useLiveQuery(() => db.recurrings.toArray())
   const nodeRows = useLiveQuery(() => db.balanceNodes.toArray())
   const goalRows = useLiveQuery(() => db.goals.toArray())
+  const allocationRows = useLiveQuery(() => db.goalAllocations.toArray())
   const settings = useLiveQuery(() => db.balanceSettings.get(SETTINGS_KEY))
   const rateRows = useLiveQuery(() => db.exchangeRates.toArray())
   const catalog = useCategoryCatalog()
@@ -50,6 +51,8 @@ export function useTransactions() {
     nodes,
     base,
     rates,
+    allocations: allocationRows ?? [],
+    goals,
   }
 
   return { loading, base, data, catalog, wallets, goals, transactions }

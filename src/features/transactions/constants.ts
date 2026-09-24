@@ -15,8 +15,5 @@ export const BUDGET_PERIODS: Record<BudgetPeriod, { label: string }> = {
 
 export const AT_RISK_RATIO = 0.8
 
-// The category slug goal contributions are filed under.
-export const SAVINGS_CATEGORY_ID = 'savings'
-
 // Colors a transaction view falls back to for chart segments without a category color.
 export const NEUTRAL_BORDER = 'var(--border-strong)'
