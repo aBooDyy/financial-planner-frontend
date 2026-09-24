@@ -32,6 +32,7 @@ describe('the local database', () => {
       'merchantAliases',
       'merchants',
       'outbox',
+      'plannedTransactions',
       'recurrings',
       'syncState',
       'transactions',
@@ -54,6 +55,7 @@ describe('the local database', () => {
       note: null,
       source: 'csv:batch-1',
       transferId: null,
+      plannedId: null,
       createdAt: '2026-05-01T09:00:00.000Z',
       updatedAt: '2026-05-01T09:00:00.000Z',
       version: 'v1',
@@ -81,5 +83,55 @@ describe('the local database', () => {
     await clearLocalDb()
 
     expect(await db.syncState.count()).toBe(0)
+  })
+
+  it('finds a planned item’s settlements by `plannedId` on both settlement tables', async () => {
+    const { db } = await import('./db')
+    const { settlementsOf } = await import('#/features/planned/data/rows')
+    await db.transactions.put({
+      id: 'tx-p',
+      type: 'spend',
+      amount: 100,
+      currency: 'SAR',
+      category: 'housing',
+      subcategory: null,
+      walletId: 'w1',
+      goalId: null,
+      merchantId: null,
+      date: '2026-09-01',
+      note: null,
+      source: null,
+      transferId: null,
+      plannedId: 'p-1',
+      createdAt: '',
+      updatedAt: '',
+      version: 'v1',
+      dirty: 0,
+      deleted: 0,
+    })
+    await db.goalAllocations.put({
+      id: 'a-p',
+      goalId: 'g1',
+      source: 'external',
+      walletId: null,
+      externalLabel: 'Dad',
+      amount: 50,
+      currency: 'SAR',
+      note: null,
+      position: 0,
+      date: '2026-09-01',
+      plannedId: 'p-1',
+      createdAt: '',
+      updatedAt: '',
+      version: 'v1',
+      dirty: 0,
+      deleted: 0,
+    })
+
+    const found = await settlementsOf(['p-1'])
+
+    expect(found.txns.map((t) => t.id)).toEqual(['tx-p'])
+    expect(found.allocations.map((a) => a.id)).toEqual(['a-p'])
+    await Promise.all([db.transactions.clear(), db.goalAllocations.clear()])
   })
 })

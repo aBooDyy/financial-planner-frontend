@@ -65,6 +65,11 @@ vi.mock('#/features/transactions/data/sync', () => ({
   pushSpendingEntry: track('push:spending'),
   pushTransactionCreates: track('push:txCreates'),
 }))
+vi.mock('#/features/planned/data/sync', () => ({
+  pullPlannedDelta: track('planned'),
+  pushPlannedEntry: track('push:planned'),
+  pushPlannedCreates: track('push:plannedCreates'),
+}))
 
 /**
  * Let a pull finish. The mocked endpoints resolve at once, but the Dexie writes behind them
@@ -87,6 +92,7 @@ const collections = [
   'merchants',
   'importTemplates',
   'spending',
+  'planned',
   'inboundImports',
 ]
 
@@ -158,6 +164,17 @@ describe('startSync', () => {
     await settle()
 
     expect(pulls.filter((p) => p === 'nodes')).toHaveLength(1)
+    stop()
+  })
+
+  it('counts a pull of the planner’s inputs only once they are all home', async () => {
+    const { usePullStateStore } = await import('./pullState')
+    const before = usePullStateStore.getState().plannerInputsPulled
+    const { startSync } = await import('./sync')
+    const stop = startSync()
+    await settle()
+
+    expect(usePullStateStore.getState().plannerInputsPulled).toBe(before + 1)
     stop()
   })
 })

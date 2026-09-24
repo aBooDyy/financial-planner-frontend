@@ -33,11 +33,17 @@ import {
   pushTransactionDeletes,
 } from '#/features/transactions/data/sync'
 import { pushTransferEntry } from '#/features/transactions/data/transferSync'
+import {
+  pullPlannedDelta,
+  pushPlannedCreates,
+  pushPlannedEntry,
+} from '#/features/planned/data/sync'
 import { configLimits } from '#/lib/config/appConfig'
 import { ApiError } from '#/lib/apiError'
 import { db } from './db'
+import { notePlannerInputsPulled } from './pullState'
 import { SETTINGS_KEY } from './types'
-import type { OutboxEntry } from './types'
+import type { OutboxEntity, OutboxEntry, OutboxOp } from './types'
 
 const PUSH_DEBOUNCE_MS = 800
 const SAFETY_FLUSH_MS = 30_000
@@ -55,20 +61,46 @@ const VISIBILITY_PULL_MIN_MS = 60_000
  * `POST /transactions/bulk-delete`. A CSV import queues one create per row and undoing it
  * queues one delete per row, and a queue drained a round trip at a time turns a
  * three-second commit into minutes of syncing — a measured 2 608-row undo spent ~75 s in
- * continuous HTTP.
+ * continuous HTTP. `planned` creates go out as `POST /planned-transactions/bulk` for the same
+ * reason: the planner's first pass over an account writes dozens at once.
  *
- * Only these two are batched, and only within one op. Transactions reference wallets,
- * categories and merchants queued *before* them and never each other, so a batch cannot
- * race its own prerequisite — which a batch of `node` creates (child before parent) could.
- * Splitting the run at every change of op is what keeps a create and the delete that
- * follows it on the same row in their queued order. How many rows one batch carries is the
- * server's own cap, published through `GET /config`.
+ * Only these are batched, and only within one entity and op. Neither kind references another
+ * row of its own run — ledger rows point at wallets, categories and merchants queued *before*
+ * them, planned rows at goals, streams and schedules — so a batch cannot race its own
+ * prerequisite, which a batch of `node` creates (child before parent) could. Splitting the
+ * run at every change of op is what keeps a create and the delete that follows it on the same
+ * row in their queued order. How many rows one batch carries is the server's own cap.
  */
-const BULK_ENTITY = 'transaction'
+type BulkKind = {
+  entity: OutboxEntity
+  op: OutboxOp
+  batchSize: () => number
+  push: (batch: ReadonlyArray<OutboxEntry>) => Promise<void>
+}
 
-const isBulkable = (entry: OutboxEntry): boolean =>
-  entry.entity === BULK_ENTITY &&
-  (entry.op === 'create' || entry.op === 'delete')
+const BULK_KINDS: ReadonlyArray<BulkKind> = [
+  {
+    entity: 'transaction',
+    op: 'create',
+    batchSize: () => configLimits().transactionBulkMax,
+    push: (batch) => pushTransactionCreates(batch),
+  },
+  {
+    entity: 'transaction',
+    op: 'delete',
+    batchSize: () => configLimits().transactionBulkMax,
+    push: (batch) => pushTransactionDeletes(batch),
+  },
+  {
+    entity: 'planned',
+    op: 'create',
+    batchSize: () => configLimits().plannedBulkMax,
+    push: (batch) => pushPlannedCreates(batch),
+  },
+]
+
+const bulkKindOf = (entry: OutboxEntry): BulkKind | undefined =>
+  BULK_KINDS.find((k) => k.entity === entry.entity && k.op === entry.op)
 
 /**
  * How many batches are in flight at once. Batching alone left the client waiting out a
@@ -141,14 +173,10 @@ export function bulkRunLength(
   page: ReadonlyArray<OutboxEntry>,
   at: number,
 ): number {
-  const head = page[at]
-  if (!isBulkable(head)) return 1
+  const kind = bulkKindOf(page[at])
+  if (!kind) return 1
   let run = 1
-  while (
-    at + run < page.length &&
-    page[at + run].op === head.op &&
-    isBulkable(page[at + run])
-  ) {
+  while (at + run < page.length && bulkKindOf(page[at + run]) === kind) {
     run += 1
   }
   return run
@@ -172,11 +200,14 @@ async function pushPage(page: ReadonlyArray<OutboxEntry>): Promise<boolean> {
  * independently valid, which is the same reason they may be sent together at all.
  */
 async function pushRun(run: ReadonlyArray<OutboxEntry>): Promise<boolean> {
-  if (run.length === 1) return pushEntry(run[0])
-  const batches = chunked(run, configLimits().transactionBulkMax)
+  const kind = bulkKindOf(run[0])
+  if (run.length === 1 || !kind) return pushEntry(run[0])
+  const batches = chunked(run, kind.batchSize())
   for (let at = 0; at < batches.length; at += BULK_CONCURRENCY) {
     const wave = batches.slice(at, at + BULK_CONCURRENCY)
-    const handled = await Promise.all(wave.map((batch) => pushBatch(batch)))
+    const handled = await Promise.all(
+      wave.map((batch) => pushBatch(batch, kind)),
+    )
     if (handled.includes(false)) return false
   }
   return true
@@ -191,11 +222,12 @@ const chunked = <T>(items: ReadonlyArray<T>, size: number): T[][] => {
 }
 
 /** Returns true if the batch was handled, false to stop draining (network). */
-async function pushBatch(batch: ReadonlyArray<OutboxEntry>): Promise<boolean> {
+async function pushBatch(
+  batch: ReadonlyArray<OutboxEntry>,
+  kind: BulkKind,
+): Promise<boolean> {
   try {
-    await (batch[0].op === 'create'
-      ? pushTransactionCreates(batch)
-      : pushTransactionDeletes(batch))
+    await kind.push(batch)
     return true
   } catch (e) {
     if (isNetworkError(e)) return false
@@ -238,6 +270,8 @@ async function pushEntry(entry: OutboxEntry): Promise<boolean> {
       await pushMerchantsEntry(entry)
     } else if (entry.entity === 'importTemplate') {
       await pushImportTemplatesEntry(entry)
+    } else if (entry.entity === 'planned') {
+      await pushPlannedEntry(entry)
     } else if (entry.op === 'create') {
       await pushNodeCreate(entry)
     } else if (entry.op === 'update') {
@@ -381,10 +415,12 @@ export async function pullAll(): Promise<void> {
       pullRates(),
       pullCategories(),
       pullCustomCurrencies(),
-      pullGoalsAll(),
       pullMerchantsAll(),
       pullImportTemplates(),
-      pullSpendingAll(),
+      // Everything the planner generates from, so it only ever runs over the server's rows.
+      Promise.all([pullGoalsAll(), pullSpendingAll(), pullPlannedDelta()]).then(
+        notePlannerInputsPulled,
+      ),
       pullInboundImportsDelta(),
     ])
   } catch {

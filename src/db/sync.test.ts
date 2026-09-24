@@ -234,6 +234,34 @@ describe('bulkRunLength', () => {
     expect(bulkRunLength(page, 0)).toBe(2)
     expect(bulkRunLength(page, 2)).toBe(2)
   })
+
+  it('groups planned creates on their own, never with ledger rows or planned updates', async () => {
+    const { bulkRunLength } = await import('./sync')
+    const planned = (
+      i: number,
+      op: OutboxEntry['op'] = 'create',
+    ): OutboxEntry => ({
+      op,
+      entity: 'planned',
+      id: `p-${i}`,
+      payload: { id: `p-${i}` },
+      baseVersion: null,
+      createdAt: TS,
+    })
+    const page = [
+      planned(0),
+      planned(1),
+      planned(2),
+      txEntry(0),
+      planned(3),
+      planned(3, 'update'),
+      planned(4, 'update'),
+    ]
+    expect(bulkRunLength(page, 0)).toBe(3)
+    expect(bulkRunLength(page, 3)).toBe(1)
+    expect(bulkRunLength(page, 4)).toBe(1)
+    expect(bulkRunLength(page, 5)).toBe(1)
+  })
 })
 
 describe('flushOutbox', () => {

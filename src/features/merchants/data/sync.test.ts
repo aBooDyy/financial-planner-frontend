@@ -111,6 +111,7 @@ const localTx = (
   note: null,
   source: null,
   transferId: null,
+  plannedId: null,
   createdAt: '',
   updatedAt: '',
   version: 'tx-v1',

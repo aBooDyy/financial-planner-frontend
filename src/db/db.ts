@@ -1,4 +1,5 @@
 import Dexie from 'dexie'
+import { resetPullState } from './pullState'
 import type { EntityTable } from 'dexie'
 import type {
   LocalAppConfig,
@@ -18,6 +19,7 @@ import type {
   LocalIntegrationKey,
   LocalMerchant,
   LocalMerchantAlias,
+  LocalPlanned,
   LocalRecurring,
   LocalSyncWatermark,
   LocalTransaction,
@@ -44,6 +46,7 @@ class AppDatabase extends Dexie {
   merchantAliases!: EntityTable<LocalMerchantAlias, 'id'>
   budgets!: EntityTable<LocalBudget, 'id'>
   recurrings!: EntityTable<LocalRecurring, 'id'>
+  plannedTransactions!: EntityTable<LocalPlanned, 'id'>
   emailConnections!: EntityTable<LocalEmailConnection, 'id'>
   inboundImports!: EntityTable<LocalInboundImport, 'id'>
   integrationKeys!: EntityTable<LocalIntegrationKey, 'id'>
@@ -67,13 +70,15 @@ class AppDatabase extends Dexie {
       customCurrencies: 'id, code, dirty, deleted',
       incomeStreams: 'id, dirty, deleted',
       goals: 'id, dirty, deleted',
-      goalAllocations: 'id, goalId, walletId, dirty, deleted',
+      goalAllocations: 'id, goalId, walletId, plannedId, dirty, deleted',
       transactions:
-        'id, walletId, goalId, merchantId, transferId, date, source, dirty, deleted',
+        'id, walletId, goalId, merchantId, transferId, date, source, plannedId, dirty, deleted',
       merchants: 'id, dirty, deleted',
       merchantAliases: 'id, merchantId, normalizedKey, dirty, deleted',
       budgets: 'id, dirty, deleted',
       recurrings: 'id, dirty, deleted',
+      plannedTransactions:
+        'id, goalId, incomeStreamId, recurringId, status, date, dirty, deleted',
       emailConnections: 'id, status',
       inboundImports: 'id, status, source, connectionId, keyId',
       integrationKeys: 'id, status',
@@ -101,6 +106,7 @@ export const localDbGeneration = (): number => clears
  *  knows the currency table offline. */
 export async function clearLocalDb(): Promise<void> {
   clears += 1
+  resetPullState()
   await db.transaction(
     'rw',
     [
@@ -115,6 +121,7 @@ export async function clearLocalDb(): Promise<void> {
       db.transactions,
       db.budgets,
       db.recurrings,
+      db.plannedTransactions,
       db.merchants,
       db.merchantAliases,
       db.emailConnections,
@@ -138,6 +145,7 @@ export async function clearLocalDb(): Promise<void> {
         db.transactions.clear(),
         db.budgets.clear(),
         db.recurrings.clear(),
+        db.plannedTransactions.clear(),
         db.merchants.clear(),
         db.merchantAliases.clear(),
         db.emailConnections.clear(),

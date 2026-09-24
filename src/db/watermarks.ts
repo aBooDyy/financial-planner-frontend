@@ -7,6 +7,7 @@ export type DeltaEntityName =
   | 'merchant'
   | 'merchantAlias'
   | 'inboundImport'
+  | 'planned'
 
 /**
  * A watermark is scoped to the signed-in user, not just the entity. Sign-out wipes the

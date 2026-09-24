@@ -29,6 +29,7 @@ const asTransaction = (id: string): Transaction => ({
   note: null,
   source: null,
   transferId: null,
+  plannedId: null,
   version: `v-${id}`,
   createdAt: '2026-09-01T00:00:00Z',
   updatedAt: '2026-09-01T00:00:00Z',

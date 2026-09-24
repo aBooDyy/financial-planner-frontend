@@ -27,6 +27,7 @@ const tx = (over: Partial<LocalTransaction> = {}): LocalTransaction => ({
   note: null,
   source: null,
   transferId: null,
+  plannedId: null,
   createdAt: '2026-01-05T00:00:00.000Z',
   updatedAt: '2026-01-05T00:00:00.000Z',
   version: 'v1',

@@ -8,6 +8,11 @@ import type {
 } from '#/features/import/data/types'
 import type { AliasOrigin } from '#/features/merchants/api/types'
 import type {
+  PlannedOrigin,
+  PlannedRole,
+  PlannedStatus,
+} from '#/features/planned/api/types'
+import type {
   BudgetPeriod,
   BudgetScope,
   TransactionType,
@@ -115,6 +120,10 @@ export type LocalIncomeStream = {
   day: number
   color: string
   position: number
+  /** Where the pay lands — what a planned payday confirms into. */
+  walletId: string | null
+  /** ISO date of a known payday; non-monthly paydays step from it. */
+  anchorDate: string | null
   createdAt: string
   updatedAt: string
   version: string
@@ -135,6 +144,15 @@ export type LocalGoal = {
   frequency: GoalFrequency | null
   nextDue: string | null
   dueDate: string | null
+  // The stored plan's header (null until the planner first generates this goal's rows).
+  plannedAt: string | null
+  planAmount: number | null
+  planCount: number | null
+  planStart: string | null
+  /** Day of the month set-asides fall on (1–28); null reads as the 1st. */
+  setAsideDay: number | null
+  /** One-time obligations only: also plan the final payment on the due date. */
+  payOnDue: boolean
   createdAt: string
   updatedAt: string
   version: string
@@ -158,6 +176,10 @@ export type LocalGoalAllocation = {
   currency: CurrencyCode
   note: string | null
   position: number
+  /** When it was set aside (ISO date). */
+  date: string
+  /** The planned set-aside this reservation settles, if any. */
+  plannedId: string | null
   createdAt: string
   updatedAt: string
   version: string
@@ -179,6 +201,8 @@ export type LocalTransaction = {
   note: string | null
   source: string | null
   transferId: string | null
+  /** The planned item this transaction settles, if any. Never set on a transfer leg. */
+  plannedId: string | null
   createdAt: string
   updatedAt: string
   version: string
@@ -214,6 +238,40 @@ export type LocalRecurring = {
   frequency: GoalFrequency
   nextDue: string
   autopost: boolean
+  createdAt: string
+  updatedAt: string
+  version: string
+  dirty: Flag
+  deleted: Flag
+}
+
+// --- Planned transactions -------------------------------------------------------------
+// A scheduled intention to move money on a date. Never touches balances, budgets or goal
+// progress: only the transactions / reservations that settle it (via their `plannedId`) do.
+
+export type LocalPlanned = {
+  id: string
+  origin: PlannedOrigin
+  role: PlannedRole
+  goalId: string | null
+  incomeStreamId: string | null
+  recurringId: string | null
+  /** Suggested wallet; null means "ask at confirm". */
+  walletId: string | null
+  /** Display name, kept after the origin is deleted. */
+  name: string
+  amount: number
+  currency: CurrencyCode
+  category: string | null
+  subcategory: string | null
+  /** The date the generator assigned. Immutable — it is part of the row's identity. */
+  occurrence: string
+  /** When it is due now; moving it leaves `occurrence` alone. */
+  date: string
+  status: PlannedStatus
+  /** Edited by hand, so the generator never rewrites it. */
+  pinned: boolean
+  note: string | null
   createdAt: string
   updatedAt: string
   version: string
@@ -436,6 +494,7 @@ export type OutboxEntity =
   | 'merchant'
   | 'merchantAlias'
   | 'importTemplate'
+  | 'planned'
 
 export type OutboxEntry = {
   seq?: number
