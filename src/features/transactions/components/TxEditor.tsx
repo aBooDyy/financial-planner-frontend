@@ -8,6 +8,7 @@ import { MerchantPicker } from '#/features/merchants/components/MerchantPicker'
 import type { GoalFrequency } from '#/features/goals/api/types'
 import type { BudgetScope } from '#/features/transactions/api/types'
 import { useCategoryCatalog } from '#/features/categories/hooks/useCategoryCatalog'
+import { useCountsToward } from '#/features/transactions/hooks/useCountsToward'
 import { resolveTransfer } from '#/features/transactions/data/transferForm'
 import type {
   EditorTxType,
@@ -37,6 +38,7 @@ import {
 import { Switch } from '#/components/ui/switch'
 import { usePreferencesStore } from '#/stores/preferences'
 import { CategoryPickerDialog } from './CategoryPickerDialog'
+import { CountsTowardField } from './CountsTowardField'
 import { TransferFields } from './TransferFields'
 
 type Props = {
@@ -55,7 +57,8 @@ type Props = {
   onMerchant: (merchant: LocalMerchant | null) => void
   onApplySuggestion: () => void
   onScopeType: (s: BudgetScope) => void
-  onSave: () => void
+  /** `link` is the planned item the entry settles, as "Counts toward" resolved it. */
+  onSave: (link?: { plannedId: string | null }) => void
   onDelete: () => void
   onClose: () => void
 }
@@ -108,6 +111,20 @@ export function TxEditor({
   const subcategory = catalog.sub(draft.category, draft.subcategory)
   const [pickerOpen, setPickerOpen] = useState(false)
   const dateFormat = usePreferencesStore((s) => s.dateFormat)
+  const counts = useCountsToward({
+    type: draft.type,
+    goalId: draft.goalId,
+    plannedId: draft.plannedId,
+    date: draft.date,
+    goals,
+  })
+  const showCounts = kind === 'tx' && !isTransfer
+  const selectCounts = (optionId: string | null) => {
+    if (counts.isIncome) {
+      counts.selectStream(optionId)
+      if (draft.plannedId) onField('plannedId', null)
+    } else onGoal(optionId)
+  }
 
   const currencyOf = (walletId: string): CurrencyCode =>
     wallets.find((w) => w.id === walletId)?.currency ?? base
@@ -150,7 +167,9 @@ export function TxEditor({
       </Button>
       <Button
         type="button"
-        onClick={onSave}
+        onClick={() =>
+          onSave(showCounts ? { plannedId: counts.plannedId } : undefined)
+        }
         disabled={saveBlocked}
         className={
           saveBlocked
@@ -342,6 +361,10 @@ export function TxEditor({
           </div>
         ) : null}
 
+        {showCounts ? (
+          <CountsTowardField counts={counts} onSelect={selectCounts} />
+        ) : null}
+
         {/* Wallet (transactions & recurring) */}
         {kind !== 'budget' && !isTransfer ? (
           <div>
@@ -398,8 +421,8 @@ export function TxEditor({
           </div>
         ) : null}
 
-        {/* Toward a goal (transactions & recurring, spend only) */}
-        {kind !== 'budget' && draft.type === 'spend' && goals.length > 0 ? (
+        {/* Toward a goal (recurring spends; a transaction uses "Counts toward") */}
+        {kind === 'recurring' && draft.type === 'spend' && goals.length > 0 ? (
           <div>
             <Label className={LABEL}>
               Toward a goal{' '}

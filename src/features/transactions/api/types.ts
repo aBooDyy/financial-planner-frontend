@@ -106,6 +106,8 @@ export type Transaction = {
   note: string | null
   source: string | null
   transferId: string | null
+  /** The planned item this settles; null on transfer legs and unlinked rows. */
+  plannedId: string | null
   createdAt: string
   updatedAt: string
   version: string
@@ -158,6 +160,7 @@ export type TransactionWire = {
   note: string | null
   source: string | null
   transfer_id: string | null
+  planned_id?: string | null
   created_at: string
   updated_at: string
   version: string
@@ -208,6 +211,7 @@ export type CreateTransactionWire = {
   date: string
   note: string | null
   source: string | null
+  planned_id: string | null
 }
 export type UpdateTransactionWire = Omit<CreateTransactionWire, 'id'> & {
   version: string
@@ -352,6 +356,7 @@ export const toTransaction = (w: TransactionWire): Transaction => ({
   note: w.note,
   source: w.source,
   transferId: w.transfer_id,
+  plannedId: w.planned_id ?? null,
   createdAt: w.created_at,
   updatedAt: w.updated_at,
   version: w.version,

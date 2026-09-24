@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate, useSearch } from '@tanstack/react-router'
 import { Download, Inbox, Plus } from 'lucide-react'
 import { MobileTabBar } from '#/components/chrome/MobileTabBar'
@@ -11,7 +11,6 @@ import { setBaseCurrency } from '#/features/balances/data/mutations'
 import { useSessionStore } from '#/stores/session'
 import { usePreferencesStore } from '#/stores/preferences'
 import { currencySymbol } from '#/lib/currency'
-import { runAutoPost } from '#/features/transactions/data/autopost'
 import {
   addDays,
   inWindow,
@@ -44,6 +43,13 @@ import {
 } from '#/components/ui/select'
 import { useTransactions } from '#/features/transactions/hooks/useTransactions'
 import { useTxEditor } from '#/features/transactions/hooks/useTxEditor'
+import { usePlanned } from '#/features/planned'
+import { ConfirmPlannedDialog } from '#/features/planned/components/ConfirmPlannedDialog'
+import { PlannedCard } from '#/features/planned/components/PlannedCard'
+import { PlannedNudge } from '#/features/planned/components/PlannedNudge'
+import { PlannedSummaryCard } from '#/features/planned/components/PlannedSummaryCard'
+import { useOriginColors } from '#/features/planned/hooks/useOriginColors'
+import { usePlannedRowActions } from '#/features/planned/hooks/usePlannedRowActions'
 import type { CurrencyCode } from '#/lib/currency'
 import { BreakdownCard } from './BreakdownCard'
 import { BudgetHealthCard, BudgetsCard } from './BudgetsCard'
@@ -54,10 +60,12 @@ import { RecurringCard, UpcomingCard } from './RecurringCard'
 import { TransactionList } from './TransactionList'
 import { TxEditor } from './TxEditor'
 
-type View = 'activity' | 'budgets' | 'recurring'
+type View = 'activity' | 'planned' | 'budgets' | 'recurring'
+
+const VIEWS: View[] = ['activity', 'planned', 'budgets', 'recurring']
 
 const viewSeg = (active: boolean) =>
-  `rounded-[10px] px-4 py-2 text-[13.5px] ${
+  `inline-flex flex-1 items-center justify-center gap-[6px] rounded-[10px] px-2 py-2 text-[13px] md:flex-none md:px-4 md:text-[13.5px] ${
     active
       ? 'bg-fp-surface font-bold text-fp-text shadow-[0_1px_2px_rgba(0,0,0,0.06)]'
       : 'bg-transparent font-semibold text-fp-text-2'
@@ -77,6 +85,10 @@ export function TransactionsPage() {
   const [reviewOpen, setReviewOpen] = useState(deepLinkedToReview)
 
   const [view, setView] = useState<View>('activity')
+  const planned = usePlanned()
+  const originColor = useOriginColors()
+  const [confirmId, setConfirmId] = useState<string | null>(null)
+  const plannedActions = usePlannedRowActions(setConfirmId)
   const [scope, setScope] = useState<Scope>({ type: 'all' })
   const [mode, setMode] = useState<RangeMode>('month')
   const [anchor, setAnchor] = useState(() => {
@@ -84,11 +96,6 @@ export function TransactionsPage() {
     return ymd(new Date(t.getFullYear(), t.getMonth(), 1))
   })
   const [calOpen, setCalOpen] = useState(false)
-
-  // Catch up any due auto-post recurrings once the page mounts.
-  useEffect(() => {
-    void runAutoPost(startOfToday())
-  }, [])
 
   if (!user) return null
 
@@ -168,6 +175,10 @@ export function TransactionsPage() {
   const recurring = buildRecurringView(data, catalog, scope, today)
 
   const onRowClick = (row: ActivityRow) => {
+    if (row.kind === 'set_aside') {
+      void navigate({ to: '/goals' })
+      return
+    }
     if (row.kind === 'transfer') {
       const legs = transactions.filter((x) => x.transferId === row.id)
       editor.openEditTransfer(row.id, legs)
@@ -208,8 +219,8 @@ export function TransactionsPage() {
         <div className="mx-auto grid w-full max-w-[560px] grid-cols-1 items-start gap-4 px-4 py-4 pb-[30px] md:max-w-[1180px] md:grid-cols-[minmax(0,1fr)_360px] md:gap-6 md:px-6 md:py-[24px] md:pb-[90px]">
           {/* Header: view tabs + global account scope */}
           <div className="md:col-span-2 flex flex-wrap items-center gap-[10px]">
-            <div className="inline-flex rounded-[13px] border border-fp-border bg-fp-surface-2 p-[3px]">
-              {(['activity', 'budgets', 'recurring'] as View[]).map((v) => (
+            <div className="flex w-full rounded-[13px] border border-fp-border bg-fp-surface-2 p-[3px] md:inline-flex md:w-auto">
+              {VIEWS.map((v) => (
                 <button
                   key={v}
                   type="button"
@@ -217,6 +228,14 @@ export function TransactionsPage() {
                   className={viewSeg(view === v)}
                 >
                   {v[0].toUpperCase() + v.slice(1)}
+                  {v === 'planned' && planned.dueCount > 0 ? (
+                    <span
+                      aria-label={`${planned.dueCount} need confirming`}
+                      className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-fp-warn px-[5px] text-[10.5px] font-bold text-white"
+                    >
+                      {planned.dueCount}
+                    </span>
+                  ) : null}
                 </button>
               ))}
             </div>
@@ -267,6 +286,12 @@ export function TransactionsPage() {
           <div className="flex min-w-0 flex-col gap-4">
             {view === 'activity' ? (
               <>
+                {planned.dueCount > 0 ? (
+                  <PlannedNudge
+                    count={planned.dueCount}
+                    onReview={() => setView('planned')}
+                  />
+                ) : null}
                 <DaysCard
                   calendar={calendar}
                   mode={mode}
@@ -286,6 +311,17 @@ export function TransactionsPage() {
                   onRowClick={onRowClick}
                 />
               </>
+            ) : null}
+            {view === 'planned' ? (
+              <PlannedCard
+                view={planned}
+                loading={planned.loading}
+                colorOf={originColor}
+                busyId={plannedActions.busyId}
+                onOpen={setConfirmId}
+                onConfirm={(row) => void plannedActions.confirm(row)}
+                onSkip={(row) => void plannedActions.skip(row)}
+              />
             ) : null}
             {view === 'budgets' ? (
               <BudgetsCard
@@ -319,6 +355,9 @@ export function TransactionsPage() {
                 </div>
                 <BreakdownCard view={breakdown} />
               </>
+            ) : null}
+            {view === 'planned' && !planned.isEmpty ? (
+              <PlannedSummaryCard view={planned} base={base} />
             ) : null}
             {view === 'budgets' ? (
               <BudgetHealthCard view={budgets} onAdd={editor.openAddBudget} />
@@ -358,9 +397,18 @@ export function TransactionsPage() {
           onMerchant={editor.setMerchant}
           onApplySuggestion={editor.applySuggestion}
           onScopeType={editor.setScopeType}
-          onSave={() => void editor.save()}
+          onSave={(link) => void editor.save(link)}
           onDelete={() => void editor.remove()}
           onClose={editor.close}
+        />
+      ) : null}
+
+      {confirmId ? (
+        <ConfirmPlannedDialog
+          plannedId={confirmId}
+          onOpenChange={(open) => {
+            if (!open) setConfirmId(null)
+          }}
         />
       ) : null}
 

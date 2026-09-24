@@ -6,6 +6,8 @@ import type { DateFormat } from '#/lib/date'
 import type {
   LocalBalanceNode,
   LocalBudget,
+  LocalGoal,
+  LocalGoalAllocation,
   LocalRecurring,
   LocalTransaction,
 } from '#/db/types'
@@ -64,6 +66,10 @@ export type SpendingData = {
   nodes: LocalBalanceNode[]
   base: CurrencyCode
   rates: RatesMap
+  /** Goal reservations — listed in Activity as "Set aside" rows, never counted in a total. */
+  allocations?: ReadonlyArray<LocalGoalAllocation>
+  /** Names the goal a set-aside row belongs to. */
+  goals?: ReadonlyArray<LocalGoal>
 }
 
 // --- Scope helpers -------------------------------------------------------------------
@@ -167,8 +173,34 @@ const isFlow = (t: LocalTransaction): t is FlowTxn =>
 const flowTxns = (data: SpendingData, scope: Scope): FlowTxn[] =>
   liveTxns(data, scope).filter(isFlow)
 
-const isContribution = (t: LocalTransaction): boolean =>
-  t.type === 'spend' && t.goalId !== null
+/**
+ * Σ wallet-held goal reservations dated in the window, in base currency — the hero's "Saved".
+ * A reservation keeps the money in its wallet, so it is never a spend; a spend linked to a goal
+ * is a payment that left the wallet and counts as Spent like any other.
+ */
+function savedInWindow(
+  data: SpendingData,
+  scope: Scope,
+  win: DateWindow,
+): number {
+  const matcher = walletMatcher(scope, data.nodes)
+  return (data.allocations ?? [])
+    .filter(
+      (a) =>
+        a.deleted === 0 &&
+        a.source === 'wallet' &&
+        a.walletId !== null &&
+        matcher(a.walletId) &&
+        inWindow(a.date, win),
+    )
+    .reduce(
+      (sum, a) =>
+        sum + convertMinor(a.amount, a.currency, data.base, data.rates),
+      0,
+    )
+}
+
+const SAVED_SEGMENT = '__saved__'
 
 // --- Cashflow hero -------------------------------------------------------------------
 
@@ -211,7 +243,6 @@ export function buildCashflow(
 
   let income = 0
   let spent = 0
-  let saved = 0
   const byCat = new Map<string, number>()
   for (const t of txns) {
     const v = toBase(t, data)
@@ -219,14 +250,27 @@ export function buildCashflow(
       income += v
       continue
     }
-    if (isContribution(t)) saved += v
-    else spent += v
+    spent += v
     byCat.set(t.category, (byCat.get(t.category) ?? 0) + v)
   }
+  const saved = savedInWindow(data, scope, win)
   const net = income - spent - saved
   const outflow = spent + saved
   const sorted = [...byCat.entries()].sort((a, b) => b[1] - a[1])
   const denom = Math.max(outflow, 1)
+  const savedSegment =
+    saved > 0
+      ? [
+          {
+            key: SAVED_SEGMENT,
+            label: 'Set aside',
+            color: 'var(--fp-text-3)',
+            pct: (saved / denom) * 100,
+            valueStr: formatMoneyRounded(saved, data.base),
+            pctStr: `${formatShare((saved / denom) * 100)} of outflow`,
+          },
+        ]
+      : []
 
   const periodLabel = rangeLabel(anchor, mode, win, dateFormat)
 
@@ -242,17 +286,20 @@ export function buildCashflow(
     pillLabel: net >= 0 ? 'Net positive' : 'Overspending',
     txCount: txns.length,
     txCountStr: `${txns.length} transaction${txns.length === 1 ? '' : 's'}`,
-    segments: sorted.map(([cat, v]) => {
-      const pct = (v / denom) * 100
-      return {
-        key: cat,
-        label: catalog.get(cat).name,
-        color: catalog.get(cat).color,
-        pct,
-        valueStr: formatMoneyRounded(v, data.base),
-        pctStr: `${formatShare(pct)} of outflow`,
-      }
-    }),
+    segments: [
+      ...sorted.map(([cat, v]) => {
+        const pct = (v / denom) * 100
+        return {
+          key: cat,
+          label: catalog.get(cat).name,
+          color: catalog.get(cat).color,
+          pct,
+          valueStr: formatMoneyRounded(v, data.base),
+          pctStr: `${formatShare(pct)} of outflow`,
+        }
+      }),
+      ...savedSegment,
+    ],
     topLabel: sorted.length
       ? `Top: ${catalog.get(sorted[0][0]).name} ${formatMoneyRounded(sorted[0][1], data.base)}`
       : 'No spend yet',
@@ -335,9 +382,31 @@ export type TxRow = {
   walletName: string
   walletColor: string
   isIncome: boolean
-  isContribution: boolean
+  /** The pill before the meta: what a confirmed planned item (or a goal spend) was. */
+  tag: TxTag | null
   amountStr: string
 }
+
+export type TxTag = 'goal' | 'obligation' | 'income'
+
+export const TX_TAG_LABEL: Record<TxTag, string> = {
+  goal: 'Goal',
+  obligation: 'Obligation',
+  income: 'Income',
+}
+
+/**
+ * A confirmed planned payday reads "Income", a confirmed planned payment "Obligation"; an
+ * unplanned spend toward a goal keeps its "Goal" pill.
+ */
+export const txTagOf = (t: LocalTransaction): TxTag | null =>
+  t.plannedId && t.type === 'income'
+    ? 'income'
+    : t.plannedId && t.type === 'spend'
+      ? 'obligation'
+      : t.type === 'spend' && t.goalId !== null
+        ? 'goal'
+        : null
 
 /**
  * One transfer, however many of its legs are held. `neutral` when the scope holds both
@@ -355,7 +424,20 @@ export type TransferRow = {
   amountStr: string
 }
 
-export type ActivityRow = TxRow | TransferRow
+/** A goal reservation — money held aside in a wallet (or outside one), not spent. */
+export type SetAsideRow = {
+  kind: 'set_aside'
+  id: string
+  goalId: string
+  /** The goal's name. */
+  name: string
+  /** "Main Checking", or an external source's label. */
+  sourceName: string
+  sourceColor: string
+  amountStr: string
+}
+
+export type ActivityRow = TxRow | TransferRow | SetAsideRow
 
 export type DayGroup = {
   dateLabel: string
@@ -397,7 +479,7 @@ function txRowOf(t: FlowTxn, ctx: ActivityContext): TxRow {
     walletName: wallet?.name ?? '',
     walletColor: wallet?.color ?? NO_WALLET_COLOR,
     isIncome: isInc,
-    isContribution: isContribution(t),
+    tag: txTagOf(t),
     amountStr: `${isInc ? '+' : '−'}${formatMoneyRounded(toBase(t, ctx.data), ctx.data.base)}`,
   }
 }
@@ -449,6 +531,46 @@ function transferRowOf(
         ? money
         : `${direction === 'out' ? '−' : '+'}${money}`,
   }
+}
+
+function setAsideRowOf(
+  a: LocalGoalAllocation,
+  ctx: ActivityContext,
+  goalNames: ReadonlyMap<string, string>,
+): SetAsideRow {
+  const wallet = a.walletId ? ctx.nodeById.get(a.walletId) : undefined
+  return {
+    kind: 'set_aside',
+    id: a.id,
+    goalId: a.goalId,
+    name: goalNames.get(a.goalId) ?? 'Goal',
+    sourceName:
+      a.source === 'external'
+        ? (a.externalLabel ?? 'External')
+        : (wallet?.name ?? DELETED_ACCOUNT),
+    sourceColor: wallet?.color ?? NO_WALLET_COLOR,
+    amountStr: formatMoneyRounded(
+      convertMinor(a.amount, a.currency, ctx.data.base, ctx.data.rates),
+      ctx.data.base,
+    ),
+  }
+}
+
+/** Live reservations in the window: a wallet's when it is in scope, an external one only unscoped. */
+function windowSetAsides(
+  data: SpendingData,
+  win: DateWindow,
+  scope: Scope,
+  inScope: (walletId: string) => boolean,
+): LocalGoalAllocation[] {
+  return (data.allocations ?? []).filter(
+    (a) =>
+      a.deleted === 0 &&
+      inWindow(a.date, win) &&
+      (a.source === 'wallet' && a.walletId
+        ? inScope(a.walletId)
+        : scope.type === 'all'),
+  )
 }
 
 /**
@@ -519,18 +641,28 @@ export function buildActivityList(
   )
 
   const byDay = new Map<string, LocalTransaction[]>()
-  const order: string[] = []
   for (const t of txns) {
-    if (!byDay.has(t.date)) {
-      byDay.set(t.date, [])
-      order.push(t.date)
-    }
-    byDay.get(t.date)!.push(t)
+    const day = byDay.get(t.date)
+    if (day) day.push(t)
+    else byDay.set(t.date, [t])
   }
+  const setAsidesByDay = new Map<string, LocalGoalAllocation[]>()
+  for (const a of windowSetAsides(data, win, scope, ctx.inScope)) {
+    const day = setAsidesByDay.get(a.date)
+    if (day) day.push(a)
+    else setAsidesByDay.set(a.date, [a])
+  }
+  const order = [...new Set([...byDay.keys(), ...setAsidesByDay.keys()])].sort(
+    (a, b) => b.localeCompare(a),
+  )
+  const goalNames = new Map((data.goals ?? []).map((g) => [g.id, g.name]))
 
   const yesterday = addDays(today, -1)
   const groups: DayGroup[] = order.map((date) => {
-    const txnsOfDay = byDay.get(date)!
+    const txnsOfDay = byDay.get(date) ?? []
+    const setAsideRows = (setAsidesByDay.get(date) ?? [])
+      .sort((a, b) => b.id.localeCompare(a.id))
+      .map((a) => setAsideRowOf(a, ctx, goalNames))
     let spent = 0
     let income = 0
     for (const t of txnsOfDay) {
@@ -553,7 +685,7 @@ export function buildActivityList(
     return {
       dateLabel: prefix + formatDate(d, dateFormat),
       totalStr,
-      rows: dayRows(txnsOfDay, ctx),
+      rows: [...dayRows(txnsOfDay, ctx), ...setAsideRows],
     }
   })
 
@@ -870,7 +1002,7 @@ function budgetSpentMinor(
   const matcher = walletMatcher(scope, data.nodes)
   let sum = 0
   for (const t of data.txns) {
-    if (t.deleted || t.type !== 'spend' || t.goalId) continue // savings and transfers aren't budget spend
+    if (t.deleted || t.type !== 'spend') continue // transfers aren't budget spend
     if (!matcher(t.walletId)) continue
     if (!inWindow(t.date, win)) continue
     // Caps are parent-scoped: the child a row may also name never narrows the match.

@@ -1,11 +1,14 @@
-import { Plus, Target } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import type {
   ActivityListView,
   ActivityRow,
   TxRow,
 } from '#/features/transactions/data/selectors'
+import { TX_TAG_LABEL } from '#/features/transactions/data/selectors'
+import { TagPill } from '#/components/TagPill'
 import { Button } from '#/components/ui/button'
 import { CategoryIcon } from './CategoryIcon'
+import { SetAsideActivityRow } from './SetAsideActivityRow'
 import { TransferActivityRow } from './TransferActivityRow'
 
 type Props = {
@@ -33,6 +36,12 @@ function Row({ row, onClick }: { row: TxRow; onClick: () => void }) {
       <div className="flex min-w-0 flex-col gap-px">
         <span className="truncate text-[14px] font-semibold">{row.name}</span>
         <span className="flex items-center gap-[6px] text-[12px] text-fp-text-3">
+          {row.tag ? (
+            <TagPill
+              label={TX_TAG_LABEL[row.tag]}
+              tone={row.tag === 'obligation' ? 'neutral' : 'accent'}
+            />
+          ) : null}
           <span className="min-w-0 truncate">{row.catLabel}</span>
           <span className="h-[3px] w-[3px] rounded-full bg-fp-border-strong" />
           <span
@@ -40,12 +49,6 @@ function Row({ row, onClick }: { row: TxRow; onClick: () => void }) {
             style={{ background: row.walletColor }}
           />
           {row.walletName}
-          {row.isContribution ? (
-            <span className="ms-1 inline-flex items-center gap-[3px] rounded-full bg-fp-accent-soft px-[6px] py-px text-[10px] font-bold text-fp-accent-ink">
-              <Target size={10} strokeWidth={2.2} />
-              Goal
-            </span>
-          ) : null}
         </span>
       </div>
       <div className="flex-1" />
@@ -90,6 +93,12 @@ export function TransactionList({ view, onAdd, onRowClick }: Props) {
             {g.rows.map((r) =>
               r.kind === 'transfer' ? (
                 <TransferActivityRow
+                  key={r.id}
+                  row={r}
+                  onClick={() => onRowClick(r)}
+                />
+              ) : r.kind === 'set_aside' ? (
+                <SetAsideActivityRow
                   key={r.id}
                   row={r}
                   onClick={() => onRowClick(r)}

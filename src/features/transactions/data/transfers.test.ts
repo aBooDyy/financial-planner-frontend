@@ -59,6 +59,7 @@ const serverLeg = (
   note: 'ATM withdrawal',
   source: null,
   transferId: null,
+  plannedId: null,
   createdAt: 'c',
   updatedAt: 'u',
   version: 'server-v1',

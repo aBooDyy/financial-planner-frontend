@@ -3,6 +3,8 @@ import type {
   LocalBalanceNode,
   LocalBudget,
   LocalCategory,
+  LocalGoal,
+  LocalGoalAllocation,
   LocalRecurring,
   LocalTransaction,
 } from '#/db/types'
@@ -15,11 +17,13 @@ import {
   buildCalendar,
   buildCashflow,
   buildRecurringView,
+  txTagOf,
 } from './selectors'
 import type {
   ActivityRow,
   MonthGridView,
   Scope,
+  SetAsideRow,
   SpendingData,
   TransferRow,
   TxRow,
@@ -46,6 +50,7 @@ const tx = (over: Partial<LocalTransaction>): LocalTransaction => ({
   note: null,
   source: null,
   transferId: null,
+  plannedId: null,
   createdAt: '',
   updatedAt: '',
   version: '',
@@ -116,6 +121,28 @@ const CATALOG = buildCatalog([
 const txRows = (rows: ActivityRow[]): TxRow[] =>
   rows.filter((r): r is TxRow => r.kind === 'tx')
 
+const allocationRow = (
+  over: Partial<LocalGoalAllocation> = {},
+): LocalGoalAllocation => ({
+  id: `a${seq++}`,
+  goalId: 'g1',
+  source: 'wallet',
+  walletId: 'w1',
+  externalLabel: null,
+  amount: 0,
+  currency: 'SAR',
+  note: null,
+  position: 0,
+  date: '2026-06-10',
+  plannedId: null,
+  createdAt: '',
+  updatedAt: '',
+  version: '',
+  dirty: 0,
+  deleted: 0,
+  ...over,
+})
+
 const data = (over: Partial<SpendingData>): SpendingData => ({
   txns: [],
   budgets: [],
@@ -127,13 +154,31 @@ const data = (over: Partial<SpendingData>): SpendingData => ({
 })
 
 describe('buildCashflow', () => {
-  it('splits income, consumption spend, and goal savings; net subtracts both outflows', () => {
+  // Saved used to be goal-linked spends. Under ADR-3 a set-aside is a reservation (an
+  // allocation), and a goal-linked spend is a payment that left the wallet — so Saved is now
+  // the period's wallet reservations and every spend is Spent.
+  it('splits income, spend and set-asides; net subtracts both outflows', () => {
     const txns = [
       tx({ type: 'income', amount: 1_200_000, category: 'salary' }),
       tx({ type: 'spend', amount: 240_000, category: 'groceries' }),
-      tx({ type: 'spend', amount: 60_000, category: 'savings', goalId: 'g1' }),
     ]
-    const view = buildCashflow(data({ txns }), CATALOG, ALL, ANCHOR, 'month')
+    const allocations = [
+      allocationRow({ amount: 60_000, date: '2026-06-05' }),
+      allocationRow({ amount: 99_000, date: '2026-05-31' }), // outside June
+      allocationRow({
+        amount: 50_000,
+        source: 'external',
+        walletId: null,
+        externalLabel: 'Dad',
+      }), // not held in a wallet
+    ]
+    const view = buildCashflow(
+      data({ txns, allocations }),
+      CATALOG,
+      ALL,
+      ANCHOR,
+      'month',
+    )
     expect(view.incomeStr).toBe('SR 12,000')
     expect(view.spentStr).toBe('SR 2,400')
     expect(view.hasSaved).toBe(true)
@@ -141,7 +186,38 @@ describe('buildCashflow', () => {
     // net = 12,000 − 2,400 − 600 = +9,000
     expect(view.netStr).toBe('+SR 9,000')
     expect(view.netPositive).toBe(true)
-    expect(view.txCount).toBe(3)
+    expect(view.txCount).toBe(2)
+    expect(view.segments.map((s) => s.label)).toEqual([
+      'Groceries',
+      'Set aside',
+    ])
+  })
+
+  it('counts a goal-linked payment as Spent, not Saved', () => {
+    const txns = [
+      tx({
+        type: 'spend',
+        amount: 350_000,
+        category: 'groceries',
+        goalId: 'rent',
+      }),
+    ]
+    const view = buildCashflow(data({ txns }), CATALOG, ALL, ANCHOR, 'month')
+    expect(view.spentStr).toBe('SR 3,500')
+    expect(view.hasSaved).toBe(false)
+    expect(view.netStr).toBe('−SR 3,500')
+  })
+
+  it('takes set-asides only from wallets in scope', () => {
+    const allocations = [allocationRow({ amount: 60_000, walletId: 'w1' })]
+    const scoped = buildCashflow(
+      data({ allocations }),
+      CATALOG,
+      { type: 'wallet', id: 'elsewhere' },
+      ANCHOR,
+      'month',
+    )
+    expect(scoped.hasSaved).toBe(false)
   })
 
   it('only counts transactions inside the window', () => {
@@ -190,18 +266,25 @@ describe('buildBudgetsView', () => {
     expect(row.pctStr).toBe('80%')
   })
 
-  it('excludes goal contributions from budget spend', () => {
+  // Goal-linked spends used to be skipped as "contributions". A goal payment (rent) is money
+  // that left the wallet under its own category (ADR-7), so it burns the budget like any spend;
+  // money put aside is a reservation and never reaches a budget.
+  it('counts goal-linked payments against the budget, not set-asides', () => {
     const txns = [
       tx({ category: 'groceries', amount: 90_000 }),
-      tx({ category: 'groceries', amount: 80_000, goalId: 'g1' }), // a contribution, not budget spend
+      tx({ category: 'groceries', amount: 80_000, goalId: 'g1' }),
     ]
     const view = buildBudgetsView(
-      data({ txns, budgets: [budget({})] }),
+      data({
+        txns,
+        budgets: [budget({})],
+        allocations: [allocationRow({ amount: 500_000 })],
+      }),
       CATALOG,
       ALL,
       TODAY,
     )
-    expect(view.rows[0].spentStr).toBe('SR 900')
+    expect(view.rows[0].spentStr).toBe('SR 1,700')
   })
 })
 
@@ -618,5 +701,114 @@ describe('transfers', () => {
       direction: 'out',
       amountStr: '−SR 500',
     })
+  })
+})
+
+describe('confirmed planned items in Activity', () => {
+  const allocation = (
+    over: Partial<LocalGoalAllocation> = {},
+  ): LocalGoalAllocation => ({
+    id: `a${seq++}`,
+    goalId: 'umrah',
+    source: 'wallet',
+    walletId: 'w1',
+    externalLabel: null,
+    amount: 150_000,
+    currency: 'SAR',
+    note: null,
+    position: 0,
+    date: '2026-06-10',
+    plannedId: null,
+    createdAt: '',
+    updatedAt: '',
+    version: '',
+    dirty: 0,
+    deleted: 0,
+    ...over,
+  })
+  const umrah = { id: 'umrah', name: 'Umrah trip' } as LocalGoal
+  const list = (over: Partial<SpendingData>, scope: Scope = ALL) =>
+    buildActivityList(
+      data({ goals: [umrah], ...over }),
+      CATALOG,
+      scope,
+      ANCHOR,
+      'month',
+      TODAY,
+    )
+
+  it('lists a set-aside as its own row, kept out of the day total', () => {
+    const view = list({
+      txns: [tx({ type: 'spend', amount: 5_000, date: '2026-06-10' })],
+      allocations: [allocation({ date: '2026-06-10' })],
+    })
+    expect(view.groups).toHaveLength(1)
+    const [day] = view.groups
+    expect(day.totalStr).toBe('−SR 50')
+    const setAside = day.rows.find((r) => r.kind === 'set_aside') as SetAsideRow
+    expect(setAside).toMatchObject({
+      name: 'Umrah trip',
+      sourceName: 'Main',
+      amountStr: 'SR 1,500',
+      goalId: 'umrah',
+    })
+  })
+
+  it('gives a day holding only set-asides no total; they feed Saved, not Spent', () => {
+    const d = data({
+      goals: [umrah],
+      allocations: [allocation({ date: '2026-06-03' })],
+    })
+    const view = buildActivityList(d, CATALOG, ALL, ANCHOR, 'month', TODAY)
+    expect(view.groups[0].totalStr).toBe('—')
+    const hero = buildCashflow(d, CATALOG, ALL, ANCHOR, 'month')
+    expect(hero.spentStr).toBe('SR 0')
+    expect(hero.txCount).toBe(0)
+    expect(hero.savedStr).toBe('SR 1,500')
+  })
+
+  it('shows an external set-aside only when no account scope is set', () => {
+    const allocations = [
+      allocation({
+        source: 'external',
+        walletId: null,
+        externalLabel: 'Dad’s help',
+      }),
+    ]
+    expect(list({ allocations }).groups[0].rows[0]).toMatchObject({
+      kind: 'set_aside',
+      sourceName: 'Dad’s help',
+    })
+    expect(list({ allocations }, { type: 'wallet', id: 'w1' }).empty).toBe(true)
+  })
+
+  it('skips deleted and out-of-window set-asides', () => {
+    const view = list({
+      allocations: [
+        allocation({ deleted: 1 }),
+        allocation({ date: '2026-05-31' }),
+      ],
+    })
+    expect(view.empty).toBe(true)
+  })
+
+  it('tags a confirmed payday, a confirmed payment and an unplanned goal spend', () => {
+    expect(txTagOf(tx({ type: 'income', plannedId: 'p1' }))).toBe('income')
+    expect(txTagOf(tx({ type: 'spend', plannedId: 'p2', goalId: 'g' }))).toBe(
+      'obligation',
+    )
+    expect(txTagOf(tx({ type: 'spend', goalId: 'g' }))).toBe('goal')
+    expect(txTagOf(tx({ type: 'spend' }))).toBeNull()
+    const row = list({
+      txns: [
+        tx({
+          type: 'income',
+          category: 'salary',
+          plannedId: 'p1',
+          amount: 100,
+        }),
+      ],
+    }).groups[0].rows[0] as TxRow
+    expect(row.tag).toBe('income')
   })
 })

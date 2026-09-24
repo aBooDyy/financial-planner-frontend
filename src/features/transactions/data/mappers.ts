@@ -25,6 +25,7 @@ import {
 export const serverTransactionToLocal = (t: Transaction): LocalTransaction => ({
   ...t,
   merchantId: t.merchantId ?? null,
+  plannedId: t.plannedId ?? null,
   dirty: 0,
   deleted: 0,
 })
@@ -45,6 +46,8 @@ export const localTransactionToCreateWire = (
   date: l.date,
   note: l.note,
   source: l.source,
+  // Always sent: PATCH replaces, so omitting it would unlink the settlement.
+  planned_id: l.plannedId,
 })
 
 export const localTransactionToUpdateWire = (
@@ -63,6 +66,8 @@ export const localTransactionToUpdateWire = (
   date: l.date,
   note: l.note,
   source: l.source,
+  // Always sent: PATCH replaces, so omitting it would unlink the settlement.
+  planned_id: l.plannedId,
 })
 
 // --- Transfers -----------------------------------------------------------------------

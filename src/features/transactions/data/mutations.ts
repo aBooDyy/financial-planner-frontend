@@ -8,6 +8,7 @@ import type {
 } from '#/db/types'
 import type { CurrencyCode } from '#/lib/currency'
 import type { GoalFrequency } from '#/features/goals/api/types'
+import { closeCovered, reopenUnderSettled } from '#/features/planned/data/rows'
 import type {
   BudgetPeriod,
   BudgetScope,
@@ -75,6 +76,8 @@ export type TransactionDraft = {
   date: string
   note: string | null
   source?: string | null
+  /** The planned item this settles. Undefined on update leaves the link alone. */
+  plannedId?: string | null
 }
 
 const buildTransaction = (
@@ -95,6 +98,7 @@ const buildTransaction = (
   note: draft.note,
   source: draft.source ?? null,
   transferId: null,
+  plannedId: draft.plannedId ?? null,
   createdAt: ts,
   updatedAt: ts,
   version: '',
@@ -121,6 +125,7 @@ export async function addTransactionWithId(
       createdAt: ts,
     })
   })
+  await closeCovered([tx.plannedId])
   schedulePush()
 }
 
@@ -152,6 +157,8 @@ export async function updateTransaction(
     date: draft.date,
     note: draft.note,
     source: draft.source ?? existing.source,
+    plannedId:
+      draft.plannedId !== undefined ? draft.plannedId : existing.plannedId,
     updatedAt: now(),
     dirty: 1,
   }
@@ -165,11 +172,16 @@ export async function updateTransaction(
       localTransactionToUpdateWire(tx),
     )
   })
+  await reopenUnderSettled([existing.plannedId])
+  await closeCovered([tx.plannedId])
   schedulePush()
 }
 
 export async function deleteTransaction(id: string): Promise<void> {
+  const plannedId = (await db.transactions.get(id))?.plannedId
   await deleteRecord('transaction', id, db.transactions)
+  await reopenUnderSettled([plannedId])
+  schedulePush()
 }
 
 /**
@@ -218,32 +230,42 @@ export async function bulkDeleteTransactions(
 ): Promise<number> {
   if (ids.length === 0) return 0
   const ts = now()
-  return db.transaction('rw', db.transactions, db.outbox, async () => {
-    const queued = await db.outbox
-      .where('[entity+id]')
-      .anyOf(ids.map((id) => ['transaction', id]))
-      .toArray()
-    const neverSynced = new Set(
-      queued.filter((e) => e.op === 'create').map((e) => e.id),
-    )
-    await db.outbox.bulkDelete(
-      queued.map((entry) => entry.seq).filter((seq) => seq !== undefined),
-    )
-    await db.transactions.bulkDelete([...ids])
-    await db.outbox.bulkAdd(
-      ids
-        .filter((id) => !neverSynced.has(id))
-        .map((id) => ({
-          op: 'delete' as const,
-          entity: 'transaction' as const,
-          id,
-          payload: null,
-          baseVersion: null,
-          createdAt: ts,
-        })),
-    )
-    return ids.length
-  })
+  const plannedIds = (await db.transactions.bulkGet([...ids])).map(
+    (t) => t?.plannedId,
+  )
+  const removed = await db.transaction(
+    'rw',
+    db.transactions,
+    db.outbox,
+    async () => {
+      const queued = await db.outbox
+        .where('[entity+id]')
+        .anyOf(ids.map((id) => ['transaction', id]))
+        .toArray()
+      const neverSynced = new Set(
+        queued.filter((e) => e.op === 'create').map((e) => e.id),
+      )
+      await db.outbox.bulkDelete(
+        queued.map((entry) => entry.seq).filter((seq) => seq !== undefined),
+      )
+      await db.transactions.bulkDelete([...ids])
+      await db.outbox.bulkAdd(
+        ids
+          .filter((id) => !neverSynced.has(id))
+          .map((id) => ({
+            op: 'delete' as const,
+            entity: 'transaction' as const,
+            id,
+            payload: null,
+            baseVersion: null,
+            createdAt: ts,
+          })),
+      )
+      return ids.length
+    },
+  )
+  await reopenUnderSettled(plannedIds)
+  return removed
 }
 
 // --- Budgets -------------------------------------------------------------------------

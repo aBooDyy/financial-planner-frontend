@@ -16,7 +16,6 @@ import type {
 } from '#/features/transactions/api/types'
 import type { CategoryCatalog } from '#/features/categories/data/catalog'
 import { useCategoryCatalog } from '#/features/categories/hooks/useCategoryCatalog'
-import { SAVINGS_CATEGORY_ID } from '#/features/transactions/constants'
 import {
   createTransfer,
   deleteTransfer,
@@ -58,6 +57,8 @@ export type TxEditorDraft = {
   subcategory: string | null
   walletId: string
   goalId: string | null
+  /** The planned item this entry settles (1e's match), or null for an unlinked entry. */
+  plannedId: string | null
   merchantId: string | null
   /** Display only — the picker's live cache may not have caught up with a just-created row. */
   merchantName: string
@@ -140,6 +141,7 @@ export function useTxEditor(
     subcategory: null,
     walletId: defaultWalletId,
     goalId: null,
+    plannedId: null,
     merchantId: null,
     merchantName: '',
     date: ymd(startOfToday()),
@@ -174,6 +176,7 @@ export function useTxEditor(
         subcategory: t.subcategory,
         walletId: t.walletId,
         goalId: t.goalId,
+        plannedId: t.plannedId,
         merchantId: t.merchantId,
         merchantName: '',
         date: t.date,
@@ -309,6 +312,7 @@ export function useTxEditor(
             ...prev.draft,
             type,
             goalId: null,
+            plannedId: null,
             toWalletId:
               toWalletId && toWalletId !== walletId
                 ? toWalletId
@@ -320,9 +324,11 @@ export function useTxEditor(
       const category = valid.includes(prev.draft.category)
         ? prev.draft.category
         : valid[0]
+      // A payday and a payment are different planned items; a new type drops the link.
+      const plannedId = type === prev.draft.type ? prev.draft.plannedId : null
       return {
         ...prev,
-        draft: { ...prev.draft, type, category, subcategory: null },
+        draft: { ...prev.draft, type, category, subcategory: null, plannedId },
       }
     })
 
@@ -333,19 +339,22 @@ export function useTxEditor(
         : prev,
     )
 
-  // Choosing a goal earmarks the entry as savings toward it.
+  // Paying toward a goal keeps the user's own category (rent paid is Housing, not
+  // Savings). A different goal means a different planned item, so any match is dropped.
   const setGoal = (goalId: string | null) =>
-    setEditing((prev) => {
-      if (!prev) return prev
-      const category = goalId ? SAVINGS_CATEGORY_ID : prev.draft.category
-      // A child of the category being left behind would no longer name anything.
-      const subcategory =
-        category === prev.draft.category ? prev.draft.subcategory : null
-      return {
-        ...prev,
-        draft: { ...prev.draft, goalId, category, subcategory },
-      }
-    })
+    setEditing((prev) =>
+      prev
+        ? {
+            ...prev,
+            draft: {
+              ...prev.draft,
+              goalId,
+              plannedId:
+                goalId === prev.draft.goalId ? prev.draft.plannedId : null,
+            },
+          }
+        : prev,
+    )
 
   /**
    * Tagging a row with a merchant is where `auto_categorize` is finally read: on, the learned
@@ -408,7 +417,8 @@ export function useTxEditor(
       return { ...prev, draft: { ...prev.draft, scopeType, target } }
     })
 
-  const save = async () => {
+  /** `link` overrides the draft's planned link — the "Counts toward" field resolves it. */
+  const save = async (link?: { plannedId: string | null }) => {
     if (!editing) return
     const { kind, id, draft } = editing
 
@@ -447,6 +457,7 @@ export function useTxEditor(
         subcategory: draft.subcategory,
         walletId: draft.walletId,
         goalId: draft.type === 'spend' ? draft.goalId : null,
+        plannedId: link ? link.plannedId : draft.plannedId,
         merchantId: draft.merchantId,
         date: draft.date,
         note: draft.note.trim() || null,

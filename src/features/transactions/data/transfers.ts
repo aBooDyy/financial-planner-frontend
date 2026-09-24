@@ -62,6 +62,7 @@ const buildLeg = (
   note: draft.note,
   source: null,
   transferId,
+  plannedId: null,
   createdAt: ts,
   updatedAt: ts,
   version: '',
