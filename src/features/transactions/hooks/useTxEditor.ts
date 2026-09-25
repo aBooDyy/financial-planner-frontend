@@ -14,6 +14,7 @@ import type {
   BudgetScope,
   TxType,
 } from '#/features/transactions/api/types'
+import { isCashflow } from '#/features/transactions/api/types'
 import type { CategoryCatalog } from '#/features/categories/data/catalog'
 import { useCategoryCatalog } from '#/features/categories/hooks/useCategoryCatalog'
 import {
@@ -97,6 +98,12 @@ export type TxEditorState = {
 const firstCategoryOf = (catalog: CategoryCatalog, type: TxType): string =>
   catalog.byType(type)[0]?.slug ?? 'other'
 
+/** A new schedule is most often a bill; start on Housing when the user kept it. */
+const recurringCategoryOf = (catalog: CategoryCatalog): string =>
+  catalog.byType('spend').some((c) => c.slug === 'housing')
+    ? 'housing'
+    : firstCategoryOf(catalog, 'spend')
+
 /** A learned category is only usable when it belongs to the type the row is being filed as. */
 const appliesTo = (
   catalog: CategoryCatalog,
@@ -163,7 +170,7 @@ export function useTxEditor(
   // --- Transactions ---
   const openAddTx = () => setEditing({ kind: 'tx', id: null, draft: blank() })
   const openEditTx = (t: LocalTransaction) => {
-    if (t.type !== 'spend' && t.type !== 'income') return
+    if (!isCashflow(t.type)) return
     setEditing({
       kind: 'tx',
       id: t.id,
@@ -242,7 +249,7 @@ export function useTxEditor(
       id: null,
       draft: {
         ...blank(),
-        category: 'housing',
+        category: recurringCategoryOf(catalog),
         date: ymd(addMonths(startOfToday(), 1)),
       },
     })

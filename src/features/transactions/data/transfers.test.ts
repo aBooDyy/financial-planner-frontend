@@ -17,17 +17,31 @@ const api = vi.hoisted(() => ({
   update: vi.fn(),
   remove: vi.fn(),
   list: vi.fn(),
+  bulkCreate: vi.fn(),
+  bulkDelete: vi.fn(),
 }))
 vi.mock('#/features/transactions/api/transactionsApi', () => ({
-  transfersApi: { create: api.create, update: api.update, remove: api.remove },
+  transfersApi: {
+    create: api.create,
+    update: api.update,
+    remove: api.remove,
+    bulkCreate: api.bulkCreate,
+    bulkDelete: api.bulkDelete,
+  },
   transactionsApi: { list: api.list },
   budgetsApi: {},
   recurringsApi: {},
 }))
 
-const { createTransfer, deleteTransfer, updateTransfer } =
-  await import('./transfers')
-const { pushTransferEntry } = await import('./transferSync')
+const {
+  bulkAddTransfers,
+  bulkDeleteTransfers,
+  createTransfer,
+  deleteTransfer,
+  updateTransfer,
+} = await import('./transfers')
+const { pushTransferCreates, pushTransferDeletes, pushTransferEntry } =
+  await import('./transferSync')
 
 const draft = {
   fromWalletId: 'w1',
@@ -117,6 +131,7 @@ describe('createTransfer', () => {
       to_amount: null,
       date: '2026-09-23',
       note: 'ATM withdrawal',
+      source: null,
     } satisfies CreateTransferWire)
     expect(schedulePush).toHaveBeenCalledTimes(1)
   })
@@ -334,5 +349,137 @@ describe('pushTransferEntry', () => {
     )
     await pushTransferEntry(await entryFor())
     expect(await queued()).toHaveLength(0)
+  })
+})
+
+describe('bulkAddTransfers', () => {
+  it('writes every transfer’s legs and one entry each, marked with the source, and no push', async () => {
+    const written = await bulkAddTransfers(
+      [
+        { id: 't1', draft },
+        { id: 't2', draft: { ...draft, fromWalletId: 'w2', toWalletId: 'w3' } },
+      ],
+      'csv:b1',
+    )
+
+    expect(written).toBe(2)
+    const legs = await db.transactions.toArray()
+    expect(legs).toHaveLength(4)
+    expect(legs.every((leg) => leg.source === 'csv:b1')).toBe(true)
+    const entries = await queued()
+    expect(entries.map((e) => [e.entity, e.op, e.id])).toEqual([
+      ['transfer', 'create', 't1'],
+      ['transfer', 'create', 't2'],
+    ])
+    expect((entries[0].payload as CreateTransferWire).source).toBe('csv:b1')
+    expect(schedulePush).not.toHaveBeenCalled()
+  })
+
+  it('writes nothing twice when a transfer id is already held', async () => {
+    await bulkAddTransfers([{ id: 't1', draft }], 'csv:b1')
+    const written = await bulkAddTransfers([{ id: 't1', draft }], 'csv:b1')
+    expect(written).toBe(0)
+    expect(await db.transactions.count()).toBe(2)
+    expect(await queued()).toHaveLength(1)
+  })
+
+  it('keeps the marker when a leg is edited later', async () => {
+    await bulkAddTransfers([{ id: 't1', draft }], 'csv:b1')
+    await updateTransfer('t1', { ...draft, note: 'edited' })
+    const legs = await legsOf('t1')
+    expect(legs.every((leg) => leg.source === 'csv:b1')).toBe(true)
+  })
+})
+
+describe('bulkDeleteTransfers', () => {
+  it('drops never-synced transfers outright and queues a delete for the rest', async () => {
+    await bulkAddTransfers(
+      [
+        { id: 't1', draft },
+        { id: 't2', draft },
+      ],
+      'csv:b1',
+    )
+    await db.outbox.where('[entity+id]').equals(['transfer', 't2']).delete()
+
+    await bulkDeleteTransfers(['t1', 't2'])
+
+    expect(await db.transactions.count()).toBe(0)
+    const entries = await queued()
+    expect(entries).toEqual([
+      expect.objectContaining({ op: 'delete', entity: 'transfer', id: 't2' }),
+    ])
+    expect(schedulePush).not.toHaveBeenCalled()
+  })
+})
+
+describe('pushTransferCreates', () => {
+  it('stores what was written, settles a taken id and drops an unusable one', async () => {
+    await bulkAddTransfers(
+      [
+        { id: 't1', draft },
+        { id: 't2', draft },
+        { id: 't3', draft },
+      ],
+      'csv:b1',
+    )
+    const echoed = await echoLegs('t1')
+    api.bulkCreate.mockResolvedValue([
+      { id: 't1', status: 'created', transfer: echoed, errorCode: null },
+      { id: 't2', status: 'taken', transfer: null, errorCode: 'x' },
+      { id: 't3', status: 'invalid', transfer: null, errorCode: 'y' },
+    ])
+    api.list.mockResolvedValue([])
+
+    await pushTransferCreates(await queued())
+
+    expect(api.bulkCreate).toHaveBeenCalledTimes(1)
+    expect(await queued()).toHaveLength(0)
+    const t1 = await legsOf('t1')
+    expect(t1.every((leg) => leg.dirty === 0)).toBe(true)
+    // A taken id that is not ours is left clean for the pull, which then drops it.
+    expect(api.list).toHaveBeenCalledTimes(1)
+    expect(await legsOf('t2')).toHaveLength(0)
+  })
+
+  it('leaves an unanswered transfer queued', async () => {
+    await bulkAddTransfers(
+      [
+        { id: 't1', draft },
+        { id: 't2', draft },
+      ],
+      'csv:b1',
+    )
+    api.bulkCreate.mockResolvedValue([
+      {
+        id: 't1',
+        status: 'created',
+        transfer: await echoLegs('t1'),
+        errorCode: null,
+      },
+    ])
+    await pushTransferCreates(await queued())
+    expect((await queued()).map((e) => e.id)).toEqual(['t2'])
+  })
+})
+
+describe('pushTransferDeletes', () => {
+  it('drops every answered delete and keeps the rest queued', async () => {
+    await db.outbox.bulkAdd(
+      ['t1', 't2'].map((id) => ({
+        op: 'delete' as const,
+        entity: 'transfer' as const,
+        id,
+        payload: null,
+        baseVersion: null,
+        createdAt: 'c',
+      })),
+    )
+    api.bulkDelete.mockResolvedValue([
+      { id: 't1', status: 'deleted', errorCode: null },
+    ])
+    await pushTransferDeletes(await queued())
+    expect(api.bulkDelete).toHaveBeenCalledWith(['t1', 't2'])
+    expect((await queued()).map((e) => e.id)).toEqual(['t2'])
   })
 })

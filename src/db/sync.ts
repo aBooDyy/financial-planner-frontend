@@ -32,7 +32,11 @@ import {
   pushTransactionCreates,
   pushTransactionDeletes,
 } from '#/features/transactions/data/sync'
-import { pushTransferEntry } from '#/features/transactions/data/transferSync'
+import {
+  pushTransferCreates,
+  pushTransferDeletes,
+  pushTransferEntry,
+} from '#/features/transactions/data/transferSync'
 import {
   pullPlannedDelta,
   pushPlannedCreates,
@@ -61,13 +65,15 @@ const VISIBILITY_PULL_MIN_MS = 60_000
  * `POST /transactions/bulk-delete`. A CSV import queues one create per row and undoing it
  * queues one delete per row, and a queue drained a round trip at a time turns a
  * three-second commit into minutes of syncing — a measured 2 608-row undo spent ~75 s in
- * continuous HTTP. `planned` creates go out as `POST /planned-transactions/bulk` for the same
- * reason: the planner's first pass over an account writes dozens at once.
+ * continuous HTTP. `transfer` creates and deletes ride `POST /transfers/bulk` and
+ * `POST /transfers/bulk-delete` for the same reason — an import can hold hundreds — and
+ * `planned` creates go out as `POST /planned-transactions/bulk`: the planner's first pass over
+ * an account writes dozens at once.
  *
- * Only these are batched, and only within one entity and op. Neither kind references another
- * row of its own run — ledger rows point at wallets, categories and merchants queued *before*
- * them, planned rows at goals, streams and schedules — so a batch cannot race its own
- * prerequisite, which a batch of `node` creates (child before parent) could. Splitting the
+ * Only these are batched, and only within one entity and op. No kind references another
+ * row of its own run — ledger rows and transfers point at wallets, categories and merchants
+ * queued *before* them, planned rows at goals, streams and schedules — so a batch cannot race
+ * its own prerequisite, which a batch of `node` creates (child before parent) could. Splitting the
  * run at every change of op is what keeps a create and the delete that follows it on the same
  * row in their queued order. How many rows one batch carries is the server's own cap.
  */
@@ -90,6 +96,18 @@ const BULK_KINDS: ReadonlyArray<BulkKind> = [
     op: 'delete',
     batchSize: () => configLimits().transactionBulkMax,
     push: (batch) => pushTransactionDeletes(batch),
+  },
+  {
+    entity: 'transfer',
+    op: 'create',
+    batchSize: () => configLimits().transactionBulkMax,
+    push: (batch) => pushTransferCreates(batch),
+  },
+  {
+    entity: 'transfer',
+    op: 'delete',
+    batchSize: () => configLimits().transactionBulkMax,
+    push: (batch) => pushTransferDeletes(batch),
   },
   {
     entity: 'planned',
@@ -451,7 +469,7 @@ async function pullNodes(): Promise<void> {
   })
 }
 
-async function pullSettings(): Promise<void> {
+export async function pullSettings(): Promise<void> {
   const settings = await balancesApi.getSettings()
   const local = await db.balanceSettings.get(SETTINGS_KEY)
   if (!local || local.dirty === 0) {

@@ -113,6 +113,63 @@ async function pushTransferDelete(entry: OutboxEntry): Promise<void> {
   await dropLocally(entry)
 }
 
+/**
+ * A run of queued transfer creates as one `POST /transfers/bulk`, answered per transfer the
+ * way `pushTransactionCreates` answers rows: a written transfer stores its legs, a taken id
+ * stores the legs the server sends back (or, when the id is not ours, leaves ours clean for
+ * the pull to replace), an unusable one is dropped. An entry the response does not mention
+ * stays queued.
+ */
+export async function pushTransferCreates(
+  entries: ReadonlyArray<OutboxEntry>,
+): Promise<void> {
+  const results = await transfersApi.bulkCreate(
+    entries.map((entry) => entry.payload as CreateTransferWire),
+  )
+  const byId = new Map(results.map((result) => [result.id, result]))
+  const foreign = results.some(
+    (result) => result.status === 'taken' && result.transfer === null,
+  )
+  await db.transaction('rw', db.transactions, db.outbox, async () => {
+    for (const entry of entries) {
+      const result = byId.get(entry.id)
+      if (result === undefined) continue
+      if (result.transfer) {
+        await db.transactions.bulkPut(
+          result.transfer.legs.map(serverTransactionToLocal),
+        )
+      } else if (result.status === 'taken') {
+        await db.transactions
+          .where('transferId')
+          .equals(entry.id)
+          .modify({ dirty: 0 })
+      }
+      await db.outbox.delete(entry.seq)
+    }
+  })
+  if (foreign) await pullTransactions()
+}
+
+/**
+ * A run of queued transfer deletes as one `POST /transfers/bulk-delete`. Every answer is
+ * terminal, so each mentioned entry is dropped with whatever legs are still held.
+ */
+export async function pushTransferDeletes(
+  entries: ReadonlyArray<OutboxEntry>,
+): Promise<void> {
+  const results = await transfersApi.bulkDelete(
+    entries.map((entry) => entry.id),
+  )
+  const answered = new Set(results.map((result) => result.id))
+  await db.transaction('rw', db.transactions, db.outbox, async () => {
+    for (const entry of entries) {
+      if (!answered.has(entry.id)) continue
+      await db.transactions.where('transferId').equals(entry.id).delete()
+      await db.outbox.delete(entry.seq)
+    }
+  })
+}
+
 /** Push one `transfer` outbox entry. Throws on network/unexpected errors. */
 export async function pushTransferEntry(entry: OutboxEntry): Promise<void> {
   if (entry.op === 'create') return pushTransferCreate(entry)

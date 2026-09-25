@@ -264,6 +264,33 @@ describe('bulkRunLength', () => {
   })
 })
 
+describe('bulkRunLength — transfers', () => {
+  it('groups transfer creates and transfer deletes on their own, never with ledger rows', async () => {
+    const { bulkRunLength } = await import('./sync')
+    const transfer = (i: number, op: OutboxEntry['op']): OutboxEntry => ({
+      op,
+      entity: 'transfer',
+      id: `t-${i}`,
+      payload: op === 'delete' ? null : { id: `t-${i}` },
+      baseVersion: null,
+      createdAt: TS,
+    })
+    const page = [
+      transfer(0, 'create'),
+      transfer(1, 'create'),
+      txEntry(0),
+      transfer(2, 'delete'),
+      transfer(3, 'delete'),
+      transfer(4, 'update'),
+      transfer(5, 'update'),
+    ]
+    expect(bulkRunLength(page, 0)).toBe(2)
+    expect(bulkRunLength(page, 2)).toBe(1)
+    expect(bulkRunLength(page, 3)).toBe(2)
+    expect(bulkRunLength(page, 5)).toBe(1)
+  })
+})
+
 describe('flushOutbox', () => {
   it('sends a run of transaction creates as one request', async () => {
     const { db } = await import('./db')

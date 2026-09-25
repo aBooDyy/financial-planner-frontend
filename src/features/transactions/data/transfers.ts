@@ -1,6 +1,6 @@
 import { db } from '#/db/db'
 import { schedulePush } from '#/db/sync'
-import type { LocalTransaction } from '#/db/types'
+import type { LocalTransaction, OutboxEntry } from '#/db/types'
 import type { CurrencyCode } from '#/lib/currency'
 import type { TransferLegType } from '#/features/transactions/api/types'
 import { transferToCreateWire, transferToUpdateWire } from './mappers'
@@ -48,6 +48,7 @@ const buildLeg = (
   currency: CurrencyCode,
   draft: TransferDraft,
   ts: string,
+  source: string | null,
 ): LocalTransaction => ({
   id,
   type,
@@ -60,7 +61,7 @@ const buildLeg = (
   merchantId: null,
   date: draft.date,
   note: draft.note,
-  source: null,
+  source,
   transferId,
   plannedId: null,
   createdAt: ts,
@@ -76,6 +77,7 @@ const legsFor = (
   inId: string,
   draft: TransferDraft,
   ts: string,
+  source: string | null = null,
 ): TransferLegs => ({
   out: buildLeg(
     outId,
@@ -86,6 +88,7 @@ const legsFor = (
     draft.fromCurrency,
     draft,
     ts,
+    source,
   ),
   in: buildLeg(
     inId,
@@ -96,6 +99,7 @@ const legsFor = (
     draft.toCurrency,
     draft,
     ts,
+    source,
   ),
 })
 
@@ -105,17 +109,58 @@ export async function createTransfer(draft: TransferDraft): Promise<string> {
   const legs = legsFor(transferId, newId(), newId(), draft, ts)
   await db.transaction('rw', db.transactions, db.outbox, async () => {
     await db.transactions.bulkPut([legs.out, legs.in])
-    await db.outbox.add({
-      op: 'create',
-      entity: 'transfer',
-      id: transferId,
-      payload: transferToCreateWire(transferId, legs),
-      baseVersion: null,
-      createdAt: ts,
-    })
+    await db.outbox.add(createEntry(transferId, legs, ts))
   })
   schedulePush()
   return transferId
+}
+
+const createEntry = (
+  transferId: string,
+  legs: TransferLegs,
+  ts: string,
+): OutboxEntry => ({
+  op: 'create',
+  entity: 'transfer',
+  id: transferId,
+  payload: transferToCreateWire(transferId, legs),
+  baseVersion: null,
+  createdAt: ts,
+})
+
+/**
+ * Many transfers in one Dexie transaction, each leg marked with `source` — the import's
+ * batch marker, which is how an undo finds them again. Transfer ids already held are left
+ * alone, so a retried import writes nothing twice.
+ *
+ * No push is scheduled: like `bulkAddTransactions`, the caller pushes once for the batch.
+ */
+export async function bulkAddTransfers(
+  entries: ReadonlyArray<{ id: string; draft: TransferDraft }>,
+  source: string | null,
+): Promise<number> {
+  if (entries.length === 0) return 0
+  const ts = now()
+  return db.transaction('rw', db.transactions, db.outbox, async () => {
+    const held = await db.transactions
+      .where('transferId')
+      .anyOf(entries.map((entry) => entry.id))
+      .toArray()
+    const existing = new Set(held.map((leg) => leg.transferId))
+    const fresh = entries
+      .filter((entry) => !existing.has(entry.id))
+      .map((entry) => ({
+        id: entry.id,
+        legs: legsFor(entry.id, newId(), newId(), entry.draft, ts, source),
+      }))
+    await db.transactions.bulkPut(
+      fresh.flatMap(({ legs }) => [legs.out, legs.in]),
+    )
+    await db.outbox.bulkAdd(
+      fresh.map(({ id, legs }) => createEntry(id, legs, ts)),
+    )
+    return fresh.length
+  })
 }
 
 /**
@@ -141,7 +186,12 @@ export async function updateTransfer(
       leg: LocalTransaction,
       prior: LocalTransaction | undefined,
     ): LocalTransaction | undefined =>
-      prior && { ...leg, createdAt: prior.createdAt, version: prior.version }
+      prior && {
+        ...leg,
+        createdAt: prior.createdAt,
+        version: prior.version,
+        source: prior.source,
+      }
     const legs: HeldLegs = {
       out: keep(fresh.out, existing.out),
       in: keep(fresh.in, existing.in),
@@ -193,4 +243,45 @@ export async function deleteTransfer(transferId: string): Promise<void> {
     })
   })
   schedulePush()
+}
+
+/**
+ * Delete many transfers — every leg of each — in one Dexie transaction. A transfer whose
+ * create is still queued is dropped outright; the rest queue one `delete` each, which the
+ * sync engine sends as `POST /transfers/bulk-delete`. Like `bulkAddTransfers`, no push.
+ */
+export async function bulkDeleteTransfers(
+  transferIds: ReadonlyArray<string>,
+): Promise<number> {
+  if (transferIds.length === 0) return 0
+  const ts = now()
+  return db.transaction('rw', db.transactions, db.outbox, async () => {
+    const queued = await db.outbox
+      .where('[entity+id]')
+      .anyOf(transferIds.map((id) => ['transfer', id]))
+      .toArray()
+    const neverSynced = new Set(
+      queued.filter((e) => e.op === 'create').map((e) => e.id),
+    )
+    await db.outbox.bulkDelete(
+      queued.map((entry) => entry.seq).filter((seq) => seq !== undefined),
+    )
+    await db.transactions
+      .where('transferId')
+      .anyOf([...transferIds])
+      .delete()
+    await db.outbox.bulkAdd(
+      transferIds
+        .filter((id) => !neverSynced.has(id))
+        .map((id) => ({
+          op: 'delete' as const,
+          entity: 'transfer' as const,
+          id,
+          payload: null,
+          baseVersion: null,
+          createdAt: ts,
+        })),
+    )
+    return transferIds.length
+  })
 }

@@ -5,9 +5,11 @@ import type {
   Budget,
   BudgetWire,
   BulkCreateTransactionsWire,
+  BulkCreateTransfersWire,
   BulkDeleteResult,
   BulkDeleteTransactionsWire,
   BulkTransactionResult,
+  BulkTransferResult,
   CreateBudgetWire,
   CreateRecurringWire,
   CreateTransactionWire,
@@ -27,6 +29,7 @@ import {
   toBudget,
   toBulkDeleteResult,
   toBulkResult,
+  toBulkTransferResult,
   toRecurring,
   toTransaction,
   toTransfer,
@@ -79,6 +82,18 @@ export const transactionsApi = {
 export const transfersApi = {
   create: (payload: CreateTransferWire): Promise<Transfer> =>
     http.post<TransferWire>('/transfers', payload).then(toTransfer),
+  /** `transactionsApi.bulkCreate` for transfers: one verdict per transfer, in request order. */
+  bulkCreate: (
+    items: ReadonlyArray<CreateTransferWire>,
+  ): Promise<BulkTransferResult[]> =>
+    http
+      .post<BulkCreateTransfersWire>('/transfers/bulk', { items })
+      .then((r) => r.results.map(toBulkTransferResult)),
+  /** Removes every standing leg of each transfer id; answered like `transactionsApi.bulkDelete`. */
+  bulkDelete: (ids: ReadonlyArray<string>): Promise<BulkDeleteResult[]> =>
+    http
+      .post<BulkDeleteTransactionsWire>('/transfers/bulk-delete', { ids })
+      .then((r) => r.results.map(toBulkDeleteResult)),
   update: (id: string, payload: UpdateTransferWire): Promise<Transfer> =>
     http.patch<TransferWire>(`/transfers/${id}`, payload).then(toTransfer),
   remove: (id: string): Promise<void> =>
