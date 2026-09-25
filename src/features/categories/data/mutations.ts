@@ -1,8 +1,10 @@
 import { db } from '#/db/db'
 import { schedulePush } from '#/db/sync'
 import type { LocalCategory } from '#/db/types'
+import type { DeleteCategoryWire } from '#/features/categories/api/types'
 import type { TxType } from '#/features/transactions/api/types'
 import { localCategoryToCreateWire, localCategoryToUpdateWire } from './mappers'
+import { filingOf, refileLocally, refileTables } from './refile'
 import { slugify } from './slug'
 
 const now = () => new Date().toISOString()
@@ -163,9 +165,21 @@ export async function updateCategory(
  * Delete a category and, when it is a parent, its children with it. The server cascades, so
  * one delete op covers the subtree — but the children's own queued ops have to go in the
  * same transaction, or a create for a child would be pushed after its parent is gone.
+ *
+ * `moveToId` names a category that stays: everything filed under the deleted one moves
+ * there, here at once and server-side when the delete is pushed.
  */
-export async function deleteCategory(id: string): Promise<void> {
-  await db.transaction('rw', db.categories, db.outbox, async () => {
+export async function deleteCategory(
+  id: string,
+  moveToId: string | null = null,
+): Promise<void> {
+  await db.transaction('rw', [db.categories, ...refileTables()], async () => {
+    const category = await db.categories.get(id)
+    const target = moveToId ? await db.categories.get(moveToId) : undefined
+    const source = category ? await filingOf(category) : null
+    const destination = target ? await filingOf(target) : null
+    if (source && destination) await refileLocally(source, destination)
+
     const neverSynced = (await pending(id).toArray()).some(
       (e) => e.op === 'create',
     )
@@ -177,11 +191,13 @@ export async function deleteCategory(id: string): Promise<void> {
     await pending(id).delete()
     await db.categories.delete(id)
     if (!neverSynced) {
+      const payload: DeleteCategoryWire | null =
+        destination && moveToId ? { move_to: moveToId } : null
       await db.outbox.add({
         op: 'delete',
         entity: 'category',
         id,
-        payload: null,
+        payload,
         baseVersion: null,
         createdAt: now(),
       })

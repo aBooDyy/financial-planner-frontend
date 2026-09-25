@@ -23,6 +23,12 @@ export const categoriesApi = {
   update: (id: string, payload: UpdateCategoryWire): Promise<Category> =>
     http.patch<CategoryWire>(`/categories/${id}`, payload).then(toCategory),
 
-  remove: (id: string): Promise<void> =>
-    http.del<void>(`/categories/${id}`).then(() => undefined),
+  remove: (id: string, moveTo: string | null = null): Promise<void> =>
+    http
+      .del<void>(
+        moveTo
+          ? `/categories/${id}?move_to=${encodeURIComponent(moveTo)}`
+          : `/categories/${id}`,
+      )
+      .then(() => undefined),
 }

@@ -4,11 +4,11 @@ import { Button } from '#/components/ui/button'
 import { CategoryEditor } from '#/features/categories/components/CategoryEditor'
 import { CategoryTree } from '#/features/categories/components/CategoryTree'
 import { DeleteCategoryDialog } from '#/features/categories/components/DeleteCategoryDialog'
-import type { DeleteTarget } from '#/features/categories/components/DeleteCategoryDialog'
 import { deleteCategory } from '#/features/categories/data/mutations'
 import { useCategoryCatalog } from '#/features/categories/hooks/useCategoryCatalog'
 import { useCategoryEditor } from '#/features/categories/hooks/useCategoryEditor'
 import { useCategoryTree } from '#/features/categories/hooks/useCategoryTree'
+import type { DeleteTarget } from '#/features/categories/hooks/useDeleteChoice'
 import { SectionHeader } from './SectionHeader'
 import { Segmented } from './Segmented'
 
@@ -28,9 +28,11 @@ export function CategoriesSection() {
         setDeleting({
           id,
           name: c.name,
-          isSub: false,
+          type: c.type,
+          parentId: null,
           subCount: c.subs.length,
           txCount: c.txCount,
+          recurringCount: c.recurringCount,
         })
         return
       }
@@ -39,17 +41,19 @@ export function CategoriesSection() {
         setDeleting({
           id,
           name: child.name,
-          isSub: true,
+          type: c.type,
+          parentId: c.id,
           subCount: 0,
           txCount: child.txCount,
+          recurringCount: child.recurringCount,
         })
         return
       }
     }
   }
 
-  const confirmDelete = () => {
-    if (deleting) void deleteCategory(deleting.id)
+  const confirmDelete = (moveToId: string | null) => {
+    if (deleting) void deleteCategory(deleting.id, moveToId)
     setDeleting(null)
     addRef.current?.focus()
   }
@@ -101,6 +105,7 @@ export function CategoriesSection() {
       <CategoryEditor editor={editor} catalog={catalog} />
       <DeleteCategoryDialog
         target={deleting}
+        catalog={catalog}
         onClose={() => setDeleting(null)}
         onConfirm={confirmDelete}
       />

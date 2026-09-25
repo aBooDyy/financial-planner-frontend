@@ -1,6 +1,7 @@
 import 'fake-indexeddb/auto'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '#/db/db'
+import type { LocalRecurring, LocalTransaction } from '#/db/types'
 import type {
   CreateCategoryWire,
   UpdateCategoryWire,
@@ -254,5 +255,168 @@ describe('deleteCategory', () => {
     const entries = await outbox().toArray()
     expect(entries).toHaveLength(1)
     expect(entries[0]).toMatchObject({ op: 'delete', id: child })
+  })
+})
+
+describe('deleteCategory with a move target', () => {
+  const tx = (
+    id: string,
+    category: string,
+    subcategory: string | null,
+  ): LocalTransaction => ({
+    id,
+    type: 'spend',
+    amount: 2400,
+    currency: 'SAR',
+    category,
+    subcategory,
+    walletId: 'w1',
+    goalId: null,
+    merchantId: null,
+    date: '2026-06-12',
+    note: null,
+    source: null,
+    transferId: null,
+    plannedId: null,
+    createdAt: '2026-06-12T00:00:00Z',
+    updatedAt: '2026-06-12T00:00:00Z',
+    version: 'v1',
+    dirty: 0,
+    deleted: 0,
+  })
+
+  const recurring = (id: string, category: string): LocalRecurring => ({
+    id,
+    name: 'Coffee club',
+    type: 'spend',
+    amount: 5000,
+    currency: 'SAR',
+    category,
+    subcategory: 'cafes',
+    walletId: 'w1',
+    goalId: null,
+    frequency: 'monthly',
+    nextDue: '2026-10-01',
+    autopost: false,
+    createdAt: '2026-06-12T00:00:00Z',
+    updatedAt: '2026-06-12T00:00:00Z',
+    version: 'v1',
+    dirty: 0,
+    deleted: 0,
+  })
+
+  const filing = async (id: string) => {
+    const row = await db.transactions.get(id)
+    return [row?.category, row?.subcategory]
+  }
+
+  /** Dining › Cafés and Takeaway, plus Groceries — all synced. */
+  const seedTree = async () => {
+    const dining = await createCategory({
+      name: 'Dining',
+      type: 'spend',
+      color: '#1F9D6B',
+    })
+    const cafes = await createCategory({
+      name: 'Cafes',
+      type: 'spend',
+      color: '#1F9D6B',
+      parentId: dining,
+    })
+    const takeaway = await createCategory({
+      name: 'Takeaway',
+      type: 'spend',
+      color: '#1F9D6B',
+      parentId: dining,
+    })
+    const groceries = await createCategory({
+      name: 'Groceries',
+      type: 'spend',
+      color: '#1F9D6B',
+    })
+    await markSynced(dining, cafes, takeaway, groceries)
+    return { dining, cafes, takeaway, groceries }
+  }
+
+  beforeEach(async () => {
+    await db.transactions.clear()
+    await db.recurrings.clear()
+    await db.plannedTransactions.clear()
+  })
+
+  it('re-files everything under a deleted parent and asks the server to do the same', async () => {
+    const { dining, groceries } = await seedTree()
+    await db.transactions.bulkPut([
+      tx('t1', 'dining', 'cafes'),
+      tx('t2', 'dining', null),
+      tx('t3', 'transport', null),
+    ])
+    await db.recurrings.put(recurring('r1', 'dining'))
+
+    await deleteCategory(dining, groceries)
+
+    expect(await filing('t1')).toEqual(['groceries', null])
+    expect(await filing('t2')).toEqual(['groceries', null])
+    expect(await filing('t3')).toEqual(['transport', null])
+    expect(await db.recurrings.get('r1')).toMatchObject({
+      category: 'groceries',
+      subcategory: null,
+    })
+    // The server re-files synced rows itself; this device queues no per-row edits.
+    const entries = await db.outbox.toArray()
+    expect(entries).toHaveLength(1)
+    expect(entries[0]).toMatchObject({
+      entity: 'category',
+      op: 'delete',
+      id: dining,
+      payload: { move_to: groceries },
+    })
+  })
+
+  it('moves only the deleted subcategory’s pair', async () => {
+    const { dining, cafes } = await seedTree()
+    await db.transactions.bulkPut([
+      tx('t1', 'dining', 'cafes'),
+      tx('t2', 'dining', 'takeaway'),
+    ])
+
+    await deleteCategory(cafes, dining)
+
+    expect(await filing('t1')).toEqual(['dining', null])
+    expect(await filing('t2')).toEqual(['dining', 'takeaway'])
+  })
+
+  it('rewrites a queued create so its push does not file it back', async () => {
+    const { dining, groceries } = await seedTree()
+    await db.transactions.put({ ...tx('t1', 'dining', 'cafes'), dirty: 1 })
+    await db.outbox.add({
+      op: 'create',
+      entity: 'transaction',
+      id: 't1',
+      payload: { id: 't1', category: 'dining', subcategory: 'cafes' },
+      baseVersion: null,
+      createdAt: '2026-06-12T00:00:00Z',
+    })
+
+    await deleteCategory(dining, groceries)
+
+    const queued = await db.outbox
+      .where('[entity+id]')
+      .equals(['transaction', 't1'])
+      .first()
+    expect(queued?.payload).toMatchObject({
+      category: 'groceries',
+      subcategory: null,
+    })
+  })
+
+  it('leaves the rows alone without a target', async () => {
+    const { dining } = await seedTree()
+    await db.transactions.put(tx('t1', 'dining', 'cafes'))
+
+    await deleteCategory(dining)
+
+    expect(await filing('t1')).toEqual(['dining', 'cafes'])
+    expect(await outbox().first()).toMatchObject({ payload: null })
   })
 })
