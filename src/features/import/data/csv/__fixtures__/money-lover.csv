@@ -1,0 +1,12 @@
+﻿Id,Date,Category,Subcategory,Amount,Currency,Wallet,Note,With,Event,Exclude from report,Members
+1,12/09/2026,Shopping,Clothing,-240.00,SAR,Albilad Bank,Pants and hiking shoes ,,,,
+2,12/09/2026,Personal care,,-40.00,SAR,Albilad Bank,,,,,
+3,12/09/2026,Transport,Fuel,-78.22,SAR,Albilad Bank,,,,,
+7,09/09/2026,Transfer,,-300.00,SAR,Albilad Bank,Send to STC Pay,,,✅,
+8,09/09/2026,Transfer,,300.00,SAR,STC Pay,Received from Albilad Bank,,,✅,
+26,01/09/2026,Transfer,,-15,SAR,Albilad Bank,Send to My Wallet,,,✅,
+27,02/09/2026,Transfer,,15,SAR,My Wallet,Received from Albilad Bank,,,✅,
+41,28/08/2026,Transfer,,-120,SAR,Albilad Bank,Send to STC Pay,,,✅,
+52,25/08/2026,Transfer,,50,SAR,Home Bank,,,,✅,
+258,18/06/2026,Balance adjustment,,-40,SAR,My Wallet,Adjust Balance,,,,
+260,15/06/2026,Salary,,5000,SAR,Albilad Bank,June salary,,,,

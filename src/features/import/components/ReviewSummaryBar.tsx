@@ -1,10 +1,14 @@
 import { Switch } from '#/components/ui/switch'
 import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
+import { planLabel } from '#/features/import/data/importCounts'
 import { REVIEW_FILTERS } from '#/features/import/data/review'
+import type { ImportPlan } from '#/features/import/data/importCounts'
 import type { ReviewCounts, ReviewFilter } from '#/features/import/data/review'
 
 type Props = {
   counts: ReviewCounts
+  /** What the included rows become — said only when some of them pair into transfers. */
+  plan: ImportPlan
   filter: ReviewFilter
   onFilter: (filter: ReviewFilter) => void
   skipDuplicates: boolean
@@ -31,6 +35,7 @@ const ITEM =
 /** What the file adds up to, and the filters over it. */
 export function ReviewSummaryBar({
   counts,
+  plan,
   filter,
   onFilter,
   skipDuplicates,
@@ -46,6 +51,12 @@ export function ReviewSummaryBar({
         {number.format(counts.error)} errors · ⧉{' '}
         {number.format(counts.duplicate)} duplicates
       </p>
+      {plan.transfers > 0 ? (
+        <p className="text-[12.5px] text-fp-text-3">
+          Imports as {planLabel(plan)} — each transfer’s two rows become one
+          transfer between your accounts.
+        </p>
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <ToggleGroup

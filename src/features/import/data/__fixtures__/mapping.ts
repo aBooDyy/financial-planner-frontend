@@ -38,6 +38,7 @@ export const testContext = (
 ): RowContext => ({
   today: '2026-06-20',
   walletCurrencies: { w1: 'SAR' },
+  walletNames: { w1: 'Main' },
   ...overrides,
 })
 
@@ -59,6 +60,8 @@ export const testFacts = (overrides: Partial<RowFacts> = {}): RowFacts => ({
   category: 'groceries',
   subcategory: null,
   categoryDefaulted: false,
+  intent: 'cashflow',
+  counterpartId: null,
   merchantId: null,
   merchantRaw: 'Bakery',
   note: 'Bakery',

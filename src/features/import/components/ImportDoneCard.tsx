@@ -3,6 +3,7 @@ import { Link } from '@tanstack/react-router'
 import { ArrowRight, CheckCircle2, Undo2 } from 'lucide-react'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
+import { batchPlan, planPhrase } from '#/features/import/data/importCounts'
 import { useImportBatch } from '#/features/import/hooks/useImportHistory'
 import type { LocalImportBatch } from '#/db/types'
 import type { TemplateSaveOutcome } from '#/features/import/data/mutations'
@@ -86,16 +87,12 @@ export function ImportDoneCard({
           <h3 className="text-[15px] font-bold">
             {undone
               ? 'Import undone.'
-              : `${
-                  batch.importedCount === 1
-                    ? '1 transaction imported'
-                    : `${number.format(batch.importedCount)} transactions imported`
-                } into ${list(walletNames)}.`}
+              : `${planPhrase(batchPlan(batch))} imported into ${list(walletNames)}.`}
           </h3>
           {undone ? (
             <p className="text-[13px] text-fp-text-2">
-              The transactions it added were removed — any you had changed since
-              were kept, along with the accounts, categories and merchants it
+              What it added was removed — anything you had changed since was
+              kept, along with the accounts, categories and merchants it
               created.
             </p>
           ) : notes.length > 0 ? (

@@ -67,5 +67,6 @@ export const reviewOrder = (rows: ReadonlyArray<ParsedRow>): number[] =>
     .sort((a, b) => a.rank - b.rank || a.position - b.position)
     .map((entry) => entry.position)
 
+/** A transfer with no other side keeps its draft for display, so the issues decide too. */
 export const isCommittable = (row: ParsedRow): boolean =>
-  row.draft !== null && !row.excluded
+  row.draft !== null && !row.excluded && !hasErrors(row.issues)

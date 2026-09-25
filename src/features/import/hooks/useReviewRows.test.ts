@@ -155,3 +155,88 @@ describe('useReviewRows', () => {
     expect(skipped.every((row) => row.excluded)).toBe(true)
   })
 })
+
+describe('useReviewRows — transfers', () => {
+  const transferSeed: StubSeed = {
+    headers: HEADERS,
+    matrix: [
+      ['2026-08-01', 'Send to Savings', '-300.00', 'Main', 'Transfer'],
+      ['2026-08-01', 'Received from Main', '300.00', 'Savings', 'Transfer'],
+      ['2026-08-02', 'Coffee', '-10.00', 'Main', 'Groceries'],
+      ['2026-08-03', 'Moved', '50.00', 'Savings', 'Transfer'],
+    ],
+    walletGroups: [
+      {
+        label: null,
+        wallets: [
+          { id: 'w1', name: 'Main' },
+          { id: 'w2', name: 'Savings' },
+        ],
+      },
+    ],
+    walletCurrencies: { w1: 'SAR', w2: 'SAR' },
+    amend: (draft) => ({
+      ...draft,
+      aliases: {
+        ...emptyAliases(),
+        wallets: {
+          main: { kind: 'wallet', walletId: 'w1' },
+          savings: { kind: 'wallet', walletId: 'w2' },
+        },
+        categories: {
+          transfer: { kind: 'transfer' },
+          groceries: {
+            kind: 'category',
+            category: 'groceries',
+            subcategory: null,
+          },
+        },
+      },
+    }),
+  }
+
+  const mountedTransfers = () =>
+    renderHook(() => {
+      const csv = useStubImport(transferSeed)
+      return { csv, review: useReviewRows(csv) }
+    })
+
+  it('counts a pair once and keeps its sides next to each other for the commit', () => {
+    const { result } = mountedTransfers()
+    expect(result.current.review.plan).toEqual({
+      transactions: 1,
+      transfers: 1,
+    })
+    const { committable } = result.current.review
+    const at = committable.indexOf(0)
+    expect(committable[at + 1]).toBe(1)
+    // The side with no other wallet is an error, and never written.
+    expect(committable).not.toContain(3)
+  })
+
+  it('leaves both sides out when either is left out, and brings both back', () => {
+    const { result } = mountedTransfers()
+    act(() => result.current.review.toggleRow(1, true))
+    expect(result.current.review.plan).toEqual({
+      transactions: 1,
+      transfers: 0,
+    })
+    expect(result.current.review.excluded).toEqual(
+      expect.arrayContaining([0, 1]),
+    )
+    act(() => result.current.review.toggleRow(0, false))
+    expect(result.current.review.plan.transfers).toBe(1)
+  })
+
+  it('splits the pair when a matched field changes, each side then naming its own', () => {
+    const { result } = mountedTransfers()
+    act(() => result.current.review.editRow(0, { amountMinor: 30_100 }))
+    expect(result.current.review.patchFor(1)).toEqual({ unpaired: true })
+    // Both notes name the other account, so both stand alone as transfers.
+    expect(result.current.review.plan).toEqual({
+      transactions: 1,
+      transfers: 2,
+    })
+    expect(result.current.review.counts.warning).toBe(2)
+  })
+})

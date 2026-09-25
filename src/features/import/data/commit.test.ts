@@ -8,6 +8,8 @@ import { buildRows } from './csv/rows'
 import { normalizeKey } from './matching'
 import { testContext, testMapping } from './__fixtures__/mapping'
 import { emptyAliases } from './types'
+import { emptyDedupeIndex } from './dedupe'
+import { moneyLover } from './__fixtures__/moneyLover'
 import type { Mapping } from './types'
 
 const schedulePush = vi.fn()
@@ -26,7 +28,7 @@ vi.mock('#/features/transactions/api/transactionsApi', () => ({
 }))
 
 const { CHUNK_SIZE, commitImport, rowsSource } = await import('./commit')
-const { rowReader } = await import('./rowScan')
+const { rowReader, scanRowsSync } = await import('./rowScan')
 const { batchSource } = await import('./batches')
 const { pushSpendingEntry } = await import('#/features/transactions/data/sync')
 
@@ -338,4 +340,76 @@ describe('commitImport', () => {
     expect(built).toBe(5000)
     expect(widest).toBe(CHUNK_SIZE)
   }, 120000)
+})
+
+describe('commitImport — transfers and adjustments', () => {
+  const committed = async (chunkBreak = false) => {
+    const { matrix, mapping, context } = moneyLover()
+    const scan = scanRowsSync({
+      matrix,
+      mapping,
+      context,
+      merchants: { merchants: [], aliases: [] },
+      ledger: emptyDedupeIndex(),
+    })
+    const reader = rowReader({
+      matrix,
+      mapping,
+      context,
+      merchants: { merchants: [], aliases: [] },
+      pairs: scan.pairs,
+    })
+    const rows = matrix.map((_cells, index) => reader.at(index))
+    // A partner that arrives in a later chunk than its side must still make one transfer.
+    const ordered = chunkBreak ? [...rows].reverse() : rows
+    return commitImport(rowsSource(ordered), mapping, meta)
+  }
+
+  it('writes each pair as one transfer, a lone side by its named wallet, and no error row', async () => {
+    const { batch } = await committed()
+
+    expect(batch.transferCount).toBe(3)
+    const legs = await db.transactions.where('transferId').above('').toArray()
+    expect(legs).toHaveLength(6)
+    expect(legs.every((leg) => leg.source === batchSource(batch.id))).toBe(true)
+
+    const outs = legs
+      .filter((leg) => leg.type === 'transfer_out')
+      .map((leg) => [leg.walletId, leg.amount, leg.date, leg.note])
+      .sort()
+    expect(outs).toEqual([
+      ['w1', 12000, '2026-08-28', 'Send to STC Pay'],
+      ['w1', 1500, '2026-09-01', 'Send to My Wallet'],
+      ['w1', 30000, '2026-09-09', 'Send to STC Pay'],
+    ])
+    const ins = legs
+      .filter((leg) => leg.type === 'transfer_in')
+      .map((leg) => leg.walletId)
+      .sort()
+    expect(ins).toEqual(['w2', 'w2', 'w3'])
+
+    const entries = await db.outbox.toArray()
+    expect(entries.filter((e) => e.entity === 'transfer')).toHaveLength(3)
+    // Ledger rows first, then transfers — one run of each for the bulk drain.
+    const kinds = entries.map((e) => e.entity)
+    expect(kinds.indexOf('transfer')).toBe(kinds.lastIndexOf('transaction') + 1)
+  })
+
+  it('writes a balance adjustment as one ledger row with no category', async () => {
+    const { batch } = await committed()
+    const adjustments = await db.transactions
+      .filter((tx) => tx.type === 'adjustment_out')
+      .toArray()
+    expect(adjustments).toMatchObject([
+      { walletId: 'w3', amount: 4000, category: null, merchantId: null },
+    ])
+    // Four spending/income rows plus the adjustment; the unpaired side is left out.
+    expect(batch.importedCount).toBe(5)
+  })
+
+  it('never splits a pair, whatever order the rows arrive in', async () => {
+    const { batch } = await committed(true)
+    expect(batch.transferCount).toBe(3)
+    expect(await db.transactions.where('transferId').above('').count()).toBe(6)
+  })
 })

@@ -6,7 +6,15 @@ import { buildRows } from './csv/rows'
 import { buildDedupeIndex, emptySeen, markRow, withDuplicate } from './dedupe'
 import { merchantLookup, predictRow } from './predict'
 import { countStatuses, reviewOrder, statusOf } from './review'
-import { rowReader, scanRows, scanRowsSync, statusAt } from './rowScan'
+import {
+  rowReader,
+  scanRows,
+  scanRowsSync,
+  statusAt,
+  transferAt,
+} from './rowScan'
+import { ROW_ISSUES } from './types'
+import { moneyLover } from './__fixtures__/moneyLover'
 import type { MerchantIndex } from '#/features/merchants/data/matching'
 import type { LedgerTransaction } from './dedupe'
 import type { Mapping } from './types'
@@ -164,5 +172,66 @@ describe('rowReader', () => {
     })
 
     for (const row of rows) expect(reader.at(row.index)).toEqual(row)
+  })
+})
+
+describe('transfers in a Money Lover export', () => {
+  const { matrix, mapping, context } = moneyLover()
+  const scan = scanRowsSync({
+    matrix,
+    mapping,
+    context,
+    merchants: NO_MERCHANTS,
+    ledger: buildDedupeIndex([]),
+  })
+  const reader = rowReader({
+    matrix,
+    mapping,
+    context,
+    merchants: NO_MERCHANTS,
+    duplicates: scan.duplicates,
+    pairs: scan.pairs,
+  })
+
+  it('reads "Transfer" and "Balance adjustment" as movements, not categories', () => {
+    expect(mapping.aliases.categories).toMatchObject({
+      transfer: { kind: 'transfer' },
+      'balance adjustment': { kind: 'adjustment' },
+    })
+    expect(reader.at(9).intent).toBe('adjustment')
+    expect(reader.at(0).intent).toBe('cashflow')
+  })
+
+  it('pairs the two sides of each whole transfer — the same day, or a day apart', () => {
+    expect([...scan.pairs.entries()].sort((a, b) => a[0] - b[0])).toEqual([
+      [3, { partner: 4, walletId: 'w2' }],
+      [4, { partner: 3, walletId: 'w1' }],
+      [5, { partner: 6, walletId: 'w3' }],
+      [6, { partner: 5, walletId: 'w1' }],
+    ])
+    expect(reader.at(4).transfer).toEqual({
+      pairIndex: 3,
+      counterpartId: 'w1',
+      guessed: false,
+    })
+    expect(statusAt(scan, 3)).toBe('ok')
+  })
+
+  it('takes a lone side’s other wallet from its note, and blocks one with none', () => {
+    expect(reader.at(7).transfer?.counterpartId).toBe('w2')
+    expect(statusAt(scan, 7)).toBe('warning')
+    expect(reader.at(8).issues.map((issue) => issue.code)).toContain(
+      ROW_ISSUES.transferUnpaired,
+    )
+    expect(statusAt(scan, 8)).toBe('error')
+  })
+
+  it('says exactly what the rows it builds say', () => {
+    const rows = matrix.map((_cells, index) => reader.at(index))
+    expect(scan.counts).toEqual(countStatuses(rows))
+    rows.forEach((row, index) =>
+      expect(statusAt(scan, index)).toBe(statusOf(row)),
+    )
+    expect(rows.filter((row) => transferAt(scan, row.index))).toHaveLength(6)
   })
 })

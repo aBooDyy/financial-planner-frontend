@@ -1,5 +1,6 @@
 import { Button } from '#/components/ui/button'
 import { ResponsiveDialog } from '#/components/ui/responsive-dialog'
+import { batchPlan, planPhrase } from '#/features/import/data/importCounts'
 import { formatMoney } from '#/lib/currency'
 import type { LocalTransaction } from '#/db/types'
 import type { UndoPlan } from '#/features/import/data/batches'
@@ -19,7 +20,11 @@ const describe = (tx: LocalTransaction): string =>
 /** Undo asks once, and says exactly what it will and will not touch. */
 export function UndoImportDialog({ plan, busy, onClose, onConfirm }: Props) {
   const number = new Intl.NumberFormat()
-  const removable = plan?.removable.length ?? 0
+  const removing = {
+    transactions: plan?.removable.length ?? 0,
+    transfers: plan?.removableTransfers.length ?? 0,
+  }
+  const removable = removing.transactions + removing.transfers
   const edited = plan?.edited ?? []
 
   return (
@@ -30,8 +35,8 @@ export function UndoImportDialog({ plan, busy, onClose, onConfirm }: Props) {
       }}
       title={
         removable === 1
-          ? 'Remove the transaction this import added?'
-          : `Remove all ${number.format(removable)} transactions this import added?`
+          ? `Remove the ${removing.transfers === 1 ? 'transfer' : 'transaction'} this import added?`
+          : `Remove all ${planPhrase(removing)} this import added?`
       }
       description="Accounts, categories and merchants it created are kept."
       footer={
@@ -55,7 +60,7 @@ export function UndoImportDialog({ plan, busy, onClose, onConfirm }: Props) {
         <p>
           {plan === null
             ? null
-            : `“${plan.batch.label}” added ${number.format(plan.batch.importedCount)} transactions.`}{' '}
+            : `“${plan.batch.label}” added ${planPhrase(batchPlan(plan.batch))}.`}{' '}
           Removing them puts your balances, budgets and spending back where they
           were.
         </p>

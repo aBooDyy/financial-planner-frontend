@@ -97,7 +97,11 @@ function useValueStep() {
         catalog: CATALOG,
         categories: categoryOptions(CATALOG),
         merchantIndex: { merchants: [], aliases: [] },
-        context: { today: '2026-09-01', walletCurrencies: { w1: 'SAR' } },
+        context: {
+          today: '2026-09-01',
+          walletCurrencies: { w1: 'SAR' },
+          walletNames: { w1: 'Main' },
+        },
         actions: { updateMapping },
       }) as unknown as CsvImport,
     [updateMapping],

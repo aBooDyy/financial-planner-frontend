@@ -1,0 +1,66 @@
+{
+  "exercises": "A Money Lover export covering several wallets — each transfer listed twice (out and in), an unpaired side, and a balance adjustment.",
+  "dialect": {
+    "delimiter": ",",
+    "quote": "\"",
+    "encoding": "utf-8",
+    "decimal": ".",
+    "skipRows": 0,
+    "hasHeader": true
+  },
+  "headers": [
+    "Id",
+    "Date",
+    "Category",
+    "Subcategory",
+    "Amount",
+    "Currency",
+    "Wallet",
+    "Note",
+    "With",
+    "Event",
+    "Exclude from report",
+    "Members"
+  ],
+  "rowCount": 11,
+  "columnCount": 12,
+  "dates": {
+    "column": 1,
+    "format": "DD/MM/YYYY",
+    "ambiguous": false,
+    "samples": [
+      {
+        "row": 0,
+        "iso": "2026-09-12"
+      },
+      {
+        "row": 6,
+        "iso": "2026-09-02"
+      }
+    ]
+  },
+  "amounts": [
+    {
+      "row": 3,
+      "column": 4,
+      "currency": "SAR",
+      "minor": 30000,
+      "negative": true
+    },
+    {
+      "row": 4,
+      "column": 4,
+      "currency": "SAR",
+      "minor": 30000,
+      "negative": false
+    },
+    {
+      "row": 9,
+      "column": 4,
+      "currency": "SAR",
+      "minor": 4000,
+      "negative": true
+    }
+  ],
+  "notes": "Rows 3/4 pair on the same day, 5/6 a day apart; row 7 names its other wallet only in the note; row 8 names none; row 9 is a balance adjustment."
+}

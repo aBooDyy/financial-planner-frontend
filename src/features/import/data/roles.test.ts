@@ -204,6 +204,20 @@ describe('suggestRoles — across the fixture corpus', () => {
       'note',
     ],
     'messy.csv': ['date', 'merchant', 'amount', 'wallet'],
+    'money-lover.csv': [
+      'skip',
+      'date',
+      'category',
+      'subcategory',
+      'amount',
+      'currency',
+      'wallet',
+      'note',
+      'skip',
+      'skip',
+      'skip',
+      'skip',
+    ],
     'pipe-delimited.csv': ['date', 'merchant', 'amountOut', 'amountIn'],
     'tab-delimited.csv': ['date', 'merchant', 'amount', 'currency'],
     'typed-column.csv': ['date', 'merchant', 'amount', 'type', 'reference'],
@@ -248,7 +262,7 @@ describe('suggestRoles — across the fixture corpus', () => {
       })
     }
 
-    expect(columns).toBe(58)
+    expect(columns).toBe(70)
     expect(misses).toEqual([
       {
         fixture: 'european.csv',

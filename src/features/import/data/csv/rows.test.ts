@@ -61,6 +61,8 @@ describe('buildRows — a split-column statement', () => {
         date: '2026-06-16',
         note: 'TESCO STORES 3411, LONDON',
       },
+      intent: 'cashflow',
+      transfer: null,
       issues: [
         {
           level: 'warning',

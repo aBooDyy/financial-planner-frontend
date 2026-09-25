@@ -298,3 +298,24 @@ describe('suggestTemplateName', () => {
     expect(suggestTemplateName('2026-08.csv')).toBe('My import')
   })
 })
+
+describe('templates — movement answers', () => {
+  it('saves and restores a transfer and an adjustment answer as they are', () => {
+    const original = draft({
+      aliases: {
+        ...emptyAliases(),
+        categories: {
+          transfer: { kind: 'transfer' },
+          'balance adjustment': { kind: 'adjustment' },
+        },
+      },
+    })
+    const config = configFromDraft(original)
+    expect(config.aliases.categories).toEqual(original.aliases.categories)
+    const applied = applyTemplateConfig(config, 5, catalogue())
+    expect(applied.unknown).toEqual([])
+    expect(applied.draft.aliases.categories).toEqual(
+      original.aliases.categories,
+    )
+  })
+})

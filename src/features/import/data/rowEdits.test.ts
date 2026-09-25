@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { testContext, testMapping } from './__fixtures__/mapping'
 import { buildRow } from './csv/rows'
-import { applyRowPatch } from './rowEdits'
-import { hasErrors } from './types'
+import { settleTransfer, transferLookupOf } from './pairing'
+import { applyRowPatch, breaksPair } from './rowEdits'
+import { emptyAliases, hasErrors } from './types'
 
 const mapping = testMapping()
 const context = testContext()
@@ -61,5 +62,89 @@ describe('applyRowPatch', () => {
 
     expect(fixed.draft?.amount).toBe(12)
     expect(fixed.draft?.note).toBe('Corrected')
+  })
+})
+
+describe('applyRowPatch — transfers', () => {
+  const transferMapping = testMapping({
+    roles: ['date', 'category', 'amount', 'note'],
+    aliases: {
+      ...emptyAliases(),
+      categories: { transfer: { kind: 'transfer' } },
+    },
+  })
+  const transferContext = testContext({
+    walletCurrencies: { w1: 'SAR', w2: 'SAR' },
+    walletNames: { w1: 'Main', w2: 'Savings' },
+  })
+  const paired = settleTransfer(
+    buildRow(
+      ['2026-06-16', 'Transfer', '-50', ''],
+      0,
+      transferMapping,
+      transferContext,
+    ),
+    { partner: 3, walletId: 'w2' },
+    transferLookupOf(transferMapping, transferContext),
+  )
+
+  it('keeps the pair across a correction that leaves its matched fields alone', () => {
+    const fixed = applyRowPatch(
+      paired,
+      { note: 'rent pot' },
+      transferMapping,
+      transferContext,
+    )
+    expect(fixed.transfer?.pairIndex).toBe(3)
+    expect(hasErrors(fixed.issues)).toBe(false)
+  })
+
+  it('stands a row alone once its pair is broken, and takes the wallet the user named', () => {
+    const alone = applyRowPatch(
+      paired,
+      { unpaired: true },
+      transferMapping,
+      transferContext,
+    )
+    expect(alone.transfer?.pairIndex).toBeNull()
+    expect(hasErrors(alone.issues)).toBe(true)
+    const named = applyRowPatch(
+      paired,
+      { unpaired: true, counterpartId: 'w2' },
+      transferMapping,
+      transferContext,
+    )
+    expect(named.transfer).toEqual({
+      pairIndex: null,
+      counterpartId: 'w2',
+      guessed: false,
+    })
+    expect(hasErrors(named.issues)).toBe(false)
+  })
+
+  it('knows which fields a pair was matched on', () => {
+    expect(breaksPair({ note: 'x' })).toBe(false)
+    expect(breaksPair({ amountMinor: 1 })).toBe(true)
+    expect(breaksPair({ intent: 'cashflow' })).toBe(true)
+  })
+
+  it('turns a spend into a movement with no category warning', () => {
+    const spend = buildRow(
+      ['2026-06-16', 'Stuff', '-50', ''],
+      0,
+      transferMapping,
+      transferContext,
+    )
+    expect(spend.issues.map((i) => i.code)).toContain(
+      'import.row.category_defaulted',
+    )
+    const adjusted = applyRowPatch(
+      spend,
+      { intent: 'adjustment' },
+      transferMapping,
+      transferContext,
+    )
+    expect(adjusted.intent).toBe('adjustment')
+    expect(adjusted.issues).toEqual([])
   })
 })

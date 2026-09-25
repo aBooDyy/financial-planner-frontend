@@ -82,8 +82,13 @@ export function useStubImport(seed: StubSeed): CsvImport {
     () => ({
       today: seed.today ?? '2026-09-01',
       walletCurrencies: seed.walletCurrencies ?? {},
+      walletNames: Object.fromEntries(
+        walletGroups.flatMap((group) =>
+          group.wallets.map((wallet) => [wallet.id, wallet.name]),
+        ),
+      ),
     }),
-    [seed.today, seed.walletCurrencies],
+    [seed.today, seed.walletCurrencies, walletGroups],
   )
 
   const categories = useMemo(() => categoryOptions(catalog), [catalog])
@@ -119,6 +124,7 @@ export function useStubImport(seed: StubSeed): CsvImport {
             context,
             merchants: merchantIndex,
             duplicates: scan?.duplicates,
+            pairs: scan?.pairs,
           }),
     [mapping, seed.matrix, context, merchantIndex, scan],
   )

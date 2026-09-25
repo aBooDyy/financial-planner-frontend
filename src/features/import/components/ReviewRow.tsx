@@ -7,7 +7,7 @@ import {
   PopoverTrigger,
 } from '#/components/ui/popover'
 import { describeRow } from '#/features/import/data/rowView'
-import type { RowLabels } from '#/features/import/data/rowView'
+import type { AmountTone, RowLabels } from '#/features/import/data/rowView'
 import type { RowStatus } from '#/features/import/data/review'
 import type { ParsedRow } from '#/features/import/data/types'
 
@@ -34,6 +34,12 @@ const STATUS: Readonly<Record<RowStatus, { glyph: string; label: string }>> = {
   warning: { glyph: '⚠', label: 'Warning' },
   error: { glyph: '⛔', label: 'Error' },
   duplicate: { glyph: '⧉', label: 'Duplicate' },
+}
+
+const AMOUNT_TONE: Readonly<Record<AmountTone, string>> = {
+  income: 'text-fp-accent-ink',
+  spend: 'text-fp-text',
+  neutral: 'text-fp-text-2',
 }
 
 const STATUS_TONE: Readonly<Record<RowStatus, string>> = {
@@ -109,9 +115,7 @@ function ReviewRowInner({
   const amount = (
     <span
       dir="ltr"
-      className={`text-[13.5px] font-bold tabular-nums ${
-        view.income ? 'text-fp-accent-ink' : 'text-fp-text'
-      }`}
+      className={`text-[13.5px] font-bold tabular-nums ${AMOUNT_TONE[view.tone]}`}
     >
       {view.amount}
     </span>

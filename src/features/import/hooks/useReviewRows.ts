@@ -1,7 +1,11 @@
 import { useCallback, useMemo, useState } from 'react'
-import { applyRowPatch, isEmptyPatch } from '#/features/import/data/rowEdits'
+import {
+  applyRowPatch,
+  breaksPair,
+  isEmptyPatch,
+} from '#/features/import/data/rowEdits'
 import { isDuplicate, statusOf } from '#/features/import/data/review'
-import { skippedAt, statusAt } from '#/features/import/data/rowScan'
+import { skippedAt, statusAt, transferAt } from '#/features/import/data/rowScan'
 import type {
   CsvImport,
   ImportFileInfo,
@@ -12,6 +16,7 @@ import type {
   ReviewFilter,
   RowStatus,
 } from '#/features/import/data/review'
+import type { ImportPlan } from '#/features/import/data/importCounts'
 import type { RowScan } from '#/features/import/data/rowScan'
 import type { ParsedRow } from '#/features/import/data/types'
 
@@ -27,6 +32,9 @@ import type { ParsedRow } from '#/features/import/data/types'
  * Nothing here holds the file. The counts, the order and the filters are read off the
  * pass's status bytes; a `ParsedRow` is built only for a row that reaches the screen, the
  * commit or the skipped-rows download.
+ *
+ * The two sides of a paired transfer are one decision: leaving either out leaves both out,
+ * and correcting a field the pair was matched on turns both back into lone rows.
  */
 
 export type RowOverride = {
@@ -43,6 +51,8 @@ type Store = {
 const EMPTY: ReadonlyMap<number, RowOverride> = new Map()
 
 const NO_ROWS: number[] = []
+
+const NO_PLAN: ImportPlan = { transactions: 0, transfers: 0 }
 
 const NO_COUNTS: ReviewCounts = {
   total: 0,
@@ -70,8 +80,13 @@ const withExclusion = (row: ParsedRow, excluded: boolean): ParsedRow =>
 
 type Tally = {
   counts: ReviewCounts
-  /** File rows that will be written, in the order the table shows them. */
+  /**
+   * File rows that will be written, in the order the table shows them — except that a
+   * paired row's partner follows it at once, so no slice of this list splits a transfer.
+   */
   committable: number[]
+  /** What those rows become: ledger rows, and transfers counted once per pair. */
+  plan: ImportPlan
   /** File rows that will not be — what the skipped-rows download quotes. */
   excluded: number[]
   excludedDuplicates: number
@@ -80,6 +95,7 @@ type Tally = {
 const EMPTY_TALLY: Tally = {
   counts: NO_COUNTS,
   committable: NO_ROWS,
+  plan: NO_PLAN,
   excluded: NO_ROWS,
   excludedDuplicates: 0,
 }
@@ -94,11 +110,21 @@ const statusFor = (
   return fixed === undefined ? statusAt(scan, index) : statusOf(fixed)
 }
 
+/** The partner of a row whose pair still stands, or undefined. */
+const partnerOf = (
+  scan: RowScan,
+  overrides: ReadonlyMap<number, RowOverride>,
+  index: number,
+): number | undefined =>
+  overrides.get(index)?.patch?.unpaired === true
+    ? undefined
+    : scan.pairs.get(index)?.partner
+
 /**
  * Why a row is out: a skip mapping, the duplicate rule, or the user — in that order, the
  * user's own call last because it outranks both.
  */
-const excludedFor = (
+const excludedAlone = (
   scan: RowScan,
   corrected: ReadonlyMap<number, ParsedRow>,
   overrides: ReadonlyMap<number, RowOverride>,
@@ -114,6 +140,35 @@ const excludedFor = (
   return fixed === undefined ? skippedAt(scan, index) : fixed.excluded
 }
 
+/** A transfer is written whole or not at all, so either side being out takes both out. */
+const excludedFor = (
+  scan: RowScan,
+  corrected: ReadonlyMap<number, ParsedRow>,
+  overrides: ReadonlyMap<number, RowOverride>,
+  skipDuplicates: boolean,
+  index: number,
+): boolean => {
+  if (excludedAlone(scan, corrected, overrides, skipDuplicates, index)) {
+    return true
+  }
+  const partner = partnerOf(scan, overrides, index)
+  return (
+    partner !== undefined &&
+    excludedAlone(scan, corrected, overrides, skipDuplicates, partner)
+  )
+}
+
+const isTransferRow = (
+  scan: RowScan,
+  corrected: ReadonlyMap<number, ParsedRow>,
+  index: number,
+): boolean => {
+  const fixed = corrected.get(index)
+  return fixed === undefined
+    ? transferAt(scan, index)
+    : fixed.intent === 'transfer'
+}
+
 /**
  * The whole file added up, from the pass's bytes plus the handful of rows the user touched.
  * It is integer work over a `Uint8Array` — the rows themselves are never built.
@@ -127,7 +182,22 @@ const tally = (
   const counts: ReviewCounts = { ...NO_COUNTS, total: scan.total }
   const committable: number[] = []
   const excluded: number[] = []
+  const placed = new Set<number>()
+  const plan = { transactions: 0, transfers: 0 }
   let excludedDuplicates = 0
+
+  const writable = (index: number): boolean =>
+    statusFor(scan, corrected, index) !== 'error' &&
+    !excludedFor(scan, corrected, overrides, skipDuplicates, index)
+
+  const place = (index: number) => {
+    committable.push(index)
+    placed.add(index)
+    if (!isTransferRow(scan, corrected, index)) plan.transactions += 1
+    else if (partnerOf(scan, overrides, index) === undefined) {
+      plan.transfers += 1
+    }
+  }
 
   for (const index of scan.order) {
     const status = statusFor(scan, corrected, index)
@@ -135,12 +205,17 @@ const tally = (
     if (excludedFor(scan, corrected, overrides, skipDuplicates, index)) {
       excluded.push(index)
       if (status === 'duplicate') excludedDuplicates += 1
-    } else if (status !== 'error') {
-      committable.push(index)
+    } else if (status !== 'error' && !placed.has(index)) {
+      place(index)
+      const partner = partnerOf(scan, overrides, index)
+      if (partner !== undefined) {
+        plan.transfers += 1
+        if (writable(partner)) place(partner)
+      }
     }
   }
 
-  return { counts, committable, excluded, excludedDuplicates }
+  return { counts, committable, plan, excluded, excludedDuplicates }
 }
 
 export function useReviewRows(csv: CsvImport) {
@@ -264,10 +339,27 @@ export function useReviewRows(csv: CsvImport) {
     [corrected, rowAt, isExcluded],
   )
 
+  /** One row's own call, laid on its partner too while the pair stands. */
+  const excludeBoth = useCallback(
+    (
+      current: ReadonlyMap<number, RowOverride>,
+      index: number,
+      excluded: boolean,
+    ): ReadonlyMap<number, RowOverride> => {
+      const next = withOverride(current, index, { excluded })
+      const partner =
+        scan === null ? undefined : partnerOf(scan, current, index)
+      return partner === undefined
+        ? next
+        : withOverride(next, partner, { excluded })
+    },
+    [scan],
+  )
+
   const toggleRow = useCallback(
     (index: number, excluded: boolean) =>
-      write(withOverride(overrides, index, { excluded })),
-    [overrides, write],
+      write(excludeBoth(overrides, index, excluded)),
+    [overrides, write, excludeBoth],
   )
 
   /** The header checkbox is scoped to what is on screen, never to the whole file. */
@@ -276,21 +368,33 @@ export function useReviewRows(csv: CsvImport) {
       let next = overrides
       for (const index of visible) {
         if (excluded && statusOfRow(index) === 'error') continue
-        next = withOverride(next, index, { excluded })
+        next = excludeBoth(next, index, excluded)
       }
       write(next)
     },
-    [overrides, visible, statusOfRow, write],
+    [overrides, visible, statusOfRow, write, excludeBoth],
   )
 
   const editRow = useCallback(
-    (index: number, patch: RowPatch) =>
-      write(
-        withOverride(overrides, index, {
-          patch: { ...overrides.get(index)?.patch, ...patch },
-        }),
-      ),
-    [overrides, write],
+    (index: number, patch: RowPatch) => {
+      const partner =
+        scan === null ? undefined : partnerOf(scan, overrides, index)
+      const unpair = partner !== undefined && breaksPair(patch)
+      let next = withOverride(overrides, index, {
+        patch: {
+          ...overrides.get(index)?.patch,
+          ...patch,
+          ...(unpair ? { unpaired: true as const } : {}),
+        },
+      })
+      if (unpair) {
+        next = withOverride(next, partner, {
+          patch: { ...overrides.get(partner)?.patch, unpaired: true },
+        })
+      }
+      write(next)
+    },
+    [scan, overrides, write],
   )
 
   const patchFor = useCallback(
@@ -311,6 +415,7 @@ export function useReviewRows(csv: CsvImport) {
   return {
     counts: summary.counts,
     committable: summary.committable,
+    plan: summary.plan,
     excluded: summary.excluded,
     excludedDuplicates: summary.excludedDuplicates,
     visible,

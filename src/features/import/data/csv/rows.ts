@@ -15,6 +15,7 @@ import type {
   ParsedRow,
   RowContext,
   RowFacts,
+  RowIntent,
   RowIssue,
 } from '../types'
 
@@ -190,13 +191,21 @@ const readWallet = (
   return { walletId: mapping.defaults.walletId, skipped: false }
 }
 
+type CategoryRead = {
+  category: string
+  subcategory: string | null
+  defaulted: boolean
+  intent: RowIntent
+}
+
 const readCategory = (
   cells: ReadonlyArray<string>,
   mapping: Mapping,
-): { category: string; subcategory: string | null; defaulted: boolean } => {
+): CategoryRead => {
   const fallback = {
     category: mapping.defaults.category,
     subcategory: mapping.defaults.subcategory,
+    intent: 'cashflow' as const,
   }
   const cell = cellAt(cells, roleColumn(mapping.roles, 'category')).trim()
   const subCell = cellAt(cells, roleColumn(mapping.roles, 'subcategory')).trim()
@@ -212,11 +221,17 @@ const readCategory = (
   // is not reported as a guess.
   if (target === undefined) return { ...fallback, defaulted: true }
   if (target.kind === 'skip') return { ...fallback, defaulted: false }
+  // A movement files under no category; the default rides along so a row turned back into
+  // spending in review still has one to show.
+  if (target.kind === 'transfer' || target.kind === 'adjustment') {
+    return { ...fallback, defaulted: false, intent: target.kind }
+  }
   // Both a binding and a create name the pair — a category still to be made can be a child.
   return {
     category: target.category,
     subcategory: target.subcategory,
     defaulted: false,
+    intent: 'cashflow',
   }
 }
 
@@ -285,6 +300,8 @@ export const readRow = (
     category: category.category,
     subcategory: category.subcategory,
     categoryDefaulted: category.defaulted,
+    intent: category.intent,
+    counterpartId: null,
     merchantId: merchant.merchantId,
     merchantRaw: merchant.raw,
     note: withReference(narrative === '' ? null : narrative, reference),
@@ -336,10 +353,22 @@ export const rowFromFacts = (
     line: facts.line,
     raw: facts.raw,
     draft,
+    intent: facts.intent,
+    transfer:
+      facts.intent === 'transfer'
+        ? {
+            pairIndex: null,
+            counterpartId: facts.counterpartId,
+            guessed: false,
+          }
+        : null,
     issues,
     duplicateOf: null,
     duplicateOfIndex: null,
-    fingerprint: draft === null ? '' : fingerprintOf(draft),
+    fingerprint:
+      draft === null
+        ? ''
+        : fingerprintOf({ ...draft, movement: facts.intent !== 'cashflow' }),
     reference: facts.reference,
     excluded: facts.walletSkipped,
     prediction: null,

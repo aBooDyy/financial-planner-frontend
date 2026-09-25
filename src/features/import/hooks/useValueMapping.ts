@@ -2,9 +2,12 @@ import { useCallback, useEffect, useMemo } from 'react'
 import { walletOptionsFrom } from '#/features/import/data/matching'
 import { lookup, roleColumn } from '#/features/import/data/types'
 import {
+  ADJUSTMENT,
   CREATE,
+  MOVEMENT_TARGETS,
   NEW,
   SKIP,
+  TRANSFER,
   UNSET,
   categoryValue,
   chosenValue,
@@ -142,11 +145,12 @@ const walletTargets = (catalogue: ValueCatalogue): TargetGroup[] => {
   return groups
 }
 
+/** The user's categories, then the two answers that are not one. */
 const categoryTargets = (catalogue: ValueCatalogue): TargetGroup[] => {
   const parents = catalogue.categories.filter(
     (option) => option.subcategory === null,
   )
-  return parents.map((parent) => ({
+  const groups = parents.map((parent) => ({
     label: parent.name,
     options: [
       {
@@ -164,6 +168,19 @@ const categoryTargets = (catalogue: ValueCatalogue): TargetGroup[] => {
         })),
     ],
   }))
+  return [...groups, MOVEMENT_TARGETS]
+}
+
+/** Why a movement answer changes what its rows become — said under the value. */
+const MOVEMENT_NOTES: Readonly<Record<string, RowNotes>> = {
+  [TRANSFER]: {
+    hint: 'Paired with the other side in the file — same amount, another account, within 2 days.',
+    newLabel: null,
+  },
+  [ADJUSTMENT]: {
+    hint: 'Corrects the account’s balance; never counted as income or spending.',
+    newLabel: null,
+  },
 }
 
 const merchantTargets = (catalogue: ValueCatalogue): TargetGroup[] => [
@@ -326,6 +343,7 @@ export function useValueMapping(csv: CsvImport, draft: MappingDraft) {
     (kind, key, value) => {
       if (value === NEW)
         return newTargetNote(kind, key, draft.aliases, categoryCatalog)
+      if (kind === 'category') return MOVEMENT_NOTES[value] ?? NO_NOTES
       if (kind !== 'merchant') return NO_NOTES
       const merchant = merchantsById.get(value)
       if (merchant === undefined) return NO_NOTES

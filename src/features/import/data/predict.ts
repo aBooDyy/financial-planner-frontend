@@ -61,7 +61,7 @@ export const predictRow = (
   mapping: Mapping,
   merchants: MerchantLookup,
 ): ParsedRow => {
-  if (row.draft === null) return row
+  if (row.draft === null || row.intent !== 'cashflow') return row
   const column = roleColumn(mapping.roles, 'merchant')
   const bound = row.draft.merchantId ?? null
   const raw = column < 0 ? '' : (row.raw[column] ?? '').trim()

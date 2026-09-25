@@ -40,6 +40,18 @@ export const SKIP = '__skip__'
 export const CREATE = '__create__'
 /** The pseudo-option standing for a target the user asked us to create at import time. */
 export const NEW = '__new__'
+/** Category answers that are not a category: money between wallets, a balance correction. */
+export const TRANSFER = '__transfer__'
+export const ADJUSTMENT = '__adjustment__'
+
+/** What the two non-category answers read as, wherever a category select offers them. */
+export const MOVEMENT_TARGETS: TargetGroup = {
+  label: 'Not income or spending',
+  options: [
+    { value: TRANSFER, label: 'Transfer between wallets' },
+    { value: ADJUSTMENT, label: 'Balance adjustment' },
+  ],
+}
 
 export type TargetOption = {
   value: string
@@ -165,7 +177,44 @@ const proposeWallet = (raw: string, catalogue: ValueCatalogue): Proposal => {
       )
 }
 
+/**
+ * The words an export uses for its own movements. The exact phrase is a sure answer; a value
+ * that only contains one ("Bank transfer fee") is offered but flagged for a look.
+ */
+const MOVEMENT_WORDS: ReadonlyArray<{
+  value: string
+  pattern: RegExp
+  exact: ReadonlyArray<string>
+}> = [
+  {
+    value: TRANSFER,
+    pattern: /transfer/i,
+    exact: ['transfer', 'transfers', 'transfer between wallets'],
+  },
+  {
+    value: ADJUSTMENT,
+    pattern: /adjust/i,
+    exact: [
+      'adjustment',
+      'balance adjustment',
+      'adjust balance',
+      'adjusted balance',
+    ],
+  },
+]
+
+const proposeMovement = (raw: string): Proposal | null => {
+  const word = MOVEMENT_WORDS.find((entry) => entry.pattern.test(raw))
+  if (word === undefined) return null
+  return bound(
+    word.value,
+    word.exact.includes(normalizeKey(raw)) ? 'auto' : 'check',
+  )
+}
+
 const proposeCategory = (raw: string, catalogue: ValueCatalogue): Proposal => {
+  const movement = proposeMovement(raw)
+  if (movement !== null) return movement
   const match = matchCategory(raw, catalogue.categories)
   return match === null
     ? NONE
@@ -243,10 +292,25 @@ const walletValue = (target: WalletTarget | undefined): string => {
 
 const categoryTargetValue = (target: CategoryTarget | undefined): string => {
   if (target === undefined) return UNSET
-  if (target.kind === 'skip') return SKIP
-  return target.kind === 'create'
-    ? NEW
-    : categoryValue(target.category, target.subcategory)
+  switch (target.kind) {
+    case 'skip':
+      return SKIP
+    case 'transfer':
+      return TRANSFER
+    case 'adjustment':
+      return ADJUSTMENT
+    case 'create':
+      return NEW
+    default:
+      return categoryValue(target.category, target.subcategory)
+  }
+}
+
+const categoryTargetOf = (value: string): CategoryTarget => {
+  if (value === SKIP) return { kind: 'skip' }
+  if (value === TRANSFER) return { kind: 'transfer' }
+  if (value === ADJUSTMENT) return { kind: 'adjustment' }
+  return { kind: 'category', ...splitCategoryValue(value) }
 }
 
 const merchantValue = (target: MerchantTarget | undefined): string => {
@@ -420,16 +484,12 @@ export const withAlias = (
     }
   }
   if (kind === 'category') {
-    const target: CategoryTarget =
-      value === SKIP
-        ? { kind: 'skip' }
-        : { kind: 'category', ...splitCategoryValue(value) }
     return {
       ...aliases,
       categories:
         value === UNSET
           ? withoutKey(aliases.categories, key)
-          : { ...aliases.categories, [key]: target },
+          : { ...aliases.categories, [key]: categoryTargetOf(value) },
     }
   }
   const target: MerchantTarget =

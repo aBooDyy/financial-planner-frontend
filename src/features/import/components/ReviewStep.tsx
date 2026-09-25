@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import { Checkbox } from '#/components/ui/checkbox'
 import { useIsDesktop } from '#/hooks/useMediaQuery'
+import { planLabel } from '#/features/import/data/importCounts'
 import { categoryValue } from '#/features/import/data/values'
 import { useDuplicateTargets } from '#/features/import/hooks/useDuplicateTargets'
 import { useVirtualRows } from '#/hooks/useVirtualRows'
@@ -239,6 +240,7 @@ export function ReviewStep({ csv, draft, review, onBack, onCommit }: Props) {
         <>
           <ReviewSummaryBar
             counts={review.counts}
+            plan={review.plan}
             filter={review.filter}
             onFilter={review.setFilter}
             skipDuplicates={review.skipDuplicates}
@@ -334,11 +336,7 @@ export function ReviewStep({ csv, draft, review, onBack, onCommit }: Props) {
 
           <WizardFooter
             onBack={onBack}
-            nextLabel={
-              count === 1
-                ? 'Import 1 transaction'
-                : `Import ${number.format(count)} transactions`
-            }
+            nextLabel={`Import ${planLabel(review.plan)}`}
             onNext={onCommit}
             disabled={count === 0}
             reason={

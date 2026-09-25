@@ -1,4 +1,5 @@
 import { Button } from '#/components/ui/button'
+import { batchPlan, planLabel } from '#/features/import/data/importCounts'
 import { formatDate, formatRelativeTime, parseISODate } from '#/lib/date'
 import { useDirectionStore } from '#/stores/direction'
 import { usePreferencesStore } from '#/stores/preferences'
@@ -12,7 +13,6 @@ type Props = {
 export function ImportHistoryRow({ batch, onUndo }: Props) {
   const dateFormat = usePreferencesStore((s) => s.dateFormat)
   const locale = useDirectionStore((s) => s.locale)
-  const number = new Intl.NumberFormat()
   const day = parseISODate(batch.createdAt.slice(0, 10))
   // "2 days ago" is what makes an import recognisable; the date itself is on the tooltip.
   const when = formatRelativeTime(batch.createdAt, locale)
@@ -26,9 +26,7 @@ export function ImportHistoryRow({ batch, onUndo }: Props) {
         <span className="font-semibold text-fp-text">{batch.label}</span>
         <span className="text-fp-text-2">
           {' · '}
-          {batch.importedCount === 1
-            ? '1 transaction'
-            : `${number.format(batch.importedCount)} transactions`}
+          {planLabel(batchPlan(batch))}
           {when ? ` · ${when}` : ''}
         </span>
       </span>

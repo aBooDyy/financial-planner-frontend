@@ -21,6 +21,9 @@ export const validateRow = (
   context: RowContext,
 ): RowIssue[] => {
   const issues: RowIssue[] = []
+  // A movement is written in the wallet's own currency and must move something, so what is
+  // only worth a warning on spending blocks it.
+  const movement = facts.intent !== 'cashflow'
   const add = (
     level: RowIssue['level'],
     field: RowIssue['field'],
@@ -52,7 +55,12 @@ export const validateRow = (
   } else if (facts.amountState === 'missing') {
     add('error', 'amount', ROW_ISSUES.amountMissing)
   } else if (facts.amountState === 'ok' && facts.amountMinor === 0) {
-    add('warning', 'amount', ROW_ISSUES.amountZero, facts.amountCell)
+    add(
+      movement ? 'error' : 'warning',
+      'amount',
+      ROW_ISSUES.amountZero,
+      facts.amountCell,
+    )
   }
 
   if (facts.currency === null) {
@@ -60,7 +68,12 @@ export const validateRow = (
   } else if (facts.walletId !== null) {
     const walletCurrency = lookup(context.walletCurrencies, facts.walletId)
     if (walletCurrency !== undefined && walletCurrency !== facts.currency) {
-      add('warning', 'currency', ROW_ISSUES.currencyMismatch, facts.currency)
+      add(
+        movement ? 'error' : 'warning',
+        'currency',
+        ROW_ISSUES.currencyMismatch,
+        facts.currency,
+      )
     }
   }
 
@@ -69,7 +82,7 @@ export const validateRow = (
     add('error', 'wallet', ROW_ISSUES.walletUnresolved)
   }
 
-  if (facts.categoryDefaulted) {
+  if (facts.categoryDefaulted && !movement) {
     add('warning', 'category', ROW_ISSUES.categoryDefaulted)
   }
   if (facts.typeDefaulted) {

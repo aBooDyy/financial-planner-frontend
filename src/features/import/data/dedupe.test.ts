@@ -3,6 +3,7 @@ import { testContext, testMapping } from './__fixtures__/mapping'
 import { loadFixture } from './csv/__fixtures__/fixtures'
 import { readCsv } from './csv/read'
 import { buildRows } from './csv/rows'
+import { DEFAULT_DEDUPE } from './types'
 import {
   buildDedupeIndex,
   emptyDedupeIndex,
@@ -10,6 +11,7 @@ import {
   fingerprintOf,
   markRow,
   referenceFromNote,
+  toLedgerEntry,
   stripReference,
   withDuplicate,
   withReference,
@@ -270,5 +272,57 @@ describe('markRow — by reference', () => {
       asLedger([rows[0]]).map((row) => ({ ...row, id: 'existing' })),
     )
     expect(markAll(rows, ledger, settings)[0].duplicateOf).toBe('existing')
+  })
+})
+
+describe('movements in the ledger index', () => {
+  const leg = (type: 'transfer_out' | 'transfer_in', walletId: string) =>
+    toLedgerEntry({
+      id: `${type}-${walletId}`,
+      date: '2026-09-09',
+      type,
+      amount: 30000,
+      currency: 'SAR',
+      walletId,
+      merchantId: null,
+      note: 'Send to STC Pay',
+    })
+
+  it('files a leg by its direction on its own wallet', () => {
+    expect(leg('transfer_out', 'w1')).toMatchObject({
+      type: 'spend',
+      movement: true,
+    })
+    expect(leg('transfer_in', 'w2')).toMatchObject({ type: 'income' })
+  })
+
+  it('matches a re-imported transfer side whatever its own note says', () => {
+    const index = buildDedupeIndex([leg('transfer_in', 'w2')])
+    const draft = {
+      date: '2026-09-10',
+      type: 'income' as const,
+      amount: 30000,
+      currency: 'SAR',
+      walletId: 'w2',
+      note: 'Received from Albilad Bank',
+    }
+    const row = {
+      ...buildRows(
+        [['2026-09-10', 'x', '300']],
+        testMapping(),
+        testContext(),
+      )[0],
+      reference: null,
+    }
+    const movement = {
+      ...row,
+      fingerprint: fingerprintOf({ ...draft, movement: true }),
+    }
+    const cashflow = { ...row, fingerprint: fingerprintOf(draft) }
+    expect(markRow(movement, index, emptySeen(), DEFAULT_DEDUPE)).toEqual({
+      ledgerId: 'transfer_in-w2',
+      earlierIndex: null,
+    })
+    expect(markRow(cashflow, index, emptySeen(), DEFAULT_DEDUPE)).toBeNull()
   })
 })

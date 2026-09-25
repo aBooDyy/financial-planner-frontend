@@ -69,7 +69,7 @@ describe('ImportDoneCard', () => {
     await db.importBatches.put({ ...BATCH, undoneAt: '2026-09-02T00:00:00Z' })
 
     expect(await screen.findByText('Import undone.')).toBeDefined()
-    expect(screen.getByText(/were removed/)).toBeDefined()
+    expect(screen.getByText(/was removed/)).toBeDefined()
     await waitFor(() =>
       expect(
         screen.queryByRole('button', { name: 'Undo this import' }),

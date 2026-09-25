@@ -4,11 +4,10 @@ import { db } from '#/db/db'
 import { SETTINGS_KEY } from '#/db/types'
 import { DEFAULT_BASE_CURRENCY } from '#/features/balances/constants'
 import { walletGroupOptions } from '#/features/balances/data/selectors'
-import { isTransferLeg } from '#/features/transactions/api/types'
 import { startOfToday, ymd } from '#/features/transactions/data/planning'
 import { parseCsvFile } from '#/features/import/data/csv/workerClient'
 import { CsvFileError } from '#/features/import/data/csv/errors'
-import { buildDedupeIndex } from '#/features/import/data/dedupe'
+import { buildDedupeIndex, toLedgerEntry } from '#/features/import/data/dedupe'
 import { buildCatalog } from '#/features/categories/data/catalog'
 import {
   draftForFile,
@@ -225,22 +224,17 @@ export function useCsvImport() {
 
   const context: RowContext = useMemo(() => {
     const walletCurrencies: Record<string, CurrencyCode> = {}
+    const walletNames: Record<string, string> = {}
     for (const node of nodes) {
-      if (node.kind === 'wallet' && node.currency) {
-        walletCurrencies[node.id] = node.currency
-      }
+      if (node.kind !== 'wallet') continue
+      walletNames[node.id] = node.name
+      if (node.currency) walletCurrencies[node.id] = node.currency
     }
-    return { today, walletCurrencies }
+    return { today, walletCurrencies, walletNames }
   }, [nodes, today])
 
-  // A file only ever holds spend and income, so a transfer leg can never be its duplicate.
   const ledgerIndex = useMemo(
-    () =>
-      buildDedupeIndex(
-        transactions.flatMap((t) =>
-          isTransferLeg(t.type) ? [] : [{ ...t, type: t.type }],
-        ),
-      ),
+    () => buildDedupeIndex(transactions.map(toLedgerEntry)),
     [transactions],
   )
 
@@ -487,6 +481,7 @@ export function useCsvImport() {
             context,
             merchants: merchantIndex,
             duplicates: scan.result?.duplicates,
+            pairs: scan.result?.pairs,
           }),
     [mapping, source, context, merchantIndex, scan.result],
   )

@@ -100,6 +100,16 @@ export type CategoryTarget =
       type: TxType
     }
   | { kind: 'skip' }
+  // Not a category at all: the rows are money moving between the user's own wallets, or a
+  // correction to one wallet's balance. Neither is ever income or spending.
+  | { kind: 'transfer' }
+  | { kind: 'adjustment' }
+
+/**
+ * What a row is, beside its direction. Only `cashflow` is income or spending; a `transfer`
+ * row is one side of money moving between two wallets, an `adjustment` a balance correction.
+ */
+export type RowIntent = 'cashflow' | 'transfer' | 'adjustment'
 
 /**
  * A merchant binding also files the file's spelling as a new alias on that merchant, which
@@ -218,6 +228,10 @@ export const ROW_ISSUES = {
   categoryDefaulted: 'import.row.category_defaulted',
   typeDefaulted: 'import.row.type_defaulted',
   ragged: 'import.row.ragged',
+  transferUnpaired: 'import.row.transfer_unpaired',
+  transferGuessed: 'import.row.transfer_guessed',
+  transferSameWallet: 'import.row.transfer_same_wallet',
+  transferCurrency: 'import.row.transfer_currency',
 } as const
 
 export type RowIssueCode = (typeof ROW_ISSUES)[keyof typeof ROW_ISSUES]
@@ -229,6 +243,7 @@ export type RowIssueField =
   | 'wallet'
   | 'category'
   | 'type'
+  | 'transfer'
   | 'row'
 
 export type RowIssue = {
@@ -272,11 +287,24 @@ export type RowFacts = {
   category: string
   subcategory: string | null
   categoryDefaulted: boolean
+  intent: RowIntent
+  /** The other wallet of a transfer, when the user named it. */
+  counterpartId: string | null
   merchantId: string | null
   merchantRaw: string | null
   note: string | null
   reference: string | null
   ragged: boolean
+}
+
+/** How a transfer row finds its other side. */
+export type RowTransfer = {
+  /** The file row holding the other side, when the file has one. */
+  pairIndex: number | null
+  /** The other wallet: the paired row's, the user's choice, or the one the note names. */
+  counterpartId: string | null
+  /** True when the note, not the file or the user, named the other wallet. */
+  guessed: boolean
 }
 
 /** What a matched merchant says about a row's category. */
@@ -295,8 +323,14 @@ export type ParsedRow = {
   /** 1-based line in the file, for error copy. Approximate for embedded newlines. */
   line: number
   raw: string[]
-  /** Null when the row carries an error and cannot be committed as it stands. */
+  /**
+   * Null when the row could not be read. Direction lives in `type` whatever the intent:
+   * `spend` is money out of the wallet, `income` money into it.
+   */
   draft: TransactionDraft | null
+  intent: RowIntent
+  /** Set exactly for a `transfer` row. */
+  transfer: RowTransfer | null
   issues: RowIssue[]
   /** An existing ledger transaction this row repeats. */
   duplicateOf: string | null
@@ -315,6 +349,8 @@ export type RowContext = {
   today: string
   /** Wallet currency by wallet id, for the mismatch warning. */
   walletCurrencies: Readonly<Record<string, CurrencyCode>>
+  /** Wallet name by wallet id — what a transfer's note is read against. */
+  walletNames: Readonly<Record<string, string>>
 }
 
 export const hasErrors = (issues: ReadonlyArray<RowIssue>): boolean =>

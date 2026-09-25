@@ -70,7 +70,7 @@ const aWizard = (step: ImportStep, draft: MappingDraft | null): CsvImport =>
     suggestedRoles: draft?.roles ?? [],
     matrix: MATRIX,
     rowAt: () => null,
-    context: { today: '2026-09-01', walletCurrencies: {} },
+    context: { today: '2026-09-01', walletCurrencies: {}, walletNames: {} },
     walletGroups: [],
     catalog: buildCatalog([]),
     categories: [],

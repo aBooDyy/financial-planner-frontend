@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '#/db/db'
 import { buildRows } from './csv/rows'
 import { testContext, testMapping } from './__fixtures__/mapping'
+import { moneyLover } from './__fixtures__/moneyLover'
+import { emptyDedupeIndex } from './dedupe'
+import { rowReader, scanRowsSync } from './rowScan'
 
 const schedulePush = vi.fn()
 vi.mock('#/db/sync', () => ({ schedulePush: () => schedulePush() }))
@@ -83,7 +86,7 @@ describe('undoImport', () => {
 
     const result = await undoImport(batch.id)
 
-    expect(result).toEqual({ removed: 4, kept: 0 })
+    expect(result).toEqual({ removed: 4, removedTransfers: 0, kept: 0 })
     expect((await db.transactions.toArray()).map((tx) => tx.id)).toEqual([
       other,
     ])
@@ -111,7 +114,7 @@ describe('undoImport', () => {
 
     const result = await undoImport(batch.id)
 
-    expect(result).toEqual({ removed: 3, kept: 1 })
+    expect(result).toEqual({ removed: 3, removedTransfers: 0, kept: 1 })
     const left = await db.transactions.toArray()
     expect(left.map((tx) => tx.id)).toEqual([edited.id])
     expect(left[0].amount).toBe(1500)
@@ -145,6 +148,71 @@ describe('undoImport', () => {
   })
 
   it('does nothing for a batch this device does not know', async () => {
-    expect(await undoImport('missing')).toEqual({ removed: 0, kept: 0 })
+    expect(await undoImport('missing')).toEqual({
+      removed: 0,
+      removedTransfers: 0,
+      kept: 0,
+    })
+  })
+})
+
+describe('undoImport — transfers', () => {
+  const commitTransfers = async () => {
+    const { matrix: file, mapping, context } = moneyLover()
+    const scan = scanRowsSync({
+      matrix: file,
+      mapping,
+      context,
+      merchants: { merchants: [], aliases: [] },
+      ledger: emptyDedupeIndex(),
+    })
+    const reader = rowReader({
+      matrix: file,
+      mapping,
+      context,
+      merchants: { merchants: [], aliases: [] },
+      pairs: scan.pairs,
+    })
+    return commitImport(
+      rowsSource(file.map((_cells, index) => reader.at(index))),
+      mapping,
+      meta,
+    )
+  }
+
+  it('removes each transfer whole, through the transfer delete, beside the ledger rows', async () => {
+    const { batch } = await commitTransfers()
+    const plan = await planUndo(batch.id)
+    expect(plan?.removableTransfers).toHaveLength(3)
+    expect(plan?.removable).toHaveLength(5)
+
+    // Pretend one transfer reached the server, so it needs a delete of its own.
+    const [synced] = plan!.removableTransfers
+    await db.outbox.where('[entity+id]').equals(['transfer', synced]).delete()
+
+    const result = await undoImport(batch.id)
+
+    expect(result).toEqual({ removed: 5, removedTransfers: 3, kept: 0 })
+    expect(await db.transactions.count()).toBe(0)
+    expect(
+      (await db.outbox.toArray()).map((e) => [e.entity, e.op, e.id]),
+    ).toEqual([['transfer', 'delete', synced]])
+  })
+
+  it('keeps a transfer whole when either of its legs changed since', async () => {
+    const { batch } = await commitTransfers()
+    const leg = (await db.transactions
+      .filter((tx) => tx.type === 'transfer_in')
+      .first())!
+    await db.transactions.update(leg.id, { updatedAt: 'later' })
+
+    const plan = await planUndo(batch.id)
+    expect(plan?.removableTransfers).toHaveLength(2)
+    expect(plan?.edited.map((tx) => tx.transferId)).toEqual([leg.transferId])
+
+    await undoImport(batch.id)
+    expect(
+      await db.transactions.where('transferId').equals(leg.transferId!).count(),
+    ).toBe(2)
   })
 })

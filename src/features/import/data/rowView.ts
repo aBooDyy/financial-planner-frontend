@@ -1,3 +1,4 @@
+import { ADJUSTMENT_LABEL } from '#/features/transactions/data/selectors'
 import { messageForCode } from '#/lib/errorMessages'
 import { formatMoney } from '#/lib/currency'
 import { stripReference } from './dedupe'
@@ -19,12 +20,15 @@ export type RowLabels = {
   transaction: (id: string) => string | null
 }
 
+/** How the amount reads: money earned, money spent, or money only moving (never a total). */
+export type AmountTone = 'income' | 'spend' | 'neutral'
+
 export type RowView = {
   status: RowStatus
   date: string
   description: string
   amount: string
-  income: boolean
+  tone: AmountTone
   category: string
   wallet: string
   /** The one-line reason the row is not simply ready. */
@@ -66,6 +70,24 @@ const duplicateText = (row: ParsedRow, labels: RowLabels): string | null => {
   return null
 }
 
+/** What sits in the category column: the category, or what the row is instead of one. */
+const categoryText = (row: ParsedRow, labels: RowLabels): string => {
+  const draft = row.draft
+  if (draft === null) return MISSING
+  if (row.intent === 'adjustment') return ADJUSTMENT_LABEL
+  if (row.intent === 'transfer') {
+    const other = row.transfer?.counterpartId ?? null
+    if (other === null) return 'Transfer'
+    return `Transfer ${draft.type === 'spend' ? '→' : '←'} ${labels.wallet(other)}`
+  }
+  return labels.category(draft.category, draft.subcategory)
+}
+
+const toneOf = (row: ParsedRow): AmountTone => {
+  if (row.intent !== 'cashflow') return 'neutral'
+  return row.draft?.type === 'income' ? 'income' : 'spend'
+}
+
 export const describeRow = (row: ParsedRow, labels: RowLabels): RowView => {
   const status = statusOf(row)
   const draft = row.draft
@@ -85,11 +107,8 @@ export const describeRow = (row: ParsedRow, labels: RowLabels): RowView => {
       draft === null
         ? (quoted(detailFor(row.issues, 'amount')) ?? MISSING)
         : `${draft.type === 'spend' ? '−' : '+'}${formatMoney(draft.amount, draft.currency)}`,
-    income: draft?.type === 'income',
-    category:
-      draft === null
-        ? MISSING
-        : labels.category(draft.category, draft.subcategory),
+    tone: toneOf(row),
+    category: categoryText(row, labels),
     wallet: labels.wallet(draft?.walletId ?? null),
     reason:
       status === 'duplicate'

@@ -1,6 +1,7 @@
 import { db } from '#/db/db'
 import { schedulePush } from '#/db/sync'
 import { bulkDeleteTransactions } from '#/features/transactions/data/mutations'
+import { bulkDeleteTransfers } from '#/features/transactions/data/transfers'
 import type { LocalImportBatch, LocalTransaction } from '#/db/types'
 
 /**
@@ -42,11 +43,36 @@ const editedSince = (tx: LocalTransaction): boolean =>
 
 export type UndoPlan = {
   batch: LocalImportBatch
-  /** Rows the undo will remove. */
+  /** Ledger rows the undo will remove. */
   removable: LocalTransaction[]
-  /** Rows changed since the import — listed in the dialog and left alone. */
+  /** Transfers the undo will remove — both legs of each. */
+  removableTransfers: string[]
+  /**
+   * What changed since the import — listed in the dialog and left alone. A transfer is kept
+   * whole when either leg changed, and is listed by its money-out leg.
+   */
   edited: LocalTransaction[]
 }
+
+type TransferLegs = { legs: LocalTransaction[]; edited: boolean }
+
+/** The batch's transfer legs, one entry per transfer. */
+const byTransfer = (
+  legs: ReadonlyArray<LocalTransaction>,
+): Map<string, TransferLegs> => {
+  const transfers = new Map<string, TransferLegs>()
+  for (const leg of legs) {
+    const id = leg.transferId as string
+    const held = transfers.get(id) ?? { legs: [], edited: false }
+    held.legs.push(leg)
+    held.edited = held.edited || editedSince(leg)
+    transfers.set(id, held)
+  }
+  return transfers
+}
+
+const shownLeg = (legs: ReadonlyArray<LocalTransaction>): LocalTransaction =>
+  legs.find((leg) => leg.type === 'transfer_out') ?? legs[0]
 
 export async function planUndo(batchId: string): Promise<UndoPlan | null> {
   const batch = await db.importBatches.get(batchId)
@@ -56,14 +82,28 @@ export async function planUndo(batchId: string): Promise<UndoPlan | null> {
     .equals(batchSource(batchId))
     .filter((tx) => tx.deleted === 0)
     .toArray()
+  const ledger = rows.filter((tx) => tx.transferId === null)
+  const transfers = [...byTransfer(rows.filter((tx) => tx.transferId !== null))]
   return {
     batch,
-    removable: rows.filter((tx) => !editedSince(tx)),
-    edited: rows.filter(editedSince),
+    removable: ledger.filter((tx) => !editedSince(tx)),
+    removableTransfers: transfers
+      .filter(([, held]) => !held.edited)
+      .map(([id]) => id),
+    edited: [
+      ...ledger.filter(editedSince),
+      ...transfers
+        .filter(([, held]) => held.edited)
+        .map(([, held]) => shownLeg(held.legs)),
+    ],
   }
 }
 
-export type UndoResult = { removed: number; kept: number }
+export type UndoResult = {
+  removed: number
+  removedTransfers: number
+  kept: number
+}
 
 /**
  * Remove what the batch added, and only that. Accounts, categories and merchants the import
@@ -72,13 +112,22 @@ export type UndoResult = { removed: number; kept: number }
  */
 export async function undoImport(batchId: string): Promise<UndoResult> {
   const plan = await planUndo(batchId)
-  if (plan === null) return { removed: 0, kept: 0 }
+  if (plan === null) return { removed: 0, removedTransfers: 0, kept: 0 }
 
   const ids = plan.removable.map((tx) => tx.id)
   for (let at = 0; at < ids.length; at += CHUNK_SIZE) {
     await bulkDeleteTransactions(ids.slice(at, at + CHUNK_SIZE))
   }
+  // The ledger's own delete refuses a transfer leg; a transfer goes whole, by its id.
+  const transfers = plan.removableTransfers
+  for (let at = 0; at < transfers.length; at += CHUNK_SIZE) {
+    await bulkDeleteTransfers(transfers.slice(at, at + CHUNK_SIZE))
+  }
   await db.importBatches.put({ ...plan.batch, undoneAt: now() })
   schedulePush()
-  return { removed: ids.length, kept: plan.edited.length }
+  return {
+    removed: ids.length,
+    removedTransfers: transfers.length,
+    kept: plan.edited.length,
+  }
 }

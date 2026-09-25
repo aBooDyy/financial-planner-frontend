@@ -1,5 +1,6 @@
+import { isCashflow } from '#/features/transactions/api/types'
 import { normalizeKey } from './matching'
-import type { TxType } from '#/features/transactions/api/types'
+import type { TransactionType, TxType } from '#/features/transactions/api/types'
 import type { DedupeSettings, ParsedRow } from './types'
 
 /**
@@ -55,7 +56,17 @@ export type FingerprintParts = {
   /** Undefined and null both mean "no merchant on this row". */
   merchantId?: string | null
   note: string | null
+  /** Money moved between wallets or a balance corrected, rather than earned or spent. */
+  movement?: boolean
 }
+
+/**
+ * The label every movement shares. The two sides of a transfer carry different notes ("Send
+ * to X" / "Received from Y") while the ledger keeps one for both legs, so a movement is
+ * matched on amount, direction, wallet and date alone. `normalizeKey` never yields `~`, so
+ * no cash-flow label can collide with it.
+ */
+const MOVEMENT_LABEL = '~'
 
 /**
  * The counterparty half of the key. A bound merchant id is preferred over any text: the
@@ -63,10 +74,12 @@ export type FingerprintParts = {
  * the id is the one thing both sides agree on. The reference suffix is stripped so a row
  * imported with a reference still matches the same row typed in by hand.
  */
-const labelOf = (parts: FingerprintParts): string =>
-  parts.merchantId !== null && parts.merchantId !== undefined
+const labelOf = (parts: FingerprintParts): string => {
+  if (parts.movement === true) return MOVEMENT_LABEL
+  return parts.merchantId !== null && parts.merchantId !== undefined
     ? `m:${parts.merchantId}`
     : normalizeKey(stripReference(parts.note) ?? '').slice(0, LABEL_LENGTH)
+}
 
 export const fingerprintOf = (parts: FingerprintParts): string =>
   [
@@ -103,7 +116,34 @@ export type LedgerTransaction = {
   walletId: string
   merchantId: string | null
   note: string | null
+  movement?: boolean
 }
+
+/**
+ * A ledger row as the index reads it. A transfer leg or an adjustment is filed by its
+ * direction on its own wallet — out as money out, in as money in — so re-importing a file, or
+ * importing the other wallet's statement, finds the movement already there.
+ */
+export const toLedgerEntry = (row: {
+  id: string
+  date: string
+  type: TransactionType
+  amount: number
+  currency: string
+  walletId: string
+  merchantId: string | null
+  note: string | null
+}): LedgerTransaction =>
+  isCashflow(row.type)
+    ? { ...row, type: row.type }
+    : {
+        ...row,
+        type:
+          row.type === 'transfer_out' || row.type === 'adjustment_out'
+            ? 'spend'
+            : 'income',
+        movement: true,
+      }
 
 type Occurrence = { id: string; date: string }
 

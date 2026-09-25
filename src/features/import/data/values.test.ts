@@ -3,8 +3,11 @@ import { buildCatalog } from '#/features/categories/data/catalog'
 import { categoryOptions } from './matching'
 import { emptyAliases } from './types'
 import {
+  ADJUSTMENT,
+  MOVEMENT_TARGETS,
   NEW,
   SKIP,
+  TRANSFER,
   UNSET,
   chosenValue,
   distinctOf,
@@ -253,5 +256,38 @@ describe('valueRows', () => {
       proposalsFor('wallet', found, catalogue),
     )
     expect(row).toMatchObject({ matched: true, proposed: false })
+  })
+})
+
+describe('movement answers — transfers and balance adjustments', () => {
+  it('proposes a transfer or an adjustment from the words an export uses', () => {
+    expect(proposalFor('category', 'Transfer', catalogue)).toMatchObject({
+      value: TRANSFER,
+      tier: 'auto',
+    })
+    expect(
+      proposalFor('category', 'Balance adjustment', catalogue),
+    ).toMatchObject({ value: ADJUSTMENT, tier: 'auto' })
+    expect(
+      proposalFor('category', 'Bank transfer fee', catalogue),
+    ).toMatchObject({ value: TRANSFER, tier: 'check' })
+  })
+
+  it('writes and reads them back as their own target kinds', () => {
+    let aliases = withAlias(emptyAliases(), 'category', 'transfer', TRANSFER)
+    aliases = withAlias(aliases, 'category', 'adjust', ADJUSTMENT)
+    expect(aliases.categories).toEqual({
+      transfer: { kind: 'transfer' },
+      adjust: { kind: 'adjustment' },
+    })
+    expect(chosenValue('category', 'transfer', aliases)).toBe(TRANSFER)
+    expect(chosenValue('category', 'adjust', aliases)).toBe(ADJUSTMENT)
+  })
+
+  it('offers both next to the user’s categories', () => {
+    expect(MOVEMENT_TARGETS.options.map((option) => option.value)).toEqual([
+      TRANSFER,
+      ADJUSTMENT,
+    ])
   })
 })
