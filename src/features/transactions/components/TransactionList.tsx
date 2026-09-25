@@ -7,6 +7,7 @@ import type {
 import { TX_TAG_LABEL } from '#/features/transactions/data/selectors'
 import { TagPill } from '#/components/TagPill'
 import { Button } from '#/components/ui/button'
+import { AdjustmentActivityRow } from './AdjustmentActivityRow'
 import { CategoryIcon } from './CategoryIcon'
 import { SetAsideActivityRow } from './SetAsideActivityRow'
 import { TransferActivityRow } from './TransferActivityRow'
@@ -99,6 +100,12 @@ export function TransactionList({ view, onAdd, onRowClick }: Props) {
                 />
               ) : r.kind === 'set_aside' ? (
                 <SetAsideActivityRow
+                  key={r.id}
+                  row={r}
+                  onClick={() => onRowClick(r)}
+                />
+              ) : r.kind === 'adjustment' ? (
+                <AdjustmentActivityRow
                   key={r.id}
                   row={r}
                   onClick={() => onRowClick(r)}

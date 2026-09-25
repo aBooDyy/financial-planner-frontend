@@ -15,6 +15,7 @@ const wallet = (over: Partial<LocalBalanceNode>): LocalBalanceNode => ({
   note: null,
   position: 0,
   collapsed: false,
+  archivedAt: null,
   amount: 0,
   currency: 'SAR',
   createdAt: '',
@@ -146,6 +147,22 @@ describe('walletLiveBalances', () => {
     expect(walletLiveBalances(nodes, txns, RATES)).toEqual({
       w1: 0,
       w2: 99_000,
+    })
+  })
+
+  it('credits an upward adjustment and debits a downward one', () => {
+    const nodes = [
+      wallet({ id: 'w1', amount: 100_000 }),
+      wallet({ id: 'w2', amount: 100_000 }),
+    ]
+    const adjustment = { category: null, amount: 12_500 }
+    const txns = [
+      tx({ ...adjustment, walletId: 'w1', type: 'adjustment_in' }),
+      tx({ ...adjustment, walletId: 'w2', type: 'adjustment_out' }),
+    ]
+    expect(walletLiveBalances(nodes, txns, RATES)).toEqual({
+      w1: 112_500,
+      w2: 87_500,
     })
   })
 })

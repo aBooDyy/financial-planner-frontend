@@ -21,8 +21,18 @@ export type TxTypeWire = 'SPEND' | 'INCOME'
  */
 export type TransferLegType = 'transfer_out' | 'transfer_in'
 export type TransferLegTypeWire = 'TRANSFER_OUT' | 'TRANSFER_IN'
-export type TransactionType = TxType | TransferLegType
-export type TransactionTypeWire = TxTypeWire | TransferLegTypeWire
+/**
+ * A balance adjustment records the gap between a wallet's derived balance and the real one.
+ * Like a transfer leg it moves the wallet but is never income or spending, and carries no
+ * category.
+ */
+export type AdjustmentType = 'adjustment_in' | 'adjustment_out'
+export type AdjustmentTypeWire = 'ADJUSTMENT_IN' | 'ADJUSTMENT_OUT'
+export type TransactionType = TxType | TransferLegType | AdjustmentType
+export type TransactionTypeWire =
+  | TxTypeWire
+  | TransferLegTypeWire
+  | AdjustmentTypeWire
 
 export type BudgetScope = 'category' | 'wallet' | 'overall'
 export type BudgetScopeWire = 'CATEGORY' | 'WALLET' | 'OVERALL'
@@ -38,6 +48,8 @@ const TRANSACTION_TYPE_TO_WIRE: Record<TransactionType, TransactionTypeWire> = {
   ...TX_TYPE_TO_WIRE,
   transfer_out: 'TRANSFER_OUT',
   transfer_in: 'TRANSFER_IN',
+  adjustment_in: 'ADJUSTMENT_IN',
+  adjustment_out: 'ADJUSTMENT_OUT',
 }
 const TX_TYPE_FROM_WIRE: Record<TxTypeWire, TxType> = {
   SPEND: 'spend',
@@ -48,6 +60,8 @@ const TRANSACTION_TYPE_FROM_WIRE: Record<TransactionTypeWire, TransactionType> =
     ...TX_TYPE_FROM_WIRE,
     TRANSFER_OUT: 'transfer_out',
     TRANSFER_IN: 'transfer_in',
+    ADJUSTMENT_IN: 'adjustment_in',
+    ADJUSTMENT_OUT: 'adjustment_out',
   }
 const SCOPE_TO_WIRE: Record<BudgetScope, BudgetScopeWire> = {
   category: 'CATEGORY',
@@ -81,6 +95,11 @@ export const fromWireTransactionType = (
 
 export const isTransferLeg = (type: TransactionType): type is TransferLegType =>
   type === 'transfer_out' || type === 'transfer_in'
+export const isAdjustment = (type: TransactionType): type is AdjustmentType =>
+  type === 'adjustment_in' || type === 'adjustment_out'
+/** Spend or income — the only types that are money earned or spent. */
+export const isCashflow = (type: TransactionType): type is TxType =>
+  type === 'spend' || type === 'income'
 export const toWireScope = (s: BudgetScope): BudgetScopeWire => SCOPE_TO_WIRE[s]
 export const fromWireScope = (w: BudgetScopeWire): BudgetScope =>
   SCOPE_FROM_WIRE[w]
@@ -96,7 +115,7 @@ export type Transaction = {
   type: TransactionType
   amount: number // minor units, always positive
   currency: CurrencyCode
-  /** Null only on transfer legs. */
+  /** Null on transfer legs and balance adjustments. */
   category: string | null
   subcategory: string | null
   walletId: string
@@ -106,7 +125,7 @@ export type Transaction = {
   note: string | null
   source: string | null
   transferId: string | null
-  /** The planned item this settles; null on transfer legs and unlinked rows. */
+  /** The planned item this settles; null on transfer legs, adjustments and unlinked rows. */
   plannedId: string | null
   createdAt: string
   updatedAt: string
@@ -197,7 +216,10 @@ export type RecurringWire = {
   version: string
 }
 
-/** The server refuses transfer legs here (`spending.transaction.transfer_via_transfers`). */
+/**
+ * The server refuses transfer legs here (`spending.transaction.transfer_via_transfers`).
+ * `category` is null exactly for an adjustment.
+ */
 export type CreateTransactionWire = {
   id: string
   type: TransactionTypeWire
@@ -231,6 +253,8 @@ export type CreateTransferWire = {
   to_amount: number | null
   date: string
   note: string | null
+  /** The batch marker (`csv:<id>`), written on both legs. */
+  source: string | null
 }
 
 /**
@@ -239,7 +263,7 @@ export type CreateTransferWire = {
  */
 export type UpdateTransferWire = Omit<
   CreateTransferWire,
-  'id' | 'out_id' | 'in_id' | 'from_wallet_id' | 'to_wallet_id'
+  'id' | 'out_id' | 'in_id' | 'from_wallet_id' | 'to_wallet_id' | 'source'
 > & {
   from_wallet_id: string | null
   to_wallet_id: string | null
@@ -281,6 +305,30 @@ export type BulkTransactionResult = {
   status: 'created' | 'taken' | 'invalid'
   /** The row as the server holds it. Absent when the taken id is not the caller's own. */
   transaction: Transaction | null
+  errorCode: string | null
+}
+
+/** What became of one transfer of `POST /transfers/bulk`. The order mirrors what was sent. */
+export type BulkTransferResultWire = {
+  id: string
+  status: 'CREATED' | 'ID_TAKEN' | 'INVALID'
+  transfer: TransferWire | null
+  error_code: string | null
+  error_field: string | null
+}
+
+export type BulkCreateTransfersWire = {
+  results: BulkTransferResultWire[]
+  created: number
+  failed: number
+}
+
+/** The transfer twin of `BulkTransactionResult`, with the same three outcomes. */
+export type BulkTransferResult = {
+  id: string
+  status: 'created' | 'taken' | 'invalid'
+  /** Both legs as the server holds them. Absent when the taken id is not the caller's own. */
+  transfer: Transfer | null
   errorCode: string | null
 }
 
@@ -379,6 +427,15 @@ export const toBulkResult = (
   id: w.id,
   status: BULK_STATUS[w.status],
   transaction: w.transaction ? toTransaction(w.transaction) : null,
+  errorCode: w.error_code,
+})
+
+export const toBulkTransferResult = (
+  w: BulkTransferResultWire,
+): BulkTransferResult => ({
+  id: w.id,
+  status: BULK_STATUS[w.status],
+  transfer: w.transfer ? toTransfer(w.transfer) : null,
   errorCode: w.error_code,
 })
 

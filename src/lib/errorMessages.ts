@@ -17,6 +17,8 @@ const MESSAGES: Record<string, string> = {
   'auth.unauthenticated': 'Your session has expired. Please log in again.',
   'common.network': 'Can’t reach the server. Check your connection.',
   'common.conflict': 'This was changed elsewhere — reload and try again.',
+  'onboarding.category_unknown': 'Pick categories from the starter set.',
+  'balances.settings.base_currency_invalid': 'Choose a supported currency.',
   'settings.category.name_required': 'Give the category a name.',
   'settings.category.slug_taken': 'A category like that already exists.',
   'balances.rate.value_invalid': 'Enter a valid exchange rate.',
@@ -27,6 +29,12 @@ const MESSAGES: Record<string, string> = {
   'spending.transaction.merchant_invalid': 'Choose one of your merchants.',
   'spending.transaction.planned_invalid':
     'That planned item is no longer available.',
+  'spending.transaction.adjustment_refs':
+    'A balance adjustment has no category, goal or merchant.',
+  'spending.transaction.adjustment_currency':
+    'A balance adjustment must be in its wallet’s currency.',
+  'spending.transaction.type_change':
+    'A balance adjustment can’t become income or spending, or the other way round.',
   'goals.allocation.planned_invalid':
     'That planned set-aside is no longer available.',
   // Minted by the planned slice (`PlannedActionError`), and the server's own planned codes.
@@ -122,6 +130,12 @@ const MESSAGES: Record<string, string> = {
   'import.row.type_defaulted':
     'Money in or out was guessed — that word isn’t mapped yet.',
   'import.row.ragged': 'This row has fewer columns than the header.',
+  'import.row.transfer_unpaired':
+    'This transfer has no other side — no matching row in another account, and the note names none. Edit the row to pick the other account.',
+  'import.row.transfer_guessed': 'Other account read from the note — check it.',
+  'import.row.transfer_same_wallet': 'A transfer needs two different accounts.',
+  'import.row.transfer_currency':
+    'The other account is in a different currency.',
   'import.template.not_found': 'That template is no longer available.',
   'import.template.name_required':
     'Give the template a name (120 characters or fewer).',

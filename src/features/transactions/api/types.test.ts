@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { toBudget, toTransaction } from './types'
-import type { BudgetWire, TransactionWire } from './types'
+import {
+  isAdjustment,
+  isCashflow,
+  isTransferLeg,
+  toBudget,
+  toTransaction,
+  toWireTransactionType,
+} from './types'
+import type { BudgetWire, TransactionType, TransactionWire } from './types'
 
 const aTxWire = (currency: string): TransactionWire => ({
   id: 't1',
@@ -52,6 +59,34 @@ describe('spending mappers', () => {
       category: null,
       transferId: 'tr1',
     })
+  })
+
+  it('maps a balance adjustment both ways with no category', () => {
+    const row = toTransaction({
+      ...aTxWire('SAR'),
+      type: 'ADJUSTMENT_OUT',
+      category: null,
+    })
+    expect(row).toMatchObject({ type: 'adjustment_out', category: null })
+    expect(toWireTransactionType('adjustment_in')).toBe('ADJUSTMENT_IN')
+    expect(toWireTransactionType('adjustment_out')).toBe('ADJUSTMENT_OUT')
+  })
+
+  it('tells cash flow, transfer legs and adjustments apart', () => {
+    const all: TransactionType[] = [
+      'spend',
+      'income',
+      'transfer_out',
+      'transfer_in',
+      'adjustment_in',
+      'adjustment_out',
+    ]
+    expect(all.filter(isCashflow)).toEqual(['spend', 'income'])
+    expect(all.filter(isTransferLeg)).toEqual(['transfer_out', 'transfer_in'])
+    expect(all.filter(isAdjustment)).toEqual([
+      'adjustment_in',
+      'adjustment_out',
+    ])
   })
 
   it('rejects an unknown currency code', () => {

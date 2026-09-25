@@ -10,10 +10,12 @@ import type { CurrencyCode } from '#/lib/currency'
 import type { GoalFrequency } from '#/features/goals/api/types'
 import { closeCovered, reopenUnderSettled } from '#/features/planned/data/rows'
 import type {
+  AdjustmentType,
   BudgetPeriod,
   BudgetScope,
   TxType,
 } from '#/features/transactions/api/types'
+import { isAdjustment } from '#/features/transactions/api/types'
 import {
   localBudgetToCreateWire,
   localBudgetToUpdateWire,
@@ -80,25 +82,65 @@ export type TransactionDraft = {
   plannedId?: string | null
 }
 
+/**
+ * A balance adjustment: the gap between a wallet's derived balance and its real one. It is
+ * always in the wallet's currency and links to nothing.
+ */
+export type AdjustmentDraft = {
+  type: AdjustmentType
+  amount: number
+  currency: CurrencyCode
+  walletId: string
+  date: string
+  note: string | null
+  source?: string | null
+}
+
+/** Anything written as one ordinary ledger row. */
+export type LedgerDraft = TransactionDraft | AdjustmentDraft
+
+const isAdjustmentDraft = (d: LedgerDraft): d is AdjustmentDraft =>
+  isAdjustment(d.type)
+
+type Links = Pick<
+  LocalTransaction,
+  'category' | 'subcategory' | 'goalId' | 'merchantId' | 'plannedId'
+>
+
+const NO_LINKS: Links = {
+  category: null,
+  subcategory: null,
+  goalId: null,
+  merchantId: null,
+  plannedId: null,
+}
+
+const linksOf = (draft: LedgerDraft): Links =>
+  isAdjustmentDraft(draft)
+    ? NO_LINKS
+    : {
+        category: draft.category,
+        subcategory: draft.subcategory,
+        goalId: draft.goalId,
+        merchantId: draft.merchantId ?? null,
+        plannedId: draft.plannedId ?? null,
+      }
+
 const buildTransaction = (
   id: string,
-  draft: TransactionDraft,
+  draft: LedgerDraft,
   ts: string,
 ): LocalTransaction => ({
   id,
   type: draft.type,
   amount: draft.amount,
   currency: draft.currency,
-  category: draft.category,
-  subcategory: draft.subcategory,
+  ...linksOf(draft),
   walletId: draft.walletId,
-  goalId: draft.goalId,
-  merchantId: draft.merchantId ?? null,
   date: draft.date,
   note: draft.note,
   source: draft.source ?? null,
   transferId: null,
-  plannedId: draft.plannedId ?? null,
   createdAt: ts,
   updatedAt: ts,
   version: '',
@@ -106,10 +148,10 @@ const buildTransaction = (
   deleted: 0,
 })
 
-/** Insert a transaction under a caller-supplied id (used by the auto-poster for idempotency). */
+/** Insert a ledger row under a caller-supplied id (used by the auto-poster for idempotency). */
 export async function addTransactionWithId(
   id: string,
-  draft: TransactionDraft,
+  draft: LedgerDraft,
 ): Promise<void> {
   const ts = now()
   const tx = buildTransaction(id, draft, ts)
@@ -177,6 +219,46 @@ export async function updateTransaction(
   schedulePush()
 }
 
+export async function createAdjustment(
+  draft: AdjustmentDraft,
+): Promise<string> {
+  const id = newId()
+  await addTransactionWithId(id, draft)
+  return id
+}
+
+/** Rewrites an adjustment in place. A row never crosses between cash flow and adjustment. */
+export async function updateAdjustment(
+  id: string,
+  draft: AdjustmentDraft,
+): Promise<void> {
+  const existing = await db.transactions.get(id)
+  if (!existing || !isAdjustment(existing.type)) return
+  const tx: LocalTransaction = {
+    ...existing,
+    type: draft.type,
+    amount: draft.amount,
+    currency: draft.currency,
+    walletId: draft.walletId,
+    date: draft.date,
+    note: draft.note,
+    source: draft.source ?? existing.source,
+    updatedAt: now(),
+    dirty: 1,
+  }
+  await db.transaction('rw', db.transactions, db.outbox, async () => {
+    await db.transactions.put(tx)
+    await enqueueUpsert(
+      'transaction',
+      id,
+      tx.version,
+      localTransactionToCreateWire(tx),
+      localTransactionToUpdateWire(tx),
+    )
+  })
+  schedulePush()
+}
+
 export async function deleteTransaction(id: string): Promise<void> {
   const plannedId = (await db.transactions.get(id))?.plannedId
   await deleteRecord('transaction', id, db.transactions)
@@ -192,7 +274,7 @@ export async function deleteTransaction(id: string): Promise<void> {
  * which is the difference between one debounced flush and one per chunk.
  */
 export async function bulkAddTransactions(
-  entries: ReadonlyArray<{ id: string; draft: TransactionDraft }>,
+  entries: ReadonlyArray<{ id: string; draft: LedgerDraft }>,
 ): Promise<number> {
   if (entries.length === 0) return 0
   const ts = now()

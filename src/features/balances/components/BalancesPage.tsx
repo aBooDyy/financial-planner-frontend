@@ -1,19 +1,26 @@
+import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useLogout } from '#/features/auth/hooks/useLogout'
 import { usePreferencesStore } from '#/stores/preferences'
 import { useSessionStore } from '#/stores/session'
+import { formatMoney } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
 import {
+  archiveNode,
   deleteNode,
   setBaseCurrency,
   toggleCollapse,
 } from '#/features/balances/data/mutations'
+import { useAdjustBalance } from '#/features/balances/hooks/useAdjustBalance'
 import { useBalances } from '#/features/balances/hooks/useBalances'
 import { useNodeEditor } from '#/features/balances/hooks/useNodeEditor'
 import { useTransferDialog } from '#/features/balances/hooks/useTransferDialog'
 import { transferWallets } from '#/features/balances/data/transferDialog'
+import { archiveTarget } from '#/features/balances/data/archivedList'
 import { MobileTabBar } from '#/components/chrome/MobileTabBar'
 import { TopNav } from '#/components/chrome/TopNav'
+import { AdjustBalanceDialog } from './AdjustBalanceDialog'
+import { ArchiveNodeDialog } from './ArchiveNodeDialog'
 import { BaselineTeaserCard } from './BaselineTeaserCard'
 import { CurrencyBreakdownCard } from './CurrencyBreakdownCard'
 import { NodeEditor } from './NodeEditor'
@@ -25,18 +32,35 @@ export function BalancesPage() {
   const user = useSessionStore((s) => s.user)
   const logout = useLogout()
   const dateFormat = usePreferencesStore((s) => s.dateFormat)
-  const { base, nodes, deltas, rates, view } = useBalances()
+  const { base, nodes, deltas, rates, view, archivedCount } = useBalances()
   const editor = useNodeEditor(base)
   const wallets = transferWallets(nodes, deltas, base)
   const transfer = useTransferDialog(wallets, rates)
   const onTransfer = wallets.length >= 2 ? transfer.openDialog : undefined
+  const adjust = useAdjustBalance(wallets)
+  const editingWallet = wallets.find((w) => w.id === editor.editing?.id)
   const navigate = useNavigate()
+  const [archivingId, setArchivingId] = useState<string | null>(null)
+  const archiving = archivingId
+    ? archiveTarget(nodes, archivingId, { deltas, base, rates })
+    : null
 
   if (!user) return null
 
   const openEdit = (id: string) => {
     const node = nodes.find((n) => n.id === id)
     if (node) editor.openEdit(node)
+  }
+
+  const adjustDialog = (
+    <AdjustBalanceDialog a={adjust} dateFormat={dateFormat} />
+  )
+
+  const confirmArchive = () => {
+    if (!archiving) return
+    void archiveNode(archiving.id)
+    if (editor.editing?.id === archiving.id) editor.close()
+    setArchivingId(null)
   }
 
   return (
@@ -60,11 +84,13 @@ export function BalancesPage() {
               onAddGroup={() => editor.openAdd('group')}
               onToggle={(id) => void toggleCollapse(id)}
               onEdit={openEdit}
+              onAdjust={adjust.openFor}
               onDelete={(id) => void deleteNode(id)}
               onAddInside={(id) => editor.openAdd('wallet', id)}
               onOpenGoal={(goalId) =>
                 void navigate({ to: '/goals', search: { goal: goalId } })
               }
+              archivedCount={archivedCount}
             />
           </div>
 
@@ -85,10 +111,29 @@ export function BalancesPage() {
           nodes={nodes}
           onField={editor.setField}
           onSave={() => void editor.save()}
+          onArchive={() => setArchivingId(editor.editing?.id ?? null)}
           onDelete={() => void editor.remove()}
           onClose={editor.close}
-        />
-      ) : null}
+          currentBalance={
+            editingWallet
+              ? formatMoney(editingWallet.balance, editingWallet.currency)
+              : undefined
+          }
+          onAdjust={
+            editingWallet ? () => adjust.openFor(editingWallet.id) : undefined
+          }
+        >
+          {adjustDialog}
+        </NodeEditor>
+      ) : (
+        adjustDialog
+      )}
+
+      <ArchiveNodeDialog
+        target={archiving}
+        onClose={() => setArchivingId(null)}
+        onConfirm={confirmArchive}
+      />
     </div>
   )
 }

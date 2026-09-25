@@ -1,4 +1,4 @@
-import { Pencil, Trash2 } from 'lucide-react'
+import { Pencil, Scale, Trash2 } from 'lucide-react'
 import type { MouseEvent } from 'react'
 import { IconChip } from '#/components/icons/IconChip'
 import { Button } from '#/components/ui/button'
@@ -9,6 +9,7 @@ import { ReservedWalletLines } from './ReservedWalletLines'
 type Props = {
   row: BalanceRow
   onEdit: (id: string) => void
+  onAdjust: (id: string) => void
   onDelete: (id: string) => void
   onOpenGoal: (goalId: string) => void
 }
@@ -26,7 +27,13 @@ const stop = (fn: (id: string) => void, id: string) => (e: MouseEvent) => {
  * A wallet. One holding goal money leads with what is free to spend and lists its pots —
  * what each goal holds in it — right underneath (05 §6).
  */
-export function WalletRow({ row, onEdit, onDelete, onOpenGoal }: Props) {
+export function WalletRow({
+  row,
+  onEdit,
+  onAdjust,
+  onDelete,
+  onOpenGoal,
+}: Props) {
   const pots = row.hasReserved
   return (
     <>
@@ -80,6 +87,17 @@ export function WalletRow({ row, onEdit, onDelete, onOpenGoal }: Props) {
             onClick={stop(onEdit, row.id)}
           >
             <Pencil size={14} strokeWidth={1.8} />
+          </Button>
+          {/* Mobile adjusts from the wallet editor; the row has no width to spare there. */}
+          <Button
+            variant="ghost"
+            size="icon"
+            title="Adjust balance"
+            aria-label="Adjust balance"
+            className={`${ACTION} hidden hover:text-fp-text md:inline-flex`}
+            onClick={stop(onAdjust, row.id)}
+          >
+            <Scale size={14} strokeWidth={1.8} />
           </Button>
           <Button
             variant="ghost"

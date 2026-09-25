@@ -21,6 +21,7 @@ import {
 } from './selectors'
 import type {
   ActivityRow,
+  AdjustmentRow,
   MonthGridView,
   Scope,
   SetAsideRow,
@@ -69,6 +70,7 @@ const wallet: LocalBalanceNode = {
   note: null,
   position: 0,
   collapsed: false,
+  archivedAt: null,
   amount: 1_000_000,
   currency: 'SAR',
   createdAt: '',
@@ -364,6 +366,22 @@ describe('buildCalendar — day grid', () => {
       expect(dayGrid(picked, mode).pivotRow.some((c) => c.isActive)).toBe(false)
   })
 
+  it('marks every day outside the selected period as outside', () => {
+    const picked = new Date(2026, 5, 10) // Wed 10 June
+    const outsideKeys = (mode: 'month' | 'week' | 'day') => {
+      const g = dayGrid(picked, mode)
+      return [...g.rowsBefore, g.pivotRow, ...g.rowsAfter]
+        .flat()
+        .filter((c) => !c.outside)
+        .map((c) => c.key)
+    }
+    expect(outsideKeys('day')).toEqual([ymd(picked)])
+    expect(outsideKeys('week')).toEqual(
+      [7, 8, 9, 10, 11, 12, 13].map((d) => ymd(new Date(2026, 5, d))),
+    )
+    expect(outsideKeys('month')).toHaveLength(30)
+  })
+
   it('builds the unfoldable month around the pivot week in week and day mode too', () => {
     for (const mode of ['month', 'week', 'day'] as const) {
       const g = dayGrid(new Date(2026, 5, 10), mode)
@@ -434,7 +452,7 @@ describe('buildCalendar — year grid', () => {
     expect(view.rowsAfter).toHaveLength(2)
   })
 
-  it('totals each month and scales spend heat against the year’s worst month', () => {
+  it('totals each month and scales each shade against the year’s biggest net of its sign', () => {
     const months = allMonths(
       yearGrid([
         tx({ type: 'income', amount: 1_000_000, date: '2026-03-04' }),
@@ -448,9 +466,12 @@ describe('buildCalendar — year grid', () => {
     expect(march.netStr).toBe('+6k') // SR 10,000 in − SR 4,000 out
     expect(march.hasBoth).toBe(true)
     expect(july.netStr).toBe('−8k')
+    expect(july.tone).toBe('neg')
     expect(july.intensity).toBe(1)
-    expect(march.intensity).toBe(0.5)
+    expect(march.tone).toBe('pos')
+    expect(march.intensity).toBe(1) // the year's only gain
     expect(months[0].hasActivity).toBe(false)
+    expect(months[0].tone).toBe('zero')
   })
 })
 
@@ -701,6 +722,128 @@ describe('transfers', () => {
       direction: 'out',
       amountStr: '−SR 500',
     })
+  })
+})
+
+describe('balance adjustments', () => {
+  const other: LocalBalanceNode = {
+    ...wallet,
+    id: 'w2',
+    name: 'Cash',
+    color: '#0EA5E9',
+  }
+  const up = tx({
+    type: 'adjustment_in',
+    category: null,
+    amount: 30_000,
+  })
+  const down = tx({
+    type: 'adjustment_out',
+    category: null,
+    amount: 5_000,
+    note: 'Matched statement',
+  })
+  const spend = tx({ type: 'spend', amount: 10_000, category: 'groceries' })
+  const withAdjustments = (txns = [spend, up, down]) =>
+    data({ nodes: [wallet, other], txns })
+
+  const activity = (d: SpendingData, scope: Scope = ALL) =>
+    buildActivityList(d, CATALOG, scope, ANCHOR, 'month', TODAY)
+  const adjustmentRows = (d: SpendingData, scope: Scope = ALL) =>
+    activity(d, scope).groups.flatMap((g) =>
+      g.rows.filter((r): r is AdjustmentRow => r.kind === 'adjustment'),
+    )
+
+  it('leaves the cashflow hero to spend and income', () => {
+    const view = buildCashflow(withAdjustments(), CATALOG, ALL, ANCHOR, 'month')
+    expect(view.spentStr).toBe('SR 100')
+    expect(view.incomeStr).toBe('SR 0')
+    expect(view.txCount).toBe(1)
+  })
+
+  it('keeps adjustments out of the breakdown donut', () => {
+    const view = buildBreakdown(
+      withAdjustments([up, down]),
+      CATALOG,
+      ALL,
+      ANCHOR,
+      'month',
+    )
+    expect(view.hasData).toBe(false)
+  })
+
+  it('never counts an adjustment as budget spend', () => {
+    const budget: LocalBudget = {
+      id: 'b1',
+      scopeType: 'wallet',
+      target: 'w1',
+      period: 'monthly',
+      customDays: null,
+      limit: 100_000,
+      currency: 'SAR',
+      createdAt: '',
+      updatedAt: '',
+      version: '',
+      dirty: 0,
+      deleted: 0,
+    }
+    const view = buildBudgetsView(
+      { ...withAdjustments(), budgets: [budget] },
+      CATALOG,
+      ALL,
+      TODAY,
+    )
+    expect(view.rows[0].spentStr).toBe('SR 100')
+  })
+
+  it('leaves an adjustment-only day cold on the calendar', () => {
+    const view = buildCalendar(
+      withAdjustments([up, down]),
+      ALL,
+      ANCHOR,
+      'month',
+      true,
+      TODAY,
+    )
+    const cells = [view.pivotRow, ...view.rowsBefore, ...view.rowsAfter].flat()
+    expect(cells.some((c) => c.hasActivity)).toBe(false)
+  })
+
+  it('lists each adjustment as its own signed row, out of the day total', () => {
+    const view = activity(withAdjustments())
+    expect(view.groups[0].rows).toHaveLength(3)
+    expect(view.groups[0].totalStr).toBe('−SR 100')
+    expect(adjustmentRows(withAdjustments())).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: up.id,
+          name: 'Balance adjustment',
+          walletName: 'Main',
+          direction: 'in',
+          amountStr: '+SR 300',
+        }),
+        expect.objectContaining({
+          id: down.id,
+          name: 'Matched statement',
+          direction: 'out',
+          amountStr: '−SR 50',
+        }),
+      ]),
+    )
+  })
+
+  it('shows a dash for a day that holds only adjustments', () => {
+    const view = activity(withAdjustments([up]))
+    expect(view.groups[0].totalStr).toBe('—')
+  })
+
+  it('shows an adjustment only while its wallet is in scope', () => {
+    expect(
+      adjustmentRows(withAdjustments(), { type: 'wallet', id: 'w1' }),
+    ).toHaveLength(2)
+    expect(
+      activity(withAdjustments([up]), { type: 'wallet', id: 'w2' }).empty,
+    ).toBe(true)
   })
 })
 

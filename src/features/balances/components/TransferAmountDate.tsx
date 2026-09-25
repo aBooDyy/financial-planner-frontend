@@ -5,6 +5,8 @@ import type { DateFormat } from '#/lib/date'
 import { cn } from '#/lib/utils'
 
 type Props = {
+  /** The amount box's visible caption and accessible name. */
+  label?: { caption: string; name: string }
   amount: string
   currency: CurrencyCode
   over: boolean
@@ -15,9 +17,11 @@ type Props = {
 }
 
 const CAPTION = 'block text-[11px] font-bold tracking-[0.05em] text-fp-text-3'
+const AMOUNT_LABEL = { caption: 'AMOUNT', name: 'Amount' }
 
 /** The AMOUNT box (the dialog's focus) beside the DATE box. */
 export function TransferAmountDate({
+  label = AMOUNT_LABEL,
   amount,
   currency,
   over,
@@ -37,7 +41,7 @@ export function TransferAmountDate({
             : 'border-fp-accent shadow-[0_0_0_4px_var(--fp-accent-soft)]',
         )}
       >
-        <span className={CAPTION}>AMOUNT</span>
+        <span className={CAPTION}>{label.caption}</span>
         <span className="flex items-baseline gap-[5px]">
           <span className="text-[18px] font-bold text-fp-text-3">
             {currencySymbol(currency)}
@@ -45,7 +49,7 @@ export function TransferAmountDate({
           <input
             value={amount}
             onChange={(e) => onAmount(e.target.value)}
-            aria-label="Amount"
+            aria-label={label.name}
             aria-invalid={over || undefined}
             {...amountInputProps(currency)}
             className="w-full min-w-0 flex-1 border-none bg-transparent text-[24px] font-extrabold tracking-[-0.02em] text-fp-text tabular-nums outline-none placeholder:text-fp-text-3"

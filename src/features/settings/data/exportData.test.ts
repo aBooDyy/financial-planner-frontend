@@ -84,4 +84,20 @@ describe('exportCsv', () => {
 
     expect(first.split(',')[2]).toBe('500')
   })
+
+  it('names an adjustment plainly and signs it by direction', async () => {
+    await db.transactions.bulkAdd([
+      tx({ id: 'a', type: 'adjustment_in', category: null, amount: 1000 }),
+      tx({ id: 'b', type: 'adjustment_out', category: null, amount: 250 }),
+    ])
+
+    const rows = (await exported()).slice(1).map((line) => line.split(','))
+
+    expect(rows.map((cells) => [cells[1], cells[2]])).toEqual(
+      expect.arrayContaining([
+        ['balance adjustment', '10'],
+        ['balance adjustment', '-2.5'],
+      ]),
+    )
+  })
 })

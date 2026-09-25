@@ -56,7 +56,13 @@ const withPots = (over: Partial<BalanceRow> = {}) =>
   })
 
 const renderRow = (row: BalanceRow) => {
-  const handlers = { onEdit: vi.fn(), onDelete: vi.fn(), onOpenGoal: vi.fn() }
+  const handlers = {
+    onEdit: vi.fn(),
+    onAdjust: vi.fn(),
+    onArchive: vi.fn(),
+    onDelete: vi.fn(),
+    onOpenGoal: vi.fn(),
+  }
   render(<WalletRow row={row} {...handlers} />)
   return handlers
 }
@@ -84,6 +90,13 @@ describe('WalletRow', () => {
       screen.getByRole('button', { name: /Open Tuition, SR 1,067.00/ }),
     )
     expect(onOpenGoal).toHaveBeenCalledWith('tuition')
+    expect(onEdit).not.toHaveBeenCalled()
+  })
+
+  it('adjusts the balance from its own action without opening the editor', () => {
+    const { onAdjust, onEdit } = renderRow(wallet())
+    fireEvent.click(screen.getByRole('button', { name: 'Adjust balance' }))
+    expect(onAdjust).toHaveBeenCalledWith(wallet().id)
     expect(onEdit).not.toHaveBeenCalled()
   })
 

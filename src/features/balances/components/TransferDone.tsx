@@ -8,7 +8,7 @@ type Props = {
   onDone: () => void
 }
 
-/** The dialog after a transfer lands: what moved, with a way back. */
+/** The dialog once its write has landed: what changed, with a way back. */
 export function TransferDone({ title, sub, onUndo, onDone }: Props) {
   return (
     <div className="flex flex-col items-center px-[6px] pt-[18px] pb-[6px] text-center">

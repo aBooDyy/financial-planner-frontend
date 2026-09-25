@@ -12,13 +12,16 @@ import type {
   LocalTransaction,
 } from '#/db/types'
 import { FREQUENCIES } from '#/features/goals/constants'
-import type { TxType } from '#/features/transactions/api/types'
-import { isTransferLeg } from '#/features/transactions/api/types'
+import type { AdjustmentType, TxType } from '#/features/transactions/api/types'
+import { isAdjustment, isCashflow } from '#/features/transactions/api/types'
 import { AMBER, AT_RISK_RATIO, RED } from '#/features/transactions/constants'
 import type { RangeMode } from '#/features/transactions/constants'
 import type { DateWindow } from './planning'
 import type { CategoryCatalog } from '#/features/categories/data/catalog'
 import { walletLiveBalances } from './ledger'
+import { activeNodes } from '#/features/balances/data/archive'
+import { GROUP_ICON, WALLET_ICON, iconIdOr } from '#/lib/icons/fallbacks'
+import type { IconId } from '#/lib/icons/catalog.gen'
 import {
   addDays,
   budgetWindow,
@@ -103,43 +106,111 @@ function walletMatcher(
   return (id) => groups.get(id)?.has(scope.id) ?? false
 }
 
-export function scopeOptions(data: SpendingData) {
+export type ScopeOption = {
+  value: string
+  kind: 'all' | 'group' | 'wallet'
+  name: string
+  amountStr: string
+  color: string | null
+  icon: IconId | null
+  /** Nesting under its group, for indentation; 0 for a top-level group or wallet. */
+  depth: number
+}
+
+export type ScopeSection = {
+  /** Heading above the section, or null when the options speak for themselves. */
+  label: string | null
+  options: ScopeOption[]
+}
+
+/**
+ * The account filter, shaped like the Balances tree: everything, then one section per
+ * top-level group with its wallets and subgroups nested beneath, then the wallets in no
+ * group. Archived accounts are left out.
+ */
+export function scopeSections(data: SpendingData): ScopeSection[] {
   const { nodes, txns, base, rates } = data
   const balances = walletLiveBalances(nodes, txns, rates)
-  const wallets = nodes.filter((n) => n.kind === 'wallet')
-  const groups = nodes.filter((n) => n.kind === 'group')
-
-  const inBase = (walletId: string): number => {
-    const node = nodes.find((n) => n.id === walletId)
-    const cur = node?.currency ?? base
-    return convertMinor(balances[walletId] ?? 0, cur, base, rates)
+  const active = activeNodes(nodes)
+  const children = new Map<string | null, LocalBalanceNode[]>()
+  for (const n of active) {
+    const list = children.get(n.parentId) ?? []
+    list.push(n)
+    children.set(n.parentId, list)
   }
-  const groupTotal = (groupId: string): number => {
-    const matcher = walletMatcher({ type: 'group', id: groupId }, nodes)
-    return wallets
-      .filter((w) => matcher(w.id))
-      .reduce((sum, w) => sum + inBase(w.id), 0)
-  }
-  const allTotal = wallets.reduce((sum, w) => sum + inBase(w.id), 0)
+  for (const list of children.values())
+    list.sort((a, b) => a.position - b.position)
 
-  const options = [
-    {
-      value: 'all',
-      label: `All accounts · ${formatMoneyRounded(allTotal, base)}`,
-    },
-    ...groups.map((g) => ({
-      value: `group:${g.id}`,
-      label: `${g.name} · ${formatMoneyRounded(groupTotal(g.id), base)}`,
-    })),
-    ...wallets.map((w) => ({
-      value: `wallet:${w.id}`,
-      label: `${w.name} · ${formatMoneyRounded(
-        balances[w.id] ?? 0,
-        w.currency ?? base,
-      )}`,
-    })),
+  const inBase = (w: LocalBalanceNode): number =>
+    convertMinor(balances[w.id] ?? 0, w.currency ?? base, base, rates)
+  const baseTotal = (id: string | null): number =>
+    (children.get(id) ?? []).reduce(
+      (sum, n) => sum + (n.kind === 'wallet' ? inBase(n) : baseTotal(n.id)),
+      0,
+    )
+
+  const option = (n: LocalBalanceNode, depth: number): ScopeOption =>
+    n.kind === 'wallet'
+      ? {
+          value: `wallet:${n.id}`,
+          kind: 'wallet',
+          name: n.name,
+          amountStr: formatMoneyRounded(
+            balances[n.id] ?? 0,
+            n.currency ?? base,
+          ),
+          color: n.color,
+          icon: iconIdOr(n.icon, WALLET_ICON),
+          depth,
+        }
+      : {
+          value: `group:${n.id}`,
+          kind: 'group',
+          name: n.name,
+          amountStr: formatMoneyRounded(baseTotal(n.id), base),
+          color: n.color,
+          icon: iconIdOr(n.icon, GROUP_ICON),
+          depth,
+        }
+  const subtree = (n: LocalBalanceNode, depth: number): ScopeOption[] => [
+    option(n, depth),
+    ...(children.get(n.id) ?? []).flatMap((c) => subtree(c, depth + 1)),
   ]
-  return options
+
+  const roots = children.get(null) ?? []
+  const loose = roots.filter((n) => n.kind === 'wallet')
+  const sections: ScopeSection[] = [
+    {
+      label: null,
+      options: [
+        {
+          value: 'all',
+          kind: 'all',
+          name: 'All accounts',
+          amountStr: formatMoneyRounded(baseTotal(null), base),
+          color: null,
+          icon: null,
+          depth: 0,
+        },
+      ],
+    },
+    ...roots
+      .filter((n) => n.kind === 'group')
+      .map((g) => ({ label: null, options: subtree(g, 0) })),
+  ]
+  if (loose.length > 0)
+    sections.push({
+      label: sections.length > 1 ? 'Not in a group' : 'Wallets',
+      options: loose.map((w) => option(w, 0)),
+    })
+  return sections
+}
+
+/** The chosen scope while it is still on offer; `all` once its account is archived or gone. */
+export function offeredScope(sections: ScopeSection[], scope: Scope): Scope {
+  const value = scopeToValue(scope)
+  const offered = sections.some((s) => s.options.some((o) => o.value === value))
+  return offered ? scope : { type: 'all' }
 }
 
 export function scopeFromValue(value: string): Scope {
@@ -164,11 +235,19 @@ const liveTxns = (data: SpendingData, scope: Scope): LocalTransaction[] => {
 const toBase = (t: LocalTransaction, data: SpendingData): number =>
   convertMinor(t.amount, t.currency, data.base, data.rates)
 
-/** A spend or income row — the only kind any total counts. Transfer legs move money, never earn or spend it. */
+/**
+ * A spend or income row — the only kind any total counts. Transfer legs and balance
+ * adjustments move money, never earn or spend it.
+ */
 type FlowTxn = LocalTransaction & { type: TxType; category: string }
 
 const isFlow = (t: LocalTransaction): t is FlowTxn =>
-  !isTransferLeg(t.type) && t.category !== null
+  isCashflow(t.type) && t.category !== null
+
+type AdjustmentTxn = LocalTransaction & { type: AdjustmentType }
+
+const isAdjustmentTxn = (t: LocalTransaction): t is AdjustmentTxn =>
+  isAdjustment(t.type)
 
 const flowTxns = (data: SpendingData, scope: Scope): FlowTxn[] =>
   liveTxns(data, scope).filter(isFlow)
@@ -437,7 +516,21 @@ export type SetAsideRow = {
   amountStr: string
 }
 
-export type ActivityRow = TxRow | TransferRow | SetAsideRow
+/** A balance adjustment — a correction to one wallet's balance, never counted in a total. */
+export type AdjustmentRow = {
+  kind: 'adjustment'
+  id: string
+  /** The note, else "Balance adjustment". */
+  name: string
+  walletName: string
+  walletColor: string
+  direction: 'in' | 'out'
+  amountStr: string
+}
+
+export const ADJUSTMENT_LABEL = 'Balance adjustment'
+
+export type ActivityRow = TxRow | TransferRow | SetAsideRow | AdjustmentRow
 
 export type DayGroup = {
   dateLabel: string
@@ -453,7 +546,7 @@ export type ActivityListView = {
 }
 
 const DELETED_ACCOUNT = 'Deleted account'
-// A day holding only transfers has nothing to total.
+// A day holding only transfers or adjustments has nothing to total.
 const NO_DAY_TOTAL = '—'
 const NO_WALLET_COLOR = 'var(--fp-border-strong)'
 
@@ -481,6 +574,23 @@ function txRowOf(t: FlowTxn, ctx: ActivityContext): TxRow {
     isIncome: isInc,
     tag: txTagOf(t),
     amountStr: `${isInc ? '+' : '−'}${formatMoneyRounded(toBase(t, ctx.data), ctx.data.base)}`,
+  }
+}
+
+function adjustmentRowOf(
+  t: AdjustmentTxn,
+  ctx: ActivityContext,
+): AdjustmentRow {
+  const wallet = ctx.nodeById.get(t.walletId)
+  const direction = t.type === 'adjustment_in' ? 'in' : 'out'
+  return {
+    kind: 'adjustment',
+    id: t.id,
+    name: t.note || ADJUSTMENT_LABEL,
+    walletName: wallet?.name ?? DELETED_ACCOUNT,
+    walletColor: wallet?.color ?? NO_WALLET_COLOR,
+    direction,
+    amountStr: `${direction === 'in' ? '+' : '−'}${formatMoneyRounded(toBase(t, ctx.data), ctx.data.base)}`,
   }
 }
 
@@ -610,6 +720,7 @@ function dayRows(
   for (const t of txns) {
     if (!t.transferId) {
       if (isFlow(t)) rows.push(txRowOf(t, ctx))
+      else if (isAdjustmentTxn(t)) rows.push(adjustmentRowOf(t, ctx))
       continue
     }
     if (emitted.has(t.transferId)) continue
@@ -711,20 +822,21 @@ export function buildActivityList(
 export type PeriodCell = {
   key: string
   label: string
-  /** Outside the focused month — rendered dimmed. Never true in the year grid. */
+  /** Outside the selected period (day, week, month or year). */
   outside: boolean
   /** Today, or the running month in the year grid. */
   isCurrent: boolean
-  /** The one period you picked — a day in day view. Elsewhere only `isCurrent` marks a cell. */
+  /** The one period you picked — a day in day view. */
   isActive: boolean
   hasActivity: boolean
-  hasSpend: boolean
   hasBoth: boolean
   netStr: string
-  netPositive: boolean
+  /** Sign of the net: income over spend, spend over income, or even (incl. no activity). */
+  tone: 'pos' | 'neg' | 'zero'
   incStr: string
   spendStr: string
-  intensity: number // 0..1 spend heat
+  /** 0..1 — the net's size against the period's biggest net of the same sign. */
+  intensity: number
 }
 
 type CellFlags = Pick<
@@ -732,25 +844,46 @@ type CellFlags = Pick<
   'key' | 'label' | 'outside' | 'isCurrent' | 'isActive'
 >
 
+/** The biggest gain and the biggest loss in a scaling period, both as positive amounts. */
+type NetPeaks = { pos: number; neg: number }
+
 const cellOf = (
   flags: CellFlags,
   inc: number,
   spend: number,
-  maxSpend: number,
+  peaks: NetPeaks,
   base: CurrencyCode,
 ): PeriodCell => {
   const net = inc - spend
+  const tone = net > 0 ? 'pos' : net < 0 ? 'neg' : 'zero'
+  const peak = tone === 'zero' ? 0 : peaks[tone]
   return {
     ...flags,
     hasActivity: spend > 0 || inc > 0,
-    hasSpend: spend > 0,
     hasBoth: spend > 0 && inc > 0,
     netStr: `${net >= 0 ? '+' : '−'}${fmtK(Math.abs(net), base)}`,
-    netPositive: net >= 0,
+    tone,
     incStr: `+${fmtK(inc, base)}`,
     spendStr: `−${fmtK(spend, base)}`,
-    intensity: maxSpend > 0 ? spend / maxSpend : 0,
+    // Square root so a small day still reads next to one huge one; capped because a
+    // neighbouring month's day can outgrow the period's peak.
+    intensity: peak > 0 ? Math.min(1, Math.sqrt(Math.abs(net) / peak)) : 0,
   }
+}
+
+function netPeaks(
+  inc: Map<string, number>,
+  spend: Map<string, number>,
+  inScope: (key: string) => boolean,
+): NetPeaks {
+  const peaks = { pos: 0, neg: 0 }
+  for (const k of new Set([...inc.keys(), ...spend.keys()])) {
+    if (!inScope(k)) continue
+    const net = (inc.get(k) ?? 0) - (spend.get(k) ?? 0)
+    if (net > 0) peaks.pos = Math.max(peaks.pos, net)
+    else peaks.neg = Math.max(peaks.neg, -net)
+  }
+  return peaks
 }
 
 /** The row that stays visible when a grid is folded shut, plus the rows that fold away. */
@@ -825,11 +958,13 @@ function buildDayGrid(
       ? startOfWeek(curMonth ? today : new Date(calY, calM, 1))
       : startOfWeek(anchor)
 
-  let cMax = 0
-  for (const [k, v] of perDaySpend) {
+  // Shades scale against the anchor's month in every mode, so a day keeps its shade as you
+  // move between month, week and day view.
+  const peaks = netPeaks(perDayInc, perDaySpend, (k) => {
     const d = parseISO(k)
-    if (d.getFullYear() === calY && d.getMonth() === calM && v > cMax) cMax = v
-  }
+    return d.getFullYear() === calY && d.getMonth() === calM
+  })
+  const selected = windowOf(anchor, mode)
 
   const cellFor = (d: Date): PeriodCell => {
     const k = dayKey(d)
@@ -837,13 +972,13 @@ function buildDayGrid(
       {
         key: k,
         label: String(d.getDate()),
-        outside: d.getMonth() !== calM,
+        outside: !inWindow(k, selected),
         isCurrent: sameDay(d, today),
         isActive: mode === 'day' && dayKey(anchor) === k,
       },
       perDayInc.get(k) ?? 0,
       perDaySpend.get(k) ?? 0,
-      cMax,
+      peaks,
       data.base,
     )
   }
@@ -907,7 +1042,7 @@ function buildMonthGrid(
     const bucket = t.type === 'income' ? perMonthInc : perMonthSpend
     bucket.set(k, (bucket.get(k) ?? 0) + toBase(t, data))
   }
-  const cMax = Math.max(0, ...perMonthSpend.values())
+  const peaks = netPeaks(perMonthInc, perMonthSpend, () => true)
 
   const months = [...Array(12).keys()].map((m) => {
     const d = new Date(year, m, 1)
@@ -922,7 +1057,7 @@ function buildMonthGrid(
       },
       perMonthInc.get(k) ?? 0,
       perMonthSpend.get(k) ?? 0,
-      cMax,
+      peaks,
       data.base,
     )
   })

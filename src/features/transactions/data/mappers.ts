@@ -92,6 +92,7 @@ export const transferToCreateWire = (
   to_amount: out.currency === inn.currency ? null : inn.amount,
   date: out.date,
   note: out.note,
+  source: out.source,
 })
 
 export const transferToUpdateWire = ({

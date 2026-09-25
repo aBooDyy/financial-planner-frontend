@@ -6,14 +6,20 @@
 import { convertMinor } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
 import type { LocalBalanceNode, LocalGoal, LocalTransaction } from '#/db/types'
+import type { TransactionType } from '#/features/transactions/api/types'
 
 type RatesMap = Partial<Record<string, number>>
 
 const live = (txns: LocalTransaction[]): LocalTransaction[] =>
   txns.filter((t) => t.deleted === 0)
 
-const signOf = (t: LocalTransaction): number =>
-  t.type === 'income' || t.type === 'transfer_in' ? 1 : -1
+const CREDITS: ReadonlySet<TransactionType> = new Set([
+  'income',
+  'transfer_in',
+  'adjustment_in',
+])
+
+const signOf = (t: LocalTransaction): number => (CREDITS.has(t.type) ? 1 : -1)
 
 const walletCurrencies = (
   nodes: LocalBalanceNode[],

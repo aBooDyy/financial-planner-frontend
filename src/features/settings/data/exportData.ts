@@ -1,5 +1,7 @@
 import { db } from '#/db/db'
+import type { LocalTransaction } from '#/db/types'
 import { buildCatalog } from '#/features/categories/data/catalog'
+import { isAdjustment } from '#/features/transactions/api/types'
 import { toMajor } from '#/lib/currency'
 
 /**
@@ -33,6 +35,16 @@ const csvCell = (value: unknown): string => {
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 
+/**
+ * An adjustment's sign is its whole meaning, and the amount column is otherwise unsigned,
+ * so it is the one row exported as a signed figure under a plain name.
+ */
+const typeCell = (t: LocalTransaction): string =>
+  isAdjustment(t.type) ? 'balance adjustment' : t.type
+
+const amountCell = (t: LocalTransaction): number =>
+  (t.type === 'adjustment_out' ? -1 : 1) * toMajor(t.amount, t.currency)
+
 export async function exportCsv(): Promise<void> {
   const [transactions, nodes, categories] = await Promise.all([
     db.transactions.toArray(),
@@ -59,8 +71,8 @@ export async function exportCsv(): Promise<void> {
     lines.push(
       [
         t.date,
-        t.type,
-        toMajor(t.amount, t.currency),
+        typeCell(t),
+        amountCell(t),
         t.currency,
         t.category === null ? '' : catalog.get(t.category).name,
         t.category === null
