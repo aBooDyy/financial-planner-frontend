@@ -85,7 +85,6 @@ export function PlannedCard({
               <PlannedBand
                 tone="due"
                 title={`Needs confirming · ${view.dueCount}`}
-                caption="Not in balances yet"
               />
               {view.due.map((r) => (
                 <PlannedRow

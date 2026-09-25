@@ -8,7 +8,7 @@ type Props = {
   tone?: 'due' | 'neutral'
 }
 
-/** A section header inside the Planned card: "Needs confirming · 2" … "Not in balances yet". */
+/** A section header inside the Planned card: "Needs confirming · 2", "Planned · next 14 days". */
 export function PlannedBand({ title, caption, tone = 'neutral' }: Props) {
   return (
     <div

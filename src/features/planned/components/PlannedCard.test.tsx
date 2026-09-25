@@ -83,7 +83,6 @@ describe('PlannedCard', () => {
     ])
     const due = screen.getByRole('region', { name: 'Needs confirming' })
     expect(within(due).getByText('Needs confirming · 1')).toBeTruthy()
-    expect(within(due).getByText('Not in balances yet')).toBeTruthy()
     expect(within(due).getByText('Goal')).toBeTruthy()
 
     fireEvent.click(within(due).getByRole('button', { name: 'Confirm' }))
