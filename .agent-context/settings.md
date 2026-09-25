@@ -7,7 +7,7 @@ shared shell (`TopNav` / `MobileTabBar`, whose `active` prop is now optional so 
 highlights) and lists its panes in `SettingsRail` (desktop left rail / mobile chips): Account,
 Preferences, Currencies & rates, Categories, Merchants, Email sync
 ([email-sync.md](email-sync.md)), Integrations ([integrations.md](integrations.md)),
-Notifications, Data & privacy. Each pane is its own route — see
+Notifications, Archived, Data & privacy. Each pane is its own route — see
 [routing.md](routing.md#settings-settings).
 
 ## Where each control's state lives
@@ -41,6 +41,13 @@ Notifications, Data & privacy. Each pane is its own route — see
   `MerchantRow` composes `features/merchants/`. A type `Segmented` filters the list;
   `useCategoryTree` supplies a live per-row transaction count. Everything about the model,
   the resolved catalog and the subtree delete is in [categories.md](categories.md).
+- **Archived** (`ArchivedSection` + `ArchivedRow` + `DeleteArchivedDialog`): every archived
+  wallet/group, newest first, from `useArchivedNodes` → pure `buildArchivedList`
+  (`features/balances/data/archivedList.ts`): balance (a group's in base currency), wallet
+  count, archive date (honours `dateFormat`), former group, and a "stranded" note when that
+  group is archived too. **Restore** is one tap (`restoreNode`); **Delete** confirms first,
+  because it is the ordinary `deleteNode` and takes the ledger with it. See
+  [balances.md](balances.md#archiving).
 - **Notifications**: five toggles → `usePreferencesStore`.
 - **Data & privacy**: Import a file (→ `/import`), real **CSV/JSON export** from the local DB
   (`data/exportData.ts`), **Import templates** (`ImportTemplatesCard` + `ImportTemplateRow`:

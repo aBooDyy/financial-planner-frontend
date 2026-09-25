@@ -113,6 +113,33 @@ walletDeltas?, reservations?)` builds the flattened tree (honoring collapse), gr
   there (it replaced the old `SignedInHome` placeholder). API types/mappers in
   `api/types.ts`, calls in `api/balancesApi.ts` (the HTTP client gained `patch`/`del`).
 
+## Archiving
+
+A node carries `archivedAt: string | null` (wire: `archived` boolean out, `archived_at` in —
+see backend `balances.md`). Archiving is **view-level**: nothing is moved or rewritten.
+
+- **Rules** in `data/archive.ts`: `hiddenByArchive` (an archived node *and everything beneath
+  an archived group*; memoised ancestor walk, bounded against cycles), `activeNodes` (live =
+  not deleted and not hidden), `hasArchivedAncestor`, `subtreeIds`.
+- **Where the filter applies.** `useBalances` builds the view from `activeNodes` and returns
+  the active set as `nodes` (so the transfer dialog, the "Place inside" picker, Preferences'
+  default account, email-sync and integrations pickers all drop archived wallets), plus
+  `archivedCount`. Ledger deltas, goal reservations and `heldCurrencies` still see every live
+  node. `walletGroupOptions`/`groupParentOptions`, `scopeSections` (Spending's account filter),
+  the goal contribution form and the planned confirm form filter through `activeNodes` too.
+  **Existing entries keep resolving**: `useTransactions` returns `wallets` (active, for new
+  entries/quick add/review), `editorWallets` (active first, then archived — so a default is
+  never an archived wallet) and `archivedWalletIds`; `TxEditor` offers an archived wallet only
+  when the entry already points at it, labelled "(archived)".
+- **UI.** Archive lives **only** in the `NodeEditor` footer, as a small ghost button — it is
+  a rare action, so the rows carry no archive control (user's call). It opens `ArchiveNodeDialog`, driven by the pure
+  `archiveTarget` (`data/archivedList.ts`): what leaves, how many wallets go with a group, and
+  the money that stops counting toward the total. `WalletsGroupsCard` ends with an "N
+  archived" link to `/settings/archived` when there are any.
+- **Restore** (`restoreNode`) clears `archivedAt`; a node whose group is still archived would
+  stay hidden, so it comes back at the **top level** instead. Settings › Archived is described
+  in [settings.md](settings.md).
+
 ## Transfer money dialog
 
 The main place to move money between wallets (Spending records it; see
@@ -146,3 +173,30 @@ The main place to move money between wallets (Spending records it; see
 - The wallet card leads with the wallet's `IconChip` (34px) rather than the design's bare
   colour dot, matching the wallet rows.
 
+## Adjust balance dialog
+
+A wallet's stored `amount` is its **opening** balance; what the rows show is opening + the
+ledger. When the two drift from the bank, the user types the real figure and the gap is
+recorded as a balance adjustment
+([transactions.md](transactions.md#balance-adjustments)) — the opening balance is never
+rewritten to fake it.
+
+- **Entry points.** `NodeEditor`, editing a saved wallet: the amount field is relabelled
+  **"Opening balance"**, and a "BALANCE NOW · <live balance>" strip under it carries an
+  outline **Adjust balance** button (desktop and mobile). Desktop also gets a `Scale` icon in
+  `WalletRow`'s action cluster (`md:` and up — the mobile row has no width to spare). Both
+  preselect the wallet; the dialog has no wallet picker.
+- **Nesting.** Opened from the editor, `AdjustBalanceDialog` is rendered as the editor's
+  `children` (the nested-picker rule in [icons.md](icons.md)); otherwise `BalancesPage`
+  renders it at page level. It is the same element either way.
+- **Pure logic** in `data/adjustBalance.ts` (tested): `adjustmentFor(current, target)` →
+  `{ type, amount }` or `null` when they match; `previewAdjustment(wallet, targetMinor)`
+  (current, next, signed difference, `canSubmit`); `differenceLabel`, `adjustSubmitLabel`,
+  `adjustDoneSummary`. Live balances come from `transferWallets` (opening + deltas), the same
+  figure the row shows.
+- **State** in `hooks/useAdjustBalance.ts`: `openFor(walletId)`, the "Actual balance" string
+  (parsed in the wallet's currency; negative allowed), date (default today), note. Submit calls
+  `createAdjustment`; the done state keeps the row id so **Undo** deletes it.
+- **Components**: `AdjustBalanceDialog` → `AdjustBalanceForm` (`AdjustWalletCard` — current
+  struck through → new; `TransferAmountDate` with an "ACTUAL BALANCE" caption;
+  `AdjustDifferenceBox`; note; submit) or the shared `TransferDone` card.

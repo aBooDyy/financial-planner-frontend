@@ -12,13 +12,15 @@ root product [`.agent-context/`](../../.agent-context/). Keep
   outbox/sync engine, bulk push, the incremental (delta) pull and its watermarks, optimistic
   updates, conflict (`409`) handling, and the silent refresh on `401`.
 - [balances.md](balances.md) — the Balances feature (first synced entity): how the Dexie +
-  sync engine, money/derivation, and the recreated UI are realized.
+  sync engine, money/derivation, and the recreated UI are realized; the transfer and
+  adjust-balance dialogs.
 - [goals.md](goals.md) — the Goals planning feature: income streams + ranked goals, the
   client-side funding engine, and the shared chrome (`src/components/chrome/`).
 - [transactions.md](transactions.md) — the Spending feature: the ledger + budgets + recurring,
   the catalog-taking selectors, client-side derivation of wallet balances & goal contributions,
   settlement links to planned rows, and transfers between wallets (two linked legs, the `transfer` outbox entity, the
-  collapsed activity row and its scope rules, exclusion from totals).
+  collapsed activity row and its scope rules, exclusion from totals), and balance adjustments
+  (`adjustment_in`/`adjustment_out` rows outside every total).
 - [planned.md](planned.md) — Planned transactions: the entity and its derived settled amount,
   deterministic UUIDv5 ids, the generator and reconciler, the app-level planner (fill /
   recalc + undo, auto-post), settlement mutations, the id-taken sync branch, the hooks the
@@ -26,6 +28,9 @@ root product [`.agent-context/`](../../.agent-context/). Keep
 - [categories.md](categories.md) — Categories: the two-level model, the synced tree and its
   Dexie/sync branch, `buildCatalog` and the `CategoryCatalog` every surface reads, the Settings
   list/editor, and the subtree-aware delete.
+- [onboarding.md](onboarding.md) — the `/setup` first-run wizard: `SessionGate`, the
+  sessionStorage draft, starter packs over the category catalog, the one commit call, the
+  inbox connect round trip.
 - [settings.md](settings.md) — the Settings page (avatar-menu route): profile editing, synced
   copy-on-write categories, editable FX rates, and the local preferences store.
 - [merchants.md](merchants.md) — Merchants: the shared `normalizeKey` port, the scored local
@@ -41,8 +46,9 @@ root product [`.agent-context/`](../../.agent-context/). Keep
   contract, the debounced dry run, reorder; the delivery log (refusals, per-field report, build
   a rule from a delivery) and the throttled-key notice.
 - [import.md](import.md) — Import: the on-device CSV pipeline (worker → mapping → review →
-  commit), saved templates, batches and undo, the review grid's virtualisation contract, and what
-  the wizard costs.
+  commit), transfers and balance adjustments found in a file (pairing, lone sides, coupling),
+  saved templates, batches and undo, the review grid's virtualisation contract, and what the
+  wizard costs.
 - [app-config.md](app-config.md) — `GET /config`: the open ISO-4217 currency table, the
   bundled snapshot + cache order, live rates and the auto-update opt-out, the user's **own
   currencies**, rate precedence, and the server limits.

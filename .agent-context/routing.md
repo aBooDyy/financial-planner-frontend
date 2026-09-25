@@ -41,10 +41,15 @@ Routing uses **TanStack Router** with file-based routes under `src/routes/` (cod
   the signed-in home.
 - **Guard convention (current):** guards are component-level, driven by the **session
   store**, not router `beforeLoad`/loaders. `__root.tsx` calls `useSessionBootstrap()` once
-  (a `GET /auth/me` that resolves the session from the cookie); routes branch on
-  `status`. `RedirectTo` (`src/components/RedirectTo.tsx`) is a tiny imperative-redirect
-  helper since TanStack's `redirect()` is loader-only. Revisit toward a guarded layout
-  route + `beforeLoad` once more authed areas exist.
+  (a `GET /auth/me` that resolves the session from the cookie). Guarded routes wrap their
+  content in **`SessionGate`** (`src/components/SessionGate.tsx`): `loading` → `Splash`,
+  `anonymous` → `/auth/login`, signed in but not onboarded → `/setup`. Use it for every new
+  authed route rather than branching on `status` by hand. `RedirectTo`
+  (`src/components/RedirectTo.tsx`) is a tiny imperative-redirect helper since TanStack's
+  `redirect()` is loader-only. Revisit toward a guarded layout route + `beforeLoad` once more
+  authed areas exist.
+- **`/setup`** (`routes/setup.tsx`) is the first-run wizard and the one authed route that does
+  not use the gate — see [onboarding.md](onboarding.md).
 
 ## Settings (`/settings/*`)
 
@@ -69,6 +74,26 @@ rendering its feature component directly:
 - **Typed search on a pane:** `/settings/integrations` validates `?key=` and `?sample=`
   (`IntegrationsSearch`) — the deep link the review queue's "Fix the rule" and a
   transaction's "View key" use. `/transactions?review=1` is the other search-driven entry.
+
+## Goals and Spending tabs
+
+`/goals/$section` and `/transactions/$view` put the page tab in the URL, like Settings panes, so a
+tab is linkable and the back button moves between tabs. Each area is a directory:
+
+- `route.tsx` — the session guard + `Outlet`, and the area's search params (`?goal=`,
+  `?review=`), so they're shared by every tab.
+- `index.tsx` — **redirects** the bare path to the first tab (`summary` / `activity`) in
+  `beforeLoad`, carrying the search along, so `/goals?goal=<id>` and `/transactions?review=1`
+  still work.
+- `$section.tsx` / `$view.tsx` — renders the page; `beforeLoad` redirects an unknown tab to the
+  first one. The valid tabs are `GOALS_SECTIONS` (`features/goals/components/sections.ts`) and
+  `SPENDING_VIEWS` (`features/transactions/constants.ts`).
+
+**A tab is a param, not a child route per tab** (unlike Settings) because the tabs share page
+state — the goal editor/detail, the Spending scope, range and calendar. One param route keeps
+the page mounted across tab switches, since TanStack only remounts a route's component on a
+param change when `remountDeps` asks it to. Tabs are `<Link>`s; the pages read the tab with
+`useParams` and navigate with `to: '/goals/$section'` / `'/transactions/$view'`.
 
 ## Import hub (`/import`)
 

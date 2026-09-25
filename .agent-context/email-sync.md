@@ -14,6 +14,15 @@ tables are a server-owned read cache, not an offline outbox — see the exceptio
 | Spending → Review             | `ReviewScanPrompt` — the inbox's scan offer, passed into the queue's `PendingReviewModal` as its `toolbar`                      |
 | Spending → edit a transaction | the queue slice's `SourceSection` inside `TxEditor` — the email an auto-logged entry came from                                  |
 
+## Where the callback returns to
+
+The callback URL is fixed (the provider apps whitelist it), so the place a connect started
+from travels through sessionStorage: `beginInboxConnect(provider, returnTo)`
+(`data/connect.ts`) stores it before leaving, and the callback route reads it once with
+`takeConnectReturnPath()` — same-origin paths only, defaulting to `/settings/email-sync`.
+Settings' wizard uses the default; first-run setup returns to `/setup`
+([onboarding.md](onboarding.md)).
+
 ## The wizard's three picks
 
 `useEmailWizard` walks provider → OAuth redirect → callback route

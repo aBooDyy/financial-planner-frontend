@@ -20,8 +20,9 @@ pattern changes. Index: [`.agent-context/README.md`](.agent-context/README.md).
 - [pwa-and-mobile.md](.agent-context/pwa-and-mobile.md) — PWA setup, offline, native-like mobile UX, responsive nav.
 - [balances.md](.agent-context/balances.md) — Balances: the first synced entity, money/derivation, the wallets/groups tree.
 - [goals.md](.agent-context/goals.md) — Goals: income streams + ranked goals, the client-side funding engine.
-- [transactions.md](.agent-context/transactions.md) — Spending: ledger + budgets + recurring, derived balances, settlement links, transfers between wallets.
+- [transactions.md](.agent-context/transactions.md) — Spending: ledger + budgets + recurring, derived balances, settlement links, transfers between wallets, balance adjustments.
 - [planned.md](.agent-context/planned.md) — Planned transactions: generator + reconciler, the app-level planner, deterministic ids, confirm/skip/recalc, the hooks the Planned tab and goal detail read.
+- [onboarding.md](.agent-context/onboarding.md) — the `/setup` first-run wizard, `SessionGate`, starter packs, the sessionStorage draft.
 - [settings.md](.agent-context/settings.md) — the Settings page and its routed panes, local preferences.
 - [categories.md](.agent-context/categories.md) — Categories: the two-level synced tree, `buildCatalog` and the `CategoryCatalog` every surface reads, the Settings editor, the subtree delete.
 - [email-sync.md](.agent-context/email-sync.md) — Email sync: the connect/map wizard, on-demand scans, feeding the review queue.

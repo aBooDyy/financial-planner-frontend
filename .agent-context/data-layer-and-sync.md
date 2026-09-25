@@ -100,6 +100,12 @@ that — from then on the next change is `version(2)` carrying a real `.upgrade(
     Grouping by entity alone would let a row's delete reach the server before the create it
     refers to, which answers `NOT_FOUND` and leaves the row standing forever. A test pins the
     split (`[create, create, delete, delete]` → runs of 2 and 2).
+  - **`transfer` creates and deletes batch too** (`POST /transfers/bulk`,
+    `POST /transfers/bulk-delete`, capped at `transaction_bulk_max`): an import writes hundreds.
+    One entry is one transfer (both legs), and the per-item results are read exactly like the
+    ledger's — `CREATED`/`ID_TAKEN` store the returned legs (a taken id that is not ours marks our
+    legs clean and runs one pull), `INVALID` drops the entry, every delete answer is terminal.
+    Transfer updates stay singular.
   - **`planned` creates batch the same way** (`POST /planned-transactions/bulk`, capped at
     `limits.planned_bulk_max`): the planner's first pass over an account writes dozens. The
     batchable kinds are one table, `BULK_KINDS` in `db/sync.ts` — entity, op, batch size, push —
@@ -344,8 +350,9 @@ writes **both** ledger legs, which share a `transferId` (indexed on `transaction
 optimistic write puts both legs and the entry in one Dexie transaction; the legs return through
 the ordinary ledger delta, so there is no transfer stream or table. Its update carries a version
 per leg inside the payload (`out_version`/`in_version`) rather than `baseVersion`, and only
-`409 common.conflict` rebases; `409 spending.transfer.id_taken` is settled by a pull. Transfer
-entries are never part of a bulk run. See [transactions.md](transactions.md#transfers-between-wallets).
+`409 common.conflict` rebases; `409 spending.transfer.id_taken` is settled by a pull. Runs of
+transfer creates and deletes go out in bulk (above); updates never do. See
+[transactions.md](transactions.md#transfers-between-wallets).
 
 ## Exception: merchant identity (`409 merchants.alias.taken`)
 
@@ -410,7 +417,10 @@ per-row mutations without leaving the pattern (`features/import/data/commit.ts`)
   set both stamps together and a server create returns them equal, so that difference is the
   only reliable signal. (Comparing against the batch's own `createdAt` would not work: once a
   row syncs its `updatedAt` is the server's clock, always later than the local commit stamp.)
-  Wallets, categories and merchants an import created are deliberately kept too.
+  Wallets, categories and merchants an import created are deliberately kept too. An imported
+  **transfer** is undone whole through `bulkDeleteTransfers` (grouped by `transferId`; kept whole
+  if either leg changed) — the ledger's bulk delete refuses legs. The commit writes transfers
+  after every ledger row, so each kind leaves as its own bulk run.
 
 ## Exception: import templates (`import.template.name_taken`)
 

@@ -16,10 +16,11 @@ src/features/import/
 ├── data/
 │   ├── csv/{encoding,dialect,dates,amounts,read,caps,errors,messages}.ts
 │   ├── csv/{worker.ts,workerClient.ts,rows.ts}
-│   ├── csv/__fixtures__/*.csv + *.expected.json   # 13 real-shaped statements
+│   ├── csv/__fixtures__/*.csv + *.expected.json   # 14 real-shaped statements
 │   ├── {roles,matching,values,validate,dedupe,predict}.ts    # the pure pipeline
 │   ├── rowScan.ts                            # the one pass + the lazy row reader
-│   ├── {mapping,review,rowView,rowEdits,skippedCsv}.ts       # the pure wizard helpers
+│   ├── pairing.ts                            # transfer rows: pairing, lone sides, the note
+│   ├── {mapping,review,rowView,rowEdits,rowEditForm,skippedCsv,importCounts}.ts  # wizard helpers
 │   ├── {templates,mappers,mutations,sync}.ts                 # saved mappings
 │   ├── {commit,batches}.ts                                   # the only writers
 │   └── types.ts                              # the mapping model + the row vocabulary
@@ -30,7 +31,7 @@ src/features/import/
 Nothing outside `data/commit.ts` and `data/batches.ts` writes to the database, and neither
 touches another feature's tables directly — they call the owning feature's id-carrying
 mutations (`createNodeWithId`, `createCategoryWithSlug`, `createMerchantWithId`,
-`bulkAddTransactions`, `bulkDeleteTransactions`).
+`bulkAddTransactions`, `bulkDeleteTransactions`, `bulkAddTransfers`, `bulkDeleteTransfers`).
 
 ## The pipeline, in order
 
@@ -239,6 +240,76 @@ sixth live query, the single settings row, is read for one field and needs none 
   the rest_ (also a `skip` target, which `readCategory` reads as "filed under the step-②
   default, deliberately" — not a guess, so no `category_defaulted` warning). Both appear
   only while something is left over.
+
+## Transfers and balance adjustments in a file
+
+An export that covers several wallets (Money Lover, our own) holds rows that are neither income
+nor spending: each transfer twice — money out of one wallet, money into another — and balance
+corrections. Left as cash flow they would double-count every transfer as a spend *and* an
+income. They are recognised in step ③ and settled in the pass.
+
+- **Two more category answers.** `CategoryTarget` gains `{kind:'transfer'}` and
+  `{kind:'adjustment'}` (select values `TRANSFER` / `ADJUSTMENT` in `data/values.ts`), offered as
+  the group _Not income or spending_ at the foot of every category select, next to Create/Skip.
+  They are **proposed**, never forced: a value matching `/transfer/i` → transfer, `/adjust/i` →
+  adjustment, ahead of the category matcher — `auto` for the exact phrases ("Transfer", "Balance
+  adjustment", "Adjust balance"…), `check` for a value that merely contains the word ("Bank
+  transfer fee"). Templates keep both as they are (`settledCategory` and `applyTemplateConfig`
+  only touch `create`/`category`); `createPendingTargets` ignores them.
+- **`RowIntent`** (`cashflow | transfer | adjustment`) rides on `RowFacts` and `ParsedRow`
+  (`readCategory` returns it). The draft stays a `TransactionDraft` whatever the intent — its
+  `type` is the **direction** (`spend` = money out of the row's wallet, `income` = in), and it
+  keeps the step-② default category so a row turned back into spending in review has one to
+  show. A movement is validated harder: a zero amount and a currency other than the wallet's are
+  **errors** (the server writes it in the wallet's currency and refuses zero), and it never gets
+  `category_defaulted`. `predictRow` skips it — no merchant, no learned category.
+- **Pairing rides the pass** (`data/pairing.ts`, called from `rowScan.ts`). A transfer row that
+  is readable, not skipped and non-zero is a `PairCandidate`; the pass holds the row back (with
+  its duplicate mark) instead of recording its status, and `finish` runs `pairTransfers` and
+  settles the held rows before the counting sort. The rule: a money-out side pairs with a
+  money-in side of the **same currency and amount, in another wallet, at most 2 days apart** —
+  the same day first, then the closest, the earliest row on a tie — greedy over the out-sides
+  in file order, so a file always pairs the same way. In-sides sit in buckets keyed
+  `currency|amount|day`, so each out-side looks at five small buckets: linear in the file (a
+  test pairs 10 000 transfers well under a second). The output is `RowScan.pairs` — a map from
+  each paired row to `{partner, walletId}` (the partner's wallet), like `duplicates` — plus a
+  `TRANSFER` bit in `flags` so the tally can count transfers without building rows.
+- **A lone side needs its other wallet.** `settleTransfer` (the pass, `rowReader.at` and
+  `applyRowPatch` all call it) lays the pair on, or else: the user's own choice
+  (`RowFacts.counterpartId`, from a patch), or the **one** other known wallet the note names —
+  names are the user's wallet names plus the file's own spellings bound in step ③
+  (`transferLookupOf`), whole words, a longer name beating one it contains ("Home bank 2" over
+  "Home bank"), two named wallets meaning no answer. Named by the note → warning
+  `import.row.transfer_guessed`; none → error `import.row.transfer_unpaired`; itself →
+  `…transfer_same_wallet`; another currency → `…transfer_currency`. A lone side **keeps its
+  draft** (the table shows its date and amount), so `isCommittable` also checks for errors.
+- **The pair is one decision** (`useReviewRows`). Leaving either side out leaves both out
+  (`excludedFor` ORs the partner's own verdict, and `toggleRow`/the header checkbox write both);
+  a correction to a field the pair was matched on — date, amount, currency, direction, account,
+  intent or the other account (`breaksPair`) — writes `unpaired: true` into **both** patches,
+  and each side is then re-settled as a lone row. A note edit keeps the pair.
+- **Review.** `describeRow` shows "Transfer → STC Pay" / "Transfer ← Albilad Bank" / "Balance
+  adjustment" in the category cell and a neutral amount (`tone`). The tally returns
+  `plan: {transactions, transfers}` (a pair counts once) for the footer ("Import 1 204
+  transactions · 243 transfers") and a line under the summary; `committable` puts a paired row's
+  partner straight after it. `RowEditDialog` offers **Spend | Income | Transfer | Adjustment**
+  (`RowKindField`), a money-out/in toggle under the last two, and an **Other account** select
+  (`WalletSelect`, own wallet excluded) for a transfer; its form logic is `data/rowEditForm.ts`.
+- **Commit.** Cash flow and adjustments stream through `bulkAddTransactions` (an adjustment as
+  `adjustment_in/out` by direction, no links); transfer rows are collected — a paired side waits
+  in a map until its partner arrives, so no chunk boundary can split a pair, and a side whose
+  partner never comes is written from its own `counterpartId` — and written **after** every
+  ledger row through `bulkAddTransfers(…, 'csv:<batchId>')`, 200 at a time, so the outbox holds
+  one run of each kind for the bulk drain. A pair's transfer is dated and noted by the out side
+  (the in side's note if that is empty). `LocalImportBatch.transferCount` records them.
+- **Undo** groups the batch's legs by `transferId`: a transfer goes whole through
+  `bulkDeleteTransfers` (the ledger's bulk delete refuses legs), and is **kept whole** if either
+  leg changed since. The dialog, history row and done card count "N transactions · M transfers"
+  (`data/importCounts.ts`).
+- **Dedupe.** `toLedgerEntry` files existing legs and adjustments by direction on their own
+  wallet, and a movement's fingerprint label is a shared `~` instead of the note — the two sides
+  of a transfer carry different notes while the ledger keeps one — so re-importing a file, or the
+  other wallet's statement, flags them. A cash-flow row never matches a movement.
 
 ## Matching accounts: the group is a name too, and a tie is a question
 
@@ -493,12 +564,15 @@ server-side and online-only because OAuth tokens and provider APIs cannot live i
 
 ## Tests
 
-`data/csv/__fixtures__/` holds **13 real-shaped statements**, each with a `.expected.json`:
+`data/csv/__fixtures__/` holds **14 real-shaped statements**, each with a `.expected.json`:
 our own export, an Arabic windows-1256 file with a 4-line preamble and a debit/credit pair, UK
 `DD/MM` with Paid in/out, US `MM/DD` signed, European `;` with `1.234,56`, tab and pipe
 dialects with commas inside descriptions, mixed-currency with **JPY (0 dp)** and **KWD (3 dp)**,
 `Amount` + `DR/CR`, a deliberately messy file (ragged, quoted newline, blank line, a duplicate
-pair, `N/A`, a future date), genuinely ambiguous dates, UTF-8 BOM, UTF-16LE BOM. They are the
+pair, `N/A`, a future date), genuinely ambiguous dates, UTF-8 BOM, UTF-16LE BOM, and a Money
+Lover export with a same-day pair, a pair a day apart, a lone side named by its note, a lone side
+naming nothing and a balance adjustment (`data/__fixtures__/moneyLover.ts` maps it the way a user
+would, for the pairing, commit and undo tests). They are the
 regression suite for detection, role suggestion, amount parsing and dedupe at once — add a new
 bank shape here before fixing it anywhere else. `__fixtures__/useStubImport.ts` is a working
 stand-in for the spine (the same pass and the same lazy reader, run synchronously) for

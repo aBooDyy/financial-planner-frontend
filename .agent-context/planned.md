@@ -176,10 +176,10 @@ others are open renders the current snapshot at once (no loading flash).
 The Spending page composes these; they read only the public hooks above.
 
 - **Tab.** `TransactionsPage` calls `usePlanned()` once and passes the view down: tabs are
-  Activity · Planned · Budgets · Recurring, the Planned label carries an amber count pill when
+  Activity · Planned · Budgets · Recurring (routes `/transactions/$view`), the Planned label carries an amber count pill when
   `dueCount > 0`, and Activity leads with `PlannedNudge` in that case.
 - **`PlannedCard`** (1c): header, then `PlannedBand` sections — "Needs confirming · N" (amber,
-  "Not in balances yet") with live rows, "Planned · next 14 days" (neutral, `nextCaption`) with
+  no caption) with live rows, "Planned · next 14 days" (neutral, `nextCaption`) with
   muted rows, and "Later in <Month>" collapsed behind "N more · Show all". `PlannedEmpty`
   links to `/goals`. `PlannedRow` draws one row: a dashed icon in the origin's colour
   (`hooks/useOriginColors`: goal → stream → category colour), name + `TagPill`, meta, amount

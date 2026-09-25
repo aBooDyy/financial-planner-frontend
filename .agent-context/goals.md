@@ -178,15 +178,16 @@ ledger.ts`): `walletReservations(allocations, goals, nodes, rates, txns?, today?
   `useGoals` is the reactive read (`useLiveQuery` → `buildGoalsView`); `useGoalEditor` drives
   the add/edit sheet for both income and goals (kind chips only when creating, since `kind` is
   immutable on update).
-- **Page shell — the "Goals v3" design (tab card + sections + detail rail).** `GoalsPage` owns
-  the active section (`summary | goals | obligations | income | timeline`, local state) and the
-  selection. Desktop: `SectionTabCard`, a tab strip carried **in a card at the top of the content
+- **Page shell — the "Goals v3" design (tab card + sections + detail rail).** The active section
+  (`summary | goals | obligations | income | timeline`) is the URL — `/goals/$section`, see
+  [routing.md](routing.md#goals-and-spending-tabs) — and `GoalsPage` owns the selection. The tabs
+  are `<Link>`s. Desktop: `SectionTabCard`, a tab strip carried **in a card at the top of the content
   column** (48px tabs, accent underline on the active one, count pills for goals/obligations) —
   it replaced the v2 212px side rail, so the content column is the only column. Mobile:
   `SectionTabs`, a strip under the top bar — deliberately **not** a replacement for the app-wide
   `MobileTabBar`, so cross-app nav survives on mobile (the design mock had the section tabs take
   over the bottom bar). Both carry an amber dot on a section holding anything not on track.
-  Switching section closes the editor.
+  Switching section closes the editor (the tabs' `onNavigate`).
 - **Summary** (`SummarySection`) answers three questions in order: does the month balance, what
   gets funded first, what actually moves next. `SummaryVerdictCard` (verdict title/sub, primary
   action, "See timeline"), `MonthlyLedgerCard` ("Every month": Income / Obligations / Goals bars
@@ -257,8 +258,9 @@ ledger.ts`): `walletReservations(allocations, goals, nodes, rates, txns?, today?
   saved plan; "Recalculate all", then "N plans updated · Undo" (undoes each result).
 - **List rows** carry a small amber "N to confirm" pill (`useGoals().dueByGoal`, from
   `dueCountByGoal`: open planned rows of that goal dated today or earlier).
-- **`/goals?goal=<id>`** (route `validateSearch`) opens that goal's read view once, then the
-  param is dropped (replace). Balances pots link here.
+- **`/goals?goal=<id>`** (validated on the `/goals` layout route, carried through the index
+  redirect) opens that goal's read view once, navigating (replace) to the goal's own section
+  and dropping the param. Balances pots link here.
 - **Income** (`IncomeSection`/`IncomeRow`) and **Timeline** (`TimelineSection` = `TimelineCard` +
   `MonthlyPlanCard`) reuse the same section header and row patterns.
 - Route `/goals` (guarded like `/balances`). Base currency is the shared `balanceSettings`

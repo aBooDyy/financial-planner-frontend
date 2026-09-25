@@ -32,8 +32,9 @@ has, and one table means one model, one outbox entity, one sync handler.
   you want it — and the editor says so in the locked "In" row.
 - **The ledger is unchanged.** `t_transactions.category` holds a parent slug and
   `.subcategory` a child slug, both plain strings, never FKs. Renaming or recolouring never
-  orphans history; deleting never deletes transactions — the slugs simply resolve through
-  the fallback path. Budgets stay **parent-scoped**: a row filed under `dining/cafes` counts
+  orphans history; deleting never deletes transactions — the user either **moves** them
+  to a surviving category (see [Deleting with a move](#deleting-with-a-move)) or keeps
+  them, and the old slugs resolve through the fallback path. Budgets stay **parent-scoped**: a row filed under `dining/cafes` counts
   against the `dining` budget ([transactions.md](transactions.md)).
 
 ## Local rows & sync
@@ -148,12 +149,17 @@ colour, icon or child list calls this; pure functions take the result as a param
 
 ## `data/defaults.ts` — the seed and the fallback, and nothing else
 
-The built-in two-level catalog (`CATEGORIES`: 18 parents with their children, each with a
-colour and an `IconId`). It is what a brand-new user's rows are seeded from on the server and
-what an unknown slug falls back to here. **Its `id` values are the slugs transactions
-persist**, so it must match the backend's `app/config/categories.py` exactly. `savings` is
-the home for goal contributions (`SAVINGS_CATEGORY_ID` lives in
-`features/transactions/constants.ts`, its only consumer).
+The built-in two-level catalog (`CATEGORIES`: 24 parents — 18 spending, 6 income — with
+their children, each with a colour and an `IconId`; children inherit type and colour). It is
+what a brand-new user's rows are seeded from on the server and what an unknown slug falls back
+to here. **Its `id` values are the slugs transactions persist**, so it must match the
+backend's `app/config/categories.py` exactly — same slugs, names, icons, colours and order;
+change the two together. The current set (2026-09-24) is Saudi-flavoured: Family, Personal
+care, Insurance, Government & fees (Iqama, visas), Gifts & giving (Eidiah, charity & zakat),
+and Other income sit beside the usual roots. Required roots stay `savings` + `other`; the
+fallback stays `other`. `savings` is the home for goal contributions (`SAVINGS_CATEGORY_ID`
+lives in `features/transactions/constants.ts`, its only consumer). Onboarding's starter packs
+must list only these root slugs ([onboarding.md](onboarding.md#packs--datapacksts)).
 
 **Importing it from outside this slice is a lint error.** `eslint.config.js` carries a
 `no-restricted-imports` rule covering every spelling of the path, exempted only for
@@ -197,6 +203,19 @@ deleteCategory(id)
   unless neverSynced: enqueue one `delete` op for the parent
 ```
 
+### Deleting with a move
+
+`deleteCategory(id, moveToId)` re-files everything filed under the deleted row — a
+root's rows under any of its children, a child's rows only for its exact pair — into
+the target's `(category, subcategory)` pair, across `transactions`, `recurrings` and
+`plannedTransactions` (`data/refile.ts`, in the same Dexie transaction as the delete).
+Synced rows are rewritten **without** outbox ops of their own: the delete op carries
+`{ move_to }` and the server re-files them atomically (`DELETE /categories/{id}?move_to=`),
+bumping their versions so the delta brings them back. Rows with a queued create/update get
+that payload's `category`/`subcategory` rewritten, or their push would file them back.
+If the server refuses or 404s a delete that carried a move, `pushCategoryDelete` clears
+the `transaction` and `planned` watermarks so the next pull restores server truth.
+
 Dropping the children's queued ops is the load-bearing part: without it, a create for a
 child would be pushed _after_ its parent is gone and fail permanently. A parent that was
 never synced needs no server op at all. Covered by explicit tests in `mutations.test.ts`,
@@ -228,9 +247,14 @@ and recorded as a sync pattern in
   stored-but-unknown icon id to `null`.
   **The `IconPicker` is a child of that dialog, not a sibling** — see
   [icons.md](icons.md#a-nested-picker-goes-inside-the-parent-dialogs-children).
-- **`DeleteCategoryDialog`** names both counts — subcategories about to go with the parent,
-  and transactions that keep their labels. The count is a local computation: the endpoint is
-  a bodyless `204`, and the client already knows its own tree.
+- **`DeleteCategoryDialog`** names the subcategories about to go with the parent and,
+  when anything is filed under it (`txCount` / `recurringCount` from `useCategoryTree`),
+  asks what happens to it: **Move them to another category** (default, with
+  `MoveTargetSelect`) or **Keep them as they are**. With nothing filed it is a plain
+  confirm. `useDeleteChoice` holds the decision and resets when the dialog opens on another
+  row; `data/moveTargets.ts` (pure, tested) lists the targets — same type, never the
+  deleted row or a child it cascades to — and suggests one: a subcategory's parent, else
+  `other`, else the first root left.
 
 ## Who reads the catalog
 
