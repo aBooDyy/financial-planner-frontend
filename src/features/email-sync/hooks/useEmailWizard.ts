@@ -6,6 +6,7 @@ import type {
   InboxMessage,
   RuleDraftWire,
 } from '#/features/email-sync/api/types'
+import { beginInboxConnect } from '#/features/email-sync/data/connect'
 import { saveRules } from '#/features/email-sync/data/mutations'
 
 export type WizardStep = 'idle' | 'provider' | 'connecting' | 'select' | 'map'
@@ -76,8 +77,7 @@ export function useEmailWizard() {
     if (!state.provider) return
     patch({ busy: true, error: null })
     try {
-      const { authorize_url } = await emailSyncApi.authorizeUrl(state.provider)
-      window.location.assign(authorize_url)
+      await beginInboxConnect(state.provider)
     } catch {
       patch({ busy: false, error: 'Could not start the inbox sign-in.' })
     }

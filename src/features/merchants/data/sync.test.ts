@@ -159,6 +159,7 @@ beforeEach(async () => {
   useSessionStore.getState().setUser({
     id: 'user-a',
     email: 'a@example.com',
+    onboardedAt: '2026-01-01T00:00:00Z',
     name: 'A',
     createdAt: '',
     updatedAt: '',

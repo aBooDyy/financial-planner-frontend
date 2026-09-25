@@ -2,6 +2,8 @@ export type User = {
   id: string
   email: string
   name: string
+  /** Null until the user finishes first-run setup (`/setup`). */
+  onboardedAt: string | null
   createdAt: string
   updatedAt: string
   version: string
@@ -15,6 +17,7 @@ export type UserWire = {
   id: string
   email: string
   name: string
+  onboarded_at: string | null
   created_at: string
   updated_at: string
   version: string
@@ -27,6 +30,7 @@ export const toUser = (wire: UserWire): User => ({
   id: wire.id,
   email: wire.email,
   name: wire.name,
+  onboardedAt: wire.onboarded_at,
   createdAt: wire.created_at,
   updatedAt: wire.updated_at,
   version: wire.version,

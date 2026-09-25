@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { Splash } from '#/components/Splash'
+import { takeConnectReturnPath } from '#/features/email-sync/data/connect'
 import { completeOAuth } from '#/features/email-sync/data/mutations'
 
 export const Route = createFileRoute('/settings_/email-sync/callback')({
@@ -13,8 +14,9 @@ export const Route = createFileRoute('/settings_/email-sync/callback')({
  * un-nesting this route from the `/settings` layout — otherwise it would render inside the
  * Settings page's Outlet (which doesn't exist) and never mount.
  *
- * Exchanges the `code` for tokens (server-side) to create the connection, then hands off to
- * Settings → Email sync, which resumes the wizard at the "select senders" step.
+ * Exchanges the `code` for tokens (server-side) to create the connection, then returns to
+ * where the connect began — by default Settings → Email sync, which resumes the wizard at
+ * the "select senders" step.
  */
 function EmailSyncCallback() {
   const ran = useRef(false)
@@ -34,7 +36,7 @@ function EmailSyncCallback() {
           // Fall through — Settings shows the idle/error state.
         }
       }
-      window.location.assign('/settings/email-sync')
+      window.location.assign(takeConnectReturnPath())
     }
     void finish()
   }, [])
