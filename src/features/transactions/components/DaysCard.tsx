@@ -1,4 +1,10 @@
-import { ChevronLeft, ChevronRight, ChevronsUpDown } from 'lucide-react'
+import {
+  ArrowLeft,
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsUpDown,
+} from 'lucide-react'
 import type { RangeMode } from '#/features/transactions/constants'
 import type { CalendarView } from '#/features/transactions/data/selectors'
 import { DayGrid } from './DayGrid'
@@ -12,6 +18,9 @@ type Props = {
   onSetMode: (m: RangeMode) => void
   onPrev: () => void
   onNext: () => void
+  /** Where today sits relative to the period in view; `null` while it's inside it. */
+  todayIs: 'ahead' | 'behind' | null
+  onToday: () => void
   onToggleCal: () => void
   onPickDay: (key: string) => void
   onPickMonth: (key: string) => void
@@ -37,6 +46,8 @@ export function DaysCard({
   onSetMode,
   onPrev,
   onNext,
+  todayIs,
+  onToday,
   onToggleCal,
   onPickDay,
   onPickMonth,
@@ -63,6 +74,9 @@ export function DaysCard({
         </div>
         <div className="min-w-[8px] flex-1" />
         <div className="flex items-center gap-1">
+          {todayIs ? (
+            <TodayButton direction={todayIs} onClick={onToday} />
+          ) : null}
           <button type="button" onClick={onPrev} className={STEP}>
             <ChevronLeft size={16} strokeWidth={2.2} />
           </button>
@@ -99,5 +113,31 @@ export function DaysCard({
         )}
       </div>
     </div>
+  )
+}
+
+/** Jumps back to the period holding today; the arrow points the way today lies. */
+function TodayButton({
+  direction,
+  onClick,
+}: {
+  direction: 'ahead' | 'behind'
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title="Jump to today"
+      className="me-1 inline-flex h-8 animate-in items-center gap-[5px] rounded-full border border-fp-accent/40 bg-fp-accent-soft px-3 text-[12.5px] font-bold text-fp-accent-ink duration-200 fade-in zoom-in-95 hover:border-fp-accent"
+    >
+      {direction === 'behind' ? (
+        <ArrowLeft size={14} strokeWidth={2.4} />
+      ) : null}
+      Today
+      {direction === 'ahead' ? (
+        <ArrowRight size={14} strokeWidth={2.4} />
+      ) : null}
+    </button>
   )
 }
