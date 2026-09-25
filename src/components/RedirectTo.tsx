@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 
-type AppRoute = '/' | '/auth/login' | '/auth/signup' | '/balances'
+type AppRoute = '/' | '/auth/login' | '/auth/signup' | '/balances' | '/setup'
 
 /** Imperative redirect for component-level route guards (no loader context needed). */
 export function RedirectTo({ to }: { to: AppRoute }) {
