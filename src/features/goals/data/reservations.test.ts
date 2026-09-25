@@ -46,6 +46,7 @@ const wallet = (over: Partial<LocalBalanceNode>): LocalBalanceNode => ({
   note: null,
   position: 0,
   collapsed: false,
+  archivedAt: null,
   amount: 0,
   currency: 'SAR',
   createdAt: '',

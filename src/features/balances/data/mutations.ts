@@ -4,6 +4,7 @@ import { SETTINGS_KEY } from '#/db/types'
 import type { LocalBalanceNode, OutboxEntry } from '#/db/types'
 import type { CurrencyCode } from '#/lib/currency'
 import type { NodeKind } from '#/features/balances/api/types'
+import { hasArchivedAncestor } from './archive'
 import { localNodeToCreateWire, localNodeToUpdateWire } from './mappers'
 
 export type NodeDraft = {
@@ -20,6 +21,7 @@ export type NodeDraft = {
 export type NodePatch = Partial<Omit<NodeDraft, 'kind'>> & {
   collapsed?: boolean
   position?: number
+  archivedAt?: string | null
 }
 
 const now = () => new Date().toISOString()
@@ -92,6 +94,7 @@ export async function createNodeWithId(
     note: draft.note,
     position: await nextPosition(draft.parentId),
     collapsed: false,
+    archivedAt: null,
     amount: draft.kind === 'wallet' ? draft.amount : null,
     currency: draft.kind === 'wallet' ? draft.currency : null,
     createdAt: ts,
@@ -136,6 +139,10 @@ export async function updateNode(id: string, patch: NodePatch): Promise<void> {
     note: patch.note !== undefined ? patch.note : existing.note,
     parentId: patch.parentId !== undefined ? patch.parentId : existing.parentId,
     collapsed: patch.collapsed ?? existing.collapsed,
+    archivedAt:
+      patch.archivedAt !== undefined
+        ? patch.archivedAt
+        : (existing.archivedAt ?? null),
     amount:
       existing.kind === 'wallet' && patch.amount !== undefined
         ? patch.amount
@@ -154,6 +161,24 @@ export async function updateNode(id: string, patch: NodePatch): Promise<void> {
     await enqueueNodeUpsert(node)
   })
   schedulePush()
+}
+
+export async function archiveNode(id: string): Promise<void> {
+  await updateNode(id, { archivedAt: now() })
+}
+
+/**
+ * Bring an archived node back. Inside a group that is itself still archived it would stay
+ * hidden, so it comes back at the top level instead.
+ */
+export async function restoreNode(id: string): Promise<void> {
+  const node = await db.balanceNodes.get(id)
+  if (!node) return
+  const stranded = hasArchivedAncestor(await liveNodes(), node)
+  await updateNode(id, {
+    archivedAt: null,
+    ...(stranded ? { parentId: null } : {}),
+  })
 }
 
 export async function toggleCollapse(id: string): Promise<void> {

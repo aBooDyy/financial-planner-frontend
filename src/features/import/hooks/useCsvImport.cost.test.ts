@@ -89,6 +89,7 @@ const wallet: LocalBalanceNode = {
   note: null,
   position: 0,
   collapsed: false,
+  archivedAt: null,
   amount: 0,
   currency: 'SAR',
   createdAt: '2026-01-01T00:00:00Z',

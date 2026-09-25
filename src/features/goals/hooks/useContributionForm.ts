@@ -14,6 +14,7 @@ import type { ContributionMode } from '#/features/goals/data/contribution'
 import { startOfToday, ymd } from '#/features/goals/data/planning'
 import { parseAmountToMinor } from '#/lib/currency'
 import { messageForApiError, messageForCode } from '#/lib/errorMessages'
+import { activeNodes } from '#/features/balances/data/archive'
 
 /** The "From" select's value for money held outside any wallet. */
 export const EXTERNAL = '__external__'
@@ -41,7 +42,7 @@ export function useContributionForm({
 }: Options) {
   const today = startOfToday()
   const role = contributionRoleOf(goal) === 'payment' ? 'payment' : 'set_aside'
-  const wallets = nodes.filter((n) => n.kind === 'wallet' && n.deleted === 0)
+  const wallets = activeNodes(nodes).filter((n) => n.kind === 'wallet')
   const nextPlanned = plan?.nextPlanned?.date ?? null
 
   const [mode, setModeState] = useState<ContributionMode>('now')

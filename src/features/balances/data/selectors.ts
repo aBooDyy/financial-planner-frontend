@@ -5,6 +5,7 @@ import type { CurrencyCode } from '#/lib/currency'
 import { GROUP_ICON, WALLET_ICON, iconIdOr } from '#/lib/icons/fallbacks'
 import type { IconId } from '#/lib/icons/catalog.gen'
 import type { LocalBalanceNode } from '#/db/types'
+import { activeNodes } from './archive'
 
 // One goal's claim on a wallet, in the wallet's currency (built by goals/data/reservations).
 export type WalletReservation = {
@@ -141,7 +142,7 @@ export type WalletGroupOption = {
 export function walletGroupOptions(
   nodes: LocalBalanceNode[],
 ): WalletGroupOption[] {
-  const live = nodes.filter((n) => n.deleted === 0)
+  const live = activeNodes(nodes)
   const children = childrenByParent(live)
   const groups: WalletGroupOption[] = []
   const walk = (parentId: string | null, label: string | null) => {
@@ -162,7 +163,7 @@ export function groupParentOptions(
   nodes: LocalBalanceNode[],
   excludeId: string | null,
 ): ParentOption[] {
-  const live = nodes.filter((n) => n.deleted === 0)
+  const live = activeNodes(nodes)
   const children = childrenByParent(live)
   const options: ParentOption[] = []
   const walk = (parentId: string | null, depth: number) => {

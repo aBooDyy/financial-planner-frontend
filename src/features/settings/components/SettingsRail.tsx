@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import {
+  Archive,
   Bell,
   Coins,
   LayoutGrid,
@@ -27,6 +28,7 @@ export const SECTIONS: Section[] = [
   { to: '/settings/email-sync', label: 'Email sync', icon: Mail },
   { to: '/settings/integrations', label: 'Integrations', icon: Webhook },
   { to: '/settings/notifications', label: 'Notifications', icon: Bell },
+  { to: '/settings/archived', label: 'Archived', icon: Archive },
   { to: '/settings/data', label: 'Data & privacy', icon: Shield },
 ]
 

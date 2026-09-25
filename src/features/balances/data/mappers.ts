@@ -19,6 +19,7 @@ export const serverNodeToLocal = (n: BalanceNode): LocalBalanceNode => ({
   note: n.note,
   position: n.position,
   collapsed: n.collapsed,
+  archivedAt: n.archivedAt,
   amount: n.amount,
   currency: n.currency,
   createdAt: n.createdAt,
@@ -49,6 +50,7 @@ export const localNodeToCreateWire = (l: LocalBalanceNode): CreateNodeWire => ({
   note: l.note,
   position: l.position,
   collapsed: l.collapsed,
+  archived: Boolean(l.archivedAt),
   amount: l.amount,
   currency: l.currency,
 })
@@ -63,6 +65,7 @@ export const localNodeToUpdateWire = (l: LocalBalanceNode): UpdateNodeWire => ({
   parent_id: l.parentId,
   position: l.position,
   collapsed: l.collapsed,
+  archived: Boolean(l.archivedAt),
   amount: l.amount,
   currency: l.currency,
 })

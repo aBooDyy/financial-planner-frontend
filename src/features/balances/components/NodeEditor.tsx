@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import type { ReactNode } from 'react'
+import { Archive, Scale } from 'lucide-react'
 import type { LocalBalanceNode } from '#/db/types'
 import { NODE_COLORS, ROOT_PARENT } from '#/features/balances/constants'
 import { groupParentOptions } from '#/features/balances/data/selectors'
@@ -32,8 +34,14 @@ type Props = {
     value: EditorDraft[TKey],
   ) => void
   onSave: () => void
+  onArchive: () => void
   onDelete: () => void
   onClose: () => void
+  /** A saved wallet's live balance, formatted; absent for a group or a new wallet. */
+  currentBalance?: string
+  onAdjust?: () => void
+  /** A dialog opened from this one; nested so using it cannot close the editor. */
+  children?: ReactNode
 }
 
 const LABEL = 'mb-[6px] block text-[12px] font-semibold text-fp-text-2'
@@ -43,8 +51,12 @@ export function NodeEditor({
   nodes,
   onField,
   onSave,
+  onArchive,
   onDelete,
   onClose,
+  currentBalance,
+  onAdjust,
+  children,
 }: Props) {
   const { mode, id, draft } = editing
   const isWallet = mode === 'wallet'
@@ -68,6 +80,18 @@ export function NodeEditor({
               className="text-fp-danger hover:border-fp-danger hover:text-fp-danger"
             >
               Delete
+            </Button>
+          ) : null}
+          {id ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onArchive}
+              title={`Archive this ${isWallet ? 'wallet' : 'group'}`}
+              className="gap-1 px-2 text-[12.5px] font-semibold text-fp-text-3 hover:text-fp-text"
+            >
+              <Archive size={13} strokeWidth={1.9} />
+              Archive
             </Button>
           ) : null}
           <div className="flex-1" />
@@ -108,7 +132,9 @@ export function NodeEditor({
         {isWallet ? (
           <div className="flex gap-[10px]">
             <div className="flex-1">
-              <Label className={LABEL}>Balance</Label>
+              <Label className={LABEL}>
+                {id ? 'Opening balance' : 'Balance'}
+              </Label>
               <Input
                 value={draft.amount}
                 onChange={(e) => onField('amount', e.target.value)}
@@ -124,6 +150,28 @@ export function NodeEditor({
                 align="end"
               />
             </div>
+          </div>
+        ) : null}
+
+        {isWallet && onAdjust ? (
+          <div className="flex items-center gap-3 rounded-[12px] border border-fp-border bg-fp-surface-2 px-[13px] py-[10px]">
+            <div className="min-w-0 flex-1">
+              <div className="text-[11px] font-bold tracking-[0.05em] text-fp-text-3">
+                BALANCE NOW
+              </div>
+              <div className="truncate text-[14.5px] font-bold text-fp-text tabular-nums">
+                {currentBalance}
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onAdjust}
+              className="flex-none gap-[6px] rounded-[11px] px-3 text-[13px] font-bold hover:border-fp-accent"
+            >
+              <Scale size={15} strokeWidth={2} />
+              Adjust balance
+            </Button>
           </div>
         ) : null}
 
@@ -190,6 +238,7 @@ export function NodeEditor({
         color={draft.color}
         onSelect={(icon) => onField('icon', icon)}
       />
+      {children}
     </ResponsiveDialog>
   )
 }

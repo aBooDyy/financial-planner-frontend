@@ -3,6 +3,7 @@ import { db } from '#/db/db'
 import { SETTINGS_KEY } from '#/db/types'
 import type { LocalBalanceNode } from '#/db/types'
 import { DEFAULT_BASE_CURRENCY } from '#/features/balances/constants'
+import { activeNodes, isArchived } from '#/features/balances/data/archive'
 import {
   buildBalancesView,
   heldCurrencies,
@@ -48,7 +49,9 @@ export function useBalances() {
     startOfToday(),
     plannedRows ?? [],
   )
-  const view = buildBalancesView(liveNodes, base, rates, deltas, reservations)
+  // Archived nodes keep their ledger and earmarks but leave the tree and its totals.
+  const active = activeNodes(liveNodes)
+  const view = buildBalancesView(active, base, rates, deltas, reservations)
   const held = heldCurrencies(base, [
     liveNodes,
     liveGoals,
@@ -64,7 +67,8 @@ export function useBalances() {
     rateRows: rateRows ?? [],
     held,
     settings,
-    nodes: liveNodes,
+    nodes: active,
+    archivedCount: liveNodes.filter(isArchived).length,
     deltas,
     view,
   }

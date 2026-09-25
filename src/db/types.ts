@@ -33,6 +33,7 @@ export type LocalBalanceNode = {
   note: string | null
   position: number
   collapsed: boolean
+  archivedAt: string | null
   amount: number | null
   currency: CurrencyCode | null
   createdAt: string
@@ -434,6 +435,8 @@ export type LocalImportBatch = {
   /** Rows the file held, against `importedCount` rows actually written. */
   rowCount: number
   importedCount: number
+  /** Transfers written, one per pair of legs. Absent on batches older than transfer import. */
+  transferCount?: number
   skippedDuplicates: number
   errorCount: number
   walletIds: string[]

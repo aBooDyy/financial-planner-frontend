@@ -32,6 +32,8 @@ export type BalanceNode = {
   note: string | null
   position: number
   collapsed: boolean
+  /** When it was archived — kept with its history, hidden from the live tree. */
+  archivedAt: string | null
   amount: number | null
   currency: CurrencyCode | null
   createdAt: string
@@ -65,6 +67,7 @@ export type BalanceNodeWire = {
   note: string | null
   position: number
   collapsed: boolean
+  archived_at: string | null
   amount: number | null
   currency: string | null
   created_at: string
@@ -99,6 +102,7 @@ export type CreateNodeWire = {
   note: string | null
   position: number
   collapsed: boolean
+  archived: boolean
   amount: number | null
   currency: string | null
 }
@@ -112,6 +116,7 @@ export type UpdateNodeWire = {
   parent_id: string | null
   position: number
   collapsed: boolean
+  archived: boolean
   amount: number | null
   currency: string | null
 }
@@ -128,6 +133,7 @@ export const toNode = (w: BalanceNodeWire): BalanceNode => ({
   note: w.note,
   position: w.position,
   collapsed: w.collapsed,
+  archivedAt: w.archived_at ?? null,
   amount: w.amount,
   currency: fromWireCurrencyOrNull(w.currency),
   createdAt: w.created_at,

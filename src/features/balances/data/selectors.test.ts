@@ -15,6 +15,7 @@ function node(over: Partial<LocalBalanceNode>): LocalBalanceNode {
     note: null,
     position: 0,
     collapsed: false,
+    archivedAt: null,
     amount: null,
     currency: null,
     createdAt: '',

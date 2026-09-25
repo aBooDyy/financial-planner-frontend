@@ -16,6 +16,7 @@ const aNodeWire = (currency: string | null): BalanceNodeWire => ({
   note: null,
   position: 0,
   collapsed: false,
+  archived_at: null,
   amount: 125000,
   currency,
   created_at: '2026-09-01T00:00:00Z',

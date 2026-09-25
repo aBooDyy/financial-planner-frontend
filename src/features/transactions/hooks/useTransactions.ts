@@ -3,6 +3,7 @@ import { db } from '#/db/db'
 import { SETTINGS_KEY } from '#/db/types'
 import type { LocalBalanceNode, LocalGoal, LocalTransaction } from '#/db/types'
 import { DEFAULT_BASE_CURRENCY } from '#/features/balances/constants'
+import { hiddenByArchive } from '#/features/balances/data/archive'
 import { useCategoryCatalog } from '#/features/categories/hooks/useCategoryCatalog'
 import type { SpendingData } from '#/features/transactions/data/selectors'
 import { useMergedRates } from '#/lib/config/rates'
@@ -38,7 +39,14 @@ export function useTransactions() {
   const nodes: LocalBalanceNode[] = (nodeRows ?? []).filter(
     (n) => n.deleted === 0,
   )
-  const wallets = nodes.filter((n) => n.kind === 'wallet')
+  const hidden = hiddenByArchive(nodes)
+  const allWallets = nodes.filter((n) => n.kind === 'wallet')
+  // New entries go to live accounts; an archived one only resolves an existing row.
+  const wallets = allWallets.filter((w) => !hidden.has(w.id))
+  const editorWallets = [
+    ...wallets,
+    ...allWallets.filter((w) => hidden.has(w.id)),
+  ]
   const goals: LocalGoal[] = (goalRows ?? []).filter((g) => g.deleted === 0)
   const transactions: LocalTransaction[] = (txnRows ?? []).filter(
     (t) => t.deleted === 0,
@@ -55,5 +63,15 @@ export function useTransactions() {
     goals,
   }
 
-  return { loading, base, data, catalog, wallets, goals, transactions }
+  return {
+    loading,
+    base,
+    data,
+    catalog,
+    wallets,
+    editorWallets,
+    archivedWalletIds: hidden,
+    goals,
+    transactions,
+  }
 }

@@ -18,6 +18,7 @@ import { messageForApiError, messageForCode } from '#/lib/errorMessages'
 import { minorToInputValue, parseAmountToMinor } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
 import { useConfirmPlanned } from './useConfirmPlanned'
+import { activeNodes } from '#/features/balances/data/archive'
 
 /** The "External…" choice in the wallet select (set-asides only). */
 export const EXTERNAL = '__external__'
@@ -47,8 +48,7 @@ export function useConfirmForm(plannedId: string | null, onDone: () => void) {
   const c = useConfirmPlanned(plannedId)
   const nodeRows = useLiveQuery(() => db.balanceNodes.toArray())
   const wallets = useMemo<LocalBalanceNode[]>(
-    () =>
-      (nodeRows ?? []).filter((n) => n.deleted === 0 && n.kind === 'wallet'),
+    () => activeNodes(nodeRows ?? []).filter((n) => n.kind === 'wallet'),
     [nodeRows],
   )
   const [form, setForm] = useState<Form | null>(null)

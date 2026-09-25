@@ -1,4 +1,5 @@
-import { Plus } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
+import { Archive, ChevronRight, Plus } from 'lucide-react'
 import { TransferGlyph } from '#/components/icons/TransferGlyph'
 import { Button } from '#/components/ui/button'
 import type { BalanceRow } from '#/features/balances/data/selectors'
@@ -13,9 +14,11 @@ type Props = {
   onTransfer?: () => void
   onToggle: (id: string) => void
   onEdit: (id: string) => void
+  onAdjust: (id: string) => void
   onDelete: (id: string) => void
   onAddInside: (id: string) => void
   onOpenGoal: (goalId: string) => void
+  archivedCount: number
 }
 
 export function WalletsGroupsCard({
@@ -25,9 +28,11 @@ export function WalletsGroupsCard({
   onTransfer,
   onToggle,
   onEdit,
+  onAdjust,
   onDelete,
   onAddInside,
   onOpenGoal,
+  archivedCount,
 }: Props) {
   return (
     <div className="overflow-hidden rounded-[18px] border border-fp-border bg-fp-surface shadow-fp">
@@ -94,6 +99,7 @@ export function WalletsGroupsCard({
                 key={row.id}
                 row={row}
                 onEdit={onEdit}
+                onAdjust={onAdjust}
                 onDelete={onDelete}
                 onOpenGoal={onOpenGoal}
               />
@@ -101,6 +107,17 @@ export function WalletsGroupsCard({
           )}
         </div>
       )}
+
+      {archivedCount > 0 ? (
+        <Link
+          to="/settings/archived"
+          className="flex items-center gap-2 px-4 py-3 text-[12.5px] font-semibold text-fp-text-3 transition hover:bg-fp-surface-2 hover:text-fp-text"
+        >
+          <Archive size={14} strokeWidth={1.9} />
+          <span className="flex-1">{archivedCount} archived</span>
+          <ChevronRight size={15} strokeWidth={2} className="rtl:rotate-180" />
+        </Link>
+      ) : null}
     </div>
   )
 }

@@ -44,6 +44,8 @@ import { TransferFields } from './TransferFields'
 type Props = {
   editing: TxEditorState
   wallets: LocalBalanceNode[]
+  /** Offered only when the entry already points at one. */
+  archivedWalletIds?: ReadonlySet<string>
   goals: LocalGoal[]
   onField: <TKey extends keyof TxEditorDraft>(
     f: TKey,
@@ -73,6 +75,8 @@ const typeBtn = (active: boolean) =>
       : 'bg-transparent font-semibold text-fp-text-2'
   }`
 
+const NO_IDS: ReadonlySet<string> = new Set()
+
 const TYPE_LABELS: Record<EditorTxType, string> = {
   spend: 'Spend',
   income: 'Income',
@@ -82,6 +86,7 @@ const TYPE_LABELS: Record<EditorTxType, string> = {
 export function TxEditor({
   editing,
   wallets,
+  archivedWalletIds = NO_IDS,
   goals,
   onField,
   onType,
@@ -125,6 +130,13 @@ export function TxEditor({
       if (draft.plannedId) onField('plannedId', null)
     } else onGoal(optionId)
   }
+
+  const inUse = [draft.walletId, draft.toWalletId, draft.target]
+  const choices = wallets.filter(
+    (w) => !archivedWalletIds.has(w.id) || inUse.includes(w.id),
+  )
+  const walletLabel = (w: LocalBalanceNode) =>
+    archivedWalletIds.has(w.id) ? `${w.name} (archived)` : w.name
 
   const currencyOf = (walletId: string): CurrencyCode =>
     wallets.find((w) => w.id === walletId)?.currency ?? base
@@ -262,7 +274,7 @@ export function TxEditor({
         {isTransfer ? (
           <TransferFields
             draft={draft}
-            wallets={wallets}
+            wallets={choices}
             fromCurrency={fromCurrency}
             toCurrency={currencyOf(draft.toWalletId)}
             dateFormat={dateFormat}
@@ -319,9 +331,9 @@ export function TxEditor({
               </SelectTrigger>
               <SelectContent>
                 {draft.scopeType === 'wallet'
-                  ? wallets.map((w) => (
+                  ? choices.map((w) => (
                       <SelectItem key={w.id} value={w.id}>
-                        {w.name}
+                        {walletLabel(w)}
                       </SelectItem>
                     ))
                   : catalog.byType('spend').map((c) => (
@@ -377,12 +389,12 @@ export function TxEditor({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {wallets.length === 0 ? (
+                {choices.length === 0 ? (
                   <SelectItem value={NONE}>No wallets yet</SelectItem>
                 ) : null}
-                {wallets.map((w) => (
+                {choices.map((w) => (
                   <SelectItem key={w.id} value={w.id}>
-                    {w.name}
+                    {walletLabel(w)}
                   </SelectItem>
                 ))}
               </SelectContent>
