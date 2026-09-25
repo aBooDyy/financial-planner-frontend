@@ -36,7 +36,7 @@ export const CATEGORIES: DefaultCategory[] = [
     subs: [
       sub('supermarket', 'Supermarket', 'storefront'),
       sub('bakery', 'Bakery', 'bread'),
-      sub('convenience', 'Convenience', 'basket'),
+      sub('convenience', 'Convenience store', 'basket'),
     ],
   },
   {
@@ -48,7 +48,22 @@ export const CATEGORIES: DefaultCategory[] = [
     subs: [
       sub('restaurants', 'Restaurants', 'bowl-food'),
       sub('cafes', 'Cafés', 'coffee'),
+      sub('desserts', 'Desserts', 'cake'),
+      sub('snacks', 'Snacks', 'cookie'),
       sub('takeaway', 'Takeaway', 'hamburger'),
+    ],
+  },
+  {
+    id: 'family',
+    name: 'Family',
+    type: 'spend',
+    color: '#F43F5E',
+    icon: 'users-three',
+    subs: [
+      sub('household', 'Household groceries', 'basket'),
+      sub('family_dining', 'Family outings', 'bowl-steam'),
+      sub('family_pharmacy', 'Family pharmacy', 'first-aid-kit'),
+      sub('support', 'Family support', 'hand-heart'),
     ],
   },
   {
@@ -59,9 +74,12 @@ export const CATEGORIES: DefaultCategory[] = [
     icon: 'car',
     subs: [
       sub('fuel', 'Fuel', 'gas-pump'),
+      sub('maintenance', 'Car maintenance', 'wrench'),
+      sub('car_wash', 'Car wash', 'drop'),
+      sub('parking', 'Parking', 'garage'),
       sub('ride_hailing', 'Ride-hailing', 'taxi'),
       sub('public_transit', 'Public transit', 'bus'),
-      sub('parking', 'Parking', 'garage'),
+      sub('fines', 'Traffic fines', 'traffic-sign'),
     ],
   },
   {
@@ -73,12 +91,14 @@ export const CATEGORIES: DefaultCategory[] = [
     subs: [
       sub('rent', 'Rent', 'house-line'),
       sub('mortgage', 'Mortgage', 'bank'),
-      sub('maintenance', 'Maintenance', 'wrench'),
+      sub('maintenance', 'Repairs & maintenance', 'hammer'),
+      sub('furniture', 'Furniture & home goods', 'couch'),
+      sub('home_services', 'Home services', 'truck'),
     ],
   },
   {
     id: 'utilities',
-    name: 'Utilities',
+    name: 'Bills & utilities',
     type: 'spend',
     color: '#14B8A6',
     icon: 'lightbulb',
@@ -87,6 +107,21 @@ export const CATEGORIES: DefaultCategory[] = [
       sub('water', 'Water', 'drop'),
       sub('internet', 'Internet', 'wifi-high'),
       sub('mobile', 'Mobile', 'phone'),
+      sub('gas', 'Cooking gas', 'fire'),
+    ],
+  },
+  {
+    id: 'subscriptions',
+    name: 'Subscriptions',
+    type: 'spend',
+    color: '#A855F7',
+    icon: 'repeat',
+    subs: [
+      sub('cloud', 'Cloud & storage', 'cloud'),
+      sub('ai', 'AI tools', 'sparkle'),
+      sub('streaming', 'Streaming', 'television-simple'),
+      sub('software', 'Software & hosting', 'hard-drives'),
+      sub('memberships', 'Memberships', 'seal-check'),
     ],
   },
   {
@@ -98,7 +133,20 @@ export const CATEGORIES: DefaultCategory[] = [
     subs: [
       sub('clothing', 'Clothing', 't-shirt'),
       sub('electronics', 'Electronics', 'laptop'),
-      sub('home_goods', 'Home goods', 'couch'),
+      sub('accessories', 'Accessories', 'watch'),
+      sub('fragrances', 'Fragrances', 'flower'),
+    ],
+  },
+  {
+    id: 'personal_care',
+    name: 'Personal care',
+    type: 'spend',
+    color: '#D946EF',
+    icon: 'scissors',
+    subs: [
+      sub('barber', 'Barber', 'scissors'),
+      sub('grooming', 'Grooming & toiletries', 'shower'),
+      sub('laundry', 'Laundry & ironing', 'washing-machine'),
     ],
   },
   {
@@ -110,19 +158,33 @@ export const CATEGORIES: DefaultCategory[] = [
     subs: [
       sub('pharmacy', 'Pharmacy', 'pill'),
       sub('doctor', 'Doctor', 'stethoscope'),
+      sub('dental', 'Dental', 'tooth'),
+      sub('eyewear', 'Eyewear', 'eyeglasses'),
       sub('fitness', 'Fitness', 'barbell'),
     ],
   },
   {
-    id: 'entertainment',
-    name: 'Entertainment',
+    id: 'insurance',
+    name: 'Insurance',
     type: 'spend',
-    color: '#6366F1',
-    icon: 'mask-happy',
+    color: '#0284C7',
+    icon: 'umbrella',
     subs: [
-      sub('streaming', 'Streaming', 'television-simple'),
-      sub('games', 'Games', 'game-controller'),
-      sub('events', 'Events', 'ticket'),
+      sub('car_insurance', 'Car insurance', 'car-profile'),
+      sub('health_insurance', 'Health insurance', 'first-aid-kit'),
+    ],
+  },
+  {
+    id: 'government',
+    name: 'Government & fees',
+    type: 'spend',
+    color: '#78716C',
+    icon: 'stamp',
+    subs: [
+      sub('residency', 'Iqama & residency', 'file-text'),
+      sub('visas', 'Passports & visas', 'globe'),
+      sub('licenses', 'Licenses', 'seal-check'),
+      sub('bank_fees', 'Bank fees', 'bank'),
     ],
   },
   {
@@ -133,8 +195,22 @@ export const CATEGORIES: DefaultCategory[] = [
     icon: 'graduation-cap',
     subs: [
       sub('tuition', 'Tuition', 'student'),
-      sub('books', 'Books', 'books'),
+      sub('books', 'Books & materials', 'books'),
       sub('courses', 'Courses', 'certificate'),
+      sub('exams', 'Exams', 'exam'),
+    ],
+  },
+  {
+    id: 'entertainment',
+    name: 'Entertainment',
+    type: 'spend',
+    color: '#6366F1',
+    icon: 'mask-happy',
+    subs: [
+      sub('movies', 'Movies', 'film-slate'),
+      sub('events', 'Outings & events', 'ticket'),
+      sub('games', 'Games', 'game-controller'),
+      sub('sports', 'Sports', 'soccer-ball'),
     ],
   },
   {
@@ -150,14 +226,15 @@ export const CATEGORIES: DefaultCategory[] = [
     ],
   },
   {
-    id: 'subscriptions',
-    name: 'Subscriptions',
+    id: 'giving',
+    name: 'Gifts & giving',
     type: 'spend',
-    color: '#A855F7',
-    icon: 'repeat',
+    color: '#BE185D',
+    icon: 'gift',
     subs: [
-      sub('apps', 'Apps', 'squares-four'),
-      sub('memberships', 'Memberships', 'seal-check'),
+      sub('gifts', 'Gifts', 'gift'),
+      sub('eidiah', 'Eidiah', 'moon-stars'),
+      sub('charity', 'Charity & zakat', 'hand-heart'),
     ],
   },
   {
@@ -169,6 +246,7 @@ export const CATEGORIES: DefaultCategory[] = [
     subs: [
       sub('goal', 'Goal contribution', 'target'),
       sub('emergency', 'Emergency fund', 'shield-check'),
+      sub('investing', 'Investing', 'chart-line-up'),
     ],
   },
   {
@@ -204,20 +282,26 @@ export const CATEGORIES: DefaultCategory[] = [
     ],
   },
   {
-    id: 'refund',
-    name: 'Refund',
-    type: 'income',
-    color: '#14B8A6',
-    icon: 'arrows-clockwise',
-    subs: [],
-  },
-  {
     id: 'gift',
-    name: 'Gift',
+    name: 'Gifts received',
     type: 'income',
     color: '#EC4899',
     icon: 'gift',
-    subs: [],
+    subs: [
+      sub('eidiah', 'Eidiah', 'moon-stars'),
+      sub('allowance', 'Family allowance', 'hand-coins'),
+    ],
+  },
+  {
+    id: 'refund',
+    name: 'Refunds',
+    type: 'income',
+    color: '#14B8A6',
+    icon: 'arrows-clockwise',
+    subs: [
+      sub('reimbursement', 'Reimbursements', 'receipt'),
+      sub('cashback', 'Cashback', 'percent'),
+    ],
   },
   {
     id: 'investment',
@@ -227,8 +311,16 @@ export const CATEGORIES: DefaultCategory[] = [
     icon: 'chart-line-up',
     subs: [
       sub('dividends', 'Dividends', 'coins'),
-      sub('interest', 'Interest', 'percent'),
+      sub('returns', 'Returns', 'trend-up'),
     ],
+  },
+  {
+    id: 'other_income',
+    name: 'Other income',
+    type: 'income',
+    color: '#64748B',
+    icon: 'coins',
+    subs: [],
   },
 ]
 

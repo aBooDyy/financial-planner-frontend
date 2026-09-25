@@ -53,6 +53,8 @@ describe('buildCatalog', () => {
     expect(catalog.subsOf('dining').map((s) => s.slug)).toEqual([
       'restaurants',
       'cafes',
+      'desserts',
+      'snacks',
       'takeaway',
     ])
   })

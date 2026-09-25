@@ -55,6 +55,9 @@ export type UpdateCategoryWire = {
   position: number
 }
 
+/** Present only when the deleted category's rows move somewhere rather than keep its slugs. */
+export type DeleteCategoryWire = { move_to: string }
+
 export const toCategory = (w: CategoryWire): Category => ({
   id: w.id,
   parentId: w.parent_id,

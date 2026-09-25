@@ -1,8 +1,10 @@
 import { db } from '#/db/db'
+import { clearWatermark } from '#/db/watermarks'
 import type { OutboxEntry } from '#/db/types'
 import { categoriesApi } from '#/features/categories/api/categoriesApi'
 import type {
   CreateCategoryWire,
+  DeleteCategoryWire,
   UpdateCategoryWire,
 } from '#/features/categories/api/types'
 import { ApiError } from '#/lib/apiError'
@@ -84,15 +86,26 @@ async function rebaseCategory(entry: OutboxEntry): Promise<void> {
 }
 
 async function pushCategoryDelete(entry: OutboxEntry): Promise<void> {
+  const moveTo = (entry.payload as DeleteCategoryWire | null)?.move_to ?? null
   try {
-    await categoriesApi.remove(entry.id)
+    await categoriesApi.remove(entry.id, moveTo)
   } catch (e) {
-    if (statusOf(e) !== 404) throw e
+    const status = statusOf(e)
+    if (status === 0) throw e
+    // The server re-filed nothing, but this device already did: forget the ledger's
+    // watermarks so the next pull restores what the server actually holds.
+    if (moveTo) await forgetRefiledWatermarks()
+    if (status !== 404) throw e
   }
   await db.transaction('rw', db.categories, db.outbox, async () => {
     await db.categories.delete(entry.id)
     await db.outbox.delete(entry.seq)
   })
+}
+
+async function forgetRefiledWatermarks(): Promise<void> {
+  await clearWatermark('transaction')
+  await clearWatermark('planned')
 }
 
 /** Push one category outbox entry. Throws on network/unexpected errors. */

@@ -8,12 +8,15 @@ import type {
 } from '#/features/categories/data/catalog'
 import { useCategoryCatalog } from './useCategoryCatalog'
 
-export type CategoryTreeSub = ResolvedSub & { txCount: number }
+/** How many ledger entries and recurring schedules are filed under a row. */
+type FiledCounts = { txCount: number; recurringCount: number }
 
-export type CategoryTreeNode = Omit<ResolvedCategory, 'subs'> & {
-  txCount: number
-  subs: CategoryTreeSub[]
-}
+export type CategoryTreeSub = ResolvedSub & FiledCounts
+
+export type CategoryTreeNode = Omit<ResolvedCategory, 'subs'> &
+  FiledCounts & {
+    subs: CategoryTreeSub[]
+  }
 
 export type CategoryTree = {
   loading: boolean
@@ -24,9 +27,31 @@ export type CategoryTree = {
 
 const pairKey = (slug: string, subSlug: string) => `${slug}\u0000${subSlug}`
 
+type Filed = {
+  category: string | null
+  subcategory: string | null
+  deleted: number
+}
+
+type Tally = { byParent: Map<string, number>; byPair: Map<string, number> }
+
+const bump = (counts: Map<string, number>, key: string) =>
+  counts.set(key, (counts.get(key) ?? 0) + 1)
+
+function tally(rows: ReadonlyArray<Filed>): Tally {
+  const byParent = new Map<string, number>()
+  const byPair = new Map<string, number>()
+  for (const r of rows) {
+    if (r.deleted === 1 || r.category === null) continue
+    bump(byParent, r.category)
+    if (r.subcategory) bump(byPair, pairKey(r.category, r.subcategory))
+  }
+  return { byParent, byPair }
+}
+
 /**
- * The Settings list's view model: the catalog of one type, with a live transaction count per
- * row. A parent counts every row filed under it — including rows that also name a child —
+ * The Settings list's view model: the catalog of one type, with live transaction and
+ * recurring counts per row. A parent counts every row filed under it — including rows that also name a child —
  * because that is the number a user deleting the parent needs to see.
  */
 export function useCategoryTree(initialType: TxType = 'spend'): CategoryTree {
@@ -34,28 +59,25 @@ export function useCategoryTree(initialType: TxType = 'spend'): CategoryTree {
   const catalog = useCategoryCatalog()
   const rows = useLiveQuery(() => db.categories.toArray())
   const txns = useLiveQuery(() => db.transactions.toArray())
+  const recurrings = useLiveQuery(() => db.recurrings.toArray())
 
   const categories = useMemo(() => {
-    const parentCounts = new Map<string, number>()
-    const pairCounts = new Map<string, number>()
-    for (const t of txns ?? []) {
-      if (t.deleted === 1 || t.category === null) continue
-      parentCounts.set(t.category, (parentCounts.get(t.category) ?? 0) + 1)
-      if (t.subcategory) {
-        const key = pairKey(t.category, t.subcategory)
-        pairCounts.set(key, (pairCounts.get(key) ?? 0) + 1)
-      }
-    }
-
+    const tx = tally(txns ?? [])
+    const rec = tally(recurrings ?? [])
     return catalog.byType(type).map((c) => ({
       ...c,
-      txCount: parentCounts.get(c.slug) ?? 0,
-      subs: c.subs.map((s) => ({
-        ...s,
-        txCount: pairCounts.get(pairKey(c.slug, s.slug)) ?? 0,
-      })),
+      txCount: tx.byParent.get(c.slug) ?? 0,
+      recurringCount: rec.byParent.get(c.slug) ?? 0,
+      subs: c.subs.map((s) => {
+        const key = pairKey(c.slug, s.slug)
+        return {
+          ...s,
+          txCount: tx.byPair.get(key) ?? 0,
+          recurringCount: rec.byPair.get(key) ?? 0,
+        }
+      }),
     }))
-  }, [catalog, type, txns])
+  }, [catalog, type, txns, recurrings])
 
   return { loading: rows === undefined, type, setType, categories }
 }
