@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router'
 import { STATUS_COLORS } from '#/features/goals/constants'
 import { GOALS_SECTIONS } from './sections'
 import type { GoalsSection } from './sections'
@@ -5,22 +6,24 @@ import type { GoalsSection } from './sections'
 type Props = {
   active: GoalsSection
   alerts: Partial<Record<GoalsSection, boolean>>
-  onSelect: (section: GoalsSection) => void
+  /** Runs before the section link navigates, e.g. to close an open side panel. */
+  onNavigate: () => void
 }
 
 // Mobile section switch. It sits under the top bar so the app-wide bottom tab bar keeps its
 // place; a dot marks a section holding something that isn't on track.
-export function SectionTabs({ active, alerts, onSelect }: Props) {
+export function SectionTabs({ active, alerts, onNavigate }: Props) {
   return (
     <div className="flex flex-none border-b border-fp-border bg-fp-surface/70 backdrop-blur-[14px] md:hidden">
       {GOALS_SECTIONS.map((section) => {
         const Icon = section.icon
         const isActive = section.key === active
         return (
-          <button
+          <Link
             key={section.key}
-            type="button"
-            onClick={() => onSelect(section.key)}
+            to="/goals/$section"
+            params={{ section: section.key }}
+            onClick={onNavigate}
             aria-current={isActive ? 'page' : undefined}
             className={`relative flex flex-1 flex-col items-center gap-[3px] py-2 text-[10.5px] ${
               isActive
@@ -36,7 +39,7 @@ export function SectionTabs({ active, alerts, onSelect }: Props) {
                 style={{ background: STATUS_COLORS.amber.main }}
               />
             ) : null}
-          </button>
+          </Link>
         )
       })}
     </div>

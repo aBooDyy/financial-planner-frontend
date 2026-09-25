@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router'
 import { STATUS_COLORS } from '#/features/goals/constants'
 import { GOALS_SECTIONS } from './sections'
 import type { GoalsSection } from './sections'
@@ -6,22 +7,24 @@ type Props = {
   active: GoalsSection
   counts: Partial<Record<GoalsSection, number>>
   alerts: Partial<Record<GoalsSection, boolean>>
-  onSelect: (section: GoalsSection) => void
+  /** Runs before the section link navigates, e.g. to close an open side panel. */
+  onNavigate: () => void
 }
 
 // Desktop section switch: a card at the top of the content column, so the tabs sit on the same
 // scale as the cards below them.
-export function SectionTabCard({ active, counts, alerts, onSelect }: Props) {
+export function SectionTabCard({ active, counts, alerts, onNavigate }: Props) {
   return (
     <div className="mb-[14px] hidden items-stretch gap-[22px] overflow-x-auto rounded-[14px] border border-fp-border bg-fp-surface px-4 shadow-fp md:flex">
       {GOALS_SECTIONS.map((section) => {
         const isActive = section.key === active
         const count = counts[section.key]
         return (
-          <button
+          <Link
             key={section.key}
-            type="button"
-            onClick={() => onSelect(section.key)}
+            to="/goals/$section"
+            params={{ section: section.key }}
+            onClick={onNavigate}
             aria-current={isActive ? 'page' : undefined}
             className={`flex h-12 flex-none items-center gap-[6px] text-[14px] whitespace-nowrap ${
               isActive
@@ -41,7 +44,7 @@ export function SectionTabCard({ active, counts, alerts, onSelect }: Props) {
                 style={{ background: STATUS_COLORS.amber.main }}
               />
             ) : null}
-          </button>
+          </Link>
         )
       })}
     </div>

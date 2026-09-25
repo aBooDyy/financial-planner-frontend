@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate, useSearch } from '@tanstack/react-router'
+import { Link, useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { Download, Inbox, Plus } from 'lucide-react'
 import { MobileTabBar } from '#/components/chrome/MobileTabBar'
 import { TopNav } from '#/components/chrome/TopNav'
@@ -28,19 +28,16 @@ import {
   buildCashflow,
   buildActivityList,
   buildRecurringView,
-  scopeFromValue,
-  scopeOptions,
-  scopeToValue,
+  offeredScope,
+  scopeSections,
 } from '#/features/transactions/data/selectors'
 import type { ActivityRow, Scope } from '#/features/transactions/data/selectors'
-import type { RangeMode } from '#/features/transactions/constants'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '#/components/ui/select'
+  SPENDING_VIEWS,
+  isSpendingView,
+} from '#/features/transactions/constants'
+import type { RangeMode } from '#/features/transactions/constants'
+import { useAdjustmentEditor } from '#/features/transactions/hooks/useAdjustmentEditor'
 import { useTransactions } from '#/features/transactions/hooks/useTransactions'
 import { useTxEditor } from '#/features/transactions/hooks/useTxEditor'
 import { usePlanned } from '#/features/planned'
@@ -51,6 +48,7 @@ import { PlannedSummaryCard } from '#/features/planned/components/PlannedSummary
 import { useOriginColors } from '#/features/planned/hooks/useOriginColors'
 import { usePlannedRowActions } from '#/features/planned/hooks/usePlannedRowActions'
 import type { CurrencyCode } from '#/lib/currency'
+import { AdjustmentEditor } from './AdjustmentEditor'
 import { BreakdownCard } from './BreakdownCard'
 import { BudgetHealthCard, BudgetsCard } from './BudgetsCard'
 import { CashflowHeroCard } from './CashflowHeroCard'
@@ -59,10 +57,7 @@ import { QuickAddCard } from './QuickAddCard'
 import { RecurringCard, UpcomingCard } from './RecurringCard'
 import { TransactionList } from './TransactionList'
 import { TxEditor } from './TxEditor'
-
-type View = 'activity' | 'planned' | 'budgets' | 'recurring'
-
-const VIEWS: View[] = ['activity', 'planned', 'budgets', 'recurring']
+import { ScopeSelect } from './ScopeSelect'
 
 const viewSeg = (active: boolean) =>
   `inline-flex flex-1 items-center justify-center gap-[6px] rounded-[10px] px-2 py-2 text-[13px] md:flex-none md:px-4 md:text-[13.5px] ${
@@ -74,22 +69,32 @@ const viewSeg = (active: boolean) =>
 export function TransactionsPage() {
   const user = useSessionStore((s) => s.user)
   const logout = useLogout()
-  const { base, data, catalog, wallets, goals, transactions } =
-    useTransactions()
+  const {
+    base,
+    data,
+    catalog,
+    wallets,
+    editorWallets,
+    archivedWalletIds,
+    goals,
+    transactions,
+  } = useTransactions()
   const dateFormat = usePreferencesStore((s) => s.dateFormat)
-  const editor = useTxEditor(wallets, base, data.rates)
+  const editor = useTxEditor(editorWallets, base, data.rates)
+  const adjustment = useAdjustmentEditor()
   const { imports: pendingImports, count: pendingCount } = usePendingImports()
   const deepLinkedToReview =
     useSearch({ from: '/transactions' }).review === true
   const navigate = useNavigate()
   const [reviewOpen, setReviewOpen] = useState(deepLinkedToReview)
 
-  const [view, setView] = useState<View>('activity')
+  const viewParam = useParams({ from: '/transactions/$view' }).view
+  const view = isSpendingView(viewParam) ? viewParam : 'activity'
   const planned = usePlanned()
   const originColor = useOriginColors()
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const plannedActions = usePlannedRowActions(setConfirmId)
-  const [scope, setScope] = useState<Scope>({ type: 'all' })
+  const [chosenScope, setScope] = useState<Scope>({ type: 'all' })
   const [mode, setMode] = useState<RangeMode>('month')
   const [anchor, setAnchor] = useState(() => {
     const t = startOfToday()
@@ -115,13 +120,16 @@ export function TransactionsPage() {
     // Switching views should never jump away from now: if the period being left already
     // covers today, re-anchor on today rather than on the period's own start.
     const at = inWindow(ymd(today), windowOf(a, mode)) ? today : a
-    if (next === 'year') setAnchor(ymd(new Date(at.getFullYear(), 0, 1)))
-    else if (next === 'month')
-      setAnchor(ymd(new Date(at.getFullYear(), at.getMonth(), 1)))
-    else if (next === 'week') setAnchor(ymd(startOfWeek(at)))
-    else setAnchor(ymd(at))
+    setAnchor(ymd(windowOf(at, next).start))
     setMode(next)
   }
+  const goToToday = () => setAnchor(ymd(windowOf(today, mode).start))
+  const shown = windowOf(anchorDate, mode)
+  const todayIs = inWindow(ymd(today), shown)
+    ? null
+    : today > shown.end
+      ? 'ahead'
+      : 'behind'
   const pickMonth = (key: string) => {
     setMode('month')
     setAnchor(ymd(parseMonthKey(key)))
@@ -136,7 +144,8 @@ export function TransactionsPage() {
     }
   }
 
-  const options = scopeOptions(data)
+  const sections = scopeSections(data)
+  const scope = offeredScope(sections, chosenScope)
   const cashflow = buildCashflow(
     data,
     catalog,
@@ -185,7 +194,9 @@ export function TransactionsPage() {
       return
     }
     const t = transactions.find((x) => x.id === row.id)
-    if (t) editor.openEditTx(t)
+    if (!t) return
+    if (row.kind === 'adjustment') adjustment.openEdit(t)
+    else editor.openEditTx(t)
   }
   const onEditBudget = (id: string) => {
     const b = data.budgets.find((x) => x.id === id && x.deleted === 0)
@@ -199,7 +210,12 @@ export function TransactionsPage() {
   const closeReview = () => {
     setReviewOpen(false)
     if (deepLinkedToReview)
-      void navigate({ to: '/transactions', search: {}, replace: true })
+      void navigate({
+        to: '/transactions/$view',
+        params: { view },
+        search: {},
+        replace: true,
+      })
   }
 
   const activeWallet = wallets.length > 0 ? wallets[0] : null
@@ -220,11 +236,12 @@ export function TransactionsPage() {
           {/* Header: view tabs + global account scope */}
           <div className="md:col-span-2 flex flex-wrap items-center gap-[10px]">
             <div className="flex w-full rounded-[13px] border border-fp-border bg-fp-surface-2 p-[3px] md:inline-flex md:w-auto">
-              {VIEWS.map((v) => (
-                <button
+              {SPENDING_VIEWS.map((v) => (
+                <Link
                   key={v}
-                  type="button"
-                  onClick={() => setView(v)}
+                  to="/transactions/$view"
+                  params={{ view: v }}
+                  aria-current={view === v ? 'page' : undefined}
                   className={viewSeg(view === v)}
                 >
                   {v[0].toUpperCase() + v.slice(1)}
@@ -236,7 +253,7 @@ export function TransactionsPage() {
                       {planned.dueCount}
                     </span>
                   ) : null}
-                </button>
+                </Link>
               ))}
             </div>
             <div className="min-w-[8px] flex-1" />
@@ -262,24 +279,11 @@ export function TransactionsPage() {
               <Download size={15} strokeWidth={2} />
               Import
             </Link>
-            <Select
-              value={scopeToValue(scope)}
-              onValueChange={(v) => setScope(scopeFromValue(v))}
-            >
-              <SelectTrigger
-                title="Filter all tabs by account"
-                className="w-auto min-w-[172px] rounded-[11px] border-fp-border-strong px-[11px] py-[9px] text-[13px] font-semibold"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {options.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>
-                    {o.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <ScopeSelect
+              sections={sections}
+              value={scope}
+              onChange={setScope}
+            />
           </div>
 
           {/* Left column */}
@@ -289,7 +293,12 @@ export function TransactionsPage() {
                 {planned.dueCount > 0 ? (
                   <PlannedNudge
                     count={planned.dueCount}
-                    onReview={() => setView('planned')}
+                    onReview={() =>
+                      void navigate({
+                        to: '/transactions/$view',
+                        params: { view: 'planned' },
+                      })
+                    }
                   />
                 ) : null}
                 <DaysCard
@@ -300,6 +309,8 @@ export function TransactionsPage() {
                   onSetMode={changeMode}
                   onPrev={() => stepPeriod(-1)}
                   onNext={() => stepPeriod(1)}
+                  todayIs={todayIs}
+                  onToday={goToToday}
                   onToggleCal={() => setCalOpen((o) => !o)}
                   onPickMonth={pickMonth}
                   onPickDay={pickDay}
@@ -386,7 +397,8 @@ export function TransactionsPage() {
       {editor.editing ? (
         <TxEditor
           editing={editor.editing}
-          wallets={wallets}
+          wallets={editorWallets}
+          archivedWalletIds={archivedWalletIds}
           goals={goals}
           onField={editor.setField}
           onType={editor.setType}
@@ -402,6 +414,12 @@ export function TransactionsPage() {
           onClose={editor.close}
         />
       ) : null}
+
+      <AdjustmentEditor
+        editor={adjustment}
+        wallets={editorWallets}
+        dateFormat={dateFormat}
+      />
 
       {confirmId ? (
         <ConfirmPlannedDialog

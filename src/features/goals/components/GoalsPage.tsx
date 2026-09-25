@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { useNavigate, useSearch } from '@tanstack/react-router'
+import { useEffect } from 'react'
+import { useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { MobileTabBar } from '#/components/chrome/MobileTabBar'
 import { TopNav } from '#/components/chrome/TopNav'
 import { useLogout } from '#/features/auth/hooks/useLogout'
@@ -17,6 +17,7 @@ import { GoalListSection } from './GoalListSection'
 import { IncomeSection } from './IncomeSection'
 import { SectionTabCard } from './SectionTabCard'
 import { SectionTabs } from './SectionTabs'
+import { isGoalsSection } from './sections'
 import type { GoalsSection } from './sections'
 import { SummarySection } from './SummarySection'
 import { TimelineSection } from './TimelineSection'
@@ -27,8 +28,11 @@ export function GoalsPage() {
   const { base, income, goals, view, nodes, dueByGoal } = useGoals()
   const editor = useGoalEditor(base)
   const detail = useGoalDetail()
-  const [section, setSection] = useState<GoalsSection>('summary')
   const navigate = useNavigate()
+  const sectionParam = useParams({ from: '/goals/$section' }).section
+  const section: GoalsSection = isGoalsSection(sectionParam)
+    ? sectionParam
+    : 'summary'
   const linkedGoalId = useSearch({ from: '/goals' }).goal ?? null
   const linkedGoalFound =
     linkedGoalId !== null && goals.some((g) => g.id === linkedGoalId)
@@ -47,14 +51,24 @@ export function GoalsPage() {
     editor.close()
     detail.close()
   }
+  const showSection = (next: GoalsSection, replace = false) =>
+    void navigate({
+      to: '/goals/$section',
+      params: { section: next },
+      search: {},
+      replace,
+    })
   const goTo = (next: GoalsSection) => {
     closePanel()
-    setSection(next)
+    showSection(next)
   }
-  const openGoal = (id: string) => {
+  const openGoal = (id: string, replace = false) => {
     const goal = goals.find((g) => g.id === id)
     if (!goal) return
-    setSection(RECURRING_KINDS.includes(goal.kind) ? 'obligations' : 'goals')
+    showSection(
+      RECURRING_KINDS.includes(goal.kind) ? 'obligations' : 'goals',
+      replace,
+    )
     editor.close()
     detail.open(id)
   }
@@ -84,12 +98,11 @@ export function GoalsPage() {
     detail.close()
   }
 
-  // A link from elsewhere (a Balances pot) lands on that goal's detail, once, then drops
-  // the param so a later close is not undone by it.
+  // A link from elsewhere (a Balances pot) lands on that goal's detail, once; opening it
+  // drops the param so a later close is not undone by it.
   useEffect(() => {
     if (!linkedGoalId || !linkedGoalFound) return
-    openGoal(linkedGoalId)
-    void navigate({ to: '/goals', search: {}, replace: true })
+    openGoal(linkedGoalId, true)
     // `openGoal` is rebuilt every render; the link is what should trigger this.
   }, [linkedGoalId, linkedGoalFound])
 
@@ -179,7 +192,7 @@ export function GoalsPage() {
         onBaseChange={(code: CurrencyCode) => void setBaseCurrency(code)}
         onSignOut={() => void logout()}
       />
-      <SectionTabs active={section} alerts={alerts} onSelect={goTo} />
+      <SectionTabs active={section} alerts={alerts} onNavigate={closePanel} />
 
       <div className="relative flex min-h-0 flex-1">
         <main className="min-w-0 flex-1 overflow-auto">
@@ -191,7 +204,7 @@ export function GoalsPage() {
                 obligations: view.obligationsList.count,
               }}
               alerts={alerts}
-              onSelect={goTo}
+              onNavigate={closePanel}
             />
             {content}
           </div>

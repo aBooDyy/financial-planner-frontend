@@ -19,3 +19,6 @@ export const GOALS_SECTIONS: {
   { key: 'income', label: 'Income', icon: Wallet },
   { key: 'timeline', label: 'Timeline', icon: Clock },
 ]
+
+export const isGoalsSection = (value: string): value is GoalsSection =>
+  GOALS_SECTIONS.some((s) => s.key === value)

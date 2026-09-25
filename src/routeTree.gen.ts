@@ -9,13 +9,17 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as TransactionsRouteImport } from './routes/transactions'
+import { Route as SetupRouteImport } from './routes/setup'
 import { Route as ImportRouteImport } from './routes/import'
-import { Route as GoalsRouteImport } from './routes/goals'
 import { Route as BalancesRouteImport } from './routes/balances'
+import { Route as TransactionsRouteRouteImport } from './routes/transactions/route'
 import { Route as SettingsRouteRouteImport } from './routes/settings/route'
+import { Route as GoalsRouteRouteImport } from './routes/goals/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as TransactionsIndexRouteImport } from './routes/transactions/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
+import { Route as GoalsIndexRouteImport } from './routes/goals/index'
+import { Route as TransactionsViewRouteImport } from './routes/transactions/$view'
 import { Route as SettingsPreferencesRouteImport } from './routes/settings/preferences'
 import { Route as SettingsNotificationsRouteImport } from './routes/settings/notifications'
 import { Route as SettingsMerchantsRouteImport } from './routes/settings/merchants'
@@ -24,15 +28,17 @@ import { Route as SettingsEmailSyncRouteImport } from './routes/settings/email-s
 import { Route as SettingsDataRouteImport } from './routes/settings/data'
 import { Route as SettingsCurrenciesRouteImport } from './routes/settings/currencies'
 import { Route as SettingsCategoriesRouteImport } from './routes/settings/categories'
+import { Route as SettingsArchivedRouteImport } from './routes/settings/archived'
 import { Route as SettingsAccountRouteImport } from './routes/settings/account'
+import { Route as GoalsSectionRouteImport } from './routes/goals/$section'
 import { Route as AuthSignupRouteImport } from './routes/auth/signup'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
 import { Route as SettingsEmailSyncCallbackRouteImport } from './routes/settings_.email-sync.callback'
 import { Route as AuthGoogleCallbackRouteImport } from './routes/auth/google.callback'
 
-const TransactionsRoute = TransactionsRouteImport.update({
-  id: '/transactions',
-  path: '/transactions',
+const SetupRoute = SetupRouteImport.update({
+  id: '/setup',
+  path: '/setup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ImportRoute = ImportRouteImport.update({
@@ -40,14 +46,14 @@ const ImportRoute = ImportRouteImport.update({
   path: '/import',
   getParentRoute: () => rootRouteImport,
 } as any)
-const GoalsRoute = GoalsRouteImport.update({
-  id: '/goals',
-  path: '/goals',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const BalancesRoute = BalancesRouteImport.update({
   id: '/balances',
   path: '/balances',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TransactionsRouteRoute = TransactionsRouteRouteImport.update({
+  id: '/transactions',
+  path: '/transactions',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRouteRoute = SettingsRouteRouteImport.update({
@@ -55,15 +61,35 @@ const SettingsRouteRoute = SettingsRouteRouteImport.update({
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GoalsRouteRoute = GoalsRouteRouteImport.update({
+  id: '/goals',
+  path: '/goals',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TransactionsIndexRoute = TransactionsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => TransactionsRouteRoute,
+} as any)
 const SettingsIndexRoute = SettingsIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => SettingsRouteRoute,
+} as any)
+const GoalsIndexRoute = GoalsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => GoalsRouteRoute,
+} as any)
+const TransactionsViewRoute = TransactionsViewRouteImport.update({
+  id: '/$view',
+  path: '/$view',
+  getParentRoute: () => TransactionsRouteRoute,
 } as any)
 const SettingsPreferencesRoute = SettingsPreferencesRouteImport.update({
   id: '/preferences',
@@ -105,10 +131,20 @@ const SettingsCategoriesRoute = SettingsCategoriesRouteImport.update({
   path: '/categories',
   getParentRoute: () => SettingsRouteRoute,
 } as any)
+const SettingsArchivedRoute = SettingsArchivedRouteImport.update({
+  id: '/archived',
+  path: '/archived',
+  getParentRoute: () => SettingsRouteRoute,
+} as any)
 const SettingsAccountRoute = SettingsAccountRouteImport.update({
   id: '/account',
   path: '/account',
   getParentRoute: () => SettingsRouteRoute,
+} as any)
+const GoalsSectionRoute = GoalsSectionRouteImport.update({
+  id: '/$section',
+  path: '/$section',
+  getParentRoute: () => GoalsRouteRoute,
 } as any)
 const AuthSignupRoute = AuthSignupRouteImport.update({
   id: '/auth/signup',
@@ -134,14 +170,17 @@ const AuthGoogleCallbackRoute = AuthGoogleCallbackRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/goals': typeof GoalsRouteRouteWithChildren
   '/settings': typeof SettingsRouteRouteWithChildren
+  '/transactions': typeof TransactionsRouteRouteWithChildren
   '/balances': typeof BalancesRoute
-  '/goals': typeof GoalsRoute
   '/import': typeof ImportRoute
-  '/transactions': typeof TransactionsRoute
+  '/setup': typeof SetupRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/signup': typeof AuthSignupRoute
+  '/goals/$section': typeof GoalsSectionRoute
   '/settings/account': typeof SettingsAccountRoute
+  '/settings/archived': typeof SettingsArchivedRoute
   '/settings/categories': typeof SettingsCategoriesRoute
   '/settings/currencies': typeof SettingsCurrenciesRoute
   '/settings/data': typeof SettingsDataRoute
@@ -150,19 +189,23 @@ export interface FileRoutesByFullPath {
   '/settings/merchants': typeof SettingsMerchantsRoute
   '/settings/notifications': typeof SettingsNotificationsRoute
   '/settings/preferences': typeof SettingsPreferencesRoute
+  '/transactions/$view': typeof TransactionsViewRoute
+  '/goals/': typeof GoalsIndexRoute
   '/settings/': typeof SettingsIndexRoute
+  '/transactions/': typeof TransactionsIndexRoute
   '/auth/google/callback': typeof AuthGoogleCallbackRoute
   '/settings/email-sync/callback': typeof SettingsEmailSyncCallbackRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/balances': typeof BalancesRoute
-  '/goals': typeof GoalsRoute
   '/import': typeof ImportRoute
-  '/transactions': typeof TransactionsRoute
+  '/setup': typeof SetupRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/signup': typeof AuthSignupRoute
+  '/goals/$section': typeof GoalsSectionRoute
   '/settings/account': typeof SettingsAccountRoute
+  '/settings/archived': typeof SettingsArchivedRoute
   '/settings/categories': typeof SettingsCategoriesRoute
   '/settings/currencies': typeof SettingsCurrenciesRoute
   '/settings/data': typeof SettingsDataRoute
@@ -171,21 +214,27 @@ export interface FileRoutesByTo {
   '/settings/merchants': typeof SettingsMerchantsRoute
   '/settings/notifications': typeof SettingsNotificationsRoute
   '/settings/preferences': typeof SettingsPreferencesRoute
+  '/transactions/$view': typeof TransactionsViewRoute
+  '/goals': typeof GoalsIndexRoute
   '/settings': typeof SettingsIndexRoute
+  '/transactions': typeof TransactionsIndexRoute
   '/auth/google/callback': typeof AuthGoogleCallbackRoute
   '/settings/email-sync/callback': typeof SettingsEmailSyncCallbackRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/goals': typeof GoalsRouteRouteWithChildren
   '/settings': typeof SettingsRouteRouteWithChildren
+  '/transactions': typeof TransactionsRouteRouteWithChildren
   '/balances': typeof BalancesRoute
-  '/goals': typeof GoalsRoute
   '/import': typeof ImportRoute
-  '/transactions': typeof TransactionsRoute
+  '/setup': typeof SetupRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/signup': typeof AuthSignupRoute
+  '/goals/$section': typeof GoalsSectionRoute
   '/settings/account': typeof SettingsAccountRoute
+  '/settings/archived': typeof SettingsArchivedRoute
   '/settings/categories': typeof SettingsCategoriesRoute
   '/settings/currencies': typeof SettingsCurrenciesRoute
   '/settings/data': typeof SettingsDataRoute
@@ -194,7 +243,10 @@ export interface FileRoutesById {
   '/settings/merchants': typeof SettingsMerchantsRoute
   '/settings/notifications': typeof SettingsNotificationsRoute
   '/settings/preferences': typeof SettingsPreferencesRoute
+  '/transactions/$view': typeof TransactionsViewRoute
+  '/goals/': typeof GoalsIndexRoute
   '/settings/': typeof SettingsIndexRoute
+  '/transactions/': typeof TransactionsIndexRoute
   '/auth/google/callback': typeof AuthGoogleCallbackRoute
   '/settings_/email-sync/callback': typeof SettingsEmailSyncCallbackRoute
 }
@@ -202,14 +254,17 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/settings'
-    | '/balances'
     | '/goals'
-    | '/import'
+    | '/settings'
     | '/transactions'
+    | '/balances'
+    | '/import'
+    | '/setup'
     | '/auth/login'
     | '/auth/signup'
+    | '/goals/$section'
     | '/settings/account'
+    | '/settings/archived'
     | '/settings/categories'
     | '/settings/currencies'
     | '/settings/data'
@@ -218,19 +273,23 @@ export interface FileRouteTypes {
     | '/settings/merchants'
     | '/settings/notifications'
     | '/settings/preferences'
+    | '/transactions/$view'
+    | '/goals/'
     | '/settings/'
+    | '/transactions/'
     | '/auth/google/callback'
     | '/settings/email-sync/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/balances'
-    | '/goals'
     | '/import'
-    | '/transactions'
+    | '/setup'
     | '/auth/login'
     | '/auth/signup'
+    | '/goals/$section'
     | '/settings/account'
+    | '/settings/archived'
     | '/settings/categories'
     | '/settings/currencies'
     | '/settings/data'
@@ -239,20 +298,26 @@ export interface FileRouteTypes {
     | '/settings/merchants'
     | '/settings/notifications'
     | '/settings/preferences'
+    | '/transactions/$view'
+    | '/goals'
     | '/settings'
+    | '/transactions'
     | '/auth/google/callback'
     | '/settings/email-sync/callback'
   id:
     | '__root__'
     | '/'
-    | '/settings'
-    | '/balances'
     | '/goals'
-    | '/import'
+    | '/settings'
     | '/transactions'
+    | '/balances'
+    | '/import'
+    | '/setup'
     | '/auth/login'
     | '/auth/signup'
+    | '/goals/$section'
     | '/settings/account'
+    | '/settings/archived'
     | '/settings/categories'
     | '/settings/currencies'
     | '/settings/data'
@@ -261,18 +326,22 @@ export interface FileRouteTypes {
     | '/settings/merchants'
     | '/settings/notifications'
     | '/settings/preferences'
+    | '/transactions/$view'
+    | '/goals/'
     | '/settings/'
+    | '/transactions/'
     | '/auth/google/callback'
     | '/settings_/email-sync/callback'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  GoalsRouteRoute: typeof GoalsRouteRouteWithChildren
   SettingsRouteRoute: typeof SettingsRouteRouteWithChildren
+  TransactionsRouteRoute: typeof TransactionsRouteRouteWithChildren
   BalancesRoute: typeof BalancesRoute
-  GoalsRoute: typeof GoalsRoute
   ImportRoute: typeof ImportRoute
-  TransactionsRoute: typeof TransactionsRoute
+  SetupRoute: typeof SetupRoute
   AuthLoginRoute: typeof AuthLoginRoute
   AuthSignupRoute: typeof AuthSignupRoute
   AuthGoogleCallbackRoute: typeof AuthGoogleCallbackRoute
@@ -281,11 +350,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/transactions': {
-      id: '/transactions'
-      path: '/transactions'
-      fullPath: '/transactions'
-      preLoaderRoute: typeof TransactionsRouteImport
+    '/setup': {
+      id: '/setup'
+      path: '/setup'
+      fullPath: '/setup'
+      preLoaderRoute: typeof SetupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/import': {
@@ -295,18 +364,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ImportRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/goals': {
-      id: '/goals'
-      path: '/goals'
-      fullPath: '/goals'
-      preLoaderRoute: typeof GoalsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/balances': {
       id: '/balances'
       path: '/balances'
       fullPath: '/balances'
       preLoaderRoute: typeof BalancesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/transactions': {
+      id: '/transactions'
+      path: '/transactions'
+      fullPath: '/transactions'
+      preLoaderRoute: typeof TransactionsRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -316,6 +385,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/goals': {
+      id: '/goals'
+      path: '/goals'
+      fullPath: '/goals'
+      preLoaderRoute: typeof GoalsRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -323,12 +399,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/transactions/': {
+      id: '/transactions/'
+      path: '/'
+      fullPath: '/transactions/'
+      preLoaderRoute: typeof TransactionsIndexRouteImport
+      parentRoute: typeof TransactionsRouteRoute
+    }
     '/settings/': {
       id: '/settings/'
       path: '/'
       fullPath: '/settings/'
       preLoaderRoute: typeof SettingsIndexRouteImport
       parentRoute: typeof SettingsRouteRoute
+    }
+    '/goals/': {
+      id: '/goals/'
+      path: '/'
+      fullPath: '/goals/'
+      preLoaderRoute: typeof GoalsIndexRouteImport
+      parentRoute: typeof GoalsRouteRoute
+    }
+    '/transactions/$view': {
+      id: '/transactions/$view'
+      path: '/$view'
+      fullPath: '/transactions/$view'
+      preLoaderRoute: typeof TransactionsViewRouteImport
+      parentRoute: typeof TransactionsRouteRoute
     }
     '/settings/preferences': {
       id: '/settings/preferences'
@@ -386,12 +483,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsCategoriesRouteImport
       parentRoute: typeof SettingsRouteRoute
     }
+    '/settings/archived': {
+      id: '/settings/archived'
+      path: '/archived'
+      fullPath: '/settings/archived'
+      preLoaderRoute: typeof SettingsArchivedRouteImport
+      parentRoute: typeof SettingsRouteRoute
+    }
     '/settings/account': {
       id: '/settings/account'
       path: '/account'
       fullPath: '/settings/account'
       preLoaderRoute: typeof SettingsAccountRouteImport
       parentRoute: typeof SettingsRouteRoute
+    }
+    '/goals/$section': {
+      id: '/goals/$section'
+      path: '/$section'
+      fullPath: '/goals/$section'
+      preLoaderRoute: typeof GoalsSectionRouteImport
+      parentRoute: typeof GoalsRouteRoute
     }
     '/auth/signup': {
       id: '/auth/signup'
@@ -424,8 +535,23 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface GoalsRouteRouteChildren {
+  GoalsSectionRoute: typeof GoalsSectionRoute
+  GoalsIndexRoute: typeof GoalsIndexRoute
+}
+
+const GoalsRouteRouteChildren: GoalsRouteRouteChildren = {
+  GoalsSectionRoute: GoalsSectionRoute,
+  GoalsIndexRoute: GoalsIndexRoute,
+}
+
+const GoalsRouteRouteWithChildren = GoalsRouteRoute._addFileChildren(
+  GoalsRouteRouteChildren,
+)
+
 interface SettingsRouteRouteChildren {
   SettingsAccountRoute: typeof SettingsAccountRoute
+  SettingsArchivedRoute: typeof SettingsArchivedRoute
   SettingsCategoriesRoute: typeof SettingsCategoriesRoute
   SettingsCurrenciesRoute: typeof SettingsCurrenciesRoute
   SettingsDataRoute: typeof SettingsDataRoute
@@ -439,6 +565,7 @@ interface SettingsRouteRouteChildren {
 
 const SettingsRouteRouteChildren: SettingsRouteRouteChildren = {
   SettingsAccountRoute: SettingsAccountRoute,
+  SettingsArchivedRoute: SettingsArchivedRoute,
   SettingsCategoriesRoute: SettingsCategoriesRoute,
   SettingsCurrenciesRoute: SettingsCurrenciesRoute,
   SettingsDataRoute: SettingsDataRoute,
@@ -454,13 +581,27 @@ const SettingsRouteRouteWithChildren = SettingsRouteRoute._addFileChildren(
   SettingsRouteRouteChildren,
 )
 
+interface TransactionsRouteRouteChildren {
+  TransactionsViewRoute: typeof TransactionsViewRoute
+  TransactionsIndexRoute: typeof TransactionsIndexRoute
+}
+
+const TransactionsRouteRouteChildren: TransactionsRouteRouteChildren = {
+  TransactionsViewRoute: TransactionsViewRoute,
+  TransactionsIndexRoute: TransactionsIndexRoute,
+}
+
+const TransactionsRouteRouteWithChildren =
+  TransactionsRouteRoute._addFileChildren(TransactionsRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  GoalsRouteRoute: GoalsRouteRouteWithChildren,
   SettingsRouteRoute: SettingsRouteRouteWithChildren,
+  TransactionsRouteRoute: TransactionsRouteRouteWithChildren,
   BalancesRoute: BalancesRoute,
-  GoalsRoute: GoalsRoute,
   ImportRoute: ImportRoute,
-  TransactionsRoute: TransactionsRoute,
+  SetupRoute: SetupRoute,
   AuthLoginRoute: AuthLoginRoute,
   AuthSignupRoute: AuthSignupRoute,
   AuthGoogleCallbackRoute: AuthGoogleCallbackRoute,
