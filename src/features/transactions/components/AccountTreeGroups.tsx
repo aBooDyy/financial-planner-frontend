@@ -1,6 +1,7 @@
 import { Layers } from 'lucide-react'
 import { Fragment } from 'react'
 import { IconChip } from '#/components/icons/IconChip'
+import { ValueOrSkeleton } from '#/components/ValueOrSkeleton'
 import {
   SelectGroup,
   SelectItem,
@@ -16,11 +17,19 @@ type Props = {
   sections: ReadonlyArray<ScopeSection>
   /** A filter can pick a whole group; an entry is always written to one wallet. */
   groupsSelectable: boolean
+  /** The balances are still being summed; the accounts themselves are listed already. */
+  amountsLoading?: boolean
 }
 
 const INDENT_PX = 18
 
-function OptionContent({ option }: { option: ScopeOption }) {
+function OptionContent({
+  option,
+  amountsLoading,
+}: {
+  option: ScopeOption
+  amountsLoading: boolean
+}) {
   return (
     <>
       {option.icon && option.color ? (
@@ -42,14 +51,21 @@ function OptionContent({ option }: { option: ScopeOption }) {
         {option.name}
       </span>
       <span className="fp-sensitive ms-auto ps-3 text-[12px] font-semibold whitespace-nowrap text-fp-text-3 tabular-nums">
-        {option.amountStr}
+        <ValueOrSkeleton
+          value={amountsLoading ? null : option.amountStr}
+          className="h-3 w-14"
+        />
       </span>
     </>
   )
 }
 
 /** The accounts laid out like the Wallets tree, for a `Select`'s content. */
-export function AccountTreeGroups({ sections, groupsSelectable }: Props) {
+export function AccountTreeGroups({
+  sections,
+  groupsSelectable,
+  amountsLoading = false,
+}: Props) {
   return sections.map((section, i) => (
     <Fragment key={section.options[0]?.value ?? i}>
       {i > 0 ? <SelectSeparator /> : null}
@@ -67,7 +83,7 @@ export function AccountTreeGroups({ sections, groupsSelectable }: Props) {
               style={indent}
               className="flex items-center gap-2 py-[7px] pe-2 text-[13px] text-fp-text"
             >
-              <OptionContent option={option} />
+              <OptionContent option={option} amountsLoading={amountsLoading} />
             </SelectLabel>
           ) : (
             <SelectItem
@@ -76,7 +92,7 @@ export function AccountTreeGroups({ sections, groupsSelectable }: Props) {
               style={indent}
               className="text-[13px] *:[span]:last:min-w-0 *:[span]:last:flex-1"
             >
-              <OptionContent option={option} />
+              <OptionContent option={option} amountsLoading={amountsLoading} />
             </SelectItem>
           )
         })}

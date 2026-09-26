@@ -1,3 +1,4 @@
+import { Skeleton } from '#/components/ui/skeleton'
 import { RED } from '#/features/transactions/constants'
 import type { PeriodCell } from '#/features/transactions/data/selectors'
 
@@ -5,6 +6,8 @@ type Props = {
   cell: PeriodCell
   /** Show the income/spend split under the net figure. */
   showBreakdown: boolean
+  /** The day's figures are still loading: a placeholder stands where the net goes. */
+  loading: boolean
   height: string
   onPick: (key: string) => void
 }
@@ -50,7 +53,13 @@ function paletteFor(c: PeriodCell): Palette {
  * The picked day is marked by a heavy neutral border and today by an inverted date chip —
  * neither uses a colour, so neither competes with the day's green or red wash.
  */
-export function CalendarCell({ cell, showBreakdown, height, onPick }: Props) {
+export function CalendarCell({
+  cell,
+  showBreakdown,
+  loading,
+  height,
+  onPick,
+}: Props) {
   const p = paletteFor(cell)
 
   return (
@@ -77,7 +86,12 @@ export function CalendarCell({ cell, showBreakdown, height, onPick }: Props) {
       >
         {cell.label}
       </span>
-      {cell.hasActivity ? (
+      {loading ? (
+        <Skeleton
+          aria-hidden
+          className="mt-[3px] h-[9px] w-[70%] md:h-[11px]"
+        />
+      ) : cell.hasActivity ? (
         <span
           className="fp-sensitive mt-px text-[10px] font-extrabold leading-[1.1] tabular-nums md:text-[12px]"
           style={{ color: p.net }}

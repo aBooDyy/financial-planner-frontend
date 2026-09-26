@@ -1,13 +1,22 @@
 import { ChartPie } from 'lucide-react'
 import { EmptyState } from '#/components/EmptyState'
+import { Skeleton } from '#/components/ui/skeleton'
 import type { BreakdownView } from '#/features/transactions/data/selectors'
 
-export function BreakdownCard({ view }: { view: BreakdownView }) {
+type Props = {
+  /** `null` while the period's rows load; the heading renders regardless. */
+  view: BreakdownView | null
+  periodLabel: string
+}
+
+export function BreakdownCard({ view, periodLabel }: Props) {
   return (
     <div className="rounded-[18px] border border-fp-border bg-fp-surface p-[18px] shadow-fp">
       <div className="mb-[3px] text-[14px] font-bold">Where it went</div>
-      <div className="mb-[15px] text-[12px] text-fp-text-3">{view.sub}</div>
-      {view.hasData ? (
+      <div className="mb-[15px] text-[12px] text-fp-text-3">{periodLabel}</div>
+      {!view ? (
+        <DonutSkeleton />
+      ) : view.hasData ? (
         <div className="flex items-center gap-4">
           <div
             className="flex h-[92px] w-[92px] flex-none items-center justify-center rounded-full"
@@ -46,6 +55,19 @@ export function BreakdownCard({ view }: { view: BreakdownView }) {
           text="Spending in this window is broken down here by category."
         />
       )}
+    </div>
+  )
+}
+
+function DonutSkeleton() {
+  return (
+    <div aria-hidden className="flex items-center gap-4">
+      <Skeleton className="size-[92px] flex-none rounded-full" />
+      <div className="flex min-w-0 flex-1 flex-col gap-3">
+        {[0, 1, 2].map((i) => (
+          <Skeleton key={i} className="h-3 w-full" />
+        ))}
+      </div>
     </div>
   )
 }

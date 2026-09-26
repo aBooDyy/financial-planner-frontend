@@ -1,7 +1,9 @@
+import { ValueOrSkeleton } from '#/components/ValueOrSkeleton'
 import { Button } from '#/components/ui/button'
 
 type Props = {
-  balance: string
+  /** `null` while the balance is still loading. */
+  balance: string | null
   onAdjust: () => void
 }
 
@@ -14,7 +16,7 @@ export function BalanceNowStrip({ balance, onAdjust }: Props) {
           BALANCE NOW
         </div>
         <div className="truncate text-[18px] font-extrabold text-fp-text tabular-nums">
-          {balance}
+          <ValueOrSkeleton value={balance} className="h-[18px] w-28" />
         </div>
       </div>
       <Button
