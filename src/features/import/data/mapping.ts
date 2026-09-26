@@ -2,7 +2,6 @@ import { inferDateFormat } from './csv/dates'
 import { suggestColumns } from './roles'
 import {
   COLUMN_ROLES,
-  DEFAULT_DEDUPE,
   emptyAliases,
   isExclusiveRole,
   pendingCategoryId,
@@ -17,7 +16,6 @@ import type {
   AmountMode,
   AmountUnit,
   ColumnRole,
-  DedupeSettings,
   Dialect,
   Mapping,
   MappingDefaults,
@@ -49,7 +47,6 @@ export type MappingDraft = {
   amountUnit: AmountUnit
   defaults: MappingDefaults
   aliases: Aliases
-  dedupe: DedupeSettings
 }
 
 /** The columns a draft's chosen shape needs, or null while one is still missing. */
@@ -158,7 +155,6 @@ export const draftForFile = (seed: DraftSeed): MappingDraft => {
         categoryIds: { ...seed.fallbackCategories },
       },
       aliases: emptyAliases(),
-      dedupe: DEFAULT_DEDUPE,
     },
     seed.matrix,
   )

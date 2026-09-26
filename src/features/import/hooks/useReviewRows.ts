@@ -4,7 +4,7 @@ import {
   breaksPair,
   isEmptyPatch,
 } from '#/features/import/data/rowEdits'
-import { isDuplicate, statusOf } from '#/features/import/data/review'
+import { statusOf } from '#/features/import/data/review'
 import { skippedAt, statusAt, transferAt } from '#/features/import/data/rowScan'
 import type {
   CsvImport,
@@ -38,7 +38,7 @@ import type { ParsedRow } from '#/features/import/data/types'
  */
 
 export type RowOverride = {
-  /** The user's own call on this row, which outranks the duplicate rule. */
+  /** The user's own call on this row, which outranks a skip mapping. */
   excluded?: boolean
   patch?: RowPatch
 }
@@ -59,7 +59,6 @@ const NO_COUNTS: ReviewCounts = {
   ok: 0,
   warning: 0,
   error: 0,
-  duplicate: 0,
 }
 
 /** Rows kept built at once. A window is ~30; this holds a few screens of scrollback. */
@@ -89,7 +88,6 @@ type Tally = {
   plan: ImportPlan
   /** File rows that will not be — what the skipped-rows download quotes. */
   excluded: number[]
-  excludedDuplicates: number
 }
 
 const EMPTY_TALLY: Tally = {
@@ -97,7 +95,6 @@ const EMPTY_TALLY: Tally = {
   committable: NO_ROWS,
   plan: NO_PLAN,
   excluded: NO_ROWS,
-  excludedDuplicates: 0,
 }
 
 /** A corrected row outranks the pass; everything else is one byte. */
@@ -120,23 +117,16 @@ const partnerOf = (
     ? undefined
     : scan.pairs.get(index)?.partner
 
-/**
- * Why a row is out: a skip mapping, the duplicate rule, or the user — in that order, the
- * user's own call last because it outranks both.
- */
+/** Why a row is out: the user's own call, else a skip mapping. */
 const excludedAlone = (
   scan: RowScan,
   corrected: ReadonlyMap<number, ParsedRow>,
   overrides: ReadonlyMap<number, RowOverride>,
-  skipDuplicates: boolean,
   index: number,
 ): boolean => {
-  const fixed = corrected.get(index)
-  const repeats =
-    fixed === undefined ? scan.duplicates.has(index) : isDuplicate(fixed)
   const own = overrides.get(index)?.excluded
   if (own !== undefined) return own
-  if (repeats) return skipDuplicates
+  const fixed = corrected.get(index)
   return fixed === undefined ? skippedAt(scan, index) : fixed.excluded
 }
 
@@ -145,16 +135,12 @@ const excludedFor = (
   scan: RowScan,
   corrected: ReadonlyMap<number, ParsedRow>,
   overrides: ReadonlyMap<number, RowOverride>,
-  skipDuplicates: boolean,
   index: number,
 ): boolean => {
-  if (excludedAlone(scan, corrected, overrides, skipDuplicates, index)) {
-    return true
-  }
+  if (excludedAlone(scan, corrected, overrides, index)) return true
   const partner = partnerOf(scan, overrides, index)
   return (
-    partner !== undefined &&
-    excludedAlone(scan, corrected, overrides, skipDuplicates, partner)
+    partner !== undefined && excludedAlone(scan, corrected, overrides, partner)
   )
 }
 
@@ -177,18 +163,16 @@ const tally = (
   scan: RowScan,
   corrected: ReadonlyMap<number, ParsedRow>,
   overrides: ReadonlyMap<number, RowOverride>,
-  skipDuplicates: boolean,
 ): Tally => {
   const counts: ReviewCounts = { ...NO_COUNTS, total: scan.total }
   const committable: number[] = []
   const excluded: number[] = []
   const placed = new Set<number>()
   const plan = { transactions: 0, transfers: 0 }
-  let excludedDuplicates = 0
 
   const writable = (index: number): boolean =>
     statusFor(scan, corrected, index) !== 'error' &&
-    !excludedFor(scan, corrected, overrides, skipDuplicates, index)
+    !excludedFor(scan, corrected, overrides, index)
 
   const place = (index: number) => {
     committable.push(index)
@@ -202,9 +186,8 @@ const tally = (
   for (const index of scan.order) {
     const status = statusFor(scan, corrected, index)
     counts[status] += 1
-    if (excludedFor(scan, corrected, overrides, skipDuplicates, index)) {
+    if (excludedFor(scan, corrected, overrides, index)) {
       excluded.push(index)
-      if (status === 'duplicate') excludedDuplicates += 1
     } else if (status !== 'error' && !placed.has(index)) {
       place(index)
       const partner = partnerOf(scan, overrides, index)
@@ -215,12 +198,11 @@ const tally = (
     }
   }
 
-  return { counts, committable, plan, excluded, excludedDuplicates }
+  return { counts, committable, plan, excluded }
 }
 
 export function useReviewRows(csv: CsvImport) {
   const [store, setStore] = useState<Store>({ owner: null, overrides: EMPTY })
-  const [skipDuplicates, setSkipDuplicates] = useState(true)
   const [filter, setFilter] = useState<ReviewFilter>('all')
 
   const scan = csv.scan.result
@@ -254,8 +236,8 @@ export function useReviewRows(csv: CsvImport) {
     () =>
       scan === null
         ? EMPTY_TALLY
-        : tally(scan, corrected, overrides, skipDuplicates),
-    [scan, corrected, overrides, skipDuplicates],
+        : tally(scan, corrected, overrides),
+    [scan, corrected, overrides],
   )
 
   const statusOfRow = useCallback(
@@ -266,9 +248,8 @@ export function useReviewRows(csv: CsvImport) {
 
   const isExcluded = useCallback(
     (index: number): boolean =>
-      scan !== null &&
-      excludedFor(scan, corrected, overrides, skipDuplicates, index),
-    [scan, corrected, overrides, skipDuplicates],
+      scan !== null && excludedFor(scan, corrected, overrides, index),
+    [scan, corrected, overrides],
   )
 
   /** The file rows on screen, in the table's order, narrowed to the chosen filter. */
@@ -417,14 +398,11 @@ export function useReviewRows(csv: CsvImport) {
     committable: summary.committable,
     plan: summary.plan,
     excluded: summary.excluded,
-    excludedDuplicates: summary.excludedDuplicates,
     visible,
     rowAt: rowAtPosition,
     rowsFor,
     filter,
     setFilter,
-    skipDuplicates,
-    setSkipDuplicates,
     toggleRow,
     setVisibleExcluded,
     editRow,

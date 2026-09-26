@@ -13,12 +13,9 @@ const MATRIX = [
 const built = () => buildRows(MATRIX, testMapping(), testContext())
 
 describe('skipReason', () => {
-  it('names the error, then the duplicate, then the user', () => {
+  it('names the error, else says the user left the row out', () => {
     const rows = built()
     expect(skipReason(rows[1])).toContain('amount')
-    expect(skipReason({ ...rows[0], duplicateOf: 't-atm' })).toBe(
-      'Skipped as already in Means.',
-    )
     expect(skipReason(rows[0])).toBe('You left this row out.')
   })
 })

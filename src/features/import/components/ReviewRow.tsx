@@ -1,11 +1,6 @@
 import { memo, useMemo } from 'react'
-import { Info, Pencil } from 'lucide-react'
+import { Pencil } from 'lucide-react'
 import { Checkbox } from '#/components/ui/checkbox'
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '#/components/ui/popover'
 import { describeRow } from '#/features/import/data/rowView'
 import type { AmountTone, RowLabels } from '#/features/import/data/rowView'
 import type { RowStatus } from '#/features/import/data/review'
@@ -33,7 +28,6 @@ const STATUS: Readonly<Record<RowStatus, { glyph: string; label: string }>> = {
   ok: { glyph: '✅', label: 'Ready' },
   warning: { glyph: '⚠', label: 'Warning' },
   error: { glyph: '⛔', label: 'Error' },
-  duplicate: { glyph: '⧉', label: 'Duplicate' },
 }
 
 const AMOUNT_TONE: Readonly<Record<AmountTone, string>> = {
@@ -46,7 +40,6 @@ const STATUS_TONE: Readonly<Record<RowStatus, string>> = {
   ok: 'text-fp-accent-ink',
   warning: 'text-fp-text-2',
   error: 'text-fp-danger',
-  duplicate: 'text-fp-text-3',
 }
 
 function StatusChip({ status }: { status: RowStatus }) {
@@ -57,22 +50,6 @@ function StatusChip({ status }: { status: RowStatus }) {
       <span aria-hidden>{STATUS[status].glyph}</span>
       {STATUS[status].label}
     </span>
-  )
-}
-
-function DuplicateInfo({ text }: { text: string }) {
-  return (
-    <Popover>
-      <PopoverTrigger
-        aria-label="What this row matched"
-        className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-lg text-fp-text-3 transition hover:bg-fp-surface-2 hover:text-fp-text"
-      >
-        <Info size={14} strokeWidth={2} />
-      </PopoverTrigger>
-      <PopoverContent className="w-[min(280px,calc(100vw-32px))] text-[12.5px] text-fp-text-2">
-        {text}
-      </PopoverContent>
-    </Popover>
   )
 }
 
@@ -167,7 +144,6 @@ function ReviewRowInner({
           </div>
         </div>
         <div role="gridcell" className="flex shrink-0 items-center gap-1">
-          {view.duplicate ? <DuplicateInfo text={view.duplicate} /> : null}
           {edit}
         </div>
       </div>
@@ -218,7 +194,6 @@ function ReviewRowInner({
         <StatusChip status={view.status} />
       </div>
       <div role="gridcell" className="flex items-center justify-end gap-1">
-        {view.duplicate ? <DuplicateInfo text={view.duplicate} /> : null}
         {edit}
       </div>
     </div>

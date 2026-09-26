@@ -3,7 +3,6 @@ import {
   matchSuggestion,
   predictionFor,
 } from '#/features/merchants/hooks/useMerchantMatch'
-import { fingerprintOf } from './dedupe'
 import { normalizeKey } from './matching'
 import { ROW_ISSUES, lookup, roleColumn } from './types'
 import type { MerchantIndex } from '#/features/merchants/data/matching'
@@ -51,8 +50,7 @@ export const merchantLookup = (index: MerchantIndex): MerchantLookup => {
 }
 
 /**
- * Bind the merchant this row names and pre-fill its learned category. Run **before** the
- * duplicate check: a learned category is part of a row's fingerprint.
+ * Bind the merchant this row names and pre-fill its learned category.
  *
  * The row is returned as it came when nothing matched — a prediction pass must not cost an
  * allocation per row of the file.
@@ -106,7 +104,6 @@ export const predictRow = (
   return {
     ...row,
     draft,
-    fingerprint: fingerprintOf(draft),
     issues: applied
       ? row.issues.filter(
           (issue) => issue.code !== ROW_ISSUES.categoryDefaulted,

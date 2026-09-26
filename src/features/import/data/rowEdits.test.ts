@@ -21,7 +21,6 @@ describe('applyRowPatch', () => {
 
     expect(fixed.draft?.amount).toBe(3400)
     expect(hasErrors(fixed.issues)).toBe(false)
-    expect(fixed.fingerprint).not.toBe('')
   })
 
   it('treats a corrected category as an answer, not a guess', () => {
@@ -78,16 +77,9 @@ describe('applyRowPatch', () => {
     expect(hasErrors(flipped.issues)).toBe(false)
   })
 
-  it('carries the duplicate marks across, and an empty patch changes nothing', () => {
-    const base = {
-      ...row(['2026-06-16', 'Bakery', '-12.40']),
-      duplicateOf: 't1',
-    }
-
+  it('changes nothing for an empty patch', () => {
+    const base = row(['2026-06-16', 'Bakery', '-12.40'])
     expect(applyRowPatch(base, {}, mapping, context)).toBe(base)
-    expect(
-      applyRowPatch(base, { note: 'Corrected' }, mapping, context).duplicateOf,
-    ).toBe('t1')
   })
 
   it('re-reads the row’s own cells, so a later mapping change still reaches it', () => {

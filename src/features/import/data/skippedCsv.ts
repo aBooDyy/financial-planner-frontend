@@ -1,6 +1,5 @@
 import { download } from '#/features/settings/data/exportData'
 import { messageForCode } from '#/lib/errorMessages'
-import { isDuplicate } from './review'
 import { hasErrors } from './types'
 import type { Dialect, ParsedRow } from './types'
 
@@ -20,7 +19,6 @@ export const skipReason = (row: ParsedRow): string => {
     const message = messageForCode(issue.code)
     return issue.detail ? `${message} (${issue.detail})` : message
   }
-  if (isDuplicate(row)) return 'Skipped as already in Means.'
   return 'You left this row out.'
 }
 

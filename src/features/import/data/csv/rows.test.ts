@@ -69,9 +69,6 @@ describe('buildRows — a split-column statement', () => {
           code: ROW_ISSUES.categoryDefaulted,
         },
       ],
-      duplicateOf: null,
-      duplicateOfIndex: null,
-      fingerprint: `2026-06-16|4215|GBP|c:${catId('other')}`,
       reference: null,
       excluded: false,
       prediction: null,
@@ -368,7 +365,7 @@ describe('buildRows — mapping decisions', () => {
     expect(codes(unknown)).toContain(ROW_ISSUES.typeDefaulted)
   })
 
-  it('files the bank reference into the note, where dedupe can find it again', () => {
+  it('files the bank reference into the note', () => {
     const mapping = testMapping({
       roles: ['date', 'merchant', 'amount', 'reference'],
     })

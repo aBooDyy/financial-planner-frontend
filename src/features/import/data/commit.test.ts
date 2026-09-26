@@ -13,7 +13,6 @@ import { categoryTypesOf } from './mapping'
 import { normalizeKey } from './matching'
 import { testContext, testMapping } from './__fixtures__/mapping'
 import { emptyAliases, pendingCategoryId } from './types'
-import { emptyDedupeIndex } from './dedupe'
 import { moneyLover } from './__fixtures__/moneyLover'
 import type { Mapping } from './types'
 
@@ -42,7 +41,6 @@ const meta = {
   label: 'statement.csv',
   templateId: null,
   rowCount: 0,
-  skippedDuplicates: 0,
   errorCount: 0,
 }
 
@@ -407,7 +405,6 @@ describe('commitImport — transfers and adjustments', () => {
       mapping,
       context,
       merchants: { merchants: [], aliases: [] },
-      ledger: emptyDedupeIndex(),
     })
     const reader = rowReader({
       matrix,

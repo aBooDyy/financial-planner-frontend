@@ -1,4 +1,4 @@
-import { stripReference } from './dedupe'
+import { stripReference } from './reference'
 import { normalizeKey } from './matching'
 import { ROW_ISSUES, lookup } from './types'
 import type { TransactionDraft } from '#/features/transactions/data/mutations'

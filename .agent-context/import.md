@@ -19,7 +19,7 @@ src/features/import/
 │   ├── csv/{encoding,dialect,dates,amounts,read,caps,errors,messages}.ts
 │   ├── csv/{worker.ts,workerClient.ts,rows.ts}
 │   ├── csv/__fixtures__/*.csv + *.expected.json   # 14 real-shaped statements
-│   ├── {roles,matching,values,validate,dedupe,predict}.ts    # the pure pipeline
+│   ├── {roles,matching,values,validate,reference,predict}.ts # the pure pipeline
 │   ├── rowScan.ts                            # the one pass + the lazy row reader
 │   ├── pairing.ts                            # transfer rows: pairing, lone sides, the note
 │   ├── {mapping,review,rowView,rowEdits,rowEditForm,skippedCsv,importCounts}.ts  # wizard helpers
@@ -40,14 +40,14 @@ mutations (`createNodeWithId`, `createCategoryWithSlug`, `createMerchantWithId`,
 ```
 File → parseCsvFile (worker) → CsvReadResult{dialect, headers, rows}   ← the raw matrix, held
      → draftForFile → MappingDraft --(the user answers ② and ③)--> Mapping
-     → scanRows  (one streaming pass: buildRow → predictRow → markRow)  → RowScan
+     → scanRows  (one streaming pass: buildRow → predictRow → pairing)  → RowScan
      → rowReader.at(index)  (one ParsedRow, on the way to the screen)
      → review overrides → commitImport (200-row chunks) → Dexie + outbox → schedulePush()
 ```
 
-**The order inside a row is load-bearing.** `predictRow` runs _before_ `markRow` because
-a learned category changes a row's fingerprint; the other way round finds different
-duplicates. `scanRows` keeps them in that order for every row it touches.
+**No duplicate detection** (removed 2026-09-27, user decision): a file is imported as it is.
+Nothing is compared against the ledger or against the file's other rows; if a file repeats a
+row, that is the file's business. So the importer never reads `db.transactions` at all.
 
 ### Nothing is derived before it is asked for
 
@@ -63,9 +63,8 @@ _What the wizard costs_):
 - **`scanRows` is the one pass.** It is chunked (2 000 rows), yields between chunks, aborts on
   a mapping change, and produces **compact per-row state, never rows**: a status byte per row
   (`flags`, with the review rank in the low bits and "left out by a skip mapping" above them),
-  the table's order as an `Int32Array` (a counting sort over the four ranks, stable by
-  construction), a `Map` holding a mark only for the rows that repeat something, the ledger
-  ids those marks point at, the status counts and the per-issue counts. At 5 000 rows that is
+  the table's order as an `Int32Array` (a counting sort over the three ranks — error, warning,
+  ok — stable by construction), the transfer pairs, the status counts and the per-issue counts. At 5 000 rows that is
   ~25 KB against ~2.4 MB for the same file as `ParsedRow[]`.
 - **It runs for `columns` and `review` only** (`WHOLE_FILE_STEPS`). Step ② renders "_4 329
   rows: this row has no account_", which is a whole-file fact and cannot be answered any other
@@ -76,15 +75,15 @@ _What the wizard costs_):
   one changes what a pass would find, so `dataReady` gates the effect — the difference between
   one pass and five when a file is opened.
 - **`rowReader.at(index)` is the only place a `ParsedRow` is made after the pass**, from the
-  matrix + the current mapping + the pass's duplicate marks. The review table builds the ~26
+  matrix + the current mapping + the pass's transfer pairs. The review table builds the ~26
   rows of its window and no more; `useReviewRows` holds them in a 200-entry LRU so identity
   stays stable and `ReviewRow`'s `memo` keeps biting.
 - **The commit streams.** `commitImport` takes a `CommitSource`
   (`{total, cellsAt, rowsAt}`) and pulls 200 rows at a time, so the peak is one chunk rather
   than the file. `merchantSpellings` reads the matrix cells directly and builds nothing.
   `rowsSource(rows)` adapts an array for callers (and tests) that already hold one.
-- **Nothing ships a whole-array pass.** `predictRow` and `markRow` are per-row, the scan is
-  their only caller, and neither clones a row that did not change. The pure tests map them
+- **Nothing ships a whole-array pass.** `predictRow` is per-row, the scan is its only caller,
+  and it never clones a row that did not change. The pure tests map it
   over an array themselves — putting such a `map` back into production is the regression this
   feature is most likely to suffer twice.
 
@@ -290,15 +289,15 @@ income. They are recognised in step ③ and settled in the pass.
   **errors** (the server writes it in the wallet's currency and refuses zero), and it never gets
   `category_defaulted`. `predictRow` skips it — no merchant, no learned category.
 - **Pairing rides the pass** (`data/pairing.ts`, called from `rowScan.ts`). A transfer row that
-  is readable, not skipped and non-zero is a `PairCandidate`; the pass holds the row back (with
-  its duplicate mark) instead of recording its status, and `finish` runs `pairTransfers` and
+  is readable, not skipped and non-zero is a `PairCandidate`; the pass holds the row back
+  instead of recording its status, and `finish` runs `pairTransfers` and
   settles the held rows before the counting sort. The rule: a money-out side pairs with a
   money-in side of the **same currency and amount, in another wallet, at most 2 days apart** —
   the same day first, then the closest, the earliest row on a tie — greedy over the out-sides
   in file order, so a file always pairs the same way. In-sides sit in buckets keyed
   `currency|amount|day`, so each out-side looks at five small buckets: linear in the file (a
   test pairs 10 000 transfers well under a second). The output is `RowScan.pairs` — a map from
-  each paired row to `{partner, walletId}` (the partner's wallet), like `duplicates` — plus a
+  each paired row to `{partner, walletId}` (the partner's wallet) — plus a
   `TRANSFER` bit in `flags` so the tally can count transfers without building rows.
 - **A lone side needs its other wallet.** `settleTransfer` (the pass, `rowReader.at` and
   `applyRowPatch` all call it) lays the pair on, or else: the user's own choice
@@ -333,11 +332,6 @@ income. They are recognised in step ③ and settled in the pass.
   `bulkDeleteTransfers` (the ledger's bulk delete refuses legs), and is **kept whole** if either
   leg changed since. The dialog, history row and done card count "N transactions · M transfers"
   (`data/importCounts.ts`).
-- **Dedupe.** `toLedgerEntry` files existing legs and adjustments by direction on their own
-  wallet, and a movement's fingerprint is keyed on direction + wallet (it has no category) and
-  never the note — the two sides of a transfer carry different notes while the ledger keeps one —
-  so re-importing a file, or the other wallet's statement, flags them. A cash-flow row never
-  matches a movement.
 
 ## Matching accounts: the group is a name too, and a tie is a question
 
@@ -375,26 +369,19 @@ carries ("_“Account” isn't mapped_"), and a line appears when no column is A
 fallback is set. Step ③ still does **not** block — a user with no accounts would be trapped; the
 card explains and review shows the flagged rows.
 
-## Validation and dedupe
+## Validation and the reference
 
 - `validate.ts` is a **pure, ordered rule table**: facts in, `RowIssue[]` out, read
   top-to-bottom the way a person checks a row. An `error` blocks the row from being
   committed; a `warning` commits by default. `import.row.type_defaulted` and
   `import.row.category_defaulted` exist because silently defaulting a direction or a category
   is exactly the silence this feature must avoid.
-- `dedupe.ts` gives every row **two keys**: the bank's own reference when the file has one,
-  and a fingerprint when it does not. A cash-flow fingerprint is `date|amount|currency|c:<categoryId>`
-  — **same day, same amount, same category** (2026-09-27, user decision): wallet, merchant and
-  note are ignored, because a hand-typed entry rarely spells them like the statement. A transfer
-  leg or adjustment uses `date|amount|currency|~|type|walletId`. Against the ledger the
-  fingerprint alone decides; against **earlier rows of the same file** the normalised note is
-  appended (`inFileKey`), since two rows of one statement are both real unless their narrative
-  matches too. No ±days window (removed 2026-09-25, user decision).
-- A mapped `reference` rides at the **end of the note** as ` · ref:<id>`, because
-  `t_transactions` has one `source` column and the batch marker has to win it.
-- **`markRow` decides one row against a running `SeenRows`**, which is what lets the check ride
-  along inside the streaming pass. The earlier-rows index is the pass's own working memory and
-  dies with it; all that survives is a mark for the rows that actually repeat something.
+- A mapped `reference` rides at the **end of the note** as ` · ref:<id>` (`reference.ts`:
+  `withReference` / `referenceFromNote` / `stripReference`), because `t_transactions` has one
+  `source` column and the batch marker has to win it. Review and pairing read the note without
+  it.
+- Saved templates written before 2026-09-27 still carry a `dedupe` key in their `config`; it is
+  ignored, and nothing writes it any more.
 
 ## Where the user's row-level state lives
 
@@ -408,8 +395,8 @@ a new dialect means the indices no longer point at the same lines.
 A correction is stored as a **`RowPatch` — the changed fields only, never a frozen row**.
 `applyRowPatch` re-reads that row's own cells through the current mapping, lays the patch over
 the facts and re-runs `validateRow`, so a fixed row flips to ready immediately _and_ still
-tracks later mapping changes. Duplicate marks are carried across rather than recomputed (the
-duplicate check is a whole-file pass, not worth re-running for one row).
+tracks later mapping changes. A transfer pair is carried across rather than re-paired (pairing
+is a whole-file question), unless the patch breaks it.
 
 **The corrected rows are the only rows the hook builds eagerly**, and there are only ever a
 handful — the user corrects rows, not files. Everything the screen needs about the rest of the
@@ -621,12 +608,12 @@ server-side and online-only because OAuth tokens and provider APIs cannot live i
 our own export, an Arabic windows-1256 file with a 4-line preamble and a debit/credit pair, UK
 `DD/MM` with Paid in/out, US `MM/DD` signed, European `;` with `1.234,56`, tab and pipe
 dialects with commas inside descriptions, mixed-currency with **JPY (0 dp)** and **KWD (3 dp)**,
-`Amount` + `DR/CR`, a deliberately messy file (ragged, quoted newline, blank line, a duplicate
-pair, `N/A`, a future date), genuinely ambiguous dates, UTF-8 BOM, UTF-16LE BOM, and a Money
+`Amount` + `DR/CR`, a deliberately messy file (ragged, quoted newline, blank line, a repeated
+row, `N/A`, a future date), genuinely ambiguous dates, UTF-8 BOM, UTF-16LE BOM, and a Money
 Lover export with a same-day pair, a pair a day apart, a lone side named by its note, a lone side
 naming nothing and a balance adjustment (`data/__fixtures__/moneyLover.ts` maps it the way a user
 would, for the pairing, commit and undo tests). They are the
-regression suite for detection, role suggestion, amount parsing and dedupe at once — add a new
+regression suite for detection, role suggestion and amount parsing at once — add a new
 bank shape here before fixing it anywhere else. `__fixtures__/useStubImport.ts` is a working
 stand-in for the spine (the same pass and the same lazy reader, run synchronously) for
 component tests; it defaults to a freshly seeded account's catalog (`defaultCategoryRows()`,
@@ -642,12 +629,12 @@ category; a gone default), `api/types.test.ts` (the shape check per version),
 
 Five suites guard the laziness, and they guard a **shape**, not a speed:
 `data/rowScan.test.ts` (the pass says exactly what a pass over every built row would have
-said — counts, order, marks, issue counts), `hooks/useCsvImport.cost.test.ts` (passes and rows
+said — counts, order, issue counts), `hooks/useCsvImport.cost.test.ts` (passes and rows
 built per user action at 5 000 rows, and a background pull that changed nothing costing none),
 `hooks/useValueMapping.cost.test.ts` (rows walked and matcher calls per answer in step ③),
 `components/ReviewStep.lazy.test.tsx` (rows built per paint, per scroll and per filter change)
 and `hooks/useReviewRows.test.ts` (an exclusion and a patch surviving a mapping change, the
-duplicate toggle, the filter-scoped header checkbox).
+filter-scoped header checkbox).
 
 ## What the wizard costs
 
@@ -712,7 +699,7 @@ endpoints — see [data-layer-and-sync.md](data-layer-and-sync.md).
   compositor, so neither can be closed in the test environment — the pass **counts** are
   environment-independent, the milliseconds are not, which is why the step-③ figures above were
   taken from a browser instead.
-- **The pass itself is still ~36 µs a row** (validate + fingerprint + the merchant matcher).
+- **The pass itself is still ~36 µs a row** (validate + the merchant matcher).
   Nothing has been done about that; at 50 000 rows it is ~1.8 s of chunked, yielding work, and
   it is the next thing worth profiling if a long file still feels slow.
 - **An error row is not "skipped".** `skipReason` has copy for it, but only rows whose

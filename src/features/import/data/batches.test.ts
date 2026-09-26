@@ -4,7 +4,6 @@ import { db } from '#/db/db'
 import { buildRows } from './csv/rows'
 import { testContext, testMapping } from './__fixtures__/mapping'
 import { moneyLover } from './__fixtures__/moneyLover'
-import { emptyDedupeIndex } from './dedupe'
 import { rowReader, scanRowsSync } from './rowScan'
 
 const schedulePush = vi.fn()
@@ -20,7 +19,6 @@ const meta = {
   label: 'statement.csv',
   templateId: null,
   rowCount: 4,
-  skippedDuplicates: 0,
   errorCount: 0,
 }
 
@@ -162,7 +160,6 @@ describe('undoImport — transfers', () => {
       mapping,
       context,
       merchants: { merchants: [], aliases: [] },
-      ledger: emptyDedupeIndex(),
     })
     const reader = rowReader({
       matrix: file,

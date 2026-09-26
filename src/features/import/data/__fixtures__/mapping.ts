@@ -3,7 +3,7 @@ import {
   defaultCatalog,
 } from '#/features/categories/__fixtures__/categories'
 import { categoryTypesOf } from '../mapping'
-import { DEFAULT_DEDUPE, emptyAliases } from '../types'
+import { emptyAliases } from '../types'
 import type { Dialect, Mapping, RowContext, RowFacts } from '../types'
 
 /** Builders for the mapping-shaped objects every pure-layer test needs. Test asset only. */
@@ -33,7 +33,6 @@ export const testMapping = (overrides: Partial<Mapping> = {}): Mapping => ({
     categoryIds: { spend: catId('other'), income: catId('other_income') },
   },
   aliases: emptyAliases(),
-  dedupe: DEFAULT_DEDUPE,
   ...overrides,
 })
 

@@ -5,7 +5,6 @@ import { useIsDesktop } from '#/hooks/useMediaQuery'
 import { planLabel } from '#/features/import/data/importCounts'
 import { categoryTargetGroups } from '#/features/import/data/values'
 import { pendingCategoryId } from '#/features/import/data/types'
-import { useDuplicateTargets } from '#/features/import/hooks/useDuplicateTargets'
 import { useVirtualRows } from '#/hooks/useVirtualRows'
 import { formatDate, parseISODate } from '#/lib/date'
 import { usePreferencesStore } from '#/stores/preferences'
@@ -40,8 +39,6 @@ const PAGE_STEP = 8
 
 const CARD =
   'flex flex-col overflow-hidden rounded-2xl border border-fp-border bg-fp-surface shadow-fp'
-
-const NO_IDS: string[] = []
 
 const walletGroupsFor = (
   walletGroups: CsvImport['walletGroups'],
@@ -92,9 +89,6 @@ const categoryGroupsFor = (
 export function ReviewStep({ csv, draft, review, onBack, onCommit }: Props) {
   const isDesktop = useIsDesktop()
   const dateFormat = usePreferencesStore((s) => s.dateFormat)
-  const nameDuplicate = useDuplicateTargets(
-    csv.scan.result?.duplicateIds ?? NO_IDS,
-  )
   const [editing, setEditing] = useState<ParsedRow | null>(null)
   const [cursor, setCursor] = useState(0)
 
@@ -141,7 +135,6 @@ export function ReviewStep({ csv, draft, review, onBack, onCommit }: Props) {
         const parsed = parseISODate(iso)
         return parsed === null ? iso : formatDate(parsed, dateFormat)
       },
-      transaction: nameDuplicate,
     }
   }, [
     walletGroups,
@@ -149,7 +142,6 @@ export function ReviewStep({ csv, draft, review, onBack, onCommit }: Props) {
     csv.merchantIndex,
     draft.aliases.merchants,
     dateFormat,
-    nameDuplicate,
   ])
 
   useEffect(() => {
@@ -226,8 +218,6 @@ export function ReviewStep({ csv, draft, review, onBack, onCommit }: Props) {
             plan={review.plan}
             filter={review.filter}
             onFilter={review.setFilter}
-            skipDuplicates={review.skipDuplicates}
-            onSkipDuplicates={review.setSkipDuplicates}
           />
 
           <section className={CARD}>

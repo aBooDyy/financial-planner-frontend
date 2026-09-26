@@ -1,4 +1,4 @@
-import { stripReference } from './dedupe'
+import { stripReference } from './reference'
 import { minorToInputValue, parseAmountToMinor } from '#/lib/currency'
 import type { RowPatch } from './rowEdits'
 import type { MappingDefaults, ParsedRow, RowIntent } from './types'

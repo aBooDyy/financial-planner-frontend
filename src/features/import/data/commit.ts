@@ -41,7 +41,6 @@ export type CommitMeta = {
   templateId: string | null
   /** Rows the file held, against the rows actually written. */
   rowCount: number
-  skippedDuplicates: number
   errorCount: number
 }
 
@@ -376,7 +375,6 @@ export async function commitImport(
     rowCount: meta.rowCount,
     importedCount: imported,
     transferCount: transferred,
-    skippedDuplicates: meta.skippedDuplicates,
     errorCount: meta.errorCount,
     walletIds: [...walletIds],
     createdAt: new Date().toISOString(),

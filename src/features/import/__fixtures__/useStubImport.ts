@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import { buildCatalog } from '#/features/categories/data/catalog'
 import { defaultCategoryRows } from '#/features/categories/__fixtures__/categories'
-import { buildDedupeIndex } from '#/features/import/data/dedupe'
 import {
   categoryTypesOf,
   draftForFile,
@@ -11,7 +10,6 @@ import {
 import { categoryOptions } from '#/features/import/data/matching'
 import { rowReader, scanRowsSync } from '#/features/import/data/rowScan'
 import type { LocalCategory } from '#/db/types'
-import type { LedgerTransaction } from '#/features/import/data/dedupe'
 import type { MappingDraft } from '#/features/import/data/mapping'
 import type { MerchantIndex } from '#/features/merchants/data/matching'
 import type { WalletGroupOption } from '#/features/wallets/data/selectors'
@@ -45,7 +43,6 @@ export type StubSeed = {
   /** The user's own category rows; absent means a freshly seeded account's. */
   categoryRows?: LocalCategory[]
   merchantIndex?: MerchantIndex
-  ledger?: LedgerTransaction[]
   today?: string
   baseCurrency?: CurrencyCode
   amend?: (draft: MappingDraft) => MappingDraft
@@ -106,11 +103,6 @@ export function useStubImport(seed: StubSeed): CsvImport {
 
   const mapping = useMemo(() => toMapping(draft), [draft])
 
-  const ledgerIndex = useMemo(
-    () => buildDedupeIndex(seed.ledger ?? []),
-    [seed.ledger],
-  )
-
   const scan = useMemo(
     () =>
       mapping === null
@@ -120,9 +112,8 @@ export function useStubImport(seed: StubSeed): CsvImport {
             mapping,
             context,
             merchants: merchantIndex,
-            ledger: ledgerIndex,
           }),
-    [mapping, seed.matrix, context, merchantIndex, ledgerIndex],
+    [mapping, seed.matrix, context, merchantIndex],
   )
 
   const reader = useMemo(
@@ -134,7 +125,6 @@ export function useStubImport(seed: StubSeed): CsvImport {
             mapping,
             context,
             merchants: merchantIndex,
-            duplicates: scan?.duplicates,
             pairs: scan?.pairs,
           }),
     [mapping, seed.matrix, context, merchantIndex, scan],

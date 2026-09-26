@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { testDialect } from '#/features/import/data/__fixtures__/mapping'
 import { configFromDraft } from '#/features/import/data/templates'
 import {
-  DEFAULT_DEDUPE,
   emptyAliases,
   isConfigV1,
 } from '#/features/import/data/types'
@@ -24,7 +23,6 @@ const draft: MappingDraft = {
     categoryIds: { spend: 'cat-other', income: 'cat-other_income' },
   },
   aliases: emptyAliases(),
-  dedupe: DEFAULT_DEDUPE,
 }
 
 const v2 = () => configFromDraft(draft)

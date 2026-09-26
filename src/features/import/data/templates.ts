@@ -123,7 +123,6 @@ export const configFromDraft = (draft: MappingDraft): ImportTemplateConfig => ({
     categoryIds: { ...draft.defaults.categoryIds },
   },
   aliases: settledAliases(draft.aliases),
-  dedupe: { ...draft.dedupe },
 })
 
 /**
@@ -396,7 +395,6 @@ export const applyTemplateConfig = (
         types: { ...config.aliases.types },
         currencies: { ...config.aliases.currencies },
       },
-      dedupe: { strategy: config.dedupe.strategy },
     },
     unknown,
   }

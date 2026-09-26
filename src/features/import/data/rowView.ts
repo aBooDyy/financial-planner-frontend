@@ -1,7 +1,7 @@
 import { ADJUSTMENT_LABEL } from '#/features/transactions/data/selectors'
 import { messageForCode } from '#/lib/errorMessages'
 import { formatMoney } from '#/lib/currency'
-import { stripReference } from './dedupe'
+import { stripReference } from './reference'
 import { statusOf } from './review'
 import type { RowStatus } from './review'
 import type { ParsedRow, RowIssue, RowIssueField } from './types'
@@ -16,8 +16,6 @@ export type RowLabels = {
   category: (id: string) => string
   merchant: (id: string | null) => string | null
   date: (iso: string) => string
-  /** Names the ledger row a duplicate repeats, when it can be found. */
-  transaction: (id: string) => string | null
 }
 
 /** How the amount reads: money earned, money spent, or money only moving (never a total). */
@@ -33,8 +31,6 @@ export type RowView = {
   wallet: string
   /** The one-line reason the row is not simply ready. */
   reason: string | null
-  /** What the duplicate `ⓘ` says, when this row repeats something. */
-  duplicate: string | null
 }
 
 const MISSING = '—'
@@ -55,19 +51,6 @@ const issueText = (issue: RowIssue, line: number): string => {
   const detail = quoted(issue.detail ?? null)
   const message = messageForCode(issue.code)
   return `Line ${line} · ${detail === null ? message : `${message} ${detail}`}`
-}
-
-const duplicateText = (row: ParsedRow, labels: RowLabels): string | null => {
-  if (row.duplicateOf !== null) {
-    const named = labels.transaction(row.duplicateOf)
-    return named === null
-      ? 'Already in Means — a transaction you already have matches this row.'
-      : `Already in Means — matches ${named}.`
-  }
-  if (row.duplicateOfIndex !== null) {
-    return `Repeats an earlier row of this file (row ${row.duplicateOfIndex + 1}).`
-  }
-  return null
 }
 
 /** What sits in the category column: the category, or what the row is instead of one. */
@@ -94,7 +77,6 @@ export const describeRow = (row: ParsedRow, labels: RowLabels): RowView => {
   const merchant = labels.merchant(draft?.merchantId ?? null)
   const note = stripReference(draft?.note ?? null)
   const issue = worstIssue(row.issues)
-  const duplicate = duplicateText(row, labels)
 
   return {
     status,
@@ -110,12 +92,6 @@ export const describeRow = (row: ParsedRow, labels: RowLabels): RowView => {
     tone: toneOf(row),
     category: categoryText(row, labels),
     wallet: labels.wallet(draft?.walletId ?? null),
-    reason:
-      status === 'duplicate'
-        ? duplicate
-        : issue === null
-          ? null
-          : issueText(issue, row.line),
-    duplicate,
+    reason: issue === null ? null : issueText(issue, row.line),
   }
 }

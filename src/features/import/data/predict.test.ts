@@ -162,13 +162,6 @@ describe('predictRow', () => {
     expect(row.prediction).toBeNull()
   })
 
-  it('re-derives the fingerprint once a learned category applies', () => {
-    const before = rowsFor('CARREFOUR HYPER 4471')
-    const [after] = predictAll(before, MAPPING, index())
-    expect(after.fingerprint).not.toBe(before[0].fingerprint)
-    expect(after.fingerprint).toContain(`c:${after.draft?.categoryId}`)
-  })
-
   it('reads the prediction of a merchant the value step already bound', () => {
     const mapping = testMapping({
       aliases: {

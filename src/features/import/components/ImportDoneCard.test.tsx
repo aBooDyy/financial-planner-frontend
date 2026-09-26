@@ -19,7 +19,6 @@ const BATCH: LocalImportBatch = {
   templateId: null,
   rowCount: 3,
   importedCount: 2,
-  skippedDuplicates: 1,
   errorCount: 0,
   walletIds: ['w1'],
   createdAt: '2026-09-01T00:00:00Z',
@@ -55,7 +54,6 @@ describe('ImportDoneCard', () => {
     renderCard()
 
     expect(screen.getByText('2 transactions imported into Main.')).toBeDefined()
-    expect(screen.getByText('1 duplicates skipped')).toBeDefined()
     expect(
       screen.getByRole('button', { name: 'Undo this import' }),
     ).toBeDefined()

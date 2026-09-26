@@ -550,8 +550,7 @@ fake-indexeddb (both legs + one entry, coalescing, lone-leg PATCH, id-taken, 404
 
 Transactions arrive from four places besides the editor, each marked by its `source`. Only the
 CSV import produces transfer legs and balance adjustments (a file's own transfer and adjustment
-rows — [import.md](import.md#transfers-and-balance-adjustments-in-a-file)); its dedupe index files
-existing legs and adjustments by direction on their own wallet:
+rows — [import.md](import.md#transfers-and-balance-adjustments-in-a-file)):
 `recurring:<id>:<date>` (an auto-posted schedule, above), `email:<connection_id>` / `webhook:<key_id>` (a
 confirmed or auto-confirmed inbound import — [inbound-imports.md](inbound-imports.md)) and
 `csv:<batchId>` (a file import —

@@ -452,7 +452,6 @@ export type LocalImportBatch = {
   importedCount: number
   /** Transfers written, one per pair of legs. Absent on batches older than transfer import. */
   transferCount?: number
-  skippedDuplicates: number
   errorCount: number
   walletIds: string[]
   createdAt: string

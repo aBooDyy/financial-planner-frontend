@@ -157,12 +157,6 @@ export const emptyAliases = (): Aliases => ({
   currencies: {},
 })
 
-export type DedupeStrategy = 'reference' | 'fingerprint' | 'off'
-
-export type DedupeSettings = { strategy: DedupeStrategy }
-
-export const DEFAULT_DEDUPE: DedupeSettings = { strategy: 'fingerprint' }
-
 export type MappingDefaults = {
   walletId: string | null
   currency: CurrencyCode
@@ -184,7 +178,6 @@ export type Mapping = {
   amountUnit: AmountUnit
   defaults: MappingDefaults
   aliases: Aliases
-  dedupe: DedupeSettings
 }
 
 /**
@@ -211,7 +204,6 @@ export type ImportTemplateConfig = {
   amountUnit: AmountUnit
   defaults: MappingDefaults
   aliases: Aliases
-  dedupe: DedupeSettings
 }
 
 /** How a version-1 template named a category: its root's slug, plus a child's slug. */
@@ -370,13 +362,8 @@ export type ParsedRow = {
   /** Set exactly for a `transfer` row. */
   transfer: RowTransfer | null
   issues: RowIssue[]
-  /** An existing ledger transaction this row repeats. */
-  duplicateOf: string | null
-  /** An earlier row of this same file this row repeats. */
-  duplicateOfIndex: number | null
-  fingerprint: string
   reference: string | null
-  /** Excluded from the commit — by the user, by a skip mapping, or as a duplicate. */
+  /** Excluded from the commit — by the user or by a skip mapping. */
   excluded: boolean
   prediction: RowPrediction | null
 }

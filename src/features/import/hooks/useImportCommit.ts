@@ -79,7 +79,6 @@ export function useImportCommit(
           label: file?.name ?? 'Imported file',
           templateId: templateId === ONE_TIME_TEMPLATE ? null : templateId,
           rowCount: review.counts.total,
-          skippedDuplicates: review.excludedDuplicates,
           errorCount: review.counts.error,
         },
         (done, total) => setState({ status: 'running', done, total }),

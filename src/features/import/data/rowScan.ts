@@ -1,6 +1,5 @@
 import { buildRow } from './csv/rows'
 import { CSV_FILE_ERRORS, CsvFileError } from './csv/errors'
-import { emptySeen, markRow, withDuplicate } from './dedupe'
 import {
   candidateOf,
   pairTransfers,
@@ -10,7 +9,6 @@ import {
 import { merchantLookup, predictRow } from './predict'
 import { RANKED_STATUS, STATUS_RANK, statusOf } from './review'
 import type { MerchantIndex } from '#/features/merchants/data/matching'
-import type { DedupeIndex, DuplicateMark, SeenRows } from './dedupe'
 import type { PairCandidate, TransferLookup, TransferPair } from './pairing'
 import type { MerchantLookup } from './predict'
 import type { ReviewCounts, RowStatus } from './review'
@@ -21,14 +19,12 @@ import type { Mapping, ParsedRow, RowContext, RowIssueCode } from './types'
  *
  * A `ParsedRow` costs roughly a kilobyte; a file has tens of thousands of rows and a screen
  * holds thirty. So the pass keeps **only what a whole-file question needs** — a status byte
- * per row, the order the table shows them in, and a mark for the few rows that repeat
- * something — and every row the user actually looks at is built from the raw matrix on the
- * way to the screen.
+ * per row and the order the table shows them in — and every row the user actually looks at is
+ * built from the raw matrix on the way to the screen.
  *
- * The pass runs in the plan's order: read the row → predict its merchant → check it for
- * duplicates. That order is load-bearing, because binding a merchant changes a row's
- * fingerprint. Transfer rows ask the one question a row cannot answer alone — whether the
- * file holds their other side — so they are held back and settled once the last row is read.
+ * Each row is read, then its merchant predicted. Transfer rows ask the one question a row
+ * cannot answer alone — whether the file holds their other side — so they are held back and
+ * settled once the last row is read.
  */
 
 /** How many rows each issue touches — the whole-file warning line under step ②'s table. */
@@ -47,10 +43,6 @@ export type RowScan = {
   flags: Uint8Array
   /** File rows in the order the table shows them: attention first, then the file's own. */
   order: Int32Array
-  /** Only the rows that repeat something — a statement repeats a handful, not itself. */
-  duplicates: ReadonlyMap<number, DuplicateMark>
-  /** The ledger rows those marks point at, deduped: what the duplicate ⓘ has to name. */
-  duplicateIds: string[]
   /** Both sides of every transfer the file holds whole, each keyed by its own row. */
   pairs: ReadonlyMap<number, TransferPair>
   counts: ReviewCounts
@@ -62,7 +54,6 @@ export type ScanInput = {
   mapping: Mapping
   context: RowContext
   merchants: MerchantIndex
-  ledger: DedupeIndex
 }
 
 export type ScanOptions = {
@@ -85,39 +76,30 @@ export const skippedAt = (scan: RowScan, index: number): boolean =>
 export const transferAt = (scan: RowScan, index: number): boolean =>
   (scan.flags[index] & TRANSFER) !== 0
 
-export const EMPTY_MARKS: ReadonlyMap<number, DuplicateMark> = new Map()
-
 export const EMPTY_PAIRS: ReadonlyMap<number, TransferPair> = new Map()
 
 // --- The pass -------------------------------------------------------------------------
 
 type Pass = {
   flags: Uint8Array
-  duplicates: Map<number, DuplicateMark>
-  ids: Set<string>
   counts: ReviewCounts
   issues: Map<RowIssueCode, IssueCount>
-  seen: SeenRows
   merchants: MerchantLookup
   transfers: TransferLookup
   candidates: PairCandidate[]
-  /** Transfer rows waiting on the whole file, with the duplicate mark each already has. */
-  held: Map<number, { row: ParsedRow; mark: DuplicateMark | null }>
+  /** Transfer rows waiting on the whole file. */
+  held: Map<number, ParsedRow>
 }
 
 const startPass = (input: ScanInput): Pass => ({
   flags: new Uint8Array(input.matrix.length),
-  duplicates: new Map(),
-  ids: new Set(),
   counts: {
     total: input.matrix.length,
     ok: 0,
     warning: 0,
     error: 0,
-    duplicate: 0,
   },
   issues: new Map(),
-  seen: emptySeen(),
   merchants: merchantLookup(input.merchants),
   transfers: transferLookupOf(input.mapping, input.context),
   candidates: [],
@@ -140,17 +122,8 @@ const countIssues = (pass: Pass, row: ParsedRow): void => {
   }
 }
 
-const record = (
-  pass: Pass,
-  index: number,
-  row: ParsedRow,
-  mark: DuplicateMark | null,
-): void => {
-  const status: RowStatus = mark === null ? statusOf(row) : 'duplicate'
-  if (mark !== null) {
-    pass.duplicates.set(index, mark)
-    if (mark.ledgerId !== null) pass.ids.add(mark.ledgerId)
-  }
+const record = (pass: Pass, index: number, row: ParsedRow): void => {
+  const status: RowStatus = statusOf(row)
   pass.flags[index] =
     STATUS_RANK[status] |
     (row.excluded ? SKIPPED : 0) |
@@ -165,7 +138,7 @@ const scanInto = (
   start: number,
   end: number,
 ): void => {
-  const { matrix, mapping, context, ledger } = input
+  const { matrix, mapping, context } = input
   for (let index = start; index < end; index += 1) {
     const row = predictRow(
       buildRow(matrix[index], index, mapping, context),
@@ -173,13 +146,12 @@ const scanInto = (
       pass.merchants,
       context.categoryTypes,
     )
-    const mark = markRow(row, ledger, pass.seen, mapping.dedupe)
     const candidate = candidateOf(row)
     if (candidate === null) {
-      record(pass, index, settleTransfer(row, undefined, pass.transfers), mark)
+      record(pass, index, settleTransfer(row, undefined, pass.transfers))
     } else {
       pass.candidates.push(candidate)
-      pass.held.set(index, { row, mark })
+      pass.held.set(index, row)
     }
   }
 }
@@ -187,21 +159,16 @@ const scanInto = (
 /** The held transfer rows, settled now that the whole file has been read. */
 const settleHeld = (pass: Pass): Map<number, TransferPair> => {
   const pairs = pairTransfers(pass.candidates)
-  for (const [index, { row, mark }] of pass.held) {
-    record(
-      pass,
-      index,
-      settleTransfer(row, pairs.get(index), pass.transfers),
-      mark,
-    )
+  for (const [index, row] of pass.held) {
+    record(pass, index, settleTransfer(row, pairs.get(index), pass.transfers))
   }
   return pairs
 }
 
-/** The table's order, as a counting sort over the four ranks — stable by construction. */
+/** The table's order, as a counting sort over the ranks — stable by construction. */
 const orderOf = (flags: Uint8Array, counts: ReviewCounts): Int32Array => {
   const order = new Int32Array(flags.length)
-  const at = [0, 0, 0, 0]
+  const at = RANKED_STATUS.map(() => 0)
   let running = 0
   for (let rank = 0; rank < RANKED_STATUS.length; rank += 1) {
     at[rank] = running
@@ -221,8 +188,6 @@ const finish = (pass: Pass): RowScan => {
     total: pass.flags.length,
     flags: pass.flags,
     order: orderOf(pass.flags, pass.counts),
-    duplicates: pass.duplicates,
-    duplicateIds: [...pass.ids].sort(),
     pairs,
     counts: pass.counts,
     issues: [...pass.issues.values()].sort(
@@ -278,8 +243,6 @@ export type RowReaderInput = {
   mapping: Mapping
   context: RowContext
   merchants: MerchantIndex
-  /** The marks the pass found. Without them a row cannot know what it repeats. */
-  duplicates?: ReadonlyMap<number, DuplicateMark>
   /** The transfers it paired. Without them every transfer row reads as having no partner. */
   pairs?: ReadonlyMap<number, TransferPair>
 }
@@ -298,24 +261,20 @@ const NO_CELLS: ReadonlyArray<string> = []
 export const rowReader = (input: RowReaderInput): RowReader => {
   const merchants = merchantLookup(input.merchants)
   const transfers = transferLookupOf(input.mapping, input.context)
-  const duplicates = input.duplicates ?? EMPTY_MARKS
   const pairs = input.pairs ?? EMPTY_PAIRS
   return {
     at: (index) =>
       settleTransfer(
-        withDuplicate(
-          predictRow(
-            buildRow(
-              input.matrix[index] ?? NO_CELLS,
-              index,
-              input.mapping,
-              input.context,
-            ),
+        predictRow(
+          buildRow(
+            input.matrix[index] ?? NO_CELLS,
+            index,
             input.mapping,
-            merchants,
-            input.context.categoryTypes,
+            input.context,
           ),
-          duplicates.get(index),
+          input.mapping,
+          merchants,
+          input.context.categoryTypes,
         ),
         pairs.get(index),
         transfers,

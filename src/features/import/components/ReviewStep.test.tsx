@@ -7,7 +7,6 @@ import { useReviewRows } from '#/features/import/hooks/useReviewRows'
 import { emptyAliases } from '#/features/import/data/types'
 import { ReviewStep } from './ReviewStep'
 import type { StubSeed } from '#/features/import/__fixtures__/useStubImport'
-import type { LedgerTransaction } from '#/features/import/data/dedupe'
 
 const HEADERS = ['Date', 'Description', 'Amount', 'Account', 'Category']
 
@@ -17,19 +16,6 @@ const MATRIX = [
   ['2026-08-04', 'ATM WITHDRAWAL', '-500.00', 'Main', 'Groceries'],
   ['2026-08-05', 'CORNER SHOP', '-34.00', 'Main', ''],
   ['2026-08-06', 'REFUND', 'N/A', 'Main', 'Groceries'],
-]
-
-const LEDGER: LedgerTransaction[] = [
-  {
-    id: 't-atm',
-    date: '2026-08-04',
-    type: 'spend',
-    amount: 50000,
-    currency: 'SAR',
-    walletId: 'w1',
-    categoryId: 'cat-groceries',
-    note: 'ATM WITHDRAWAL',
-  },
 ]
 
 const WALLETS = [{ label: null, wallets: [{ id: 'w1', name: 'Main' }] }]
@@ -74,7 +60,6 @@ const renderStep = (seed: Partial<StubSeed> & { onCommit?: () => void } = {}) =>
       matrix={MATRIX}
       walletGroups={WALLETS}
       walletCurrencies={{ w1: 'SAR' }}
-      ledger={LEDGER}
       amend={(draft) => ({ ...draft, aliases: ANSWERED() })}
       {...seed}
     />,
@@ -131,10 +116,10 @@ describe('ReviewStep', () => {
 
     expect(
       screen.getByText(
-        /5 rows · ✅ 2 ready · ⚠ 1 warnings · ⛔ 1 errors · ⧉ 1 duplicates/,
+        /5 rows · ✅ 3 ready · ⚠ 1 warnings · ⛔ 1 errors/,
       ),
     ).toBeDefined()
-    expect(commitButton().textContent).toContain('Import 3 transactions')
+    expect(commitButton().textContent).toContain('Import 4 transactions')
   })
 
   it('filters the visible rows and scopes the header checkbox to them', () => {
@@ -147,15 +132,15 @@ describe('ReviewStep', () => {
     expect(screen.getAllByRole('row')).toHaveLength(1)
     fireEvent.click(screen.getByLabelText('Include every row shown'))
 
-    // Only the warning row left the commit; the two ready rows are untouched.
-    expect(commitButton().textContent).toContain('Import 2 transactions')
+    // Only the warning row left the commit; the ready rows are untouched.
+    expect(commitButton().textContent).toContain('Import 3 transactions')
   })
 
   it('excluding a row decrements the count', () => {
     renderStep()
 
     fireEvent.click(screen.getByLabelText('Include row 1'))
-    expect(commitButton().textContent).toContain('Import 2 transactions')
+    expect(commitButton().textContent).toContain('Import 3 transactions')
   })
 
   it('fixing an error row flips it to ready and counts it', () => {
@@ -165,28 +150,16 @@ describe('ReviewStep', () => {
     fireEvent.click(screen.getByRole('button', { name: 'fix the refund' }))
 
     expect(
-      screen.getByText(/✅ 3 ready · ⚠ 1 warnings · ⛔ 0 errors/),
+      screen.getByText(/✅ 4 ready · ⚠ 1 warnings · ⛔ 0 errors/),
     ).toBeDefined()
-    expect(commitButton().textContent).toContain('Import 4 transactions')
+    expect(commitButton().textContent).toContain('Import 5 transactions')
   })
 
-  it('skips duplicates by default and restores them when turned off', () => {
+  it('has no duplicate status or toggle: the file imports as it is', () => {
     renderStep()
 
-    const toggle = screen.getByLabelText('Skip duplicates')
-    expect(toggle.getAttribute('data-state')).toBe('checked')
-    expect(commitButton().textContent).toContain('Import 3 transactions')
-
-    fireEvent.click(toggle)
-    expect(commitButton().textContent).toContain('Import 4 transactions')
-  })
-
-  it('names what a duplicate matched', () => {
-    renderStep()
-
-    fireEvent.click(screen.getByRole('radio', { name: /Duplicates/ }))
-    expect(screen.getAllByRole('row')).toHaveLength(1)
-    expect(screen.getByText(/Already in Means/)).toBeDefined()
+    expect(screen.queryByText(/duplicate/i)).toBeNull()
+    expect(screen.queryByLabelText('Skip duplicates')).toBeNull()
   })
 
   it('hands the commit exactly the rows the table counted', () => {
@@ -205,7 +178,6 @@ describe('ReviewStep', () => {
         matrix={MATRIX}
         walletGroups={WALLETS}
         walletCurrencies={{ w1: 'SAR' }}
-        ledger={LEDGER}
         amend={(draft) => ({ ...draft, aliases: ANSWERED() })}
       />
     )
@@ -242,7 +214,7 @@ describe('ReviewStep', () => {
       'Groceries',
     ])
 
-    renderStep({ matrix, ledger: [] })
+    renderStep({ matrix })
 
     expect(commitButton().textContent).toContain('Import 10,000 transactions')
     expect(screen.getAllByRole('row').length).toBeLessThan(40)

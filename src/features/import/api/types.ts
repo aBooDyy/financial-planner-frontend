@@ -103,7 +103,6 @@ const hasShape = (value: Record<string, unknown>): boolean => {
     Array.isArray(value.roles) &&
     isRecord(value.defaults) &&
     hasDefaultCategory(value.version, value.defaults) &&
-    isRecord(value.dedupe) &&
     isRecord(aliases) &&
     isRecord(aliases.wallets) &&
     isRecord(aliases.categories) &&

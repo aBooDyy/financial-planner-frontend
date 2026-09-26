@@ -15,7 +15,6 @@ import {
   withCreatedCategories,
 } from './templates'
 import {
-  DEFAULT_DEDUPE,
   TEMPLATE_CONFIG_VERSION,
   emptyAliases,
   pendingCategoryId,
@@ -51,7 +50,6 @@ const draft = (overrides: Partial<MappingDraft> = {}): MappingDraft => ({
     categoryIds: { spend: catId('other'), income: catId('other_income') },
   },
   aliases: emptyAliases(),
-  dedupe: DEFAULT_DEDUPE,
   ...overrides,
 })
 

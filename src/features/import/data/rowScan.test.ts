@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { catId } from '#/features/categories/__fixtures__/categories'
 import { testContext, testMapping } from './__fixtures__/mapping'
 import { loadFixture } from './csv/__fixtures__/fixtures'
 import { readCsv } from './csv/read'
 import { buildRows } from './csv/rows'
-import { buildDedupeIndex, emptySeen, markRow, withDuplicate } from './dedupe'
 import { merchantLookup, predictRow } from './predict'
 import { countStatuses, reviewOrder, statusOf } from './review'
 import {
@@ -17,7 +15,6 @@ import {
 import { ROW_ISSUES } from './types'
 import { moneyLover } from './__fixtures__/moneyLover'
 import type { MerchantIndex } from '#/features/merchants/data/matching'
-import type { LedgerTransaction } from './dedupe'
 import type { Mapping } from './types'
 
 const LIMITS = { maxRows: 50_000, maxBytes: 10 * 1024 * 1024 }
@@ -35,56 +32,31 @@ const MAPPING = testMapping({
 const messyMatrix = () =>
   readCsv(loadFixture('messy.csv').bytes, { limits: LIMITS }).rows
 
-const LEDGER: LedgerTransaction[] = [
-  {
-    id: 'existing',
-    date: '2026-06-18',
-    type: 'spend',
-    amount: 450,
-    currency: 'SAR',
-    walletId: 'w1',
-    categoryId: catId('other'),
-    note: 'DUPLICATE COFFEE',
-  },
-]
-
-/** The pipeline as it used to run: build every row, predict over it, mark duplicates. */
+/** The pipeline as it used to run: build every row, then predict over it. */
 const theOldWay = (
   matrix: ReadonlyArray<ReadonlyArray<string>>,
   mapping: Mapping,
-  ledger: LedgerTransaction[],
 ) => {
   const merchants = merchantLookup(NO_MERCHANTS)
-  const index = buildDedupeIndex(ledger)
-  const seen = emptySeen()
   const context = testContext()
-  return buildRows(matrix, mapping, context)
-    .map((row) => predictRow(row, mapping, merchants, context.categoryTypes))
-    .map((row) =>
-      withDuplicate(
-        row,
-        markRow(row, index, seen, mapping.dedupe) ?? undefined,
-      ),
-    )
+  return buildRows(matrix, mapping, context).map((row) =>
+    predictRow(row, mapping, merchants, context.categoryTypes),
+  )
 }
 
-const scanOf = (
-  matrix: ReadonlyArray<ReadonlyArray<string>>,
-  ledger: LedgerTransaction[] = [],
-) =>
+const scanOf = (matrix: ReadonlyArray<ReadonlyArray<string>>) =>
   scanRowsSync({
     matrix,
     mapping: MAPPING,
     context: testContext(),
     merchants: NO_MERCHANTS,
-    ledger: buildDedupeIndex(ledger),
   })
 
 describe('scanRows', () => {
   it('says exactly what a pass over every built row would have said', () => {
     const matrix = messyMatrix()
-    const rows = theOldWay(matrix, MAPPING, LEDGER)
-    const scan = scanOf(matrix, LEDGER)
+    const rows = theOldWay(matrix, MAPPING)
+    const scan = scanOf(matrix)
 
     expect(scan.total).toBe(rows.length)
     expect(scan.counts).toEqual(countStatuses(rows))
@@ -94,28 +66,9 @@ describe('scanRows', () => {
     )
   })
 
-  it('keeps a mark only for the rows that repeat something', () => {
-    const matrix = messyMatrix()
-    const rows = theOldWay(matrix, MAPPING, LEDGER)
-    const scan = scanOf(matrix, LEDGER)
-
-    const marked = rows.filter(
-      (row) => row.duplicateOf !== null || row.duplicateOfIndex !== null,
-    )
-    expect(marked.length).toBeGreaterThan(0)
-    expect(scan.duplicates.size).toBe(marked.length)
-    for (const row of marked) {
-      expect(scan.duplicates.get(row.index)).toEqual({
-        ledgerId: row.duplicateOf,
-        earlierIndex: row.duplicateOfIndex,
-      })
-    }
-    expect(scan.duplicateIds).toEqual(['existing'])
-  })
-
   it('counts how many rows each issue touches, worst first', () => {
     const scan = scanOf(messyMatrix())
-    const rows = theOldWay(messyMatrix(), MAPPING, [])
+    const rows = theOldWay(messyMatrix(), MAPPING)
 
     for (const issue of scan.issues) {
       expect(issue.count).toBe(
@@ -135,7 +88,6 @@ describe('scanRows', () => {
         mapping: MAPPING,
         context: testContext(),
         merchants: NO_MERCHANTS,
-        ledger: buildDedupeIndex([]),
       },
       { chunkSize: 2, onProgress: (done) => seen.push(done) },
     )
@@ -152,7 +104,6 @@ describe('scanRows', () => {
           mapping: MAPPING,
           context: testContext(),
           merchants: NO_MERCHANTS,
-          ledger: buildDedupeIndex([]),
         },
         { chunkSize: 2, signal: controller.signal },
       ),
@@ -161,16 +112,14 @@ describe('scanRows', () => {
 })
 
 describe('rowReader', () => {
-  it('builds one row exactly as the pass saw it, marks and all', () => {
+  it('builds one row exactly as the pass saw it', () => {
     const matrix = messyMatrix()
-    const rows = theOldWay(matrix, MAPPING, LEDGER)
-    const scan = scanOf(matrix, LEDGER)
+    const rows = theOldWay(matrix, MAPPING)
     const reader = rowReader({
       matrix,
       mapping: MAPPING,
       context: testContext(),
       merchants: NO_MERCHANTS,
-      duplicates: scan.duplicates,
     })
 
     for (const row of rows) expect(reader.at(row.index)).toEqual(row)
@@ -184,14 +133,12 @@ describe('transfers in a Money Lover export', () => {
     mapping,
     context,
     merchants: NO_MERCHANTS,
-    ledger: buildDedupeIndex([]),
   })
   const reader = rowReader({
     matrix,
     mapping,
     context,
     merchants: NO_MERCHANTS,
-    duplicates: scan.duplicates,
     pairs: scan.pairs,
   })
 

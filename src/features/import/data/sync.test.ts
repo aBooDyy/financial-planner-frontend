@@ -4,7 +4,7 @@ import { db } from '#/db/db'
 import { ApiError } from '#/lib/apiError'
 import { testDialect } from './__fixtures__/mapping'
 import { configFromDraft } from './templates'
-import { DEFAULT_DEDUPE, emptyAliases } from './types'
+import { emptyAliases } from './types'
 import type { LocalImportTemplate, OutboxEntry } from '#/db/types'
 import type { ImportTemplateWire } from '#/features/import/api/types'
 import type { MappingDraft } from './mapping'
@@ -50,7 +50,6 @@ const draft: MappingDraft = {
     categoryIds: { spend: 'cat-other', income: 'cat-other_income' },
   },
   aliases: emptyAliases(),
-  dedupe: DEFAULT_DEDUPE,
 }
 
 const config = configFromDraft(draft)

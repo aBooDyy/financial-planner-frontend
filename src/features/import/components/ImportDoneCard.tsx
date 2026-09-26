@@ -51,9 +51,6 @@ export function ImportDoneCard({
   const undone = (useImportBatch(batch.id) ?? batch).undoneAt !== null
   const number = new Intl.NumberFormat()
   const notes: string[] = []
-  if (batch.skippedDuplicates > 0) {
-    notes.push(`${number.format(batch.skippedDuplicates)} duplicates skipped`)
-  }
   if (batch.errorCount > 0) {
     notes.push(
       `${number.format(batch.errorCount)} rows with errors were not imported`,

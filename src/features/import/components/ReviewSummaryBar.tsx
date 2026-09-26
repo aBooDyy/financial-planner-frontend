@@ -1,4 +1,3 @@
-import { Switch } from '#/components/ui/switch'
 import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
 import { planLabel } from '#/features/import/data/importCounts'
 import { REVIEW_FILTERS } from '#/features/import/data/review'
@@ -11,8 +10,6 @@ type Props = {
   plan: ImportPlan
   filter: ReviewFilter
   onFilter: (filter: ReviewFilter) => void
-  skipDuplicates: boolean
-  onSkipDuplicates: (skip: boolean) => void
 }
 
 /** Glyph + word, never colour alone — the same pairing the rows use. */
@@ -23,7 +20,6 @@ const FILTERS: Readonly<
   ok: { glyph: '✅', label: 'Ready' },
   warning: { glyph: '⚠', label: 'Warnings' },
   error: { glyph: '⛔', label: 'Errors' },
-  duplicate: { glyph: '⧉', label: 'Duplicates' },
 }
 
 const countOf = (counts: ReviewCounts, filter: ReviewFilter): number =>
@@ -38,8 +34,6 @@ export function ReviewSummaryBar({
   plan,
   filter,
   onFilter,
-  skipDuplicates,
-  onSkipDuplicates,
 }: Props) {
   const number = new Intl.NumberFormat()
 
@@ -48,8 +42,7 @@ export function ReviewSummaryBar({
       <p aria-live="polite" className="text-[13px] text-fp-text-2">
         {number.format(counts.total)} rows · ✅ {number.format(counts.ok)} ready
         · ⚠ {number.format(counts.warning)} warnings · ⛔{' '}
-        {number.format(counts.error)} errors · ⧉{' '}
-        {number.format(counts.duplicate)} duplicates
+        {number.format(counts.error)} errors
       </p>
       {plan.transfers > 0 ? (
         <p className="text-[12.5px] text-fp-text-3">
@@ -81,15 +74,6 @@ export function ReviewSummaryBar({
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
-
-        <label className="ms-auto flex cursor-pointer items-center gap-2 text-[12.5px] font-semibold text-fp-text-2">
-          <Switch
-            checked={skipDuplicates}
-            onCheckedChange={onSkipDuplicates}
-            aria-label="Skip duplicates"
-          />
-          <span aria-hidden>⧉</span> Skip duplicates
-        </label>
       </div>
     </div>
   )

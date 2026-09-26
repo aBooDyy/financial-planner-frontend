@@ -1,5 +1,5 @@
 import { decimalsFor } from '#/lib/currency'
-import { fingerprintOf, withReference } from '../dedupe'
+import { withReference } from '../reference'
 import { matchCurrency, matchType, normalizeKey } from '../matching'
 import {
   ROW_ISSUES,
@@ -27,8 +27,8 @@ import type {
 
 /**
  * Raw cells + a mapping → the rows the review step shows. Everything a row says is read
- * here; whether that makes it committable is `validate.ts`'s call, and duplicate detection
- * and merchant prediction are later passes over the result.
+ * here; whether that makes it committable is `validate.ts`'s call, and merchant prediction
+ * is a later pass over the result.
  */
 
 const other = (type: TxType): TxType => (type === 'spend' ? 'income' : 'spend')
@@ -370,12 +370,6 @@ export const rowFromFacts = (
           }
         : null,
     issues,
-    duplicateOf: null,
-    duplicateOfIndex: null,
-    fingerprint:
-      draft === null
-        ? ''
-        : fingerprintOf({ ...draft, movement: facts.intent !== 'cashflow' }),
     reference: facts.reference,
     excluded: facts.walletSkipped,
     prediction: null,

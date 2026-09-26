@@ -7,7 +7,6 @@ import { walletGroupOptions } from '#/features/wallets/data/selectors'
 import { startOfToday, ymd } from '#/features/transactions/data/planning'
 import { parseCsvFile } from '#/features/import/data/csv/workerClient'
 import { CsvFileError } from '#/features/import/data/csv/errors'
-import { buildDedupeIndex, toLedgerEntry } from '#/features/import/data/dedupe'
 import { buildCatalog } from '#/features/categories/data/catalog'
 import {
   categoryTypesOf,
@@ -182,13 +181,11 @@ export function useCsvImport() {
   const [today] = useState(() => ymd(startOfToday()))
   const nodeRows = useLiveQuery(() => db.balanceNodes.toArray())
   const settings = useLiveQuery(() => db.balanceSettings.get(SETTINGS_KEY))
-  const transactionRows = useLiveQuery(() => db.transactions.toArray())
   const categoryRows = useLiveQuery(() => db.categories.toArray())
   const merchantRows = useLiveQuery(() => db.merchants.toArray())
   const aliasRows = useLiveQuery(() => db.merchantAliases.toArray())
 
   const nodes = useLiveRows(nodeRows)
-  const transactions = useLiveRows(transactionRows)
   const categoryList = useLiveRows(categoryRows)
   const merchants = useLiveRows(merchantRows)
   const aliases = useLiveRows(aliasRows)
@@ -202,7 +199,6 @@ export function useCsvImport() {
    */
   const dataReady =
     nodeRows !== undefined &&
-    transactionRows !== undefined &&
     categoryRows !== undefined &&
     merchantRows !== undefined &&
     aliasRows !== undefined
@@ -246,11 +242,6 @@ export function useCsvImport() {
     }
     return { today, walletCurrencies, walletNames, categoryTypes }
   }, [nodes, today, categoryTypes])
-
-  const ledgerIndex = useMemo(
-    () => buildDedupeIndex(transactions.map(toLedgerEntry)),
-    [transactions],
-  )
 
   // Memoised from the raw tables rather than taken from `useMerchantIndex`, whose object
   // is new on every render — which would re-run the derivation below on every render.
@@ -412,8 +403,8 @@ export function useCsvImport() {
 
   /** Everything a pass reads. Its identity is what decides whether another is owed. */
   const scanKey = useMemo(
-    () => ({ mapping, source, context, merchantIndex, ledgerIndex }),
-    [mapping, source, context, merchantIndex, ledgerIndex],
+    () => ({ mapping, source, context, merchantIndex }),
+    [mapping, source, context, merchantIndex],
   )
 
   const fresh = scanned !== null && scanned.key === scanKey
@@ -440,7 +431,6 @@ export function useCsvImport() {
             mapping,
             context,
             merchants: merchantIndex,
-            ledger: ledgerIndex,
           },
           {
             signal,
@@ -466,7 +456,6 @@ export function useCsvImport() {
     source,
     context,
     merchantIndex,
-    ledgerIndex,
   ])
 
   /**
@@ -494,7 +483,6 @@ export function useCsvImport() {
             mapping,
             context,
             merchants: merchantIndex,
-            duplicates: scan.result?.duplicates,
             pairs: scan.result?.pairs,
           }),
     [mapping, source, context, merchantIndex, scan.result],
