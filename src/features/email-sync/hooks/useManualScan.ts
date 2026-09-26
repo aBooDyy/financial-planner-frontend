@@ -16,6 +16,12 @@ import { messageForApiError, messageForCode } from '#/lib/errorMessages'
  */
 export const MANUAL_SCAN_LIMIT = 100
 
+/**
+ * One press catches up: an inbox that held more than one scan reads says so, and the scan
+ * runs again — up to this many times, so a very full inbox cannot keep the button busy.
+ */
+export const MAX_CATCH_UP_ROUNDS = 5
+
 /** Never ask for more than the server accepts; `email_sync_max_limit` is its cap. */
 const manualScanLimit = (): number =>
   Math.min(MANUAL_SCAN_LIMIT, configLimits().emailSyncMaxLimit)
@@ -31,16 +37,17 @@ const IN_PROGRESS_RETRY_MS = 4000
 
 export type ScanState =
   | { status: 'idle' }
-  | { status: 'scanning' }
+  /** `round` counts the catch-up passes; 1 is the press itself. */
+  | { status: 'scanning'; round: number }
   /** Someone else's scan holds the slot. Waiting, not failing. */
   | { status: 'busy'; message: string }
-  | { status: 'done'; result: SyncResult }
+  | { status: 'done'; result: SyncResult; more: boolean }
   | { status: 'failed'; code: string; message: string }
 
 /** The result of a scan, already worded — including the honest nothing-new case. */
 export type ScanSummary = {
   line: string
-  /** Set when some inboxes could not be read; the counts above exclude them. */
+  /** Set when some inboxes could not be read, or more remains; the counts above stand. */
   note: string | null
   /** Imports this scan left waiting, i.e. what a "Review" link would open. */
   reviewCount: number
@@ -66,8 +73,11 @@ const failureNote = (failures: SyncFailure[]): string | null => {
   return `${failures.length} inboxes couldn’t be read, so their emails weren’t scanned.`
 }
 
+const MORE_NOTE = 'There’s more to read — sync again to keep going.'
+
 const summaryLine = (result: SyncResult): string => {
-  const { scannedMessages, newImports, autoConfirmed, failures } = result
+  const { scannedMessages, newImports, autoConfirmed, ignored, failures } =
+    result
   const scanned = `Scanned ${scannedMessages} ${plural(scannedMessages, 'email', 'emails')}`
 
   if (result.syncedConnections === 0 && failures.length > 0) {
@@ -77,19 +87,21 @@ const summaryLine = (result: SyncResult): string => {
     return 'No new emails to scan — you’re up to date.'
   }
   if (newImports === 0) {
-    return `${scanned} · nothing new. Everything from your tracked senders is already in.`
+    const skipped = ignored > 0 ? ` ${ignored} didn’t match any rule.` : ''
+    return `${scanned} · nothing new. Everything from your tracked senders is already in.${skipped}`
   }
 
   const parts = [scanned, `${newImports} new`]
   if (autoConfirmed > 0) parts.push(`${autoConfirmed} logged automatically`)
   const needReview = newImports - autoConfirmed
   if (needReview > 0) parts.push(`${needReview} need review`)
+  if (ignored > 0) parts.push(`${ignored} didn’t match a rule`)
   return parts.join(' · ')
 }
 
-const toSummary = (result: SyncResult): ScanSummary => ({
+const toSummary = (result: SyncResult, more: boolean): ScanSummary => ({
   line: summaryLine(result),
-  note: failureNote(result.failures),
+  note: failureNote(result.failures) ?? (more ? MORE_NOTE : null),
   reviewCount: Math.max(result.newImports - result.autoConfirmed, 0),
 })
 
@@ -97,6 +109,34 @@ const codeOf = (error: unknown): string =>
   typeof error === 'object' && error !== null && 'code' in error
     ? String(error.code)
     : ''
+
+/** Inboxes this round read only part of — the next round picks up where it stopped. */
+const unfinished = (result: SyncResult): string[] =>
+  result.connections.filter((c) => !c.complete).map((c) => c.connectionId)
+
+/** Every round's counts added up; an inbox that failed in any round is reported once. */
+export function combineResults(a: SyncResult, b: SyncResult): SyncResult {
+  const failed = new Map(a.failures.map((f) => [f.connectionId, f]))
+  for (const f of b.failures) failed.set(f.connectionId, f)
+  return {
+    syncedConnections: Math.max(a.syncedConnections, b.syncedConnections),
+    scannedMessages: a.scannedMessages + b.scannedMessages,
+    newImports: a.newImports + b.newImports,
+    autoConfirmed: a.autoConfirmed + b.autoConfirmed,
+    ignored: a.ignored + b.ignored,
+    failures: [...failed.values()],
+    connections: b.connections,
+  }
+}
+
+/** The next round's request: only the inbox still behind, when there is just one. */
+const nextRound = (
+  request: ScanOptions & { limit: number },
+  behind: string[],
+): ScanOptions & { limit: number } =>
+  request.connectionId || behind.length !== 1
+    ? request
+    : { ...request, connectionId: behind[0] }
 
 /**
  * Runs a scan the user asked for and reports what it found. Single-flight: a second call
@@ -122,23 +162,42 @@ export function useManualScan(): ManualScan {
     running.current = true
     const request = { limit: manualScanLimit(), ...options }
     const alive = () => mounted.current
-    setState({ status: 'scanning' })
-    try {
-      let result: SyncResult
+
+    const once = async (
+      round: number,
+      body: ScanOptions,
+    ): Promise<SyncResult | null> => {
+      setState({ status: 'scanning', round })
       try {
-        result = await runEmailSync(request)
+        return await runEmailSync(body)
       } catch (error) {
         if (codeOf(error) !== IN_PROGRESS_CODE) throw error
-        if (!alive()) return
+        if (!alive()) return null
         setState({ status: 'busy', message: messageForCode(IN_PROGRESS_CODE) })
         await new Promise((resolve) =>
           setTimeout(resolve, IN_PROGRESS_RETRY_MS),
         )
-        if (!alive()) return
-        setState({ status: 'scanning' })
-        result = await runEmailSync(request)
+        if (!alive()) return null
+        setState({ status: 'scanning', round })
+        return await runEmailSync(body)
       }
-      if (alive()) setState({ status: 'done', result })
+    }
+
+    try {
+      let total = await once(1, request)
+      if (!total || !alive()) return
+      let behind = unfinished(total)
+      for (
+        let round = 2;
+        behind.length > 0 && round <= MAX_CATCH_UP_ROUNDS;
+        round += 1
+      ) {
+        const next = await once(round, nextRound(request, behind))
+        if (!next || !alive()) return
+        total = combineResults(total, next)
+        behind = unfinished(next)
+      }
+      setState({ status: 'done', result: total, more: behind.length > 0 })
     } catch (error) {
       if (!alive()) return
       const code = codeOf(error)
@@ -157,7 +216,8 @@ export function useManualScan(): ManualScan {
 
   return {
     state,
-    summary: state.status === 'done' ? toSummary(state.result) : null,
+    summary:
+      state.status === 'done' ? toSummary(state.result, state.more) : null,
     scan,
     reset,
   }

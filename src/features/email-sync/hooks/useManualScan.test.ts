@@ -6,6 +6,7 @@ import type { SyncResult } from '#/features/email-sync/api/types'
 import {
   IN_PROGRESS_CODE,
   MANUAL_SCAN_LIMIT,
+  MAX_CATCH_UP_ROUNDS,
   useManualScan,
 } from './useManualScan'
 
@@ -20,8 +21,19 @@ const aResult = (over: Partial<SyncResult> = {}): SyncResult => ({
   scannedMessages: 128,
   newImports: 6,
   autoConfirmed: 2,
+  ignored: 0,
   failures: [],
+  connections: [],
   ...over,
+})
+
+const behind = (connectionId: string, complete = false) => ({
+  connectionId,
+  scannedMessages: 100,
+  newImports: 6,
+  autoConfirmed: 2,
+  ignored: 0,
+  complete,
 })
 
 /** A promise plus the handles to settle it, so a scan can be held mid-flight. */
@@ -312,6 +324,58 @@ describe('useManualScan', () => {
 
     expect(result.current.state.status).toBe('busy')
     vi.useRealTimers()
+  })
+
+  it('keeps syncing an inbox that was only partly read, and adds the rounds up', async () => {
+    runEmailSync
+      .mockResolvedValueOnce(
+        aResult({ connections: [behind('c1'), behind('c2', true)] }),
+      )
+      .mockResolvedValueOnce(
+        aResult({ scannedMessages: 20, newImports: 1, autoConfirmed: 0 }),
+      )
+    const { result } = renderHook(() => useManualScan())
+
+    await act(async () => {
+      await result.current.scan()
+    })
+
+    expect(runEmailSync).toHaveBeenCalledTimes(2)
+    expect(runEmailSync).toHaveBeenLastCalledWith({
+      limit: MANUAL_SCAN_LIMIT,
+      connectionId: 'c1',
+    })
+    expect(result.current.summary?.line).toBe(
+      'Scanned 148 emails · 7 new · 2 logged automatically · 5 need review',
+    )
+    expect(result.current.summary?.note).toBeNull()
+  })
+
+  it('stops catching up after a bounded number of rounds and says there is more', async () => {
+    runEmailSync.mockResolvedValue(aResult({ connections: [behind('c1')] }))
+    const { result } = renderHook(() => useManualScan())
+
+    await act(async () => {
+      await result.current.scan({ connectionId: 'c1' })
+    })
+
+    expect(runEmailSync).toHaveBeenCalledTimes(MAX_CATCH_UP_ROUNDS)
+    expect(result.current.summary?.note).toBe(
+      'There’s more to read — sync again to keep going.',
+    )
+  })
+
+  it('mentions mail that no rule matched', async () => {
+    runEmailSync.mockResolvedValueOnce(aResult({ ignored: 3 }))
+    const { result } = renderHook(() => useManualScan())
+
+    await act(async () => {
+      await result.current.scan()
+    })
+
+    expect(result.current.summary?.line).toBe(
+      'Scanned 128 emails · 6 new · 2 logged automatically · 4 need review · 3 didn’t match a rule',
+    )
   })
 
   it('reset clears the last result', async () => {

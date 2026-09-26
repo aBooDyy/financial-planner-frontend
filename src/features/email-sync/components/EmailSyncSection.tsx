@@ -1,148 +1,117 @@
-import { useEffect, useRef } from 'react'
-import { ArrowRight, Check, Lock, Mail } from 'lucide-react'
+import { useMemo } from 'react'
+import { getRouteApi, useNavigate } from '@tanstack/react-router'
+import { CloudOff, Plus } from 'lucide-react'
 import { Button } from '#/components/ui/button'
-import type { LocalEmailConnection } from '#/db/types'
-import { useBalances } from '#/features/balances/hooks/useBalances'
-import { walletGroupOptions } from '#/features/balances/data/selectors'
-import {
-  disconnectConnection,
-  updateConnectionSettings,
-} from '#/features/email-sync/data/mutations'
-import type { ConnectionSettings } from '#/features/email-sync/data/mutations'
+import { walletGroupOptions } from '#/features/wallets/data/selectors'
+import { useWallets } from '#/features/wallets/hooks/useWallets'
+import { useCategoryCatalog } from '#/features/categories/hooks/useCategoryCatalog'
 import { useEmailConnections } from '#/features/email-sync/hooks/useEmailConnections'
-import { usePendingImports } from '#/features/inbound-imports/hooks/usePendingImports'
-import { useEmailWizard } from '#/features/email-sync/hooks/useEmailWizard'
+import { useInboxFlow } from '#/features/email-sync/hooks/useInboxFlow'
 import { SectionHeader } from '#/features/settings/components/SectionHeader'
-import { ConnectedPanel } from './ConnectedPanel'
-import { EmailSyncWizard } from './EmailSyncWizard'
+import { ConnectInboxDialog } from './ConnectInboxDialog'
+import { DisconnectInboxDialog } from './DisconnectInboxDialog'
+import { InboxEditorDialog } from './InboxEditorDialog'
+import { InboxList } from './InboxList'
+import { NoInboxCard } from './NoInboxCard'
 
-const FEATURES = [
-  {
-    title: 'Read-only',
-    desc: 'Means only reads messages — never sends, replies, or deletes.',
-  },
-  {
-    title: 'You choose',
-    desc: 'Pick exactly which senders count as transactions.',
-  },
-  {
-    title: 'You confirm',
-    desc: 'Point out the amount & currency once; we reuse the pattern.',
-  },
-]
-
-function IdleCard({ onStart }: { onStart: () => void }) {
-  return (
-    <div className="overflow-hidden rounded-2xl border border-fp-border bg-fp-surface shadow-fp">
-      <div className="flex flex-wrap items-start gap-[18px] p-6">
-        <span className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[15px] bg-fp-accent-soft text-fp-accent-ink">
-          <Mail size={26} strokeWidth={1.7} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="text-[18.5px] font-extrabold tracking-[-0.01em]">
-            Auto-log transactions from your inbox
-          </div>
-          <div className="mt-1.5 max-w-[580px] text-[13.5px] leading-relaxed text-fp-text-2">
-            Connect the inbox where your bank and card alerts land. Means reads
-            those emails (read-only), finds the amount and currency, and books
-            each transaction for you.
-          </div>
-        </div>
-      </div>
-      <div className="grid grid-cols-1 gap-px border-y border-fp-border bg-fp-border sm:grid-cols-3">
-        {FEATURES.map((f) => (
-          <div key={f.title} className="bg-fp-surface px-[18px] py-4">
-            <div className="mb-1.5 flex items-center gap-2">
-              <span className="flex h-[22px] w-[22px] items-center justify-center rounded-[7px] bg-fp-accent-soft text-fp-accent-ink">
-                <Check size={13} strokeWidth={2.6} />
-              </span>
-              <span className="text-[13.5px] font-bold">{f.title}</span>
-            </div>
-            <div className="text-[12.5px] leading-relaxed text-fp-text-3">
-              {f.desc}
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="flex flex-wrap items-center gap-4 px-6 py-[18px]">
-        <Button
-          type="button"
-          onClick={onStart}
-          className="px-5 py-3 text-[14.5px]"
-        >
-          <ArrowRight size={17} strokeWidth={2} />
-          Connect an inbox
-        </Button>
-        <span className="inline-flex items-center gap-[7px] text-[12.5px] text-fp-text-3">
-          <Lock size={14} strokeWidth={1.8} />
-          Read-only access · disconnect anytime
-        </span>
-      </div>
-    </div>
-  )
-}
+/** Read through the route API rather than the route module, which imports this component. */
+const settingsRoute = getRouteApi('/settings/email-sync')
 
 export function EmailSyncSection() {
-  const { connections } = useEmailConnections()
-  const { imports } = usePendingImports()
-  const wizard = useEmailWizard()
-  const { nodes } = useBalances()
+  const model = useEmailConnections()
+  const search = settingsRoute.useSearch()
+  const navigate = useNavigate()
+  const flow = useInboxFlow(search)
+  const { nodes, base } = useWallets()
+  const catalog = useCategoryCatalog()
+  const walletGroups = useMemo(() => walletGroupOptions(nodes), [nodes])
 
-  const walletGroups = walletGroupOptions(nodes)
-
-  const connected = connections.filter((c) => c.status === 'connected')
-  const pendingSetup = connections.find((c) => c.status === 'pending_setup')
-
-  // Returning from the OAuth redirect leaves a PENDING_SETUP connection; resume its setup.
-  const resumeSetup = wizard.actions.resumeSetup
-  const wizardIdle = wizard.state.step === 'idle'
-  // Resume fetches the inbox's messages, so it must happen once per connection, not once
-  // per render: `pendingSetup` is a row from a live query and arrives as a new object every
-  // time the table emits, which a plain dependency on it would read as a new connection.
-  const resumedId = useRef<string | null>(null)
-  useEffect(() => {
-    if (!pendingSetup || !wizardIdle) return
-    if (resumedId.current === pendingSetup.id) return
-    resumedId.current = pendingSetup.id
-    void resumeSetup(pendingSetup)
-  }, [pendingSetup, wizardIdle, resumeSetup])
-
-  const saveSettings =
-    (connection: LocalEmailConnection) => (s: ConnectionSettings) => {
-      void updateConnectionSettings(connection, s)
+  const closeEditor = () => {
+    flow.closeEditor()
+    if (search.inbox) {
+      void navigate({ to: '/settings/email-sync', search: {}, replace: true })
     }
-
-  const body = () => {
-    if (wizard.state.step !== 'idle') {
-      return <EmailSyncWizard wizard={wizard} />
-    }
-    if (connected.length > 0) {
-      return (
-        <div className="flex flex-col gap-5">
-          {connected.map((c) => (
-            <ConnectedPanel
-              key={c.id}
-              connection={c}
-              walletGroups={walletGroups}
-              recent={imports.filter((i) => i.connectionId === c.id)}
-              onSave={saveSettings(c)}
-              onDisconnect={() => void disconnectConnection(c.id)}
-              onConnectAnother={wizard.actions.start}
-            />
-          ))}
-        </div>
-      )
-    }
-    return <IdleCard onStart={wizard.actions.start} />
   }
+  const editing = model.connections.find((c) => c.id === flow.editingId) ?? null
 
   return (
     <div className="flex flex-col gap-4">
       <SectionHeader
         title="Email sync"
-        subtitle="Connect an inbox so Means auto-logs your bank and card transactions."
+        subtitle="Log transactions from the bank and card alerts in your inbox."
       />
-      {body()}
+
+      {!model.online ? (
+        <p
+          role="status"
+          className="flex items-center gap-2 text-[12.5px] text-fp-text-2"
+        >
+          <CloudOff size={15} strokeWidth={1.8} className="shrink-0" />
+          You’re offline. These are your inboxes as of the last sync — syncing
+          or changing one needs the server.
+        </p>
+      ) : model.stale ? (
+        <p role="status" className="text-[12.5px] text-fp-text-2">
+          Couldn’t refresh your inboxes. Showing the last copy on this device.
+        </p>
+      ) : null}
+
+      <div className="mt-2 flex items-center justify-between gap-3">
+        <h2 className="text-[16px] font-extrabold">Inboxes</h2>
+        {model.connections.length > 0 ? (
+          <Button
+            type="button"
+            disabled={!model.online}
+            onClick={flow.startConnect}
+            className="gap-1.5 px-4 py-[9px] text-[13.5px]"
+          >
+            <Plus size={15} strokeWidth={2.2} />
+            Connect inbox
+          </Button>
+        ) : null}
+      </div>
+
+      {model.loading ? null : model.connections.length === 0 ? (
+        <NoInboxCard canConnect={model.online} onConnect={flow.startConnect} />
+      ) : (
+        <InboxList
+          connections={model.connections}
+          online={model.online}
+          onEdit={flow.edit}
+          onAddRule={flow.addRule}
+          onDisconnect={flow.askDisconnect}
+        />
+      )}
+
+      {model.connections.length > 0 ? (
+        <p className="text-[12.5px] leading-relaxed text-fp-text-3">
+          Means syncs each inbox when you open the app. Background sync is on
+          its way; until then, Sync now reads everything since the last sync.
+        </p>
+      ) : null}
+
+      <ConnectInboxDialog open={flow.connecting} onClose={flow.cancelConnect} />
+
+      {editing ? (
+        <InboxEditorDialog
+          key={editing.id}
+          connection={editing}
+          intent={flow.intent}
+          online={model.online}
+          walletGroups={walletGroups}
+          catalog={catalog}
+          baseCurrency={base}
+          onClose={closeEditor}
+        />
+      ) : null}
+
+      <DisconnectInboxDialog
+        email={flow.pending?.email ?? null}
+        busy={flow.busy}
+        error={flow.pendingError}
+        onConfirm={() => void flow.confirmDisconnect()}
+        onClose={flow.cancelDisconnect}
+      />
     </div>
   )
 }

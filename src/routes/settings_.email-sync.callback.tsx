@@ -1,7 +1,10 @@
 import { useEffect, useRef } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { Splash } from '#/components/Splash'
-import { takeConnectReturnPath } from '#/features/email-sync/data/connect'
+import {
+  connectedReturnUrl,
+  takeConnectReturnPath,
+} from '#/features/email-sync/data/connect'
 import { completeOAuth } from '#/features/email-sync/data/mutations'
 
 export const Route = createFileRoute('/settings_/email-sync/callback')({
@@ -15,8 +18,8 @@ export const Route = createFileRoute('/settings_/email-sync/callback')({
  * Settings page's Outlet (which doesn't exist) and never mount.
  *
  * Exchanges the `code` for tokens (server-side) to create the connection, then returns to
- * where the connect began — by default Settings → Email sync, which resumes the wizard at
- * the "select senders" step.
+ * where the connect began — by default Settings → Email sync, opened on the new inbox's first
+ * rule.
  */
 function EmailSyncCallback() {
   const ran = useRef(false)
@@ -29,14 +32,17 @@ function EmailSyncCallback() {
     const state = params.get('state')
 
     const finish = async () => {
+      let connectionId: string | null = null
       if (code && state) {
         try {
-          await completeOAuth(code, state)
+          connectionId = (await completeOAuth(code, state)).id
         } catch {
-          // Fall through — Settings shows the idle/error state.
+          // Fall through — Settings shows the inboxes as they are.
         }
       }
-      window.location.assign(takeConnectReturnPath())
+      window.location.assign(
+        connectedReturnUrl(takeConnectReturnPath(), connectionId),
+      )
     }
     void finish()
   }, [])

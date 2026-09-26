@@ -2,7 +2,7 @@ import { emailSyncApi } from '#/features/email-sync/api/emailSyncApi'
 import type { EmailProvider } from '#/features/email-sync/api/types'
 
 const RETURN_KEY = 'fp.emailSync.returnTo'
-const DEFAULT_RETURN = '/settings/email-sync'
+export const SETTINGS_PATH = '/settings/email-sync'
 
 /**
  * Leave for the provider's consent screen. The OAuth callback URL is fixed (the provider
@@ -11,7 +11,7 @@ const DEFAULT_RETURN = '/settings/email-sync'
  */
 export async function beginInboxConnect(
   provider: EmailProvider,
-  returnTo: string = DEFAULT_RETURN,
+  returnTo: string = SETTINGS_PATH,
 ): Promise<void> {
   const { authorize_url } = await emailSyncApi.authorizeUrl(provider)
   try {
@@ -31,5 +31,18 @@ export function takeConnectReturnPath(): string {
   } catch {
     // Storage blocked.
   }
-  return DEFAULT_RETURN
+  return SETTINGS_PATH
+}
+
+/**
+ * Back in Settings, a new inbox opens straight onto its first rule — it reads nothing until it
+ * has one. Anywhere else (first-run setup) gets the path unchanged.
+ */
+export function connectedReturnUrl(
+  path: string,
+  connectionId: string | null,
+): string {
+  if (path !== SETTINGS_PATH || !connectionId) return path
+  const params = new URLSearchParams({ inbox: connectionId, fresh: '1' })
+  return `${path}?${params.toString()}`
 }
