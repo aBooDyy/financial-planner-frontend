@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <style>
+    .tile { fill: #1f9d6b }
+    @media (prefers-color-scheme: dark) { .tile { fill: #2fbd8b } }
+  </style>
+  <rect class="tile" width="32" height="32" rx="9.6" />
+  <rect x="10.13" y="10.13" width="11.74" height="11.74" rx="3.2" fill="#fff" transform="rotate(45 16 16)" />
+</svg>

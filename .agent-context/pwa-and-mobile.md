@@ -7,10 +7,20 @@ offering a richer layout on desktop.
 
 - **Decision (locked): `vite-plugin-pwa`** (Workbox under the hood) for the service worker
   and manifest generation.
-- **Update the web manifest** — the scaffold ships TanStack's placeholder
-  (`public/manifest.json` still says "TanStack App"). Set real `name`/`short_name`, theme &
-  background colors (aligned to `fp-` tokens), proper icons (incl. maskable), `display:
-standalone`, and `start_url`.
+- **Web manifest** — `public/manifest.json` (static until `vite-plugin-pwa` lands; then
+  move it into the plugin config). Name "Means", theme/background `fp-bg` light `#FAF8F4`.
+- **Icons** — the Means mark (the `BrandMark` tile + rotated square) in `public/`:
+  - `favicon.svg` — the source of truth; swaps the tile to the dark accent under
+    `prefers-color-scheme: dark`.
+  - `favicon.ico` (16/32/48) — fallback for browsers without SVG favicons.
+  - `apple-touch-icon.png` (180, opaque full-bleed — iOS rounds it itself).
+  - `icon-192/512.png` (rounded tile, `any`), `icon-maskable-192/512.png` (full-bleed,
+    glyph at 80% so it survives the maskable safe zone), `icon-monochrome-512.png`
+    (alpha-only silhouette for themed icons).
+  - The PNG/ICO files are rasterised from the SVG geometry. There is no generator in the
+    repo, so if the mark changes, regenerate every variant together.
+  - `index.html` links the icons + manifest and sets `theme-color` per OS scheme (these
+    follow the OS, not the in-app theme toggle).
 - Service worker caching:
   - **App shell**: precache for instant, offline-capable loads.
   - **Data**: the app's data is local-first (Dexie), so the SW mainly handles the shell and
