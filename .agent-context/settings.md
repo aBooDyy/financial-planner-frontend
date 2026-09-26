@@ -44,6 +44,10 @@ Notifications, Archived, Data & privacy. Each pane is its own route — see
   `MerchantRow` composes `features/merchants/`. A type `Segmented` filters the list;
   `useCategoryTree` supplies a live per-row transaction count. Everything about the model,
   the resolved catalog and the subtree delete is in [categories.md](categories.md).
+- **Merchants** (`MerchantsSection` → `MerchantRow`): each row's "File as … automatically"
+  switch shows the merchant's `learnedCategoryId` by `catalog.labelOf` ("Dining · Cafés") with
+  that category's icon chip; it only appears while the merchant has one. The model is in
+  [merchants.md](merchants.md).
 - **Archived** (`ArchivedSection` + `ArchivedRow` + balances' `DeleteNodeDialog` with `archived`): every archived
   wallet/group, newest first, from `useArchivedNodes` → pure `buildArchivedList`
   (`features/wallets/data/archivedList.ts`): balance (a group's in base currency), wallet

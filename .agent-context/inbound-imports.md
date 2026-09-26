@@ -40,9 +40,15 @@ that. So sources depend on the queue, never the reverse:
 webhook row — null once its key is deleted (the row survives). `sourceRef` / `sourceLabel` are the sender address and display name for an inbox,
 the key's token prefix and name for a webhook — denormalised, so a row outlives a revoked key
 and still says where it came from. `occurredOn` is the event's `YYYY-MM-DD`.
-`suggestedType` / `suggestedWalletId` are what the source resolved (a webhook rule's type and
-wallet, or the key's defaults; an inbox connection's default wallet) — the review form starts
-from them. Both are null when the source said nothing.
+`suggestedType` / `suggestedWalletId` / `suggestedCategoryId` are what the source resolved (a
+webhook rule's type, wallet and category, a merchant's learned category, or the key's defaults;
+an email rule's routing) — the review form starts from them. All are null when the source said
+nothing; with no `suggestedType` the form starts on the suggested category's own direction
+(else spend). `suggestedCategoryId` is the leaf (a child's id when a subcategory was resolved),
+an FK the server moves with a delete's `move_to` or nulls without one — the local cache mirrors
+either at once (`categories/data/refile.ts`). Confirm refuses an unknown or foreign id with
+`inbound.import.category_invalid` and one of the other direction with
+`spending.transaction.category_type_mismatch`, both on `category_id`.
 
 ## Reviewing a staged import
 
@@ -83,16 +89,18 @@ the fast path, and expands into the **stored body** plus every editable value
   a number + currency code out of the tapped line — the shortest path from "here is the amount
   in the body" to a correct entry.
 - **The category controls read the user's real catalog.** `useImportReview` takes a
-  `CategoryCatalog` ([categories.md](categories.md)), so the category select offers the
-  user's own categories of the draft's type and the subcategory select offers that
-  category's own children — a staged row can be filed under a category the user invented.
-  **The pair is normalised at render, not on write**: a suggestion naming a category Dexie
-  has not delivered yet upgrades when the catalog lands, instead of being collapsed to the
-  first category of its type on first paint. A `subcategory` the chosen parent does not own is
-  dropped rather than kept as a dangling slug.
+  `CategoryCatalog` ([categories.md](categories.md)); the draft holds one `categoryId` (the
+  leaf). The quick Category select offers the draft type's roots (`rootId`) and the details'
+  Subcategory select that root's children (`subcategoryId`, "—" files under the root):
+  `setCategory(rootId)` / `setSubcategory(childId | null)` both write the one id. **The id is
+  resolved at render, not on write**: kept while the catalog holds it under the draft's type,
+  else `catalog.fallbackFor(type)` (`other` / `other_income`) — so a suggestion Dexie has not
+  delivered yet upgrades when the catalog lands, and switching Spend/Income re-points it.
+  Confirm sends `category_id` (required); with none resolvable it asks for a category instead.
 - **Merchant learning is shown, not hidden.** The detail carries the merchant with what the
   user filed it under before (`MerchantHint`); the next import from that merchant arrives with
-  `suggestedCategory`/`suggestedSubcategory` already set by the backend. The merchant field is
+  `suggestedCategoryId` already set by the backend; the hint names it with `labelOf`
+  ("Groceries · Supermarket"). The merchant field is
   only sent on confirm when it was **edited** — resending it would re-count the sighting.
 
 **The row's shape** (Means R1). 560px dialog, no footer, full-bleed rows. Each row: an
@@ -144,21 +152,24 @@ on demand; a JSON payload renders read-only (no pick bar).
 ## Contract notes
 
 `InboundImportWire` carries `source`, `connection_id` / `integration_key_id` (one is null),
-`source_ref`, `source_label`, `occurred_on`, `merchant_id`, `suggested_subcategory`,
+`source_ref`, `source_label`, `occurred_on`, `merchant_id`, `suggested_category_id`,
 `suggested_type` (`'SPEND' | 'INCOME' | null`), `suggested_wallet_id`, `rule_id`, `has_body` and
 `body_format`; the body itself only comes from the detail endpoints
 (`GET /inbound-imports/{id}` and `GET /inbound-imports/by-transaction/{transactionId}`, both →
 `ImportDetailWire { inbound_import, body_lines, body_truncated, merchant }`). Confirm returns
-`{ transaction, inbound_import }`; its `amount`/`currency`/`date`/`merchant`/`note` are all
+`{ transaction, inbound_import }`; its request (`ConfirmImportWire`) takes `wallet_id`,
+`category_id` and `type` (required) and `amount`/`currency`/`date`/`merchant`/`note` as
 optional overrides. Backend counterpart:
 [inbound-imports.md](../../financial-planner-backend/.agent-context/inbound-imports.md).
 
 ## Tests
 
-`api/types.test.ts` (mappers incl. suggestions), `data/lineValues.test.ts`,
+`api/types.test.ts` (mappers incl. suggestions), `data/mutations.test.ts` (confirm sends
+`category_id` and files the promoted row locally), `data/lineValues.test.ts`,
 `data/pickValues.test.ts` (reading a tapped value per field, the hop order),
 `data/sources.test.ts` (`ledgerSourceOf`), `data/sync.test.ts` (delta, eviction, single
-flight, a pull overtaken by sign-out), `api/inboundImportsApi.test.ts` (ids encoded into paths), `hooks/useImportReview.test.ts` (prefill from suggestions, late wallets, payload
+flight, a pull overtaken by sign-out), `api/inboundImportsApi.test.ts` (ids encoded into paths), `hooks/useImportReview.test.ts` (prefill from suggestions, a subcategory confirmed by its
+own id, the fallback for an unknown id, late categories and wallets, the type switch, payload
 picks), `components/BodyPreview.test.tsx` (text lines, the tree via the slot, truncated
 fallback), `components/PendingImportRow.test.tsx` (a webhook row renders, opens on its
 payload, fills from taps and confirms; the inbox row keeps its copy; an unread inbox row links to its inbox's rule editor with `rule` and `sample`; "Not a transaction" undoes, sends after the wait, and sends at once on unmount),

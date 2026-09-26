@@ -9,7 +9,8 @@ backend [onboarding.md](../../financial-planner-backend/.agent-context/onboardin
 
 `User.onboardedAt` is `null` until setup is finished. Every guarded route renders through
 `components/SessionGate.tsx` — `loading` → `Splash`, `anonymous` → `/auth/login`, not onboarded
-→ `/setup` — so nothing in the app opens before setup, whichever URL was typed. Sign-up and the
+→ `/setup`, categories not on this device yet → `Splash` ([categories.md](categories.md#the-loading-gate--sessiongate))
+— so nothing in the app opens before setup, whichever URL was typed. Sign-up and the
 Google callback just navigate to `/`; the gate does the rest.
 
 `routes/setup.tsx` is the exception that must not use the gate. It decides "already set up"
@@ -37,7 +38,7 @@ Pure data and helpers, unit-tested in `packs.test.ts`:
 - `INTENTS` (6) each point at one pack; `suggestedPackId` picks the most specific pack among
   the goals chosen (`family` > `freelancer` > `student` > `traveler` > `saver` > `essentials`).
 - `PACKS` (6) list **default top-level slugs only**, and only slugs the built-in catalog has
-  — `packs.test.ts` checks that against `buildCatalog([])`, and that every built-in root is
+  — `packs.test.ts` checks that against `defaultCatalog()` (the seeded rows), and that every built-in root is
   offered by at least one pack. The design's mock set was adapted to our real catalog: its
   "Fun"/"Subs" became `entertainment`/`subscriptions`, and a **Saver** pack (with
   `investment`) was added for the "Save and grow my money" goal. The other roots are spread

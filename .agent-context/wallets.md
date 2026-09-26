@@ -24,8 +24,9 @@ those without a coordinated backend + Dexie migration.
   entity (nodes/settings, plus the Goals `income`/`goal` entities — see [goals.md](goals.md)).
   Push drains the outbox debounced ~800ms with a 30s safety flush; pull is a full refresh
   that skips `dirty` records. `409` → pull, rebase the local edit on the server
-  version, retry once, else accept server (whole-record LWW, client re-apply). Non-network
-  4xx drops the bad op and lets a pull restore canonical state (no infinite loops).
+  version, retry once, else accept server (whole-record LWW, client re-apply). Any other
+  failure keeps the op and flags it — rejected ones back off, unavailable ones stop the drain
+  ([data-layer-and-sync.md](data-layer-and-sync.md#failed-pushes-flag-hold-retry--never-drop)).
 - **Optimistic mutations** (`src/features/wallets/data/mutations.ts`): write Dexie + queue
   a **coalesced** outbox entry (a pending create absorbs later edits; delete of a
   never-synced node just drops its queued ops). Server cascade means delete enqueues **one**
@@ -39,8 +40,9 @@ those without a coordinated backend + Dexie migration.
   KWD), so formatting (via `Intl`) and FX conversion happen only here. Any ISO code is valid,
   validated at the wire boundary — see [app-config.md](app-config.md). Totals are computed
   client-side, not fetched.
-- **Rates**: `useWallets` builds one map with `useMergedRates(rateRows)` — the config's seed
-  rates with the user's override rows on top. The server stores overrides only; an unpriced
+- **Rates**: `useWallets` builds one map with `useStableRates(rateRows)` (`src/hooks/`) — the
+  config's seed rates with the user's override rows on top, memoized so it can key a live
+  query (`useMergedRates` returns a new object every render). The server stores overrides only; an unpriced
   currency has no rate and `convertMinor` returns `0` for that pair.
 - `heldCurrencies(base, sources)` lists the currencies the user actually holds (wallets,
   goals, transactions, allocations, overrides); anything that renders a rate list uses it.
@@ -75,6 +77,33 @@ walletDeltas?, reservations?)` builds the flattened tree (honoring collapse), gr
   so `available` can go **negative** and the row carries `overReserved` (rendered red). The goal
   editor warns first (red box + "Save anyway"), comparing each wallet's live balance against its
   reserves from all goals (`reservedByWallet`) plus the draft's rows.
+
+### The ledger read and the loading state
+
+- **`useWallets` never holds the ledger's rows.** `readLedgerSummary(rates)`
+  (`features/transactions/data/ledgerReads.ts`) reads the whole table inside one live query and
+  hands back only what the view derives from it: each wallet's `walletDeltas`, the
+  **goal-linked** rows (every one, deleted included — all `goalProgress` reads, since a payment
+  is `goalId === g.id && type === 'spend' && !deleted`), and the set of row **currencies**
+  (deleted rows included, as `heldCurrencies` always counted them). A balance sums every row, so
+  the read itself stays whole; nothing it shows changed — `hooks/useWallets.test.ts` compares
+  deltas, the full view and `held` against the old every-row derivation. It waits for the rates
+  (so a mount costs one read, not two); a rate edit re-runs it.
+- **Two flags.** `loading` = the nodes are not known yet. `balancesLoading` = any input a figure
+  derives from is still missing: the nodes, the settings (`null`, not `undefined`, when there is
+  no row), the rates, goals, allocations, planned rows or the ledger summary. The old flag
+  ignored all but nodes and rates, so balances first drew as bare opening balances and then
+  jumped. While `balancesLoading`, the view is built with **no deltas and no reservations**, so
+  the tree is right but its figures are not — and must not be shown.
+- **Skeletons for figures only.** The page renders every card, the tree (names, icons, child
+  counts, actions), titles, labels, the base pill and the wallet/group/currency counts at once;
+  each figure goes through the shared `ValueOrSkeleton` with `loading` passed down —
+  `TotalHeroCard` (total, group-bar values, the bar itself), `GroupRow` (subtotal), `WalletRow`
+  (balance; the foreign base line waits), `CurrencyBreakdownCard` (share, sum, bar, base line),
+  and the editor's `BalanceNowStrip` (`currentBalance: null`). `ReservedWalletLines`/`PotRow`
+  need no flag: with no reservations while loading, no wallet has pots until the figures land.
+  The page grid is `aria-busy` with one `sr-only` `role="status"`.
+  `components/walletsLoading.test.tsx` pins chrome present, no money figure, skeletons in place.
 
 ## UI & wiring
 

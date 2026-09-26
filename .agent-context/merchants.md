@@ -68,8 +68,12 @@ rather than owning merchant logic of its own.
 
 The backend stores the flag and deliberately never acts on it. `useMerchantMatch.predictionFor`
 is the one place it is read: **on** ⇒ the learned category is applied silently, **off** ⇒ it is
-offered as a suggestion. `useTxEditor.setMerchant` applies or stashes it, and only when the
-learned category belongs to the type the row is being filed as.
+offered as a suggestion. A `CategoryPrediction` is `{ categoryId, apply }` — the leaf id the
+merchant was last filed under (`learnedCategoryId`, wire `learned_category_id`, an FK the
+server nulls when the category is deleted without a move); its direction is the category's.
+`useTxEditor.setMerchant` applies or stashes it, and only when the learned category belongs to
+the type the row is being filed as (the CSV importer checks `learnedType`). `MerchantOptions`
+and Settings' `MerchantRow` name it with `catalog.labelOf` ("Dining · Cafés").
 
 ## Sync — standard, plus one branch
 

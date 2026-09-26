@@ -195,7 +195,9 @@ ledger.ts`): `walletReservations(allocations, goals, nodes, rates, txns?, today?
 ## UI & wiring
 
 - Feature in `src/features/goals/` (`api/`, `data/`, `hooks/`, `components/`, `constants.ts`).
-  `useGoals` is the reactive read (`useLiveQuery` → `buildGoalsView`); `useGoalEditor` drives
+  `useGoals` is the reactive read (`useLiveQuery` → `buildGoalsView`); its transactions are only
+  the linked ones (`planned/data/linkedTransactions`, index reads — never the whole ledger), since
+  `goalProgress` looks at goal-linked rows alone. `useGoalEditor` drives
   the add/edit sheet for both income and goals (kind chips only when creating, since `kind` is
   immutable on update).
 - **Page shell — the "Goals v3" design (tab card + sections + detail rail).** The active section

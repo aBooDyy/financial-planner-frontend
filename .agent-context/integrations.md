@@ -58,10 +58,13 @@ the server makes it), so there is no offline write and no outbox entity. Dexie `
 
 `useKeyEditor` seeds a `KeySettings` draft from the key once and PATCHes the **whole** settings
 object with the key's `version` (the backend treats omitted nullables as cleared). `applyEdit`
-keeps it coherent: a type change clears category + subcategory, a category change clears the
-subcategory, clearing the account turns auto-confirm off. `draftProblems` checks name (≤ 120),
-rate limit (1–600) and auto-confirm-needs-account locally; the server re-checks everything.
-Category/subcategory selects read the live `CategoryCatalog` ([categories.md](categories.md)).
+keeps it coherent: a type change clears `defaultCategoryId`, clearing the account turns
+auto-confirm off. `draftProblems` checks name (≤ 120), rate limit (1–600) and
+auto-confirm-needs-account locally; the server re-checks everything. The default category is
+one id-valued select (`SuggestedCategorySelect`, from the categories slice) over the live
+`CategoryCatalog` ([categories.md](categories.md)) — a root or a child, wire
+`default_category_id`; `integrations.key.category_invalid` / `default_category_id` go beside it
+(`KeyField` `defaultCategoryId`).
 
 One **Save** stores whatever changed: the settings PATCH (key `version`), then the rule set's
 PUT (the set's own `version`). Either failing keeps the dialog open with the error in the
@@ -160,7 +163,18 @@ states say what differs: path not found, "Found “…” but the pattern matche
 "“…” is not a number / a currency Means knows / a date in the layout chosen below", and
 UNRESOLVED (amount: no currency to read it in; type: not in the map → the key's default).
 Unset fields say their fallback (the key's default currency/account/category/type, the day it
-arrives). Values sit in a `<bdi>` so a Latin value reads correctly in an RTL sentence.
+arrives). **Categories come back as a leaf id plus a name snapshot**: both the dry run's and a
+delivery's `resolved` carry `category_id` and `category` / `subcategory` (the root's and the
+child's **names** at the time → `categoryText` / `subcategoryText`; all nullable, and a delivery
+logged before ids has slugs there with a null id). The snapshot is shown as it is when present,
+so the log still reads right after the category is renamed or deleted; otherwise
+`useFieldStatusContext`'s `category(id)` names the id from the live catalog (root's name for the
+Category line, its own for the Subcategory line) — two children sharing a slug (`maintenance`)
+can no longer be confused, which a lookup by bare slug could. The webhook response's `parsed`
+carries only `category_id`. **Constants stay text**: a
+rule's constant category/subcategory is the slug the server resolves like a payload value
+(`ConstantInput` — the category picker emits a root's slug, the subcategory picker a child's,
+each slug once). Values sit in a `<bdi>` so a Latin value reads correctly in an RTL sentence.
 
 **Which rule fires.** `TraceBanner` (rule view) says: this rule handles the sample (+ what
 ingest would do: stage / post / ignore), its own condition fails (with the server's detail), or
@@ -266,7 +280,10 @@ offline from Dexie, failed refresh, 409 as a field error, token never cached, re
 rules: `data/ruleData.test.ts` (tokens and pattern suggestion — incl. the four Tasker words —,
 date guessing, path quoting, sample reading, visible ids, reference candidates, the reducer's
 hop / optional-never-steals / condition binding / Done-vs-Cancel / working set / reorder,
-`sendable`, `bindLocator`, `ruleProblems`, `treeMarks`), `hooks/useRuleEditor.test.ts`
+`sendable`, `bindLocator`, `ruleProblems`, `treeMarks`), `data/fieldStatus.test.ts` (a
+resolved child named by id on both lines, two same-slug children told apart, a root with no
+subcategory, a delivery's logged words as they are, the key default's label),
+`hooks/useRuleEditor.test.ts`
 (fresh-key rule, draft dry run debounced to one call, save with the set version + cached count,
 422 beside its rule, 409 conflict, retry without a refused pattern, no run without a sample),
 `components/PayloadTree.test.tsx` (nested render, dotted key path, word binding, the keyboard

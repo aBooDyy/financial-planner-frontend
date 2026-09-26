@@ -30,8 +30,8 @@ editor that swaps in with a back chevron and Done/Cancel. Plan and contract:
 - **A rule** (`EmailRule`, fetched with the set when an inbox's editor opens, never cached) is
   a filter (`senders`, `subjectAny`, `bodyAny`, `excludeAny`), a learned **template** (how to
   read the amount — anchor, which number, decimal style —, the currency — read from the email
-  or fixed —, and optionally the merchant), and routing (`walletId`, `type`,
-  `category`/`subcategory`, `autoConfirm`, `enabled`). The set is ordered; the first enabled
+  or fixed —, and optionally the merchant), and routing (`walletId`, `type`, `categoryId` —
+  the leaf, a root's or a child's id, wire `category_id` —, `autoConfirm`, `enabled`). The set is ordered; the first enabled
   rule whose filter matches an email handles it. One `version` for the whole set.
 - The template is **learned by the server** (`POST …/rules/learn`) from the user's taps — the
   client never builds one. That keeps the heuristic (and later an AI strategy) in one place.
@@ -111,8 +111,10 @@ stacks it first.
    the open rule as `focus_index`, so it says how many recent emails get through **this**
    filter, what each reads as, and how many an earlier rule takes first.
 4. **File into** — `RuleRoutingForm`: name, account (`WalletSelect` from balances, "Choose when
-   reviewing"), Spend/Income, category/subcategory from the live catalog, post without review
-   (disabled without an account), rule on/off.
+   reviewing"), Spend/Income, one category select by id (`SuggestedCategorySelect` from the
+   categories slice: the type's roots with their children indented, plus "Decide when reviewing"),
+   post without review (disabled without an account), rule on/off. Changing the type clears
+   `categoryId` (the reducer's `edit`), and a 422 on `rules[i].category_id` sits beside it.
 
 **State.** `useEmailRuleEditor` wraps the pure reducer `data/ruleEditorState.ts`: the draft
 set, the open rule (`OpenRule`: draft, `mapping` — sample, similar, picks, options —, target,

@@ -190,6 +190,12 @@ iconIdOr(id: string | null | undefined, fallback: IconId): IconId
 
 `CATEGORY_ICON_FALLBACK` maps `'spend' | 'income'` to the first two.
 
+Rows name a category by **id**, never by slug, so a surface that draws a row's glyph hands the
+leaf id to `CategoryIcon({ categoryId })` (transactions), which reads
+`catalog.get(id).icon` — already resolved down the chain above. Slugs survive only inside the
+resolver, to find a built-in default icon. An id the catalog does not hold draws the
+"Deleted category" entry's `tag`.
+
 **The stored field is `string | null`, not `IconId | null`.** `LocalCategory.icon` and
 `LocalBalanceNode.icon` are plain strings because the database is not the place to enforce
 a union that the pack can redefine. Narrowing happens at the **render boundary** —

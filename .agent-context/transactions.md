@@ -9,7 +9,8 @@ belongs to [planned.md](planned.md#the-planned-tab-and-the-confirm-dialog-compon
 ## Data layer (`data/`)
 
 - **mappers / mutations / sync** mirror goals exactly: optimistic local write → outbox →
-  `schedulePush()`; 409 rebase-retry, 404 drop, network keep. `pushSpendingEntry` /
+  `schedulePush()`; 409 rebase-retry, 404 drop, anything else kept and flagged
+  ([Sync failures on ledger rows](#sync-failures-on-ledger-rows)), including a bulk `INVALID`. `pushSpendingEntry` /
   `pullSpendingAll` are wired into `db/sync.ts`. Money is minor units; `version` is the
   server sha256 string (empty until first sync); enums map at the boundary (`api/types.ts`).
   **The ledger is the one table here that does not pull in full**: `pullSpendingAll` runs
@@ -18,11 +19,13 @@ belongs to [planned.md](planned.md#the-planned-tab-and-the-confirm-dialog-compon
   is not — see [data-layer-and-sync.md](data-layer-and-sync.md#incremental-pull-the-delta-streams).
   Rows also leave in bulk in both directions: `POST /transactions/bulk` for a run of queued
   creates, `POST /transactions/bulk-delete` for a run of queued deletes.
-- **The catalog is not here.** Transactions store the parent `category` + an optional
-  `subcategory` **slug**, and everything those slugs mean — name, colour, icon, the child
-  list — is resolved from the user's own synced two-level category tree in
-  `features/categories/` ([categories.md](categories.md)). Nothing in this slice may import
-  the built-in defaults; an ESLint rule enforces it. (`SAVINGS_CATEGORY_ID` is gone: linking
+- **The catalog is not here.** A transaction or recurring schedule stores one leaf
+  **`categoryId`** (the subcategory's id when one was picked, else the root's), and everything
+  it means — name, colour, icon, its root — is resolved from the user's own synced two-level
+  category tree in `features/categories/` ([categories.md](categories.md)). Nothing in this
+  slice may import the built-in defaults; an ESLint rule enforces it. No slug literal reaches a
+  row either: a default goes through `catalog.fallbackFor(type)` / `bySlug(...)` (e.g. a new
+  schedule starts on Housing only when `bySlug('housing')` finds the user's own). (`SAVINGS_CATEGORY_ID` is gone: linking
   an entry to a goal no longer re-files it under Savings — ADR-7.)
 - **ledger.ts** — the cross-feature derivation. `walletLiveBalances(nodes, txns, rates)` =
   opening `amount` + Σ signed deltas (in the wallet's currency); `contributionsByGoal(...)` =
@@ -52,6 +55,14 @@ belongs to [planned.md](planned.md#the-planned-tab-and-the-confirm-dialog-compon
   `buildCalendar` (see below), `buildActivityList` (day groups), `buildBreakdown` (donut),
   `buildBudgetsView` (burn vs cap, health rail), `buildRecurringView` (monthly-normalized total +
   upcoming timeline). `Scope` = all | wallet | group (group matches descendant wallets).
+  **Everything rolls up to the root:** the hero's segments and the donut group by
+  `catalog.rootOf(t.categoryId).id`, and a category budget (its `categoryId` is a root) counts a
+  spend when `rootOf(t.categoryId).id === b.categoryId` — a row filed under Dining › Cafés burns
+  the Dining cap; a wallet budget matches `t.walletId === b.walletId`. Rows hand ids to the icon:
+  `TxRow.categoryId` / `RecurringRow.categoryId` are the leaf (so `CategoryIcon` draws the
+  child's glyph) while their colour and name come from the root; `BudgetRow.categoryId` is the
+  capped root (null for wallet/overall caps). An id the catalog no longer holds resolves to the
+  shared "Deleted category" entry ([categories.md](categories.md#the-resolver--datacatalogts)).
   **A goal-linked spend is a payment, not saving** (ADR-3: setting aside is a reservation;
   ADR-7: a payment keeps its own category). It counts as Spent in the hero, day totals, donut
   and calendar, and burns budgets like any spend — the old `isContribution` rule (spend with a
@@ -116,9 +127,12 @@ flattening every red day; the square root keeps small days distinguishable from 
   chosen scope back to `all` once its account is archived or deleted. Transactions on archived
   wallets stay in the history under "All accounts".
 
-`hooks/useTransactions` bundles all inputs into `SpendingData` **and returns the live
-`catalog` beside it** (the selectors' explicit signature won over folding it into
-`SpendingData`); `TransactionsPage` threads it into every builder. `hooks/useTxEditor` is the
+`hooks/useTransactions` bundles every input **except the ledger rows** into `SpendingInputs`
+(`SpendingData` minus `txns`), memoized on its source rows, **and returns the live `catalog`
+beside it** (the selectors' explicit signature won over folding it into `SpendingData`), plus
+`deltas` — each wallet's `walletDeltas` over the whole ledger. The page reads its rows for the
+period on screen ([How the page reads the ledger](#how-the-page-reads-the-ledger)).
+`TransactionsPage` threads both into every builder. `hooks/useTxEditor` is the
 tx/budget/recurring editor state machine. Components are dumb (`components/`): page composition
 
 - `CashflowHeroCard` — its stacked bar is the shared `SegmentedBar`, so every category chunk
@@ -141,8 +155,9 @@ tx/budget/recurring editor state machine. Components are dumb (`components/`): p
   store once the editor closes. `ConnectedTxEditor` is the one place a `useTxEditor` instance is
   wired to an editor — `TransactionDialog` for a transaction or transfer, `BudgetEditor` for a
   budget, `RecurringEditor` for a recurring schedule (routed by `editing.kind`) — and the Spending page and the sheet both render through it. It
-  takes the page's `SpendingData` to hand the dialog its accounts with live balances
-  (`transferWallets` over `walletDeltas`).
+  takes the page's `SpendingInputs` and its whole-ledger `deltas` to hand the dialog its
+  accounts with live balances (`transferWallets` and `scopeSections` over those deltas); both
+  callers render it only once `deltas` has landed.
 - **The transaction dialog** (`TransactionDialog`, from the "New Transaction Redesign" handoff).
   One `ResponsiveDialog` for Spend / Income / Transfer, titled "New transaction" or "Edit
   <type>". Top to bottom: `TxTypeSwitch` (pill segmented; the chosen type wears its tint —
@@ -174,8 +189,10 @@ tx/budget/recurring editor state machine. Components are dumb (`components/`): p
   `adjustmentDeleteCopy`) and an optional picker `pane`. Saving follows the transaction dialog's
   pattern: a hint above the buttons while not ready (`budgetBlock` / `cashflowBlock`), the submit
   muted but pressable, pressing it reveals field errors. `BudgetEditor`: "What does it cover?"
-  `OptionTiles` (Category / Account / Overall — `setScopeType` resets the target, Overall hides the
-  picker), `AmountWell` on the spend tint with `CurrencyPill` (the `CurrencyPicker` flattened into a
+  `OptionTiles` (Category / Account / Overall, Overall hides the picker). The draft has no
+  `target`: a category budget reads `draft.categoryId` (kept on a spend **root** —
+  `setScopeType` and save normalise it with `rootOf`) and a wallet budget reads
+  `draft.walletId`; save sends `BudgetDraft { categoryId, walletId }` with the other one null, `AmountWell` on the spend tint with `CurrencyPill` (the `CurrencyPicker` flattened into a
   "Currency SAR ▾" pill), "Which category/account?" `BudgetTargetSelect`, `BudgetPeriodFields`
   (Weekly / Monthly / Custom days chips + "Period length __ days", at least 1). `RecurringEditor`:
   Spend | Income `PillSwitch`, "What is it? optional", `AmountWell` "How much each time?" with the
@@ -241,28 +258,128 @@ full-width trigger showing the chosen icon and "Parent › Sub".
 **More** chip (`CategoryPicker`'s `trigger` prop). The chips are
 `data/quickChips.ts#quickChips` over the last `QUICK_CHIP_LOOKBACK_DAYS` (90) of the type's
 ledger rows (`hooks/useQuickChips`, one `date`-index live query): the `QUICK_CHIP_COUNT` (4)
-most-used category/subcategory pairs, ties to the latest use, topped up with the catalog's
-first parents so a new user still sees a full row. Until the user picks, the entry files
+most-used categories, keyed by the leaf `categoryId` (`QuickChip = { categoryId }`), ties to
+the latest use, topped up with the catalog's first roots so a new user still sees a full row.
+An id the catalog no longer holds, or one of the other type, is never offered. Until the user picks, the entry files
 under the first chip; a type switch drops the pick. A pick from More that isn't a chip takes
 More's place, in its own colour, and reopens the list. Subcategories are saved.
 
-`CategoryIcon` resolves a row's glyph live — the **child's** icon when the row names one,
-the parent's otherwise. The surfaces that already hold a `ResolvedCategory` (the picker)
+- **Amount prediction.** `QuickAddCard` passes the typed amount (`useQuickChips(type, count,
+  { minor, currency })`, debounced 350 ms so "120" doesn't flash "1" and "12"). Every
+  category the same type was filed under for **that exact minor amount in that
+  currency** within `AMOUNT_MATCH_LOOKBACK_DAYS` (30) leads the row — all of them, even past
+  `count` — ranked like the frequent ones; the frequent/catalog chips follow. Since the entry
+  files under the first chip until the user picks, the best match becomes the default.
+- **No load flicker.** Both the catalog (`useCategoryCatalogState` keeps the last built
+  catalog at module level; `loaded` says it reflects the table) and the chips (`lastRanked`,
+  the amount-free ranking per type+count, keyed with `localDbGeneration()` too) seed a
+  remount's first render from the last result — never across a sign-out — and `useQuickChips` never ranks until *both* the ledger rows and the catalog have
+  loaded — so the row no longer steps built-ins → user catalog → favourites. A cold start
+  shows only More until the first real ranking, which then fades in.
+- **Motion.** `QuickCategoryChips` animates re-ranks with `src/hooks/useFlipLayout` — a
+  dependency-free FLIP over `[data-flip-key]` children (Web Animations API: moved chips
+  slide, new ones fade/scale in, reduced motion respected, a no-op in jsdom). The container
+  must be the chips' offset parent (`relative`). No framer-motion: reuse this hook for other
+  reorders before reaching for a library. Removed chips vanish (no exit animation).
+
+`CategoryIcon({ categoryId })` resolves a row's glyph live from the leaf id — a child's own icon
+(which the resolver already falls back to the parent's).
+
+**The editor draft** (`useTxEditor`) holds one `categoryId`; `setCategory(id)` sets it, a
+merchant's learned `CategoryPrediction { categoryId, apply }` applies (or is offered) only when
+the id is live and of the row's type, and a spend ↔ income switch keeps the pick only when
+`rootOf(id).type` matches, else takes the type's first root. The surfaces that already hold a `ResolvedCategory` (the picker)
 render `<Icon>`/`IconChip` directly rather than round-tripping a slug
 through a component that opens its own live query.
+
+### How the page reads the ledger
+
+The Spending page never loads the whole `transactions` table into its views — a ledger grows
+without bound, and every builder only ever looks at a few dates. **What each consumer needs:**
+
+| Consumer                                               | Dates it reads                                                                                                                                                 |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `buildCashflow`, `buildBreakdown`, `buildActivityList` | `windowOf(anchor, mode)` — a transfer's partner leg only counts when it is in that window too                                                                  |
+| `buildCalendar`                                        | the anchor month's whole-week grid (`calendarSpan`), which spills into the neighbouring months; the year in year mode                                         |
+| `buildBudgetsView`                                     | each live budget's `budgetWindow(period, customDays, today)` — **relative to today, not the anchor**, so browsing an old month still reads this month's budget span |
+| `buildRecurringView`                                   | none — schedules only; that tab never waits for the ledger                                                                                                     |
+| `scopeSections`, the `ConnectedTxEditor` accounts      | **every row**: a balance is opening + the whole ledger                                                                                                         |
+| opening a transfer row                                 | both legs by the `transferId` index (`readTransferLegs`) — a leg can sit on another date                                                                      |
+
+- **`data/ledgerRange.ts` — `ledgerRanges(anchor, mode, today, budgets)`** is the union of the
+  first three rows as merged, sorted, inclusive ISO spans (`mergeRanges`). Pure, tested alone.
+- **`data/ledgerReads.ts` — `readLedgerWindow(anchor, mode, today)`** reads the budgets, computes
+  the ranges and queries `transactions.where('date').inAnyRange(ranges, { includeUppers: true })`.
+  Reading the budgets **inside** the live query makes a budget edit that widens its span re-run
+  it. The answer (`LedgerWindow`) is tagged with the period it was read for **and carries the
+  budgets it computed the ranges from**; the budgets view is built from those, never from
+  `useTransactions`' faster budget list — otherwise a newly added or widened budget is summed
+  for one render over rows read for the old ranges. **Rows are sorted by id** before they leave:
+  a full-table read returns primary-key order, the date index returns date order, and the
+  builders' stable sorts (`buildCashflow`, `buildBreakdown`) break equal totals by arrival —
+  so date order could swap the "Top: …" category. It relies on dates being wire ISO
+  `YYYY-MM-DD`, where string order is date order.
+- **The one full read is `readWalletDeltas(rates)`.** It reduces inside the live query, so only
+  the per-wallet map reaches React. It cannot be windowed without stored aggregates, which were
+  declined. It waits for the rates to load (so a mount costs one full read, not two), and only
+  the account filter's balances and the editors wait for it — the filter lists its accounts at
+  once (`scopeSections` over empty deltas) with skeleton balances until then.
+- **Stepping periods never flashes.** `useLedgerWindow` wraps `useLiveQuery`, which
+  (dexie-react-hooks 4) keeps the previous answer across a deps change, and `useSpendingViews`
+  builds the ledger views for the period **the rows were read for**, not the one in state — so the
+  old period stays whole on screen until the new one lands (`hooks/useLedgerWindow.test.ts` pins
+  the hook side). `useSpendingViews` returns `period` (`mode`, caption, `todayIs`) for the period
+  on screen — the loaded one, else the one asked for — and `DaysCard`, the hero and the donut
+  take it from there rather than from `useSpendingPeriod`, so a header always matches its grid.
+- **Views are memoized and built per tab** (`hooks/useSpendingViews`): one `useMemo` per builder,
+  keyed on its real inputs (`scopeToValue(scope)` rather than the scope object, ISO strings
+  rather than `Date`s), each `null` unless its tab is showing — Activity builds
+  cashflow/calendar/list/breakdown, Budgets and Recurring one view each. Unfolding the calendar
+  rebuilds only the calendar. `useMergedRates` returns a new object every render, so
+  `useTransactions` memoizes `mergeRates` on the config store's slices instead, keeping `rates`
+  stable.
+- **Loading skeletons only the figures, never zeros, never whole cards.** Every card renders
+  for real from the first frame — frame, headings, static labels ("Income", "Spent", "Net",
+  "on track"…), the mode switcher, prev/next/Today, the period caption (it derives from the
+  anchor, not data), Add buttons and the quick-add form. Only data-driven parts wait:
+  - a card takes a **nullable view** (`null` = loading) and draws each figure through the shared
+    `ValueOrSkeleton` (`src/components/`) — the value, or a skeleton sized like it; bars and the
+    donut get a skeleton of their own shape; list cards draw `SkeletonRows` inside the real list
+    body. Empty states only show once a view has loaded.
+  - the calendar lays out its real days before any figure lands (`buildCalendar` over no rows),
+    and `loading` puts a skeleton where each cell's net would be.
+  - `ScopeSelect` keeps its trigger and accounts; `balancesLoading` skeletons the balances.
+    `QuickAddCard` takes `symbol: null` while the wallets load.
+  - The page marks the grid `aria-busy` and announces through one `sr-only` `role="status"`;
+    skeletons are `aria-hidden`. The shadcn `Skeleton` (`components/ui/skeleton.tsx`) sits on
+    `bg-accent` (= `fp-surface-2`), so it follows light/dark; placeholders use logical sizing only.
+  - `useTransactions().loading` covers every input — settings resolve to `null`, not
+    `undefined`, when there is no row, so "none" is not "still loading".
+  - `components/loadingCards.test.tsx` pins it: with a `null` view each card shows its chrome,
+    skeletons in place of figures, and no digit (bar the calendar's day numbers).
+- `hooks/useSpendingPeriod` owns the range mode and anchor (step, re-anchor on a mode change,
+  pick a month/day); `hooks/useActivityRowClick` opens a row's editor.
+- **The equivalence test.** `data/ledgerReads.test.ts` seeds fake-indexeddb with 2½ years of
+  spends, incomes, split-date and one-legged transfers, adjustments, deleted rows and
+  weekly/monthly/custom budgets, and asserts every builder gives **identical** output from the
+  window and from the full ledger (in primary-key order, with random ids so that is not date
+  order) — 15 period/today combinations (year mode, week and year edges, past months while
+  budgets stay relative to today, and a month of equal category totals whose date order is the
+  reverse of their id order) × 4 scopes.
+  `hooks/useSpendingViews.test.ts` counts builder calls per tab and per re-render.
 
 ## Transfers between wallets
 
 A transfer is **two ledger rows sharing a `transferId`**: a `transfer_out` leg on the source
 wallet and a `transfer_in` leg on the destination, each in its own wallet's currency, with
-`category`/`subcategory`/`goalId`/`merchantId` all null, and `source` null unless an import
+`categoryId`/`goalId`/`merchantId` all null, and `source` null unless an import
 wrote it (then both legs carry `csv:<batchId>`). There is no transfer table:
 the legs live in `transactions` and come back through the ordinary ledger delta.
 
 - **Types.** `TxType` stays `spend | income`. It is what categories, recurring schedules,
   merchants' learned type, imports and integrations mean by a type, and the server refuses
   transfer types in all of them. Only ledger rows use the wider `TransactionType`
-  (`TxType | TransferLegType | AdjustmentType`), and `Transaction.category` is
+  (`TxType | TransferLegType | AdjustmentType`), and `Transaction.categoryId` is
   `string | null` (null on a leg and on a [balance adjustment](#balance-adjustments)).
   `isTransferLeg`, `isAdjustment` and `isCashflow` (spend or income) are the guards — test
   for cash flow with `isCashflow`, never with "not a transfer". The editor has its own `EditorTxType`
@@ -336,7 +453,7 @@ The user types a wallet's **real** balance and the app records the gap as one le
 type `adjustment_in` / `adjustment_out` (wire `ADJUSTMENT_IN` / `ADJUSTMENT_OUT`). The amount
 is positive; the sign comes from the type, as for transfer legs. It moves the wallet's derived
 balance and nothing else — **never** income, Spent, the donut, the calendar, a budget, a goal
-or a report. `category`, `subcategory`, `goalId`, `merchantId`, `plannedId` and `transferId`
+or a report. `categoryId`, `goalId`, `merchantId`, `plannedId` and `transferId`
 are all null; `currency` is the wallet's own; `source` and `note` are allowed. The server
 refuses the links (`spending.transaction.adjustment_refs`), another currency
 (`…adjustment_currency`) and a PATCH across cash flow ↔ adjustment (`…type_change`).
@@ -369,7 +486,7 @@ refuses the links (`spending.transaction.adjustment_refs`), another currency
 ## Confirmed planned items in Activity
 
 Activity never lists planned rows — only what settled them. `useTransactions` adds the goal
-reservations (`allocations`) and `goals` to `SpendingData` (both optional, so the pure tests
+reservations (`allocations`) and `goals` to `SpendingInputs` (both optional, so the pure tests
 need not pass them).
 
 - **Tag pill.** `TxRow.tag` (`txTagOf`): a transaction with a `plannedId` reads "Income"
@@ -384,6 +501,34 @@ need not pass them).
 - **Nudge.** When `usePlanned().dueCount > 0` the Activity tab leads with `PlannedNudge`
   ("● N planned waiting for you to confirm · Review →"), which switches to the Planned tab; the
   tab's label carries the same count as an amber pill.
+
+## Sync failures on ledger rows
+
+A ledger row whose queued change the server could not take shows a **badge** instead of silently
+diverging ([data-layer-and-sync.md](data-layer-and-sync.md#failed-pushes-flag-hold-retry--never-drop)).
+
+- **One live query per list.** `TransactionList` calls `useFailedSyncIds(LEDGER_SYNC_ENTITIES)`
+  (`transaction` + `transfer`) once and hands each row `failures.get(row.id)` — a transfer row's
+  id is its `transferId`, which is also its outbox key. Never one query per row.
+- **`RowSyncBadge`** (feature wiring: `describeSyncFailure` with the names the row shows —
+  `syncContextOf` in `data/syncFailures.ts`, "Deleted account" never used as a name — plus
+  `useSyncRetry`) renders the shared `components/sync/SyncFailureBadge` next to the amount on
+  spend/income rows, transfers and adjustments. Set-asides are allocations and carry none yet.
+- **`SyncFailureBadge`**: amber `CloudOff` (`fp-warn`) while unavailable, red `TriangleAlert`
+  (`fp-danger`) once rejected; `aria-label` "Not synced: <title>". Hover or focus shows a
+  tooltip (title, detail, hint); a press — the only path on touch — opens a popover with the same
+  text plus **Retry now** and, when `canFixByEditing`, **Edit** (the row's own click). The badge
+  is wrapped in a span that stops click propagation: Radix portals the popover, but React still
+  bubbles its events through the row, so without it every press in the popover would open the
+  editor. The tooltip is forced shut while the popover is open.
+- **Dialog banner.** `TransactionDialog` reads `useRowSyncFailure(isTransfer ? 'transfer' :
+  'transaction', id)` and leads the form with `SyncFailureBanner` (a compact `Alert`: title,
+  hint, Retry now). `useFlaggedField` maps a rejected failure's `field` onto the draft
+  (`wallet_id` → the account pill, `amount`/`to_amount` → the amount hero, `category_id` /
+  `merchant_id` / `date` → their `TxSection`, `goal_id`/`planned_id` → Counts toward,
+  `from_/to_wallet_id` → the transfer side cards) and marks it **until the user changes that
+  value**. Saving coalesces into the queued entry and clears the flag, so it retries at once. The
+  adjustment editor shows the same banner (`RowSyncBanner`) without field marks.
 
 ## Tests
 

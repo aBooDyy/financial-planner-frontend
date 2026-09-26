@@ -25,11 +25,23 @@ Alternatives considered (record if we ever switch):
 
 ## Tables
 
-**The whole schema is declared at a single `this.version(1).stores({...})`.** The app has never
-shipped, so no installed client's database needs walking forward — an upgrade chain here could
-only ever migrate a developer's own browser profile. Adding a table or an index means editing
-that one declaration: the schema is simply whatever it currently says. The first release ends
-that — from then on the next change is `version(2)` carrying a real `.upgrade()`.
+**The whole schema is declared once, at its current version** (`this.version(2).stores({...})`
+in `db/db.ts`). Dexie diffs the declaration against whatever is installed, so older versions
+need no declaration of their own; adding a table or an index means editing that one
+declaration and, when installed data cannot follow, bumping the version with an `.upgrade()`.
+
+- **Version 2 (category ids) is a one-off wipe.** Rows stopped naming categories by slug pair
+  and now carry a `categoryId` ([categories.md](categories.md)); a local row or a queued
+  payload in the old shape cannot be translated without the server's ids. The upgrade clears
+  every table in `SYNCED_TABLES` — every synced/server-cached table **plus the outbox and
+  `syncState`** — so the next pull is a first sync (delta streams re-read from `since: null`,
+  full lists replace). **Unpushed writes are discarded**; push before shipping a build that
+  bumps the version. `appConfig` (no user data) and `importBatches` (local history; its rows
+  come back with the re-pull, found by their `source` marker) survive. `db.test.ts` opens a
+  real v1 database and pins what survives.
+- **`categoryId` is indexed on `transactions`, `recurrings` and `plannedTransactions`**: the
+  category delete re-files by it and the Settings tree counts rows per category by it.
+- `AppDatabase` takes the database name (default `'means-app'`) so a test can open its own.
 
 - One Dexie table per synced entity (accounts, transactions, categories, budgets,
   obligations…), keyed by the server **id** (use client-generated UUIDs so records exist
@@ -92,7 +104,7 @@ that — from then on the next change is `version(2)` carrying a real `.upgrade(
     only those two ops: an import queues one create per row and they reference
     wallets/categories/merchants queued _before_ them, never each other, so a batch cannot race
     its own prerequisite — while a batch of `node` creates could push a child ahead of its
-    parent and earn a 422 the drain would then discard. Every other entry is still a run of one,
+    parent and earn a 422 for a row that was fine. Every other entry is still a run of one,
     so ordering between entities is unchanged.
   - **A run never mixes ops, and that is what keeps a row's create ahead of its delete.**
     `bulkRunLength` extends a run only while the next entry has the _same_ `op`, so a page
@@ -104,7 +116,8 @@ that — from then on the next change is `version(2)` carrying a real `.upgrade(
     `POST /transfers/bulk-delete`, capped at `transaction_bulk_max`): an import writes hundreds.
     One entry is one transfer (both legs), and the per-item results are read exactly like the
     ledger's — `CREATED`/`ID_TAKEN` store the returned legs (a taken id that is not ours marks our
-    legs clean and runs one pull), `INVALID` drops the entry, every delete answer is terminal.
+    legs clean and runs one pull), `INVALID` flags the entry, a deleted or missing answer to a
+    delete is terminal.
     Transfer updates stay singular.
   - **`planned` creates batch the same way** (`POST /planned-transactions/bulk`, capped at
     `limits.planned_bulk_max`): the planner's first pass over an account writes dozens. The
@@ -119,19 +132,20 @@ that — from then on the next change is `version(2)` carrying a real `.upgrade(
     item** and each is settled on its own terms: `CREATED` → store the row, drop the entry;
     `ID_TAKEN` → the write already landed, so store the row the server sends back (the
     caller's own row, absent when the id belongs to someone else) and drop the entry;
-    `INVALID` → no retry of the same payload can succeed, so drop it — the same rule the
-    singular path applies to a non-network failure. An entry the response does not mention
-    stays queued.
-  - **A delete's answer needs no reading at all.** `DELETED` / `NOT_FOUND` / `INVALID` are all
-    **terminal** — the row is gone, nothing of ours ever stood behind that id, or the id is
-    unusable and resending it cannot change that — so `pushTransactionDeletes` drops every entry
-    the response _mentions_ and leaves the rest queued. There is no version in the request
+    `INVALID` → flag the entry as rejected with the item's `error_code` / `error_field` and
+    keep it — the same rule the singular path applies to a rejection
+    ([Failed pushes](#failed-pushes-flag-hold-retry--never-drop)). An entry the response does
+    not mention stays queued.
+  - **A delete's answer is nearly always terminal.** `DELETED` / `NOT_FOUND` settle it — the
+    row is gone, or nothing of ours ever stood behind that id — so `pushTransactionDeletes` drops
+    those entries; `INVALID` (a transfer leg, a malformed id) is flagged like any rejection, and
+    an entry the response does not mention stays queued. There is no version in the request
     either: a queued delete carries `baseVersion: null`, ownership is the server's guard, and a
     row edited elsewhere since still deletes. That is the point — the user asked for it to go.
-  - **A failure of the batch endpoint itself is not a per-item verdict.** A network error
-    keeps the whole run queued; any other error (a 500, a fault that judged no entry)
-    **falls back to the singular path for that run**, which isolates the one row the server
-    refused rather than discarding the rest of the batch.
+  - **A failure of the batch endpoint itself is not a per-item verdict.** An unavailable
+    answer (network, `408`, `429`, `5xx`) keeps the whole run queued, flags only its head, and
+    stops; a rejection of the whole batch **falls back to the singular path for that run**,
+    which isolates the one row the server refused rather than flagging the rest of the batch.
   - **Batch size and concurrency are separate levers and both were measured.** Batching
     alone left the client idle through a whole server-side insert before starting the next
     batch, which independent batches never need to do — the old 6-at-a-time pipelining had
@@ -147,7 +161,8 @@ that — from then on the next change is `version(2)` carrying a real `.upgrade(
     2 608-row undo and asserts the batch sizes are `[1000, 1000, 608]`.
   - `2xx` → store the returned record + new `version`, clear `dirty`, remove from outbox.
   - **`409` conflict** → the server row moved on. Reconcile (see below).
-  - Network error → keep in outbox, retry with backoff.
+  - Anything else → keep in the outbox and **flag** it; see
+    [Failed pushes](#failed-pushes-flag-hold-retry--never-drop).
 - **Pull**: `pullAll()` fans out to eight collection pulls in one `Promise.all`, single-flight
   and best-effort (a failed pull just retries on the next trigger). Each upserts into its local table, **unless** the local record
   is `dirty` (then it's a conflict). Five of the streams read a delta and the rest read the full
@@ -277,6 +292,67 @@ deliver, `full_resync_required` running the full pull first, a watermark dying w
 `since` restarting as a first sync. Backend mechanism:
 [sync.md](../../financial-planner-backend/.agent-context/sync.md).
 
+## Failed pushes: flag, hold, retry — never drop
+
+A change the server cannot take is **kept and flagged**, never deleted. Dropping it (the old rule
+for any non-network error) left the local row `dirty` forever: pulls skip dirty rows, so the
+change lived only on this device, quietly diverged from the server, and the user never knew.
+The pieces live in `db/syncFailure.ts` (classification, flagging, the reads) and
+`db/syncRetry.ts` (manual retry); the drain is `drainPass` in `db/sync.ts`.
+
+**The flag is three non-indexed fields on `OutboxEntry`** (no Dexie version bump):
+`failure: SyncFailure` (`kind`, `status`, `code`, `field`, `message`, `at`), `attempts` (how
+many times the server has _rejected_ it) and `nextAttemptAt` (no automatic retry before it).
+
+| Result of a push | Treatment |
+| --- | --- |
+| network (`0`), `408`, `429`, `5xx` | **unavailable** — flag the attempted entry, **stop draining** (every later entry would fail the same way). Retried on the next flush (800 ms debounce, 30 s safety net). |
+| `409`, `404` | the feature handler's own path, unchanged (rebase, adopt, 404-drops-the-row, 404-on-delete is success) |
+| `400`, `403`, `422`, any other 4xx, a non-`ApiError` throw | **rejected** — flag, `attempts += 1`, `nextAttemptAt = at + 1 / 5 / 15 / 60 min` (capped), **keep draining past it** |
+| `401` that survived the refresh | stop draining, flag nothing (the session is ending) |
+| bulk item `INVALID` | rejected, from the item's `error_code` / `error_field` (no message on the wire) |
+
+- **A whole-batch failure** that is unavailable flags **only the head** of the batch — the rest
+  were never judged and stay plainly pending — and stops. A whole-batch _rejection_ falls back to
+  the singular path, which isolates the one row the server refuses.
+- **The drain walks the queue once per pass**, with a `seq` cursor (`where('seq').above(after)`),
+  because kept entries would otherwise be re-read from the head forever. An entry re-queued by its
+  own handler during a pass (the category re-slug) goes out on the next flush.
+- **Backoff.** A rejected entry whose `nextAttemptAt` is in the future is skipped.
+- **Same-row hold.** A pass keeps a `blocked` set of `entity:id` keys: a row whose entry failed,
+  is backing off, or is still queued after its push (an unanswered bulk item). Every later entry
+  of that row is **held** — never pushed ahead of it — and joins the set. Without this an update
+  behind a refused create would earn a `404`, and a `404` deletes the local row. A transfer is keyed
+  `transfer:<transferId>`, one entry for both legs, so it holds the same way. A bulk run is cut short
+  at the first held entry.
+- **Releasing dependants.** When an entry that had failed before is gone after its push, the pass
+  ends by clearing `nextAttemptAt` on every rejected entry (`releaseRejected`) and goes round
+  again: a ledger row refused because its wallet's create had failed retries right after that
+  create lands.
+- **A verdict belongs to a payload.** `flagEntry` writes nothing when the entry was settled or
+  re-queued with a different payload while the request was out.
+- **Editing a flagged row clears it.** Every coalescing site (`enqueueUpsert` in each feature,
+  the transfer update, planned `savePlanned`, wallets/settings/rates/templates) and every
+  payload rewrite (the category refile, the merchant adopt) writes through `requeued(entry)`,
+  which drops `failure` and `nextAttemptAt` and keeps `attempts`. The next flush sends it at
+  once — this is how the user fixes a refusal themselves.
+- **Rebase fallbacks only accept the server copy on a second `409`.** They used to accept it on
+  any error, so a `422` or an outage in the rebase retry silently threw the user's edit away;
+  anything else now propagates and is classified above.
+- **Manual retry.** `retrySync(entity, id)` clears `nextAttemptAt` (keeps `attempts`) on that
+  row's entries and flushes; `retryAllFailed()` does it for every flagged entry — exposed for a
+  future global indicator, with no UI yet.
+- **Reads.** `failuresByRow(entities)` returns the first failure per row id in one scan of the
+  outbox (`useFailedSyncIds` — **one live query per list**, never one per row);
+  `failureOfRow(entity, id)` reads one row by `[entity+id]` (`useSyncFailure`). Wording lives in
+  `lib/syncFailureMessages.ts` (`describeSyncFailure`), keyed by the code's last segment and
+  reusing `lib/errorMessages.ts` for the refused-value codes. Only ledger rows show it today
+  ([transactions.md](transactions.md#sync-failures-on-ledger-rows)); the data layer is generic.
+- Tests: `db/syncFailure.test.ts` (classification, hold, backoff, retry, release),
+  `db/sync.test.ts` (bulk `INVALID` and whole-batch failures),
+  `features/transactions/data/editClearsSyncFailure.test.ts`, `lib/syncFailureMessages.test.ts`,
+  `features/transactions/components/TransactionList.syncBadge.test.tsx`.
+
 ## Conflict handling (`409` / version mismatch)
 
 - The backend is authoritative on conflicts via the `version` column (root
@@ -288,8 +364,9 @@ deliver, `full_resync_required` running the full pull first, a watermark dying w
     `version`), **re-applies the pending local mutation** on top, and **retries once**. The
     user's most recent action wins.
   - Whole-record LWW: a local delete still wins over a server update, and vice versa.
-  - This never silently discards the user's own latest intent. If a retry still conflicts
-    repeatedly, **surface it** to the user rather than looping.
+  - This never silently discards the user's own latest intent. If the retry conflicts
+    again, the server copy is accepted rather than looping; if it fails any other way, the
+    entry is flagged and kept like any failed push.
 
 ## Auth & HTTP
 
@@ -320,8 +397,9 @@ deliver, `full_resync_required` running the full pull first, a watermark dying w
   refresh would be destroying the user's writes to report a problem it cannot even diagnose. (A
   retry that still `401`s does not sign out either; it just propagates.) The refresh failure
   deliberately replaces the caller's `401` with its own — usually `common.network` — which the
-  sync engine already reads as "keep the outbox and back off".
-- `clearLocalDb()` empties all 19 user tables, `syncState` among them, and **keeps `appConfig`**:
+  sync engine reads as "keep the outbox, flag it unavailable, and stop".
+- `clearLocalDb()` empties every user table (`USER_TABLES`: the synced tables, `outbox`,
+  `syncState` and `importBatches`) and **keeps `appConfig`**:
   it holds no user data, and keeping it means the next sign-in already knows the currency table
   offline. It also resets the pull state (so the planner waits for the next user's first pull)
   and bumps `localDbGeneration()` first: a server-owned cache whose pull was already
@@ -388,15 +466,35 @@ is pushed **after** the parent is gone and fails forever — a permanently stuck
 for a change the user already saw succeed. Dropping those ops inside the same transaction as
 the local delete is what prevents it, and it is covered by explicit tests on both sides.
 
+What was filed under the subtree follows the same rule as a wallet's dependants: the
+server rewrites every dependant, and the local side mirrors it in the same Dexie transaction
+**without** per-row outbox ops, rewriting only the payloads already queued. A category in use
+must move (`move_to`); one not in use unlinks its config references
+([categories.md](categories.md#moving-what-is-filed--datarefilets)).
+
+**A rewritten reference must not overtake its target.** The outbox drains in `seq` order, so a
+queued payload rewritten in place to name a category whose own `create` is queued _later_ would
+reach the server first, be refused, and be dropped. When that is the case the row's entries are
+deleted and re-added (in their order) behind the target's create.
+
+**Remap on a create conflict.** A client-minted id is the one references are written with
+before the server has seen it. When a category create comes back `409` because the server
+already holds the same `(parent, slug)` — of the same type — under another id, every local
+reference and queued payload is remapped onto the server's id before the local row is dropped
+(a root of the other type is a different category: the local one re-slugs and retries)
+([categories.md](categories.md#local-rows--sync)). Merchants have the same shape
+(adopt-and-remap, [merchants.md](merchants.md)).
+
 ## Bulk writes: the CSV import
 
 A CSV import is the one place hundreds of rows are written at once, so it bypasses the
 per-row mutations without leaving the pattern (`features/import/data/commit.ts`):
 
 - Entities the mapping promised to create (wallets, categories, merchants) are materialised
-  **first**, through their owning feature's mutations, under the **exact id or slug the rows
-  already carry** — the wizard mints those while mapping, so there is no alias-rewriting step
-  and a failure here leaves nothing imported.
+  **first**, through their owning feature's mutations. Wallets and merchants are created under
+  the **exact id the rows already carry** (minted while mapping); a category is created under
+  the slug minted while mapping, and the rows' placeholder `new-category:<parentId>:<slug>` id
+  is swapped for the id that comes back. A failure here leaves nothing imported.
 - Rows are then written in **200-row chunks**, one Dexie transaction per chunk
   (`bulkAddTransactions` in the transactions slice: `bulkPut` the rows, `bulkAdd` their outbox
   creates), yielding to the event loop between chunks so a 10 000-row import stays responsive.
@@ -451,10 +549,11 @@ server-side increment, so a use bump is an ordinary, rebasable `PATCH` queued li
 
 - Everything works offline: reads from local DB, writes queue in the outbox. On reconnect
   the engine flushes the outbox and pulls updates. Surface a subtle sync/offline indicator.
-- **That indicator does not exist yet**, and it is now owed something: an op the outbox had
-  to _park_ rather than retry (today only a name-conflicted import template) has no global
-  cue and is visible only on its own Settings card. Build the two together — a piece of
-  global chrome whose sole occupant is one parked template would be the wrong shape.
+- **That indicator does not exist yet**, and it is now owed two things: an op the outbox had
+  to _park_ rather than retry (a name-conflicted import template, visible only on its Settings
+  card), and **flagged entries** of every entity other than ledger rows — only transactions,
+  adjustments and transfer legs show their badge today. `retryAllFailed()` is already there
+  for it. Build them together.
 
 ## Exception: Email sync and inbound imports (online-only, server-owned cache)
 

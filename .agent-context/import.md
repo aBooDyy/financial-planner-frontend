@@ -208,33 +208,51 @@ sixth live query, the single settings row, is read for one field and needs none 
   reads it off the header; the export format was deliberately _not_ changed, because
   anyone's existing scripts read it.
 - **Aliases are the whole contract between step ③ and the rows.** `Aliases` maps a
-  **normalised file value** to what it means here — a wallet id, a category slug, a merchant
-  id, a `TxType`, a currency code. `rows.ts` looks each cell up under exactly that key and
+  **normalised file value** to what it means here — a wallet id, a category id (a root's, or a
+  child's when the value names a subcategory), a merchant id, a `TxType`, a currency code. `rows.ts` looks each cell up under exactly that key and
   step ③ writes under it; nothing else passes between them.
-- **A `create` target carries its final client id or slug** (`crypto.randomUUID()` for a
-  wallet or a merchant, a deduped `slugify` for a category), minted in the dialog. Rows
-  therefore carry real ids from the moment they are derived, and the commit only has to
-  materialise the entity under them — there is no alias-rewriting pass after creation.
+- **A wallet or merchant `create` target carries its final client id** (`crypto.randomUUID()`),
+  minted in the dialog, so those rows carry real ids from the moment they are derived and the
+  commit only materialises the entity under them.
+- **A category `create` target carries a slug, not an id** — `{kind:'create', parentId, name,
+  type, slug}`. `createCategoryWithSlug` mints the id (and returns an existing sibling's when
+  the slug is taken), so rows filed under a create carry `pendingCategoryId(target)`
+  (`new-category:<parentId>:<slug>`, unique because sibling slugs are) until the commit swaps in
+  the real one. `ReviewStep` offers pending creates under the same value, so the row editor and
+  the labels read them like any other category.
 - **A category created here can be a subcategory.** `CreateCategoryDialog` offers a parent
-  `Select` over the user's root categories (plus "— Top level —"), and the resulting
-  `CategoryTarget` of kind `create` carries **the pair** — the parent's slug in `category`
-  and the new child's in `subcategory` — plus `parentId`, `name` and `type`, because a child
-  slug is meaningless without its parent. A chosen parent is also where the type comes from.
-  `takenSlugs(parentId)` is **sibling-scoped**, counting pending creates under the same
-  parent, so an import may mint `other` under two different parents in one run. `commit.ts`
-  calls `createCategoryWithSlug` with a **blank colour** for a parented create, so the create
-  service inherits the parent's — matching what the local mutation writes.
-- **Both target kinds name the pair**, so `readCategory` returns `{ category, subcategory }`
-  for a create exactly as it does for a binding — a row filed under a category the import is
-  about to make keeps its child.
+  `Select` over the user's root categories (plus "— Top level —"); a chosen parent is also
+  where the type comes from. The slug is minted there (`uniqueSlug`), and `takenSlugs(parentId)`
+  is **sibling-scoped**, counting pending creates under the same parent, so an import may mint
+  `other` under two different parents in one run. `commit.ts` calls `createCategoryWithSlug`
+  with a **blank colour** for a parented create, so the create service inherits the parent's —
+  matching what the local mutation writes.
 - **The candidates are the user's own catalog, never the built-ins.** `useCsvImport` builds a
   `CategoryCatalog` from its `categories` Dexie read ([categories.md](categories.md)) and
-  flattens it with `categoryOptions(catalog)` — each parent, then each of its children as the
-  pair a transaction stores, with `"<parent> <child>"` as an extra match key.
-  `fallbackCategoryOf(catalog)` picks the step-② default: the user's own `other` when they
-  kept one, otherwise their first spending category — never a built-in slug they have renamed
-  away from. `DraftSeed.fallbackCategory` is **required, not defaulted**, for the same reason
-  the selectors' catalog param is: the compiler names every call site.
+  flattens it with `categoryOptions(catalog)` — each parent, then each of its children, by
+  `id` / `parentId`, with the name (and `"<parent> <child>"` for a child) as the match keys; a
+  select's value is the id. Slugs are not match keys: child slugs repeat across parents and
+  would turn clean name matches into ties.
+- **The default is one per direction.** `MappingDefaults.categoryIds: Record<TxType, string>`
+  — a category belongs to one type and the server refuses a row filed under the other
+  (`*.category_type_mismatch`), so money out and money in each fall to their own. Step ② shows
+  two selects (each type's roots with their children indented — a template may name a child);
+  `fallbackCategoriesOf(catalog)` seeds them from `catalog.fallbackFor(type)` (`other` /
+  `other_income`, else the type's first root). `readCategory` takes the row's direction, and a
+  review edit that flips a row sitting on its old direction's default (a guess, a skipped
+  category, a movement turned into spending) moves it to the other default (`applyRowPatch`). `DraftSeed.fallbackCategories` is
+  **required, not defaulted**, for the same reason the selectors' catalog param is: the
+  compiler names every call site.
+- **A category of the other direction is an error, not a silent swap.** `RowContext.categoryTypes`
+  (every catalog id plus the import's pending creates, `categoryTypesOf`) lets `validateRow` flag
+  `import.row.category_type_mismatch` on a cash-flow row. The draft is kept (`draftFrom` ignores
+  this one error) so the row editor opens on it; `isCommittable` holds it back. A cash-flow row
+  whose id is **not in `categoryTypes` at all** gets `import.row.category_missing` (an error): a
+  review edit still naming a create the mapping no longer makes (`new-category:` placeholder),
+  a category deleted mid-session, or an empty default because the catalog was not loaded — none
+  of which may reach the ledger. A merchant's learned category is applied (and suggested) only
+  when `categoryTypes` holds it **with the row's direction** (`predictRow` takes the map), so a
+  stale or other-direction learned id never slips past these checks.
 - **Resolution policy is split on purpose.** Wallets, categories and merchants resolve
   **only** through explicit aliases — auto-filing money into an account nobody chose is not a
   guess worth making. Types and currencies fall back to matchers, because they are closed
@@ -262,8 +280,8 @@ income. They are recognised in step ③ and settled in the pass.
   They are **proposed**, never forced: a value matching `/transfer/i` → transfer, `/adjust/i` →
   adjustment, ahead of the category matcher — `auto` for the exact phrases ("Transfer", "Balance
   adjustment", "Adjust balance"…), `check` for a value that merely contains the word ("Bank
-  transfer fee"). Templates keep both as they are (`settledCategory` and `applyTemplateConfig`
-  only touch `create`/`category`); `createPendingTargets` ignores them.
+  transfer fee"). Templates keep both as they are (settling and `applyTemplateConfig` only
+  touch `create`/`category`); `createPendingTargets` ignores them.
 - **`RowIntent`** (`cashflow | transfer | adjustment`) rides on `RowFacts` and `ParsedRow`
   (`readCategory` returns it). The draft stays a `TransactionDraft` whatever the intent — its
   `type` is the **direction** (`spend` = money out of the row's wallet, `income` = in), and it
@@ -519,18 +537,37 @@ table `importTemplates` (**v9**), synced through the ordinary outbox.
   pre-selects the match, and _Continue_ goes straight to ④ when a template resolved into a
   complete mapping; ② and ③ stay reachable from the rail.
 - **`ImportTemplateConfig` is the `MappingDraft` plus its own `version`**, and nothing
-  transient. Every save stamps `TEMPLATE_CONFIG_VERSION = 1`; nothing reads it back yet, it is
-  there so a later format change can tell the shapes apart. `parseTemplateConfig` is tolerant:
-  a blob that is not JSON, not an object, or missing a part the apply step reads returns
-  `null`, and the row is cached and listed as **needs rebuilding** — still renamable and
-  deletable, never overwritable, so a mapping this client failed to read is not destroyed.
+  transient. Every save stamps `TEMPLATE_CONFIG_VERSION = 2`: categories by id, in the aliases
+  and in `defaults.categoryIds`. A **version-1** blob (categories as slug pairs, one default
+  `category`/`subcategory`) is still read — `StoredTemplateConfig` is the union, `isConfigV1`
+  tells them apart — and `upgradeTemplateConfig(stored, catalog)` (run by `applyTemplateConfig`)
+  looks each pair up with `catalog.bySlug(child, parent)` / `bySlug(root)`: a match is kept by
+  id, a pair with no match is dropped and reported like a deleted target. The old default keeps
+  its own direction; the other direction gets `fallbackFor`. The next save writes it back as
+  version 2. `parseTemplateConfig` is tolerant: a blob that is not JSON, not an object, or
+  missing a part the apply step reads (for version 2 that includes `defaults.categoryIds`, for
+  version 1 `defaults.category`) returns `null`, and the row is cached and listed as **needs
+  rebuilding** — still renamable and deletable, never overwritable, so a mapping this client
+  failed to read is not destroyed.
 - **Applying re-checks the world.** `applyTemplateConfig(config, columnCount, catalogue)`
   drops wallet/category/merchant answers whose target no longer exists and returns them as
   `UnknownAlias[]`, rendered by `TemplateNotice` and re-asked in step ③, so no row can resolve
-  to a dead id. A saved role list is aligned to the open file's width (`skip`-padded or
-  truncated) rather than silently mis-read. `create` targets are **settled** into plain
-  bindings when saved — at commit time they exist — so a template can never resurrect a
-  deleted account. Restoring a saved dialect that changes how the file is _parsed_ triggers
+  to a dead id — a default category that is gone, or no longer of its direction, falls to
+  `fallbackFor(type)` and is reported as a `default` notice. A saved role list is aligned to the
+  open file's width (`skip`-padded or truncated) rather than silently mis-read. `create`
+  targets are **settled** into plain bindings when saved, so a template can never resurrect a
+  deleted account: wallets and merchants in `configFromDraft`, categories after the commit by
+  `withCreatedCategories(config, result.createdCategories)` (`useImportCommit`), because only
+  then do they have ids — a create the commit did not make is left out, and one found in a
+  stored config is dropped on apply. _Save as template_ on the Done screen first re-reads
+  those ids (`liveCreatedCategories` in `commit.ts`): a create pushed in the meantime may have
+  been remapped onto a server twin, and the template must name the twin. A template is only
+  applied once the catalog has loaded (`useTemplatePicker`), or every category answer would
+  read as deleted. Each `default` notice has its own key (`spend` / `income` / `wallet`).
+- **A category id can change under a saved template.** When a category created on this device
+  comes back from the server under another id (slug taken there), `remapTemplateCategories(
+  fromId, toId)` (`data/mutations.ts`, over the pure `remapTemplateCategoryIds`) rewrites the
+  local rows and their queued payloads; the categories slice's remap calls it. Restoring a saved dialect that changes how the file is _parsed_ triggers
   one re-read, then re-applies.
 - **Saving is explicit** — _update "X"_ / _save as new_ / _don't save_. A one-time mapping
   writes nothing at all, pinned by a test. One deliberate exception: a _saved_ template the
@@ -550,8 +587,11 @@ rows and their outbox entries land in Dexie, and **one** `schedulePush()` lets t
 drain them whenever the network is there. An import committed on a plane is a correct ledger
 on a plane.
 
-The order in `data/commit.ts`, and no other: materialise every `create` target under the exact
-id or slug the rows already carry → file the file's own spelling as an `import`-origin alias on
+The order in `data/commit.ts`, and no other: materialise every `create` target — wallets and
+merchants under the ids the rows already carry, categories through `createCategoryWithSlug`,
+queued **before** any row filed under them, with the pending id → created id map kept
+(`CommitResult.createdCategories`) and applied to each draft's `categoryId` as it is written →
+file the file's own spelling as an `import`-origin alias on
 every bound merchant → write rows in **200-row chunks**, one Dexie transaction each, with a
 `setTimeout(0)` yield between them → the batch record last, in its own transaction → one push.
 The rows arrive as a **`CommitSource`**, not an array: `rowsAt(start, end)` builds one chunk at
@@ -587,7 +627,16 @@ would, for the pairing, commit and undo tests). They are the
 regression suite for detection, role suggestion, amount parsing and dedupe at once — add a new
 bank shape here before fixing it anywhere else. `__fixtures__/useStubImport.ts` is a working
 stand-in for the spine (the same pass and the same lazy reader, run synchronously) for
-component tests.
+component tests; it defaults to a freshly seeded account's catalog (`defaultCategoryRows()`,
+ids from `catId`).
+
+Categories by id: `data/templates.test.ts` (the v1 → v2 upgrade — pairs by slug, an unmatched
+pair dropped and reported, the default per direction, saved back as 2; settling a created
+category; a gone default), `api/types.test.ts` (the shape check per version),
+`data/sync.test.ts` (`remapTemplateCategories` over a row and its queued payload),
+`data/commit.test.ts` (rows written under the created id, the category queued first),
+`data/csv/rows.test.ts` (the income default; the type-mismatch error keeping its draft),
+`data/rowEdits.test.ts` (a flipped row following the other default).
 
 Five suites guard the laziness, and they guard a **shape**, not a speed:
 `data/rowScan.test.ts` (the pass says exactly what a pass over every built row would have
