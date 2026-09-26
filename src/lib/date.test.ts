@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { formatDate, formatRelativeTime, parseISODate } from './date'
+import {
+  formatDate,
+  formatRelativeTime,
+  parseISODate,
+  relativeDayLabel,
+} from './date'
 
 const d = new Date(2026, 5, 6) // 6 June 2026 — single digits to check zero-padding
 
@@ -72,5 +77,24 @@ describe('formatRelativeTime', () => {
   it('returns null rather than “Invalid Date” for unreadable input', () => {
     expect(formatRelativeTime('', 'en-US', now)).toBeNull()
     expect(formatRelativeTime('not-a-date', 'en-US', now)).toBeNull()
+  })
+})
+
+describe('relativeDayLabel', () => {
+  const today = new Date(2026, 8, 26, 15, 30)
+  it.each([
+    ['2026-09-26', 'today'],
+    ['2026-09-27', 'tomorrow'],
+    ['2026-09-25', 'yesterday'],
+    ['2026-10-01', 'in 5d'],
+    ['2026-09-14', '12 days ago'],
+    ['2027-09-26', 'in 12 mos'],
+    ['2029-09-26', 'in 3y'],
+  ])('%s reads %s', (iso, label) => {
+    expect(relativeDayLabel(iso, today)).toBe(label)
+  })
+
+  it('is null for an unreadable date', () => {
+    expect(relativeDayLabel('', today)).toBeNull()
   })
 })

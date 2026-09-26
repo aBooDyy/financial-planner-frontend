@@ -75,3 +75,29 @@ export const formatDate = (
       return `${day}/${month}/${year}`
   }
 }
+
+const startOfDay = (d: Date): Date =>
+  new Date(d.getFullYear(), d.getMonth(), d.getDate())
+
+/**
+ * The short distance shown inside a date well — "today", "in 5d", "12 days ago",
+ * "in 12 mos" — or null for an unreadable date.
+ */
+export const relativeDayLabel = (
+  iso: string,
+  today: Date = new Date(),
+): string | null => {
+  const d = parseISODate(iso)
+  if (!d) return null
+  const days = Math.round(
+    (d.getTime() - startOfDay(today).getTime()) / 86_400_000,
+  )
+  if (days === 0) return 'today'
+  if (days === 1) return 'tomorrow'
+  if (days === -1) return 'yesterday'
+  if (days < 0) return `${-days} days ago`
+  if (days < 45) return `in ${days}d`
+  const months = Math.round(days / 30.44)
+  if (months < 24) return `in ${months} mos`
+  return `in ${Math.round(days / 365.25)}y`
+}
