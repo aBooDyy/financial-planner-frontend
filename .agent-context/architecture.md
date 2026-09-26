@@ -74,10 +74,12 @@ The app is a **standard client-rendered SPA**. **No SSR, no Node server in produ
 `vite build` emits static assets served from any CDN/static host with an SPA fallback to
 `index.html`. The only backend is FastAPI.
 
-**Hosting (Cloudflare Pages):** the SPA fallback is `public/_redirects` (`/* /index.html 200`),
-copied into `dist/` by Vite. Without it a deep link or refresh on e.g. `/auth/login` hits
-Cloudflare's "There is nothing here yet" 404. Real files in `dist/` (assets, icons,
-manifest) are still served as-is — Pages matches static files before redirect rules.
+**Hosting (Cloudflare Workers, static assets):** the Worker `means` serves `dist/` per
+`wrangler.jsonc`, whose `not_found_handling: "single-page-application"` is the SPA fallback:
+a path with no file behind it (e.g. `/auth/login`) gets `index.html`, while real files
+(assets, icons, manifest) are served as-is. Without it a deep link or refresh hits
+Cloudflare's "There is nothing here yet" 404. Don't add a `public/_redirects` catch-all
+(`/* /index.html 200`): Workers rejects it as an infinite loop and the deploy fails.
 
 **Why (not SSR):** data lives in the browser's IndexedDB (local-first), so the server can't
 render real data anyway — SSR would paint an empty shell the client immediately re-fills
