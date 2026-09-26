@@ -1,15 +1,16 @@
 import { useState } from 'react'
+import { EmptyState } from '#/components/EmptyState'
 import { Archive } from 'lucide-react'
-import { deleteNode, restoreNode } from '#/features/balances/data/mutations'
-import { useArchivedNodes } from '#/features/balances/hooks/useArchivedNodes'
+import { deleteNode, restoreNode } from '#/features/wallets/data/mutations'
+import { useArchivedNodes } from '#/features/wallets/hooks/useArchivedNodes'
+import { DeleteNodeDialog } from '#/features/wallets/components/DeleteNodeDialog'
 import { ArchivedRow } from './ArchivedRow'
-import { DeleteArchivedDialog } from './DeleteArchivedDialog'
 import { SectionHeader } from './SectionHeader'
 
 const CARD =
   'overflow-hidden rounded-2xl border border-fp-border bg-fp-surface shadow-fp'
 
-/** Wallets and groups put away from Balances — restore one, or delete it for good. */
+/** Wallets and groups put away from the Wallets page — restore one, or delete it for good. */
 export function ArchivedSection() {
   const { loading, items } = useArchivedNodes()
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -24,21 +25,16 @@ export function ArchivedSection() {
     <div className="flex flex-col gap-4">
       <SectionHeader
         title="Archived"
-        subtitle="Wallets and groups you’ve put away. Their history stays intact; restore one to bring it back to Balances."
+        subtitle="Wallets and groups you’ve put away. Their history stays intact; restore one to bring it back to the Wallets page."
       />
 
       <div className={CARD}>
         {loading ? null : items.length === 0 ? (
-          <div className="flex flex-col items-center px-6 py-10 text-center">
-            <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-[13px] bg-fp-surface-2 text-fp-text-3">
-              <Archive size={20} strokeWidth={1.8} />
-            </span>
-            <p className="text-[14px] font-semibold">Nothing archived</p>
-            <p className="mt-1 max-w-[320px] text-[13px] text-fp-text-3">
-              Archive a wallet or group from Balances to tidy it away without
-              losing its transactions.
-            </p>
-          </div>
+          <EmptyState
+            icon={Archive}
+            title="Nothing archived"
+            text="Archive a wallet or group from the Wallets page to tidy it away without losing its transactions."
+          />
         ) : (
           items.map((item, i) => (
             <ArchivedRow
@@ -52,8 +48,9 @@ export function ArchivedSection() {
         )}
       </div>
 
-      <DeleteArchivedDialog
+      <DeleteNodeDialog
         target={deleting}
+        archived
         onClose={() => setDeletingId(null)}
         onConfirm={confirmDelete}
       />

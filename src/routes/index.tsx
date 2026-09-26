@@ -7,7 +7,7 @@ export const Route = createFileRoute('/')({ component: Index })
 function Index() {
   return (
     <SessionGate>
-      <RedirectTo to="/balances" />
+      <RedirectTo to="/wallets" />
     </SessionGate>
   )
 }

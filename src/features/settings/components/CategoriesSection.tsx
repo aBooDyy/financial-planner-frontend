@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, Shapes } from 'lucide-react'
+import { EmptyState } from '#/components/EmptyState'
 import { Button } from '#/components/ui/button'
 import { CategoryEditor } from '#/features/categories/components/CategoryEditor'
 import { CategoryTree } from '#/features/categories/components/CategoryTree'
@@ -88,10 +89,20 @@ export function CategoriesSection() {
       </div>
 
       <div className={CARD}>
-        {loading || categories.length === 0 ? (
+        {loading ? (
           <div className="px-[18px] py-6 text-[13px] text-fp-text-3">
-            {loading ? 'Loading…' : 'No categories yet.'}
+            Loading…
           </div>
+        ) : categories.length === 0 ? (
+          <EmptyState
+            icon={Shapes}
+            title="No categories yet"
+            text="Categories sort your transactions and budgets. Add one to get started."
+            action={{
+              label: 'Add category',
+              onClick: () => editor.openCreate(null),
+            }}
+          />
         ) : (
           <CategoryTree
             categories={categories}

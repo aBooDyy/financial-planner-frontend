@@ -1,7 +1,7 @@
 import { RotateCcw, Trash2 } from 'lucide-react'
 import { IconChip } from '#/components/icons/IconChip'
 import { Button } from '#/components/ui/button'
-import type { ArchivedItem } from '#/features/balances/data/archivedList'
+import type { ArchivedItem } from '#/features/wallets/data/archivedList'
 
 type Props = {
   item: ArchivedItem

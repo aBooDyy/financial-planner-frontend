@@ -1,9 +1,9 @@
-import { Link } from '@tanstack/react-router'
+import { useState } from 'react'
+import { SignOutConfirm } from '#/components/chrome/SignOutConfirm'
 import { Button } from '#/components/ui/button'
 import { useLogout } from '#/features/auth/hooks/useLogout'
 import { exportCsv, exportJson } from '#/features/settings/data/exportData'
 import { usePreferencesStore } from '#/stores/preferences'
-import { ImportTemplatesCard } from './ImportTemplatesCard'
 import { SectionHeader } from './SectionHeader'
 import { SettingRow } from './SettingRow'
 import { Toggle } from './Toggle'
@@ -14,7 +14,7 @@ const GHOST =
 
 export function DataSection() {
   const logout = useLogout()
-  const onSignOut = () => void logout()
+  const [confirmingSignOut, setConfirmingSignOut] = useState(false)
   const autoBackup = usePreferencesStore((s) => s.autoBackup)
   const setAutoBackup = usePreferencesStore((s) => s.setAutoBackup)
 
@@ -28,13 +28,9 @@ export function DataSection() {
       <div className={`${CARD} p-[18px]`}>
         <div className="text-[15px] font-bold">Your data</div>
         <div className="mb-[13px] mt-[3px] text-[12.5px] text-fp-text-3">
-          Bring transactions in, or download all wallets, transactions and
-          budgets.
+          Download all wallets, transactions and budgets.
         </div>
         <div className="flex flex-wrap gap-2.5">
-          <Button asChild variant="outline" className={GHOST}>
-            <Link to="/import">Import a file</Link>
-          </Button>
           <Button
             type="button"
             variant="outline"
@@ -53,8 +49,6 @@ export function DataSection() {
           </Button>
         </div>
       </div>
-
-      <ImportTemplatesCard />
 
       <div className={`${CARD} overflow-hidden`}>
         <SettingRow
@@ -79,7 +73,7 @@ export function DataSection() {
           <Button
             type="button"
             variant="outline"
-            onClick={onSignOut}
+            onClick={() => setConfirmingSignOut(true)}
             className="rounded-[11px] border-fp-border-strong bg-fp-surface px-[15px] py-2.5 text-[13px] font-semibold text-fp-text hover:border-fp-accent hover:bg-fp-surface"
           >
             Sign out
@@ -95,6 +89,11 @@ export function DataSection() {
           </Button>
         </div>
       </div>
+      <SignOutConfirm
+        open={confirmingSignOut}
+        onOpenChange={setConfirmingSignOut}
+        onSignOut={() => void logout()}
+      />
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import { CurrencyPicker } from '#/components/CurrencyPicker'
-import { setBaseCurrency } from '#/features/balances/data/mutations'
-import { useBalances } from '#/features/balances/hooks/useBalances'
+import { setBaseCurrency } from '#/features/wallets/data/mutations'
+import { useWallets } from '#/features/wallets/hooks/useWallets'
 import type { CurrencyCode } from '#/lib/currency'
 import { DATE_FORMAT_OPTIONS } from '#/lib/date'
 import type { DateFormat } from '#/lib/date'
@@ -21,13 +21,12 @@ import { Toggle } from './Toggle'
 
 const CARD =
   'overflow-hidden rounded-2xl border border-fp-border bg-fp-surface shadow-fp'
-const SELECT =
-  'shrink-0 w-auto cursor-pointer rounded-[11px] border-fp-border-strong px-3 py-2.5 text-[14px] font-semibold text-fp-text'
+const SELECT = 'w-auto shrink-0'
 
 const DEFAULT_ACCOUNT_NONE = '__none__'
 
 export function PreferencesSection() {
-  const { base, nodes } = useBalances()
+  const { base, nodes } = useWallets()
   const preference = useThemeStore((s) => s.preference)
   const setPreference = useThemeStore((s) => s.setPreference)
   const p = usePreferencesStore()

@@ -2,8 +2,8 @@ import { Outlet } from '@tanstack/react-router'
 import { MobileTabBar } from '#/components/chrome/MobileTabBar'
 import { TopNav } from '#/components/chrome/TopNav'
 import { useLogout } from '#/features/auth/hooks/useLogout'
-import { setBaseCurrency } from '#/features/balances/data/mutations'
-import { useBalances } from '#/features/balances/hooks/useBalances'
+import { setBaseCurrency } from '#/features/wallets/data/mutations'
+import { useWallets } from '#/features/wallets/hooks/useWallets'
 import { useSessionStore } from '#/stores/session'
 import type { CurrencyCode } from '#/lib/currency'
 import { SettingsRail } from './SettingsRail'
@@ -15,7 +15,7 @@ import { SettingsRail } from './SettingsRail'
 export function SettingsLayout() {
   const user = useSessionStore((s) => s.user)
   const logout = useLogout()
-  const { base } = useBalances()
+  const { base } = useWallets()
 
   if (!user) return null
 

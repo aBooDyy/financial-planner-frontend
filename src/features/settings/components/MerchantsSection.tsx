@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { Store } from 'lucide-react'
+import { EmptyState } from '#/components/EmptyState'
 import {
   deleteMerchant,
   mergeMerchants,
@@ -9,6 +11,7 @@ import { useMerchants } from '#/features/merchants/hooks/useMerchants'
 import { useMergeSuggestions } from '#/features/merchants/hooks/useMergeSuggestions'
 import { SectionHeader } from './SectionHeader'
 import { MerchantRow } from './MerchantRow'
+import { DeleteMerchantDialog } from './DeleteMerchantDialog'
 import { MergeMerchantDialog } from './MergeMerchantDialog'
 import { MergeSuggestionsCard } from './MergeSuggestionsCard'
 
@@ -27,7 +30,9 @@ export function MerchantsSection() {
     targetId: string | null
   } | null>(null)
 
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const merging = merchants.find((m) => m.id === merge?.sourceId) ?? null
+  const deleting = merchants.find((m) => m.id === deletingId) ?? null
 
   return (
     <div className="flex flex-col gap-4">
@@ -48,9 +53,11 @@ export function MerchantsSection() {
 
       <div className={CARD}>
         {merchants.length === 0 ? (
-          <div className="px-[18px] py-6 text-[13px] text-fp-text-3">
-            No merchants yet — they appear as your transactions are tagged.
-          </div>
+          <EmptyState
+            icon={Store}
+            title="No merchants yet"
+            text="They appear as your transactions are tagged."
+          />
         ) : (
           merchants.map((m, i) => (
             <MerchantRow
@@ -64,13 +71,21 @@ export function MerchantsSection() {
               }
               onRemoveAlias={(aliasId) => void removeMerchantAlias(aliasId)}
               onMerge={() => setMerge({ sourceId: m.id, targetId: null })}
-              onDelete={() => void deleteMerchant(m.id)}
+              onDelete={() => setDeletingId(m.id)}
               last={i === merchants.length - 1}
             />
           ))
         )}
       </div>
 
+      <DeleteMerchantDialog
+        merchant={deleting}
+        onClose={() => setDeletingId(null)}
+        onConfirm={() => {
+          if (deleting) void deleteMerchant(deleting.id)
+          setDeletingId(null)
+        }}
+      />
       {merging ? (
         <MergeMerchantDialog
           key={merging.id}

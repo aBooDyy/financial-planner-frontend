@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useBalances } from '#/features/balances/hooks/useBalances'
+import { useWallets } from '#/features/wallets/hooks/useWallets'
 import { useCurrencyList } from '#/lib/config/appConfig'
 import type { CurrencyMeta, CustomCurrencyMeta } from '#/lib/config/appConfig'
 import {
@@ -37,7 +37,7 @@ export type CurrencyRates = {
 }
 
 export function useCurrencyRates(): CurrencyRates {
-  const { base, rateRows, held } = useBalances()
+  const { base, rateRows, held } = useWallets()
   const currencies = useCurrencyList()
   const merged = useMergedRates(rateRows)
 

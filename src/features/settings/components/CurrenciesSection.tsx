@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
-import { Plus, Search } from 'lucide-react'
+import { Coins, Plus, Search } from 'lucide-react'
+import { EmptyState } from '#/components/EmptyState'
 import { CurrencyPicker } from '#/components/CurrencyPicker'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
-import { setBaseCurrency } from '#/features/balances/data/mutations'
+import { setBaseCurrency } from '#/features/wallets/data/mutations'
 import {
   createCustomCurrency,
   deleteCustomCurrency,
@@ -18,6 +19,7 @@ import { usePreferencesStore } from '#/stores/preferences'
 import { CustomCurrencyDialog } from './CustomCurrencyDialog'
 import type { CustomCurrencyValues } from './CustomCurrencyDialog'
 import { CustomCurrencyRow } from './CustomCurrencyRow'
+import { DeleteCustomCurrencyDialog } from './DeleteCustomCurrencyDialog'
 import { RateList } from './RateList'
 import { SectionHeader } from './SectionHeader'
 import { SettingRow } from './SettingRow'
@@ -49,6 +51,7 @@ export function CurrenciesSection() {
   const [query, setQuery] = useState('')
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<Editing | null>(null)
+  const [deleting, setDeleting] = useState<CurrencyRateRow | null>(null)
 
   // What the user holds is what they came for; the rest is reference, alphabetical.
   const listed = useMemo(
@@ -108,7 +111,7 @@ export function CurrenciesSection() {
             label="Base currency"
             align="end"
             isoOnly
-            className="w-auto shrink-0 rounded-[11px] border-fp-border-strong px-3 py-2.5 font-bold"
+            className="w-auto shrink-0 font-bold"
           />
         </SettingRow>
         <SettingRow
@@ -146,10 +149,12 @@ export function CurrenciesSection() {
           </Button>
         </div>
         {customRows.length === 0 ? (
-          <p className="px-[18px] py-[15px] text-[13px] text-fp-text-3">
-            None yet. Add one for points, metals, or anything else you keep
-            track of.
-          </p>
+          <EmptyState
+            icon={Coins}
+            size="sm"
+            title="No custom currencies"
+            text="Add one for points, metals, or anything else you keep track of."
+          />
         ) : (
           customRows.map((row) => (
             <CustomCurrencyRow
@@ -159,7 +164,7 @@ export function CurrenciesSection() {
               onEdit={() =>
                 setEditing({ id: row.customId ?? '', values: rowToValues(row) })
               }
-              onDelete={() => void deleteCustomCurrency(row.customId ?? '')}
+              onDelete={() => setDeleting(row)}
             />
           ))
         )}
@@ -194,6 +199,14 @@ export function CurrenciesSection() {
           onClose={() => setAdding(false)}
         />
       ) : null}
+      <DeleteCustomCurrencyDialog
+        row={deleting}
+        onClose={() => setDeleting(null)}
+        onConfirm={() => {
+          if (deleting) void deleteCustomCurrency(deleting.customId ?? '')
+          setDeleting(null)
+        }}
+      />
       {editing ? (
         <CustomCurrencyDialog
           base={base}

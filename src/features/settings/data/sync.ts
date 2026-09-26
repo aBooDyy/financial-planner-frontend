@@ -1,6 +1,6 @@
 import { db } from '#/db/db'
 import type { OutboxEntry } from '#/db/types'
-import { balancesApi } from '#/features/balances/api/balancesApi'
+import { walletsApi } from '#/features/wallets/api/walletsApi'
 import { customCurrenciesApi } from '#/features/settings/api/customCurrenciesApi'
 import type {
   CreateCustomCurrencyWire,
@@ -138,7 +138,7 @@ export async function pullCustomCurrencies(): Promise<void> {
 async function pushRateUpdate(entry: OutboxEntry): Promise<void> {
   const currency = entry.id
   try {
-    const rate = await balancesApi.updateRate(
+    const rate = await walletsApi.updateRate(
       currency,
       entry.payload as UpdateRateWire,
     )
@@ -159,7 +159,7 @@ async function pushRateUpdate(entry: OutboxEntry): Promise<void> {
 
 async function rebaseRate(entry: OutboxEntry): Promise<void> {
   const currency = entry.id
-  const fresh = (await balancesApi.listRates()).find(
+  const fresh = (await walletsApi.listRates()).find(
     (r) => r.currency === currency,
   )
   const local = await db.exchangeRates.get(currency)
@@ -168,7 +168,7 @@ async function rebaseRate(entry: OutboxEntry): Promise<void> {
     return
   }
   try {
-    const rate = await balancesApi.updateRate(currency, {
+    const rate = await walletsApi.updateRate(currency, {
       version: fresh.version,
       rate: String(local.rate),
     })

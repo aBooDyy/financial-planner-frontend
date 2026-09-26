@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { Button } from '#/components/ui/button'
+import { DialogActions } from '#/components/dialog/DialogActions'
+import { NoteBox } from '#/components/dialog/NoteBox'
+import { FormRow } from '#/components/FormRow'
 import { ResponsiveDialog } from '#/components/ui/responsive-dialog'
 import {
   Select,
@@ -58,31 +60,25 @@ export function MergeMerchantDialog({
         if (!o) onClose()
       }}
       title={`Merge “${source.displayName}”`}
+      description={`Its spellings and transactions move to the merchant you pick, and “${source.displayName}” is removed.`}
       footer={
-        <>
-          <div className="flex-1" />
-          <Button type="button" variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="button" onClick={submit} disabled={!targetId || busy}>
-            {busy ? 'Merging…' : 'Merge'}
-          </Button>
-        </>
+        <DialogActions
+          onCancel={onClose}
+          submitLabel={busy ? 'Merging…' : 'Merge'}
+          onSubmit={submit}
+          disabled={!targetId || busy}
+        />
       }
       contentClassName="sm:max-w-[430px]"
     >
-      <div className="flex flex-col gap-[13px]">
-        <p className="text-[13px] text-fp-text-2">
-          Its spellings and transactions move to the merchant you pick, and “
-          {source.displayName}” is removed.
-        </p>
-        {candidates.length === 0 ? (
-          <p className="text-[13px] text-fp-text-3">
-            There is no other merchant to merge into yet.
-          </p>
-        ) : (
+      {candidates.length === 0 ? (
+        <NoteBox tone="neutral">
+          There is no other merchant to merge into yet.
+        </NoteBox>
+      ) : (
+        <FormRow id="merge-target" label="Merge into which merchant?">
           <Select value={targetId} onValueChange={setTargetId}>
-            <SelectTrigger aria-label="Merge into">
+            <SelectTrigger id="merge-target" aria-label="Merge into">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -93,19 +89,19 @@ export function MergeMerchantDialog({
               ))}
             </SelectContent>
           </Select>
-        )}
-        {target ? (
-          <p className="text-[12.5px] text-fp-text-3">
-            {source.aliases.length + target.aliases.length} spellings will point
-            at “{target.displayName}”.
-          </p>
-        ) : null}
-        {error ? (
-          <p role="alert" className="text-[12.5px] text-fp-danger">
-            {error}
-          </p>
-        ) : null}
-      </div>
+        </FormRow>
+      )}
+      {target ? (
+        <NoteBox>
+          {source.aliases.length + target.aliases.length} spellings will point
+          at “{target.displayName}”.
+        </NoteBox>
+      ) : null}
+      {error ? (
+        <p role="alert" className="text-[12.5px] font-semibold text-fp-danger">
+          {error}
+        </p>
+      ) : null}
     </ResponsiveDialog>
   )
 }

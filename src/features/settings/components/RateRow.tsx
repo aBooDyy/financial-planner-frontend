@@ -3,6 +3,7 @@ import { RotateCcw } from 'lucide-react'
 import { Input } from '#/components/ui/input'
 import type { CurrencyRateRow } from '#/features/settings/hooks/useCurrencyRates'
 import type { CurrencyCode } from '#/lib/currency'
+import { numericInputProps } from '#/lib/numericInput'
 
 /** Every row is this tall, which is what lets the list be windowed. */
 export const RATE_ROW_HEIGHT = 58
@@ -73,10 +74,9 @@ export function RateRow({ row, base, onCommit, onReset }: Props) {
       </div>
       <Input
         value={text}
-        inputMode="decimal"
         aria-label={`Rate for ${code}`}
         placeholder={defaultPerBase === null ? 'No rate' : fmt(defaultPerBase)}
-        onChange={(e) => setText(e.target.value)}
+        {...numericInputProps({}, setText)}
         onBlur={commit}
         onKeyDown={(e) => {
           if (e.key === 'Enter') e.currentTarget.blur()
