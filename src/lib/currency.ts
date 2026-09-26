@@ -1,5 +1,6 @@
 import { currencyList, currencyMeta } from '#/lib/config/appConfig'
 import type { CurrencyMeta } from '#/lib/config/appConfig'
+import { numericInputProps } from '#/lib/numericInput'
 
 /**
  * Currency metadata + money helpers. Money is an integer in the currency's minor unit
@@ -84,19 +85,18 @@ export const minorToInputValue = (
 
 /**
  * What an amount field should offer for a currency: a yen input takes whole numbers, a
- * dinar input takes three decimals. Keeps step, keypad and placeholder in one decision.
+ * dinar input takes three decimals. Keeps keypad, typing guard and placeholder in one
+ * decision; `onValue` only ever receives digits (plus a point, and a leading minus if `signed`).
  */
 export const amountInputProps = (
   code: CurrencyCode,
-): { inputMode: 'numeric' | 'decimal'; step: string; placeholder: string } => {
+  onValue: (value: string) => void,
+  { signed = false }: { signed?: boolean } = {},
+) => {
   const decimals = decimalsFor(code)
-  if (decimals === 0) {
-    return { inputMode: 'numeric', step: '1', placeholder: '0' }
-  }
   return {
-    inputMode: 'decimal',
-    step: `0.${'0'.repeat(decimals - 1)}1`,
-    placeholder: `0.${'0'.repeat(decimals)}`,
+    ...numericInputProps({ decimals, signed }, onValue),
+    placeholder: decimals === 0 ? '0' : `0.${'0'.repeat(decimals)}`,
   }
 }
 

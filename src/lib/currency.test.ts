@@ -61,20 +61,18 @@ describe('formatMoney', () => {
 })
 
 describe('amountInputProps', () => {
+  const noop = () => {}
   it('sizes an input from the currency', () => {
-    expect(amountInputProps('JPY')).toEqual({
+    expect(amountInputProps('JPY', noop)).toMatchObject({
       inputMode: 'numeric',
-      step: '1',
       placeholder: '0',
     })
-    expect(amountInputProps('SAR')).toEqual({
+    expect(amountInputProps('SAR', noop)).toMatchObject({
       inputMode: 'decimal',
-      step: '0.01',
       placeholder: '0.00',
     })
-    expect(amountInputProps('KWD')).toEqual({
+    expect(amountInputProps('KWD', noop)).toMatchObject({
       inputMode: 'decimal',
-      step: '0.001',
       placeholder: '0.000',
     })
   })

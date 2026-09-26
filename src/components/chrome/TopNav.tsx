@@ -6,6 +6,7 @@ import { CurrencyPicker } from '#/components/CurrencyPicker'
 import type { CurrencyCode } from '#/lib/currency'
 import { AccountMenu } from './AccountMenu'
 import { BrandMark } from './BrandMark'
+import { PrivacyToggle } from './PrivacyToggle'
 import { NAV_SECTIONS } from './sections'
 import type { AppSection } from './sections'
 
@@ -84,8 +85,10 @@ export function TopNav({ user, active, base, onBaseChange, onSignOut }: Props) {
             onChange={onBaseChange}
             label="Base currency"
             align="end"
-            className="w-auto rounded-[10px] border-fp-border bg-fp-surface px-2 py-[7px] text-[13px] font-bold text-fp-text"
+            className="w-auto rounded-[10px] border-transparent bg-fp-surface-2 px-[10px] py-[7px] text-[13px] font-bold text-fp-text hover:bg-fp-border/70"
           />
+
+          <PrivacyToggle />
 
           <button
             type="button"
