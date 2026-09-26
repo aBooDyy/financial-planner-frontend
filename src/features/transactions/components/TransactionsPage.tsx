@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link, useNavigate, useParams, useSearch } from '@tanstack/react-router'
+import { useMemo, useState } from 'react'
+import { useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { Inbox } from 'lucide-react'
 import { MobileTabBar } from '#/components/chrome/MobileTabBar'
 import { TopNav } from '#/components/chrome/TopNav'
@@ -11,33 +11,19 @@ import { setBaseCurrency } from '#/features/wallets/data/mutations'
 import { useSessionStore } from '#/stores/session'
 import { usePreferencesStore } from '#/stores/preferences'
 import { currencySymbol } from '#/lib/currency'
+import { startOfToday, ymd } from '#/features/transactions/data/planning'
 import {
-  addDays,
-  inWindow,
-  parseISO,
-  parseMonthKey,
-  startOfToday,
-  startOfWeek,
-  windowOf,
-  ymd,
-} from '#/features/transactions/data/planning'
-import {
-  buildBreakdown,
-  buildBudgetsView,
-  buildCalendar,
-  buildCashflow,
-  buildActivityList,
-  buildRecurringView,
   offeredScope,
   scopeSections,
 } from '#/features/transactions/data/selectors'
-import type { ActivityRow, Scope } from '#/features/transactions/data/selectors'
-import {
-  SPENDING_VIEWS,
-  isSpendingView,
-} from '#/features/transactions/constants'
-import type { RangeMode } from '#/features/transactions/constants'
+import type { Scope } from '#/features/transactions/data/selectors'
+import type { LocalTransaction } from '#/db/types'
+import { isSpendingView } from '#/features/transactions/constants'
+import { useActivityRowClick } from '#/features/transactions/hooks/useActivityRowClick'
 import { useAdjustmentEditor } from '#/features/transactions/hooks/useAdjustmentEditor'
+import { useLedgerWindow } from '#/features/transactions/hooks/useLedgerWindow'
+import { useSpendingPeriod } from '#/features/transactions/hooks/useSpendingPeriod'
+import { useSpendingViews } from '#/features/transactions/hooks/useSpendingViews'
 import { useTransactions } from '#/features/transactions/hooks/useTransactions'
 import { useTxEditor } from '#/features/transactions/hooks/useTxEditor'
 import { usePlanned } from '#/features/planned'
@@ -58,29 +44,27 @@ import { QuickAddCard } from './QuickAddCard'
 import { RecurringCard, UpcomingCard } from './RecurringCard'
 import { TransactionList } from './TransactionList'
 import { ScopeSelect } from './ScopeSelect'
+import { SpendingViewTabs } from './SpendingViewTabs'
 
-const viewSeg = (active: boolean) =>
-  `inline-flex flex-1 items-center justify-center gap-[6px] rounded-[10px] px-2 py-2 text-[13px] md:flex-none md:px-4 md:text-[13.5px] ${
-    active
-      ? 'bg-fp-surface font-bold text-fp-text shadow-[0_1px_2px_rgba(0,0,0,0.06)]'
-      : 'bg-transparent font-semibold text-fp-text-2'
-  }`
+const NO_ROWS: LocalTransaction[] = []
+const NO_DELTAS: Record<string, number> = {}
 
 export function TransactionsPage() {
   const user = useSessionStore((s) => s.user)
   const logout = useLogout()
   const {
+    loading,
     base,
-    data,
+    inputs,
+    deltas,
     catalog,
     wallets,
     editorWallets,
     archivedWalletIds,
     goals,
-    transactions,
   } = useTransactions()
   const dateFormat = usePreferencesStore((s) => s.dateFormat)
-  const editor = useTxEditor(editorWallets, base, data.rates)
+  const editor = useTxEditor(editorWallets, base, inputs.rates)
   const adjustment = useAdjustmentEditor()
   const { imports: pendingImports, count: pendingCount } = usePendingImports()
   const deepLinkedToReview =
@@ -95,115 +79,45 @@ export function TransactionsPage() {
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const plannedActions = usePlannedRowActions(setConfirmId)
   const [chosenScope, setScope] = useState<Scope>({ type: 'all' })
-  const [mode, setMode] = useState<RangeMode>('month')
-  const [anchor, setAnchor] = useState(() => {
-    const t = startOfToday()
-    return ymd(new Date(t.getFullYear(), t.getMonth(), 1))
-  })
   const [calOpen, setCalOpen] = useState(false)
+
+  const today = startOfToday()
+  const todayKey = ymd(today)
+  const period = useSpendingPeriod(today)
+  const ledger = useLedgerWindow(period.anchor, period.mode, todayKey)
+
+  // Laid out from the accounts alone; the balances in it wait for `deltas`.
+  const sections = useMemo(
+    () => scopeSections(inputs, deltas ?? NO_DELTAS),
+    [inputs, deltas],
+  )
+  const scope = loading ? chosenScope : offeredScope(sections, chosenScope)
+  const views = useSpendingViews({
+    view,
+    anchor: period.anchor,
+    mode: period.mode,
+    inputs: loading ? null : inputs,
+    ledger,
+    catalog,
+    scope,
+    calOpen,
+    today: todayKey,
+    dateFormat,
+  })
+  const onRowClick = useActivityRowClick(
+    editor,
+    adjustment,
+    ledger?.rows ?? NO_ROWS,
+  )
 
   if (!user) return null
 
-  const today = startOfToday()
-  const anchorDate = parseISO(anchor)
-
-  const stepPeriod = (dir: -1 | 1) => {
-    const a = parseISO(anchor)
-    if (mode === 'day') setAnchor(ymd(addDays(a, dir)))
-    else if (mode === 'week') setAnchor(ymd(addDays(a, dir * 7)))
-    else if (mode === 'year')
-      setAnchor(ymd(new Date(a.getFullYear() + dir, 0, 1)))
-    else setAnchor(ymd(new Date(a.getFullYear(), a.getMonth() + dir, 1)))
-  }
-  const changeMode = (next: RangeMode) => {
-    const a = parseISO(anchor)
-    // Switching views should never jump away from now: if the period being left already
-    // covers today, re-anchor on today rather than on the period's own start.
-    const at = inWindow(ymd(today), windowOf(a, mode)) ? today : a
-    setAnchor(ymd(windowOf(at, next).start))
-    setMode(next)
-  }
-  const goToToday = () => setAnchor(ymd(windowOf(today, mode).start))
-  const shown = windowOf(anchorDate, mode)
-  const todayIs = inWindow(ymd(today), shown)
-    ? null
-    : today > shown.end
-      ? 'ahead'
-      : 'behind'
-  const pickMonth = (key: string) => {
-    setMode('month')
-    setAnchor(ymd(parseMonthKey(key)))
-  }
-  const pickDay = (key: string) => {
-    if (mode === 'day' && anchor === key) {
-      setMode('week')
-      setAnchor(ymd(startOfWeek(parseISO(key))))
-    } else {
-      setMode('day')
-      setAnchor(key)
-    }
-  }
-
-  const sections = scopeSections(data)
-  const scope = offeredScope(sections, chosenScope)
-  const cashflow = buildCashflow(
-    data,
-    catalog,
-    scope,
-    anchorDate,
-    mode,
-    dateFormat,
-  )
-  const calendar = buildCalendar(
-    data,
-    scope,
-    anchorDate,
-    mode,
-    calOpen,
-    today,
-    dateFormat,
-  )
-  const list = buildActivityList(
-    data,
-    catalog,
-    scope,
-    anchorDate,
-    mode,
-    today,
-    dateFormat,
-  )
-  const breakdown = buildBreakdown(
-    data,
-    catalog,
-    scope,
-    anchorDate,
-    mode,
-    dateFormat,
-  )
-  const budgets = buildBudgetsView(data, catalog, scope, today)
-  const recurring = buildRecurringView(data, catalog, scope, today)
-
-  const onRowClick = (row: ActivityRow) => {
-    if (row.kind === 'set_aside') {
-      void navigate({ to: '/goals' })
-      return
-    }
-    if (row.kind === 'transfer') {
-      const legs = transactions.filter((x) => x.transferId === row.id)
-      editor.openEditTransfer(row.id, legs)
-      return
-    }
-    const t = transactions.find((x) => x.id === row.id)
-    if (!t) return
-    if (row.kind === 'adjustment') adjustment.openEdit(t)
-    else editor.openEditTx(t)
-  }
   const onEditBudget = (id: string) => {
-    const b = data.budgets.find((x) => x.id === id && x.deleted === 0)
+    const b = inputs.budgets.find((x) => x.id === id && x.deleted === 0)
     if (b) editor.openEditBudget(b)
   }
   const onEditRecurring = (id: string) => {
-    const r = data.recurrings.find((x) => x.id === id && x.deleted === 0)
+    const r = inputs.recurrings.find((x) => x.id === id && x.deleted === 0)
     if (r) editor.openEditRecurring(r)
   }
   // Drop `?review=1` on close so a reload doesn't reopen what the user just dismissed.
@@ -220,6 +134,15 @@ export function TransactionsPage() {
 
   const activeWallet = wallets.length > 0 ? wallets[0] : null
   const activeCurrency: CurrencyCode = activeWallet?.currency ?? base
+  const { activity, budgets, recurring } = views
+  const busy =
+    view === 'activity'
+      ? !activity?.cashflow
+      : view === 'budgets'
+        ? !budgets
+        : view === 'recurring'
+          ? !recurring
+          : false
 
   return (
     <div className="relative flex h-screen flex-col overflow-hidden bg-fp-bg text-fp-text">
@@ -232,30 +155,16 @@ export function TransactionsPage() {
       />
 
       <div className="flex-1 overflow-auto">
-        <div className="mx-auto grid w-full max-w-[560px] grid-cols-1 items-start gap-4 px-4 py-4 pb-[30px] md:max-w-[1180px] md:grid-cols-[minmax(0,1fr)_360px] md:gap-6 md:px-6 md:py-[24px] md:pb-[90px]">
+        <span role="status" className="sr-only">
+          {busy ? 'Loading your spending…' : ''}
+        </span>
+        <div
+          aria-busy={busy}
+          className="mx-auto grid w-full max-w-[560px] grid-cols-1 items-start gap-4 px-4 py-4 pb-[30px] md:max-w-[1180px] md:grid-cols-[minmax(0,1fr)_360px] md:gap-6 md:px-6 md:py-[24px] md:pb-[90px]"
+        >
           {/* Header: view tabs + global account scope */}
           <div className="md:col-span-2 flex flex-wrap items-center gap-[10px]">
-            <div className="flex w-full rounded-[13px] border border-fp-border bg-fp-surface-2 p-[3px] md:inline-flex md:w-auto">
-              {SPENDING_VIEWS.map((v) => (
-                <Link
-                  key={v}
-                  to="/transactions/$view"
-                  params={{ view: v }}
-                  aria-current={view === v ? 'page' : undefined}
-                  className={viewSeg(view === v)}
-                >
-                  {v[0].toUpperCase() + v.slice(1)}
-                  {v === 'planned' && planned.dueCount > 0 ? (
-                    <span
-                      aria-label={`${planned.dueCount} need confirming`}
-                      className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-fp-warn px-[5px] text-[10.5px] font-bold text-white"
-                    >
-                      {planned.dueCount}
-                    </span>
-                  ) : null}
-                </Link>
-              ))}
-            </div>
+            <SpendingViewTabs view={view} dueCount={planned.dueCount} />
             <div className="min-w-[8px] flex-1" />
             {pendingCount > 0 ? (
               <button
@@ -273,6 +182,7 @@ export function TransactionsPage() {
             ) : null}
             <ScopeSelect
               sections={sections}
+              balancesLoading={loading || !deltas}
               value={scope}
               onChange={setScope}
             />
@@ -293,26 +203,34 @@ export function TransactionsPage() {
                     }
                   />
                 ) : null}
-                <DaysCard
-                  calendar={calendar}
-                  mode={mode}
-                  periodLabel={cashflow.sub}
-                  calOpen={calOpen}
-                  onSetMode={changeMode}
-                  onPrev={() => stepPeriod(-1)}
-                  onNext={() => stepPeriod(1)}
-                  todayIs={todayIs}
-                  onToday={goToToday}
-                  onToggleCal={() => setCalOpen((o) => !o)}
-                  onPickMonth={pickMonth}
-                  onPickDay={pickDay}
-                />
-                <CashflowHeroCard view={cashflow} />
-                <TransactionList
-                  view={list}
-                  onAdd={editor.openAddTx}
-                  onRowClick={onRowClick}
-                />
+                {activity ? (
+                  <>
+                    <DaysCard
+                      calendar={activity.calendar}
+                      loading={!activity.cashflow}
+                      mode={views.period.mode}
+                      periodLabel={views.period.label}
+                      calOpen={calOpen}
+                      onSetMode={period.changeMode}
+                      onPrev={() => period.step(-1)}
+                      onNext={() => period.step(1)}
+                      todayIs={views.period.todayIs}
+                      onToday={period.goToToday}
+                      onToggleCal={() => setCalOpen((o) => !o)}
+                      onPickMonth={period.pickMonth}
+                      onPickDay={period.pickDay}
+                    />
+                    <CashflowHeroCard
+                      view={activity.cashflow}
+                      periodLabel={views.period.label}
+                    />
+                    <TransactionList
+                      view={activity.list}
+                      onAdd={editor.openAddTx}
+                      onRowClick={onRowClick}
+                    />
+                  </>
+                ) : null}
               </>
             ) : null}
             {view === 'planned' ? (
@@ -350,13 +268,16 @@ export function TransactionsPage() {
                   <QuickAddCard
                     walletId={activeWallet?.id ?? null}
                     currency={activeCurrency}
-                    symbol={currencySymbol(activeCurrency)}
+                    symbol={loading ? null : currencySymbol(activeCurrency)}
                     wallets={wallets}
                     base={base}
-                    rates={data.rates}
+                    rates={inputs.rates}
                   />
                 </div>
-                <BreakdownCard view={breakdown} />
+                <BreakdownCard
+                  view={activity?.breakdown ?? null}
+                  periodLabel={views.period.label}
+                />
               </>
             ) : null}
             {view === 'planned' && !planned.isEmpty ? (
@@ -374,14 +295,17 @@ export function TransactionsPage() {
 
       <MobileTabBar active="budget" />
 
-      <ConnectedTxEditor
-        editor={editor}
-        wallets={editorWallets}
-        archivedWalletIds={archivedWalletIds}
-        goals={goals}
-        base={base}
-        data={data}
-      />
+      {deltas ? (
+        <ConnectedTxEditor
+          editor={editor}
+          wallets={editorWallets}
+          archivedWalletIds={archivedWalletIds}
+          goals={goals}
+          base={base}
+          data={inputs}
+          deltas={deltas}
+        />
+      ) : null}
 
       <AdjustmentEditor
         editor={adjustment}

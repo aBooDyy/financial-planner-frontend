@@ -1,0 +1,198 @@
+// @vitest-environment jsdom
+import { renderHook } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { LocalBudget, LocalTransaction } from '#/db/types'
+import { defaultCatalog } from '#/features/categories/__fixtures__/categories'
+import type { RangeMode, SpendingView } from '#/features/transactions/constants'
+import type { LedgerWindow } from '#/features/transactions/data/ledgerReads'
+import * as selectors from '#/features/transactions/data/selectors'
+import type {
+  Scope,
+  SpendingInputs,
+} from '#/features/transactions/data/selectors'
+import { useSpendingViews } from './useSpendingViews'
+
+vi.mock('#/features/transactions/data/selectors', async (importOriginal) => {
+  const real = await importOriginal<typeof selectors>()
+  return {
+    ...real,
+    buildCashflow: vi.fn(real.buildCashflow),
+    buildCalendar: vi.fn(real.buildCalendar),
+    buildActivityList: vi.fn(real.buildActivityList),
+    buildBreakdown: vi.fn(real.buildBreakdown),
+    buildBudgetsView: vi.fn(real.buildBudgetsView),
+    buildRecurringView: vi.fn(real.buildRecurringView),
+  }
+})
+
+const BUILDERS = [
+  'buildCashflow',
+  'buildCalendar',
+  'buildActivityList',
+  'buildBreakdown',
+  'buildBudgetsView',
+  'buildRecurringView',
+] as const
+
+const calls = () =>
+  Object.fromEntries(
+    BUILDERS.map((name) => [
+      name,
+      vi.mocked(selectors[name]).mock.calls.length,
+    ]),
+  )
+
+const INPUTS: SpendingInputs = {
+  budgets: [],
+  recurrings: [],
+  nodes: [],
+  base: 'SAR',
+  rates: { SAR: 1 },
+  allocations: [],
+  goals: [],
+}
+const ROWS: LocalTransaction[] = []
+const LEDGER: LedgerWindow = {
+  anchor: '2026-09-01',
+  mode: 'month',
+  today: '2026-09-26',
+  budgets: [],
+  rows: ROWS,
+}
+const CATALOG = defaultCatalog()
+
+type Props = {
+  view: SpendingView
+  anchor: string
+  mode: RangeMode
+  ledger: LedgerWindow | undefined
+  calOpen: boolean
+  scope: Scope
+}
+
+const render = (initial: Props) =>
+  renderHook(
+    (p: Props) =>
+      useSpendingViews({
+        ...p,
+        inputs: INPUTS,
+        catalog: CATALOG,
+        today: '2026-09-26',
+        dateFormat: 'dmy',
+      }),
+    { initialProps: initial },
+  )
+
+const ACTIVITY: Props = {
+  view: 'activity',
+  anchor: '2026-09-01',
+  mode: 'month',
+  ledger: LEDGER,
+  calOpen: false,
+  scope: { type: 'all' },
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+})
+
+describe('useSpendingViews', () => {
+  it('builds only what the active tab shows', () => {
+    render(ACTIVITY)
+    expect(calls()).toEqual({
+      buildCashflow: 1,
+      buildCalendar: 1,
+      buildActivityList: 1,
+      buildBreakdown: 1,
+      buildBudgetsView: 0,
+      buildRecurringView: 0,
+    })
+    vi.clearAllMocks()
+    render({ ...ACTIVITY, view: 'budgets' })
+    expect(calls()).toMatchObject({ buildCashflow: 0, buildBudgetsView: 1 })
+  })
+
+  it('rebuilds nothing on an unrelated render, and only the calendar when it unfolds', () => {
+    const { result, rerender } = render(ACTIVITY)
+    const first = result.current.activity
+    vi.clearAllMocks()
+
+    // A fresh scope object with the same meaning is not a change.
+    rerender({ ...ACTIVITY, scope: { type: 'all' } })
+    expect(calls()).toMatchObject({ buildCashflow: 0, buildCalendar: 0 })
+    expect(result.current.activity?.list).toBe(first?.list)
+
+    rerender({ ...ACTIVITY, calOpen: true })
+    expect(calls()).toMatchObject({ buildCashflow: 0, buildCalendar: 1 })
+  })
+
+  it('measures budgets from the ledger snapshot, never a newer list than its rows', () => {
+    const wide: LocalBudget = {
+      id: 'wide',
+      scopeType: 'overall',
+      categoryId: null,
+      walletId: null,
+      period: 'custom',
+      customDays: 400,
+      limit: 100,
+      currency: 'SAR',
+      createdAt: '',
+      updatedAt: '',
+      version: '',
+      dirty: 0,
+      deleted: 0,
+    }
+    // The budget list has landed but the rows for its wider span have not.
+    const { result, rerender } = renderHook(
+      (ledger: LedgerWindow) =>
+        useSpendingViews({
+          ...ACTIVITY,
+          view: 'budgets',
+          ledger,
+          inputs: { ...INPUTS, budgets: [wide] },
+          catalog: CATALOG,
+          today: '2026-09-26',
+          dateFormat: 'dmy',
+        }),
+      { initialProps: LEDGER },
+    )
+    expect(result.current.budgets?.rows).toEqual([])
+    rerender({ ...LEDGER, budgets: [wide] })
+    expect(result.current.budgets?.rows.map((r) => r.id)).toEqual(['wide'])
+  })
+
+  it('while the ledger loads, lays out the asked-for period with no figures; schedules do not wait', () => {
+    const { result } = render({
+      ...ACTIVITY,
+      anchor: '2025-03-01',
+      ledger: undefined,
+    })
+    expect(result.current.activity).toMatchObject({
+      cashflow: null,
+      list: null,
+      breakdown: null,
+    })
+    expect(result.current.activity?.calendar.grid).toBe('days')
+    expect(result.current.period).toEqual({
+      mode: 'month',
+      label: 'March 2025',
+      todayIs: 'ahead',
+    })
+    const recurring = render({
+      ...ACTIVITY,
+      view: 'recurring',
+      ledger: undefined,
+    })
+    expect(recurring.result.current.recurring).not.toBeNull()
+  })
+
+  it('keeps showing the loaded period while the page asks for the next one', () => {
+    const { result, rerender } = render(ACTIVITY)
+    const shown = result.current.activity
+    vi.clearAllMocks()
+    rerender({ ...ACTIVITY, anchor: '2026-10-01' })
+    expect(result.current.period.label).toBe('September 2026')
+    expect(result.current.activity?.list).toBe(shown?.list)
+    expect(calls()).toMatchObject({ buildCashflow: 0, buildCalendar: 0 })
+  })
+})
