@@ -73,6 +73,8 @@ pattern changes. Index: [`.agent-context/README.md`](.agent-context/README.md).
 - **SOLID / DRY / clean code**, minimal non-stale comments — see [`../CLAUDE.md`](../CLAUDE.md).
 - **Atomic commits, one-line messages, no attribution trailers** — see
   [`../CLAUDE.md`](../CLAUDE.md#git-commits--apply-in-every-repository).
+- **Work on `dev`; releases fast-forward `main` and tag both repos `vN`** — see
+  [`../CLAUDE.md`](../CLAUDE.md#branches-and-releases--apply-in-every-repository).
 
 ## Suggested folder structure
 
