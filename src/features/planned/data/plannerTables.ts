@@ -19,6 +19,7 @@ import type {
   LocalRecurring,
   LocalTransaction,
 } from '#/db/types'
+import { linkedTransactions } from './linkedTransactions'
 
 /** Every table as last read; a table is undefined until its first read lands. */
 export type PlannerTables = {
@@ -26,6 +27,7 @@ export type PlannerTables = {
   income?: LocalIncomeStream[]
   recurrings?: LocalRecurring[]
   planned?: LocalPlanned[]
+  /** Only the linked transactions, never the whole ledger. */
   txns?: LocalTransaction[]
   allocations?: LocalGoalAllocation[]
   nodes?: LocalBalanceNode[]
@@ -38,7 +40,7 @@ const QUERIES: Record<keyof PlannerTables, () => Promise<unknown>> = {
   income: () => db.incomeStreams.toArray(),
   recurrings: () => db.recurrings.toArray(),
   planned: () => db.plannedTransactions.toArray(),
-  txns: () => db.transactions.toArray(),
+  txns: linkedTransactions,
   allocations: () => db.goalAllocations.toArray(),
   nodes: () => db.balanceNodes.toArray(),
   settings: async () => (await db.balanceSettings.get(SETTINGS_KEY)) ?? null,

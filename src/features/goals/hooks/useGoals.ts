@@ -12,6 +12,7 @@ import { buildGoalsView } from '#/features/goals/data/selectors'
 import { startOfToday, ymd } from '#/features/goals/data/planning'
 import { dueCountByGoal } from '#/features/goals/data/goalDetail'
 import { goalProgress, progressByGoal } from '#/features/goals/data/progress'
+import { linkedTransactions } from '#/features/planned/data/linkedTransactions'
 import { usePreferencesStore } from '#/stores/preferences'
 import { useMergedRates } from '#/lib/config/rates'
 import type { RatesMap } from '#/lib/config/rates'
@@ -26,7 +27,7 @@ export function useGoals() {
   const goalRows = useLiveQuery(() => db.goals.toArray())
   const settings = useLiveQuery(() => db.balanceSettings.get(SETTINGS_KEY))
   const rateRows = useLiveQuery(() => db.exchangeRates.toArray())
-  const txnRows = useLiveQuery(() => db.transactions.toArray())
+  const txnRows = useLiveQuery(() => linkedTransactions())
   const allocationRows = useLiveQuery(() => db.goalAllocations.toArray())
   const nodeRows = useLiveQuery(() => db.balanceNodes.toArray())
   const plannedRows = useLiveQuery(() => db.plannedTransactions.toArray())

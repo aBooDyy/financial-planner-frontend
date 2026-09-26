@@ -28,6 +28,7 @@ import {
 } from './rows'
 import { hasSettlements, legacyMarkerOf, settledOf } from './settle'
 import { fitGoalPlanFrom } from './fit'
+import { linkedTransactions } from './linkedTransactions'
 import { snapshotFromGoal, snapshotOf } from './snapshot'
 import type { PlanHeader } from './snapshot'
 import { derivePlannerState, liveInputs } from './state'
@@ -71,7 +72,7 @@ export async function loadPlannerInputs(): Promise<PlannerInputs> {
       db.incomeStreams.toArray(),
       db.recurrings.toArray(),
       db.plannedTransactions.toArray(),
-      db.transactions.toArray(),
+      linkedTransactions(),
       db.goalAllocations.toArray(),
       db.balanceSettings.get(SETTINGS_KEY),
     ])
@@ -151,8 +152,7 @@ async function restore(
       amount: row.amount,
       walletId: row.walletId,
       name: row.name,
-      category: row.category,
-      subcategory: row.subcategory,
+      categoryId: row.categoryId,
     })
   }
   await setGoalPlanSnapshot(goalId, snapshot)
@@ -281,8 +281,7 @@ async function autoConfirm(
         amount: item.amount - settled,
         walletId: item.walletId ?? r.walletId,
         date: item.date,
-        category: item.category ?? r.category,
-        subcategory: item.subcategory,
+        categoryId: item.categoryId ?? r.categoryId,
         note: r.name,
         source: legacyMarkerOf(r.id, item.occurrence),
       })
