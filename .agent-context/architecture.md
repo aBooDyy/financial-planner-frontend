@@ -81,6 +81,19 @@ a path with no file behind it (e.g. `/auth/login`) gets `index.html`, while real
 Cloudflare's "There is nothing here yet" 404. Don't add a `public/_redirects` catch-all
 (`/* /index.html 200`): Workers rejects it as an infinite loop and the deploy fails.
 
+**API proxy (`worker/index.ts`):** `run_worker_first: ["/api/*"]` sends only API paths
+through the Worker script, which forwards them (method, headers, body, cookies both ways;
+`redirect: 'manual'`) to the `BACKEND_ORIGIN` var, the Cloud Run URL. It exists for the
+cookies: `workers.dev` and `run.app` are different sites, so a direct call makes the auth
+cookies third-party (blocked by Safari/iOS; dropped under `SameSite=Strict` everywhere).
+Through the proxy they are first-party and the backend keeps `SameSite=Strict`. The Worker
+sets `X-Forwarded-For` to `CF-Connecting-IP` so the backend's per-IP auth limits see the
+user, not Cloudflare. `BACKEND_ORIGIN` lives in the dashboard (Settings → Variables), which
+`keep_vars: true` stops a deploy from wiping; unset, `/api/*` answers `500`. Production
+builds must set the build variable `VITE_API_BASE_URL=/api/v1` (dashboard → Build), or the
+bundle calls the `http://localhost:8000` default. Only `/api/*` counts against the Workers request
+quota; static assets don't.
+
 **Why (not SSR):** data lives in the browser's IndexedDB (local-first), so the server can't
 render real data anyway — SSR would paint an empty shell the client immediately re-fills
 from the local DB. An offline-capable PWA loads from cached static assets via the service

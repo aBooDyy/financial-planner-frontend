@@ -407,7 +407,8 @@ many times the server has _rejected_ it) and `nextAttemptAt` (no automatic retry
   inside its write transaction and drops the stale answer instead of refilling the wiped table.
 
 **Implemented (auth slice):** `src/lib/http.ts` is the client — base URL from
-`VITE_API_BASE_URL` (default `http://localhost:8000/api/v1`), `credentials: 'include'`,
+`VITE_API_BASE_URL` (default `http://localhost:8000/api/v1`; production `/api/v1`, same-origin
+through the Worker proxy — see [architecture.md](architecture.md)), `credentials: 'include'`,
 unwraps the standard `{ success, data, url, method }` envelope's `data`, and throws
 `ApiError` (`src/lib/apiError.ts`)
 carrying the backend's stable `code` + field `details`. The remote-only auth calls live in
