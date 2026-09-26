@@ -31,6 +31,14 @@ export type ConfigLimits = {
   importMaxBytes: number
   emailSyncMaxLookbackDays: number
   emailSyncMaxLimit: number
+  /** How many rules one inbox may hold. */
+  emailRulesMax: number
+  /** How many emails one learn or test call may carry. */
+  emailRuleSamplesMax: number
+  /** How many sender addresses one email rule may name. */
+  emailRuleSendersMax: number
+  /** How many terms each of an email rule's word lists may hold. */
+  emailRuleTermsMax: number
   /** How many transactions one `POST /transactions/bulk` may carry. */
   transactionBulkMax: number
   integrationKeysMax: number

@@ -20,6 +20,10 @@ type ConfigLimitsWire = {
   import_max_bytes: number
   email_sync_max_lookback_days: number
   email_sync_max_limit: number
+  email_rules_max?: number
+  email_rule_samples_max?: number
+  email_rule_senders_max?: number
+  email_rule_terms_max?: number
   transaction_bulk_max: number
   integration_keys_max: number
   integration_rules_max: number
@@ -69,6 +73,17 @@ export const toAppConfig = (w: ConfigWire): AppConfig => {
       importMaxBytes: w.limits.import_max_bytes,
       emailSyncMaxLookbackDays: w.limits.email_sync_max_lookback_days,
       emailSyncMaxLimit: w.limits.email_sync_max_limit,
+      emailRulesMax:
+        w.limits.email_rules_max ?? BUNDLED_CONFIG.limits.emailRulesMax,
+      emailRuleSamplesMax:
+        w.limits.email_rule_samples_max ??
+        BUNDLED_CONFIG.limits.emailRuleSamplesMax,
+      emailRuleSendersMax:
+        w.limits.email_rule_senders_max ??
+        BUNDLED_CONFIG.limits.emailRuleSendersMax,
+      emailRuleTermsMax:
+        w.limits.email_rule_terms_max ??
+        BUNDLED_CONFIG.limits.emailRuleTermsMax,
       transactionBulkMax: w.limits.transaction_bulk_max,
       integrationKeysMax: w.limits.integration_keys_max,
       integrationRulesMax: w.limits.integration_rules_max,
