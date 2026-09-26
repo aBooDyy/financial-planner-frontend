@@ -20,6 +20,8 @@ const goal = (over: Partial<LocalGoal>): LocalGoal => ({
   target: null,
   saved: 0,
   frequency: null,
+  customInterval: null,
+  customUnit: null,
   nextDue: null,
   dueDate: null,
   plannedAt: null,

@@ -65,9 +65,8 @@ describe('GoalProgress', () => {
     expect(document.querySelector('[data-segment="settled"]')).not.toBeNull()
     expect(document.querySelector('[data-segment="awaiting"]')).not.toBeNull()
     expect(screen.getByText('31%')).toBeDefined()
-    expect(
-      screen.getByText('SR 4,000 saved · SR 1,500 awaiting confirm'),
-    ).toBeDefined()
+    expect(screen.getByText('SR 4,000 saved')).toBeDefined()
+    expect(screen.getByText('· SR 1,500 awaiting confirm')).toBeDefined()
   })
 })
 

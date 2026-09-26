@@ -1,5 +1,9 @@
 import type { CurrencyCode } from '#/lib/currency'
-import type { GoalFrequency, GoalKind } from '#/features/goals/api/types'
+import type {
+  GoalFrequency,
+  GoalKind,
+  IntervalUnit,
+} from '#/features/goals/api/types'
 
 export const DEFAULT_BASE_CURRENCY: CurrencyCode = 'SAR'
 
@@ -15,16 +19,20 @@ export const GOAL_COLORS = [
   '#64748B',
 ] as const
 
-type FreqMeta = {
+/** How a due date steps: `every` days, weeks or calendar months at a time. */
+export type Cadence = { unit: IntervalUnit; every: number }
+
+export type FreqMeta = {
   label: string
   perYear: number
   short: string
   every: string
   ahead: number
+  cadence: Cadence
 }
 
-// Occurrences per year (to normalize to a monthly figure), display strings, and how far ahead
-// the default next-due lands. Mirrors the design's FREQ table.
+// Occurrences per year (to normalize to a monthly figure), display strings, how far ahead
+// the default next-due lands, and how a due date steps. Mirrors the design's FREQ table.
 export const FREQUENCIES: Record<GoalFrequency, FreqMeta> = {
   weekly: {
     label: 'Weekly',
@@ -32,6 +40,7 @@ export const FREQUENCIES: Record<GoalFrequency, FreqMeta> = {
     short: '/wk',
     every: 'every week',
     ahead: 1,
+    cadence: { unit: 'week', every: 1 },
   },
   monthly: {
     label: 'Monthly',
@@ -39,6 +48,7 @@ export const FREQUENCIES: Record<GoalFrequency, FreqMeta> = {
     short: '/mo',
     every: 'every month',
     ahead: 1,
+    cadence: { unit: 'month', every: 1 },
   },
   quarterly: {
     label: 'Quarterly',
@@ -46,6 +56,7 @@ export const FREQUENCIES: Record<GoalFrequency, FreqMeta> = {
     short: '/qtr',
     every: 'every quarter',
     ahead: 3,
+    cadence: { unit: 'month', every: 3 },
   },
   semi: {
     label: 'Semi-annual',
@@ -53,6 +64,7 @@ export const FREQUENCIES: Record<GoalFrequency, FreqMeta> = {
     short: '/6mo',
     every: 'twice a year',
     ahead: 6,
+    cadence: { unit: 'month', every: 6 },
   },
   annual: {
     label: 'Annual',
@@ -60,10 +72,16 @@ export const FREQUENCIES: Record<GoalFrequency, FreqMeta> = {
     short: '/yr',
     every: 'every year',
     ahead: 12,
+    cadence: { unit: 'month', every: 12 },
   },
 }
 
 export const FREQUENCY_OPTIONS = Object.keys(FREQUENCIES) as GoalFrequency[]
+
+// A custom "every N units" frequency: N from 1 to this (the server's bound), starting at 28 days.
+export const CUSTOM_INTERVAL_MAX = 365
+export const DEFAULT_CUSTOM_INTERVAL = 28
+export const DEFAULT_CUSTOM_UNIT: IntervalUnit = 'day'
 
 type KindMeta = { chip: string; title: string; desc: string }
 

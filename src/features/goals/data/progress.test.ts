@@ -195,7 +195,7 @@ describe('goalProgress — recurring obligations work per cycle', () => {
   })
 })
 
-describe('walletReservations — Balances after a goal payment', () => {
+describe('walletReservations — Wallets after a goal payment', () => {
   it('shows only what is still reserved, per goal, in the wallet currency', () => {
     const allocations = [
       setAside(m(5000), 'main'),

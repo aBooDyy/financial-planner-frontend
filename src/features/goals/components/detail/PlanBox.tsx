@@ -14,21 +14,18 @@ type Props = {
 /** The stored plan next to today's numbers, and what to do about the difference. */
 export function PlanBox({ plan, band, ...actions }: Props) {
   return (
-    <div className="overflow-hidden rounded-[12px] border border-fp-border">
-      <div className={`grid ${plan.left ? 'grid-cols-2' : 'grid-cols-1'}`}>
-        {plan.left ? (
-          <div className="border-e border-fp-border px-3 py-[11px]">
-            <PlanCellView cell={plan.left} />
-          </div>
-        ) : null}
-        <div
-          data-highlight={plan.highlightRight || undefined}
-          className={`px-3 py-[11px] ${plan.highlightRight ? 'bg-fp-accent-soft' : ''}`}
-        >
-          <PlanCellView cell={plan.right} />
+    <>
+      <div className="grid grid-cols-2 items-start gap-2">
+        {plan.left ? <PlanCellView cell={plan.left} current={false} /> : null}
+        <div className={plan.left ? undefined : 'col-span-2'}>
+          <PlanCellView
+            cell={plan.right}
+            current
+            emphasised={plan.highlightRight}
+          />
         </div>
       </div>
       {band ? <PlanBand band={band} {...actions} /> : null}
-    </div>
+    </>
   )
 }

@@ -78,7 +78,7 @@ export type ReservationLine = {
 
  * What each wallet still holds for goals, grouped by wallet, in the wallet's currency — the
 
- * pots under a wallet on Balances. A reservation a goal payment has consumed is no longer
+ * pots under a wallet on the Wallets page. A reservation a goal payment has consumed is no longer
 
  * held (see `progress.ts`), so pass the ledger to see that; without it every reservation
 

@@ -8,7 +8,12 @@ import type {
   OutboxEntity,
 } from '#/db/types'
 import type { CurrencyCode } from '#/lib/currency'
-import type { GoalFrequency, GoalKind } from '#/features/goals/api/types'
+import type {
+  GoalFrequency,
+  GoalKind,
+  IntervalUnit,
+  ObligationFrequency,
+} from '#/features/goals/api/types'
 import { requestPlanRecalc } from '#/features/planned/data/recalcRequests'
 import { closeCovered, reopenUnderSettled } from '#/features/planned/data/rows'
 import {
@@ -42,7 +47,10 @@ export type GoalDraft = {
   amount: number | null
   target: number | null
   saved: number
-  frequency: GoalFrequency | null
+  frequency: ObligationFrequency | null
+  /** Read only when `frequency` is 'custom'. */
+  customInterval?: number | null
+  customUnit?: IntervalUnit | null
   nextDue: string | null
   dueDate: string | null
   /** Undefined keeps the stored value (a new goal: the 1st). */
@@ -265,6 +273,8 @@ const PLAN_FIELDS = [
   'target',
   'saved',
   'frequency',
+  'customInterval',
+  'customUnit',
   'nextDue',
   'dueDate',
   'setAsideDay',
@@ -273,7 +283,10 @@ const PLAN_FIELDS = [
 
 /** Name / colour / position edits leave the stored plan alone; these rewrite it. */
 export const changesPlan = (before: LocalGoal, after: LocalGoal): boolean =>
-  PLAN_FIELDS.some((field) => before[field] !== after[field])
+  // A row stored before a field existed lacks it, which reads the same as null.
+  PLAN_FIELDS.some(
+    (field) => (before[field] ?? null) !== (after[field] ?? null),
+  )
 
 /** Edit only a goal's due/next-due date (the card's inline date picker). */
 export async function setGoalDate(id: string, iso: string): Promise<void> {
@@ -445,15 +458,23 @@ function kindShape(
   draft: GoalDraft,
 ): Pick<
   LocalGoal,
-  'amount' | 'target' | 'saved' | 'frequency' | 'nextDue' | 'dueDate'
+  | 'amount'
+  | 'target'
+  | 'saved'
+  | 'frequency'
+  | 'customInterval'
+  | 'customUnit'
+  | 'nextDue'
+  | 'dueDate'
 > {
   const saved = draft.saved
+  const noRepeat = { frequency: null, customInterval: null, customUnit: null }
   if (draft.kind === 'onetime') {
     return {
       amount: null,
       target: draft.target,
       saved,
-      frequency: null,
+      ...noRepeat,
       nextDue: null,
       dueDate: draft.dueDate,
     }
@@ -463,7 +484,7 @@ function kindShape(
       amount: draft.amount,
       target: draft.target,
       saved,
-      frequency: null,
+      ...noRepeat,
       nextDue: null,
       dueDate: null,
     }
@@ -472,9 +493,20 @@ function kindShape(
     amount: draft.amount,
     target: null,
     saved,
-    frequency: draft.frequency,
+    ...repeatShape(draft),
     nextDue: draft.nextDue,
     dueDate: null,
+  }
+}
+
+function repeatShape(
+  draft: GoalDraft,
+): Pick<LocalGoal, 'frequency' | 'customInterval' | 'customUnit'> {
+  const custom = draft.frequency === 'custom'
+  return {
+    frequency: draft.frequency,
+    customInterval: custom ? (draft.customInterval ?? null) : null,
+    customUnit: custom ? (draft.customUnit ?? null) : null,
   }
 }
 

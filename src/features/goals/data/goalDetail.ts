@@ -4,7 +4,8 @@
  * components render these strings and compute nothing.
  */
 import type { LocalGoal, LocalPlanned } from '#/db/types'
-import { FREQUENCIES, KINDS } from '#/features/goals/constants'
+import { KINDS } from '#/features/goals/constants'
+import { frequencyMetaOf } from '#/features/goals/data/cadence'
 import type {
   ContributionEntry,
   ContributionRun,
@@ -140,7 +141,7 @@ function cellOf(
   count: number,
   goal: LocalGoal,
 ): PlanCell {
-  const cadence = FREQUENCIES[goal.frequency ?? 'monthly'].short
+  const cadence = frequencyMetaOf(goal, 'monthly').short
   return {
     label,
     amountStr: tidyMoney(amount, goal.currency),

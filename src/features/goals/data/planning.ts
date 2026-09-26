@@ -3,8 +3,7 @@
  * rather than reading the clock, so the funding view is pure and testable. Dates on the wire
  * are ISO `YYYY-MM-DD` strings; these helpers convert at the edge.
  */
-import { FREQUENCIES } from '#/features/goals/constants'
-import type { GoalFrequency } from '#/features/goals/api/types'
+import type { FreqMeta } from '#/features/goals/constants'
 
 /** Today at local midnight — the single reference point the engine plans from. */
 export const startOfToday = (): Date => {
@@ -71,10 +70,8 @@ export const ordinal = (n: number): string => {
 }
 
 /** Default next-due for a fresh recurring goal: the 1st of a month `ahead` periods out. */
-export const nextDueDefault = (freq: GoalFrequency, today: Date): string => {
-  const ahead = FREQUENCIES[freq].ahead
-  return ymd(new Date(today.getFullYear(), today.getMonth() + ahead, 1))
-}
+export const nextDueDefault = (freq: FreqMeta, today: Date): string =>
+  ymd(new Date(today.getFullYear(), today.getMonth() + freq.ahead, 1))
 
 /** Set-asides fall on this day of the month (1–28, so every month has one). */
 export const clampSetAsideDay = (day: number | null | undefined): number =>

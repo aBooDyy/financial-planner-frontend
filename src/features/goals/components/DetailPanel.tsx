@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { X } from 'lucide-react'
-import { useIsDesktop, useMediaQuery } from '#/hooks/useMediaQuery'
+import { useIsDesktop } from '#/hooks/useMediaQuery'
 import { ResponsiveDialog } from '#/components/ui/responsive-dialog'
 
 type Props = {
@@ -13,8 +13,8 @@ type Props = {
 }
 
 /**
- * Where a selected item is edited: a docked right rail on wide screens, a rail laid over the
- * list on narrower desktops (so the list keeps its width), and a bottom sheet on mobile.
+ * Where a selected item is read or edited: a rail laid over the page's end edge on desktop (so
+ * the content underneath never reflows), and a bottom sheet on mobile.
  */
 export function DetailPanel({
   title,
@@ -24,7 +24,6 @@ export function DetailPanel({
   children,
 }: Props) {
   const isDesktop = useIsDesktop()
-  const isWide = useMediaQuery('(min-width: 1120px)')
 
   useEffect(() => {
     if (!isDesktop) return
@@ -58,34 +57,47 @@ export function DetailPanel({
 
   return (
     <aside
-      className={`flex w-[330px] flex-none flex-col border-s border-fp-border bg-fp-surface ${
-        isWide
-          ? ''
-          : 'absolute inset-y-0 end-0 z-30 max-w-[86%] shadow-[-18px_0_40px_-24px_rgba(20,18,12,0.4)]'
-      }`}
+      data-side-pane
+      className="flex h-full w-[330px] max-w-full flex-col rounded-[18px] border border-fp-border bg-fp-surface text-fp-text shadow-[-20px_0_50px_-20px_rgba(20,18,12,0.35)] rtl:shadow-[20px_0_50px_-20px_rgba(20,18,12,0.35)]"
     >
-      <div className="flex-1 overflow-auto px-[18px] pt-[18px] pb-[30px]">
-        <div className="flex items-start justify-between gap-[10px]">
-          <div className="min-w-0">
-            <div className="truncate text-[16px] font-extrabold tracking-[-0.01em]">
-              {title}
-            </div>
-            <div className="mt-[2px] text-[11.5px] text-fp-text-3">
-              {subtitle}
-            </div>
+      <div className="flex flex-none items-start gap-[10px] px-5 pt-[18px]">
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[18px] leading-[1.3] font-extrabold tracking-[-0.01em]">
+            {title}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="flex h-[30px] w-[30px] flex-none items-center justify-center rounded-[9px] bg-fp-surface-2 text-fp-text-2 hover:text-fp-text"
-          >
-            <X size={16} strokeWidth={2} />
-          </button>
+          <div className="mt-[3px] text-[13px] leading-[1.45] text-fp-text-2">
+            {subtitle}
+          </div>
         </div>
-        <div className="mt-4">{children}</div>
-        <div className="mt-[18px] flex items-center gap-2">{footer}</div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="flex h-8 w-8 flex-none items-center justify-center rounded-[10px] bg-fp-surface-2 text-fp-text-2 transition hover:text-fp-text"
+        >
+          <X size={17} strokeWidth={2} />
+        </button>
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col gap-[14px] overflow-auto px-5 pt-4 pb-[18px]">
+        {children}
+      </div>
+      <div className="flex flex-none items-center gap-2 px-5 pb-5">
+        {footer}
       </div>
     </aside>
+  )
+}
+
+/**
+ * Positions the panel over the end edge and slides it in once on open. It stays mounted while
+ * the panel swaps content (read view ↔ editor, one goal to another), so those swaps don't
+ * replay the slide. Sizeless on its own, so it never covers anything when the panel renders as a
+ * mobile sheet instead.
+ */
+export function DetailPanelOverlay({ children }: { children: ReactNode }) {
+  return (
+    <div className="absolute inset-y-3 end-3 z-30 flex max-w-[86%] duration-200 ease-out animate-in slide-in-from-end">
+      {children}
+    </div>
   )
 }

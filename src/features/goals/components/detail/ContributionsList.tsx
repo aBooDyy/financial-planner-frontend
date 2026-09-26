@@ -1,9 +1,10 @@
-import { Plus } from 'lucide-react'
+import { PiggyBank, Plus } from 'lucide-react'
 import { useState } from 'react'
 import type { GoalDetailView } from '#/features/goals/data/goalDetail'
+import { EmptyState } from '#/components/EmptyState'
 import { Button } from '#/components/ui/button'
-import { FIELD_LABEL_TEXT } from '../styles'
-import { ContributionMark } from './ContributionMark'
+import { CAPS_LABEL, PANE_BUTTON } from '../styles'
+import { ContributionLegend } from './ContributionLegend'
 import { ContributionRow } from './ContributionRow'
 
 type Props = {
@@ -14,7 +15,7 @@ type Props = {
   onRemoveAllocation: (allocationId: string) => void
 }
 
-/** Settlements and planned items, date-ordered, with "+ Add contribution". */
+/** Planned items and settlements, latest first, with "+ Add contribution". */
 export function ContributionsList({
   detail,
   color,
@@ -24,86 +25,81 @@ export function ContributionsList({
 }: Props) {
   const [showEarlier, setShowEarlier] = useState(false)
   const [openKey, setOpenKey] = useState<string | null>(null)
-  const rows = showEarlier
+  const shown = showEarlier
     ? detail.contributions
     : detail.contributions.slice(detail.earlierCount)
-  const hidden = detail.contributions.length - rows.length
+  const hidden = detail.contributions.length - shown.length
+  const rows = [...shown].reverse()
 
   return (
     <div>
-      <div className="mb-[6px] flex items-center justify-between">
-        <span className={FIELD_LABEL_TEXT}>Contributions</span>
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <span className={CAPS_LABEL}>Contributions</span>
         <Button
-          variant="outline"
+          variant="ghost"
           onClick={onAdd}
-          className="h-auto gap-1 rounded-[8px] bg-fp-surface-2 px-[9px] py-[5px] text-[11.5px] font-bold hover:border-fp-accent"
+          className={`${PANE_BUTTON} gap-1 bg-fp-accent-soft text-fp-accent-ink hover:bg-fp-accent-soft hover:text-fp-accent-ink hover:brightness-95`}
         >
-          <Plus size={13} strokeWidth={2.4} />
+          <Plus size={14} strokeWidth={2.4} />
           Add contribution
         </Button>
       </div>
 
       {rows.length === 0 ? (
-        <p className="rounded-[11px] border border-dashed border-fp-border-strong px-3 py-3 text-[12px] leading-normal text-fp-text-3">
-          Nothing yet. Planned set-asides and payments show up here, and so does
-          anything you add.
-        </p>
+        <EmptyState
+          icon={PiggyBank}
+          size="sm"
+          framed
+          title="No contributions yet"
+          text="Planned set-asides and payments show up here, and so does anything you add."
+        />
       ) : (
-        <div className="flex flex-col">
+        rows.map((row) => {
+          const allocationId = row.allocationId
+          const onSelect = row.plannedId
+            ? () => onConfirm(row.plannedId ?? '')
+            : allocationId
+              ? () => setOpenKey((k) => (k === row.key ? null : row.key))
+              : undefined
+          return (
+            <div key={row.key}>
+              <ContributionRow row={row} color={color} onSelect={onSelect} />
+              {allocationId && openKey === row.key ? (
+                <div className="mb-2 flex items-center justify-between gap-2 rounded-[10px] bg-fp-surface-2 px-3 py-2 text-[12px] text-fp-text-2">
+                  <span>Set aside, still in its wallet.</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpenKey(null)
+                      onRemoveAllocation(allocationId)
+                    }}
+                    className="font-bold text-fp-danger hover:underline"
+                  >
+                    Take it back
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          )
+        })
+      )}
+
+      {rows.length > 0 ? (
+        <div className="flex items-center justify-between gap-2 border-t border-fp-border pt-2">
           {hidden > 0 ? (
             <button
               type="button"
               onClick={() => setShowEarlier(true)}
-              className="border-b border-fp-border py-[7px] text-start text-[11.5px] font-semibold text-fp-text-2 hover:text-fp-text"
+              className="text-[12.5px] font-bold text-fp-accent-ink hover:underline"
             >
               Show {hidden} earlier
             </button>
-          ) : null}
-          {rows.map((row) => {
-            const allocationId = row.allocationId
-            const onSelect = row.plannedId
-              ? () => onConfirm(row.plannedId ?? '')
-              : allocationId
-                ? () => setOpenKey((k) => (k === row.key ? null : row.key))
-                : undefined
-            return (
-              <div key={row.key}>
-                <ContributionRow row={row} color={color} onSelect={onSelect} />
-                {allocationId && openKey === row.key ? (
-                  <div className="flex items-center justify-between gap-2 border-b border-fp-border bg-fp-surface-2 px-2 py-[7px] text-[11.5px] text-fp-text-2">
-                    <span>Set aside, still in its wallet.</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setOpenKey(null)
-                        onRemoveAllocation(allocationId)
-                      }}
-                      className="font-bold text-fp-danger hover:underline"
-                    >
-                      Take it back
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            )
-          })}
+          ) : (
+            <span />
+          )}
+          <ContributionLegend color={color} />
         </div>
-      )}
-
-      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-fp-text-3">
-        <span className="inline-flex items-center gap-[5px]">
-          <ContributionMark mark="confirmed" color={color} size={8} />
-          confirmed
-        </span>
-        <span className="inline-flex items-center gap-[5px]">
-          <ContributionMark mark="due" color={color} size={8} />
-          needs confirming
-        </span>
-        <span className="inline-flex items-center gap-[5px]">
-          <ContributionMark mark="future" color={color} size={8} />
-          planned
-        </span>
-      </div>
+      ) : null}
     </div>
   )
 }

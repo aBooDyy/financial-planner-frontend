@@ -1,5 +1,6 @@
+import { Wallet } from 'lucide-react'
+import { EmptyState } from '#/components/EmptyState'
 import type { GoalsView } from '#/features/goals/data/selectors'
-import { EmptyCard } from './EmptyCard'
 import { IncomeRow } from './IncomeRow'
 import { SectionHeader } from './SectionHeader'
 import { SURFACE_CARD } from './styles'
@@ -33,7 +34,13 @@ export function IncomeSection({ view, selectedId, onAdd, onSelect }: Props) {
           ))}
         </div>
       ) : (
-        <EmptyCard text="Add your income streams so the plan knows what there is to work with." />
+        <EmptyState
+          icon={Wallet}
+          title="No income yet"
+          text="Add your income streams so the plan knows what there is to work with."
+          framed
+          action={{ label: 'Add income', onClick: onAdd }}
+        />
       )}
     </div>
   )

@@ -2,7 +2,7 @@ import { Outlet, createFileRoute } from '@tanstack/react-router'
 import { SessionGate } from '#/components/SessionGate'
 
 export type GoalsSearch = {
-  /** `?goal=<id>` — open that goal's detail (a Balances pot links here). */
+  /** `?goal=<id>` — open that goal's detail (a Wallets pot links here). */
   goal?: string
 }
 

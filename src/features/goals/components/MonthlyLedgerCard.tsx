@@ -39,7 +39,9 @@ function LedgerBar({
           style={{ ...fill, width: `${Math.min(100, Math.max(2, pct))}%` }}
         >
           {inside ? (
-            <span className={`truncate tabular-nums ${insideClass}`}>
+            <span
+              className={`fp-sensitive truncate tabular-nums ${insideClass}`}
+            >
               {valueStr}
             </span>
           ) : null}
@@ -47,7 +49,7 @@ function LedgerBar({
       ) : null}
       {inside ? null : (
         <span
-          className={`truncate tabular-nums ${outsideClass} ${pct >= 1 ? 'ms-[10px]' : ''}`}
+          className={`fp-sensitive truncate tabular-nums ${outsideClass} ${pct >= 1 ? 'ms-[10px]' : ''}`}
         >
           {valueStr}
         </span>

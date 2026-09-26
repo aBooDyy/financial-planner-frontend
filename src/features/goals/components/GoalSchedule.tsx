@@ -1,59 +1,66 @@
-import { ChevronRight } from 'lucide-react'
-import { STATUS_COLORS } from '#/features/goals/constants'
+import { ChevronDown } from 'lucide-react'
 import type { GoalCard } from '#/features/goals/data/selectors'
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from '#/components/ui/collapsible'
+import { cn } from '#/lib/utils'
+import { PANE_CARD } from './styles'
 
-// The goal's month-by-month set-aside path, collapsed to a one-line teaser.
+/** The goal's month-by-month set-aside path, folded to its one-line summary. */
 export function GoalSchedule({ card }: { card: GoalCard }) {
-  const color = STATUS_COLORS[card.status].main
-
   return (
-    <Collapsible className="group/schedule border-t border-dashed border-fp-border pt-3">
-      <CollapsibleTrigger className="flex w-full cursor-pointer items-center gap-[7px] text-[11.5px]">
-        <ChevronRight
-          size={13}
-          strokeWidth={2.4}
-          className="shrink-0 text-fp-text-3 transition-transform group-data-[state=open]/schedule:rotate-90"
-        />
-        <span className="font-bold text-fp-text-2">Monthly plan</span>
-        <span className="truncate text-fp-text-3 tabular-nums">
+    <Collapsible className={cn(PANE_CARD, 'group/schedule')}>
+      <CollapsibleTrigger className="flex w-full cursor-pointer items-center gap-2 text-start">
+        <span className="flex-1 text-[14px] font-extrabold text-fp-text">
+          Monthly plan
+        </span>
+        <span className="min-w-0 truncate text-[13px] font-bold text-fp-text-2 tabular-nums">
           {card.scheduleSummary}
         </span>
+        <ChevronDown
+          size={16}
+          strokeWidth={2.2}
+          className="shrink-0 text-fp-text-3 transition-transform group-data-[state=open]/schedule:rotate-180"
+        />
       </CollapsibleTrigger>
-      <CollapsibleContent className="mt-[10px]">
-        <div className="mb-[9px] text-[11px] font-semibold" style={{ color }}>
+      <CollapsibleContent className="flex flex-col gap-[10px]">
+        <div
+          className={cn(
+            '-mt-1 text-[12.5px] font-bold',
+            card.status === 'red' ? 'text-fp-danger' : 'text-fp-accent-ink',
+          )}
+        >
           {card.coverageStr}
         </div>
-        <div className="relative max-h-[230px] overflow-auto ps-[6px]">
+        <div className="max-h-[230px] overflow-auto">
           {card.scheduleMonths.map((mo, i) => (
-            <div key={i} className="relative flex pb-[9px] last:pb-0">
-              {i < card.scheduleMonths.length - 1 ? (
-                <div className="absolute start-[4px] top-[11px] bottom-[-2px] w-[1.5px] bg-fp-border" />
-              ) : null}
-              <div
-                className="absolute start-0 top-[4px] h-[9px] w-[9px] rounded-full ring-[2.5px] ring-fp-surface"
-                style={{
-                  background:
-                    mo.muted && !mo.covered ? 'var(--fp-border-strong)' : color,
-                }}
-              />
-              <div className="flex min-w-0 flex-1 items-center justify-between gap-3 ps-[19px]">
-                <span
-                  className={`text-[12px] ${mo.muted ? 'text-fp-text-3' : 'text-fp-text-2'}`}
-                >
-                  {mo.label}
-                  {mo.covered ? ' · covered' : ''}
-                </span>
-                <span
-                  className={`text-[12px] tabular-nums ${mo.muted ? 'text-fp-text-3' : 'font-bold text-fp-text'}`}
-                >
-                  {mo.amountStr}
-                </span>
-              </div>
+            <div
+              key={i}
+              className="flex justify-between gap-3 border-t border-fp-border py-[5px] text-[12.5px]"
+            >
+              <span
+                className={cn(
+                  'font-semibold',
+                  mo.muted ? 'text-fp-text-3' : 'text-fp-text',
+                )}
+              >
+                {mo.label}
+              </span>
+              <span
+                className={cn(
+                  'font-bold whitespace-nowrap tabular-nums',
+                  mo.covered
+                    ? 'text-fp-accent-ink'
+                    : mo.muted
+                      ? 'text-fp-text-3'
+                      : 'text-fp-text',
+                )}
+              >
+                {mo.amountStr}
+                {mo.covered ? ' · covered' : ''}
+              </span>
             </div>
           ))}
         </div>

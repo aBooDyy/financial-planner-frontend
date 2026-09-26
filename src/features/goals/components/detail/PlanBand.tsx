@@ -1,5 +1,6 @@
 import type { DetailBand } from '#/features/goals/data/goalDetail'
 import { Button } from '#/components/ui/button'
+import { PANE_BUTTON } from '../styles'
 
 type Props = {
   band: DetailBand
@@ -9,22 +10,24 @@ type Props = {
   onUndo: () => void
 }
 
-const SMALL = 'h-auto rounded-[9px] px-[10px] py-2 text-[12px] font-bold'
+const BOX = 'rounded-[14px] px-[13px] py-3'
 
-/** The strip under the plan box: behind / ahead / off-plan, or "Plan updated · Undo". */
+/** The box under the plan tiles: behind / ahead / off-plan, or "Plan updated · Undo". */
 export function PlanBand({ band, busy, onRecalc, onConfirm, onUndo }: Props) {
   switch (band.kind) {
     case 'updated':
       return (
-        <div className="flex items-center gap-[10px] border-t border-fp-border bg-fp-accent-soft px-3 py-[10px]">
-          <p className="flex-1 text-[11.5px] leading-[1.45] text-fp-accent-ink">
-            <b>{band.lead}</b> {band.text}
+        <div
+          className={`${BOX} flex items-center gap-[10px] bg-fp-accent-soft`}
+        >
+          <p className="flex-1 text-[12.5px] leading-[1.5] text-fp-accent-ink">
+            <b className="font-extrabold">{band.lead}</b> {band.text}
           </p>
           <Button
-            variant="outline"
+            variant="quiet"
             onClick={onUndo}
             disabled={busy}
-            className="h-auto rounded-[8px] px-[9px] py-[6px] text-[11.5px] font-bold"
+            className={PANE_BUTTON}
           >
             Undo
           </Button>
@@ -32,27 +35,29 @@ export function PlanBand({ band, busy, onRecalc, onConfirm, onUndo }: Props) {
       )
     case 'behind':
       return (
-        <div className="border-t border-fp-border bg-fp-warn/10 px-3 py-[10px]">
-          <div className="text-[12px] font-bold text-fp-warn">{band.title}</div>
-          <p className="mt-[2px] text-[11.5px] leading-[1.45] text-fp-text-2">
+        <div className={`${BOX} bg-fp-spend-soft`}>
+          <div className="text-[13.5px] font-extrabold text-fp-spend">
+            {band.title}
+          </div>
+          <p className="mt-[3px] text-[12.5px] leading-[1.5] text-fp-text-2">
             {band.text}
           </p>
           {band.recalcLabel || band.confirmId ? (
-            <div className="mt-[9px] flex gap-[7px]">
+            <div className="mt-[10px] flex flex-wrap gap-[6px]">
               {band.recalcLabel ? (
                 <Button
                   onClick={onRecalc}
                   disabled={busy}
-                  className={`${SMALL} min-w-0 flex-1`}
+                  className={`${PANE_BUTTON} font-extrabold shadow-[0_6px_16px_-8px_var(--fp-accent)]`}
                 >
                   {band.recalcLabel}
                 </Button>
               ) : null}
               {band.confirmId && band.confirmLabel ? (
                 <Button
-                  variant="outline"
+                  variant="quiet"
                   onClick={() => onConfirm(band.confirmId ?? '')}
-                  className={`${SMALL} ${band.recalcLabel ? '' : 'flex-1'}`}
+                  className={PANE_BUTTON}
                 >
                   {band.confirmLabel}
                 </Button>
@@ -63,16 +68,18 @@ export function PlanBand({ band, busy, onRecalc, onConfirm, onUndo }: Props) {
       )
     case 'ahead':
       return (
-        <div className="flex items-center gap-[10px] border-t border-fp-border px-3 py-[10px]">
-          <span className="flex-1 text-[12px] font-bold text-fp-accent-ink">
+        <div
+          className={`${BOX} flex items-center gap-[10px] bg-fp-accent-soft`}
+        >
+          <span className="flex-1 text-[12.5px] font-bold text-fp-accent-ink">
             {band.title}
           </span>
           {band.recalcLabel ? (
             <Button
-              variant="outline"
+              variant="quiet"
               onClick={onRecalc}
               disabled={busy}
-              className={SMALL}
+              className={PANE_BUTTON}
             >
               {band.recalcLabel}
             </Button>
@@ -81,7 +88,9 @@ export function PlanBand({ band, busy, onRecalc, onConfirm, onUndo }: Props) {
       )
     case 'off':
       return (
-        <div className="flex flex-wrap items-center gap-x-1 border-t border-fp-border px-3 py-[9px] text-[11.5px] text-fp-text-2">
+        <div
+          className={`${BOX} flex flex-wrap items-center gap-x-1 bg-fp-surface-2 text-[12.5px] text-fp-text-2`}
+        >
           <span>{band.text} ·</span>
           <button
             type="button"

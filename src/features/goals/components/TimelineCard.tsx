@@ -1,3 +1,5 @@
+import { CalendarRange } from 'lucide-react'
+import { EmptyState } from '#/components/EmptyState'
 import { STATUS_COLORS } from '#/features/goals/constants'
 import type { GoalsView } from '#/features/goals/data/selectors'
 
@@ -7,9 +9,12 @@ export function TimelineCard({ view }: Props) {
   return (
     <div className="rounded-[16px] border border-fp-border bg-fp-surface p-[18px] shadow-fp">
       {view.timelineEmpty ? (
-        <div className="py-[6px] text-[12.5px] text-fp-text-3">
-          Add a goal or obligation with a date to see it here.
-        </div>
+        <EmptyState
+          icon={CalendarRange}
+          size="sm"
+          title="Nothing on the timeline yet"
+          text="Add a goal or obligation with a date to see it here."
+        />
       ) : (
         <div className="relative max-h-[420px] overflow-auto ps-[6px]">
           {view.timeline.map((t) => {

@@ -21,6 +21,13 @@ export type GoalFrequencyWire =
   | 'SEMI'
   | 'ANNUAL'
 
+/** A goal repeats on a preset frequency or on a custom "every N days / weeks / months". */
+export type ObligationFrequency = GoalFrequency | 'custom'
+export type ObligationFrequencyWire = GoalFrequencyWire | 'CUSTOM'
+
+export type IntervalUnit = 'day' | 'week' | 'month'
+export type IntervalUnitWire = 'DAY' | 'WEEK' | 'MONTH'
+
 const KIND_TO_WIRE: Record<GoalKind, GoalKindWire> = {
   onetime: 'ONETIME',
   recurring: 'RECURRING',
@@ -48,6 +55,17 @@ const FREQ_FROM_WIRE: Record<GoalFrequencyWire, GoalFrequency> = {
   ANNUAL: 'annual',
 }
 
+const UNIT_TO_WIRE: Record<IntervalUnit, IntervalUnitWire> = {
+  day: 'DAY',
+  week: 'WEEK',
+  month: 'MONTH',
+}
+const UNIT_FROM_WIRE: Record<IntervalUnitWire, IntervalUnit> = {
+  DAY: 'day',
+  WEEK: 'week',
+  MONTH: 'month',
+}
+
 export type AllocationSource = 'wallet' | 'external'
 export type AllocationSourceWire = 'WALLET' | 'EXTERNAL'
 
@@ -72,6 +90,15 @@ export const toWireFreq = (f: GoalFrequency): GoalFrequencyWire =>
   FREQ_TO_WIRE[f]
 export const fromWireFreq = (w: GoalFrequencyWire): GoalFrequency =>
   FREQ_FROM_WIRE[w]
+export const toWireObligationFreq = (
+  f: ObligationFrequency,
+): ObligationFrequencyWire => (f === 'custom' ? 'CUSTOM' : FREQ_TO_WIRE[f])
+export const fromWireObligationFreq = (
+  w: ObligationFrequencyWire,
+): ObligationFrequency => (w === 'CUSTOM' ? 'custom' : FREQ_FROM_WIRE[w])
+export const toWireUnit = (u: IntervalUnit): IntervalUnitWire => UNIT_TO_WIRE[u]
+export const fromWireUnit = (w: IntervalUnitWire): IntervalUnit =>
+  UNIT_FROM_WIRE[w]
 
 // --- Domain types (camelCase) --------------------------------------------------------
 
@@ -103,7 +130,10 @@ export type Goal = {
   amount: number | null
   target: number | null
   saved: number
-  frequency: GoalFrequency | null
+  frequency: ObligationFrequency | null
+  // "Every `customInterval` `customUnit`s" — set only when `frequency` is 'custom'.
+  customInterval: number | null
+  customUnit: IntervalUnit | null
   nextDue: string | null
   dueDate: string | null
   plannedAt: string | null
@@ -162,7 +192,9 @@ export type GoalWire = {
   amount: number | null
   target: number | null
   saved: number
-  frequency: GoalFrequencyWire | null
+  frequency: ObligationFrequencyWire | null
+  custom_interval?: number | null
+  custom_unit?: IntervalUnitWire | null
   next_due: string | null
   due_date: string | null
   planned_at?: string | null
@@ -240,7 +272,9 @@ export type CreateGoalWire = GoalPlanWire & {
   amount: number | null
   target: number | null
   saved: number
-  frequency: GoalFrequencyWire | null
+  frequency: ObligationFrequencyWire | null
+  custom_interval: number | null
+  custom_unit: IntervalUnitWire | null
   next_due: string | null
   due_date: string | null
 }
@@ -254,7 +288,9 @@ export type UpdateGoalWire = GoalPlanWire & {
   amount: number | null
   target: number | null
   saved: number
-  frequency: GoalFrequencyWire | null
+  frequency: ObligationFrequencyWire | null
+  custom_interval: number | null
+  custom_unit: IntervalUnitWire | null
   next_due: string | null
   due_date: string | null
 }
@@ -331,7 +367,9 @@ export const toGoal = (w: GoalWire): Goal => ({
   amount: w.amount,
   target: w.target,
   saved: w.saved,
-  frequency: w.frequency ? fromWireFreq(w.frequency) : null,
+  frequency: w.frequency ? fromWireObligationFreq(w.frequency) : null,
+  customInterval: w.custom_interval ?? null,
+  customUnit: w.custom_unit ? fromWireUnit(w.custom_unit) : null,
   nextDue: w.next_due,
   dueDate: w.due_date,
   plannedAt: w.planned_at ?? null,

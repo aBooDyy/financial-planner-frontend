@@ -1,6 +1,6 @@
 import type { LocalBalanceNode } from '#/db/types'
-import { walletGroupOptions } from '#/features/balances/data/selectors'
-import { Label } from '#/components/ui/label'
+import { walletGroupOptions } from '#/features/wallets/data/selectors'
+import { FieldLabel } from '#/components/FieldLabel'
 import {
   Select,
   SelectContent,
@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select'
-import { FIELD_LABEL } from './styles'
+import { WalletDot } from './WalletDot'
 
 const NONE = '__none__'
 
@@ -27,7 +27,7 @@ export function DepositWalletField({ value, nodes, onChange }: Props) {
 
   return (
     <div>
-      <Label className={FIELD_LABEL}>Deposits into</Label>
+      <FieldLabel optional>Deposits into</FieldLabel>
       <Select
         value={value && known ? value : NONE}
         onValueChange={(v) => onChange(v === NONE ? null : v)}
@@ -42,6 +42,7 @@ export function DepositWalletField({ value, nodes, onChange }: Props) {
               <SelectLabel>{g.label ?? 'Wallets'}</SelectLabel>
               {g.wallets.map((w) => (
                 <SelectItem key={w.id} value={w.id}>
+                  <WalletDot color={w.color} />
                   {w.name}
                 </SelectItem>
               ))}

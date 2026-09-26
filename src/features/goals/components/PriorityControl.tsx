@@ -1,6 +1,6 @@
 import { ArrowDown, ArrowUp } from 'lucide-react'
 import { Button } from '#/components/ui/button'
-import { FIELD_LABEL } from './styles'
+import { CAPS_LABEL, PANE_BUTTON, PANE_CARD } from './styles'
 
 type Props = {
   rank: number
@@ -11,9 +11,7 @@ type Props = {
   onDown: () => void
 }
 
-const MOVE =
-  'h-[34px] flex-1 gap-1 rounded-[9px] bg-fp-surface-2 text-[12px] font-bold'
-
+/** The goal's rank with its move buttons; a move is saved at once, not with the editor. */
 export function PriorityControl({
   rank,
   total,
@@ -23,34 +21,38 @@ export function PriorityControl({
   onDown,
 }: Props) {
   return (
-    <div>
-      <div className={FIELD_LABEL}>
-        Priority #{rank} of {total}
-      </div>
-      <div className="flex gap-[7px]">
+    <div role="group" aria-label="Priority" className={PANE_CARD}>
+      <div className="flex items-center gap-[10px]">
+        <div className="min-w-0 flex-1">
+          <div className={CAPS_LABEL}>Priority</div>
+          <div className="text-[17px] font-extrabold text-fp-text">
+            #{rank} of {total}
+          </div>
+        </div>
         <Button
-          variant="outline"
+          variant="quiet"
           disabled={!canUp}
           onClick={onUp}
-          className={MOVE}
+          className={`${PANE_BUTTON} gap-[6px]`}
         >
           <ArrowUp size={14} strokeWidth={2.2} />
-          Move up
+          Up
         </Button>
         <Button
-          variant="outline"
+          variant="quiet"
           disabled={!canDown}
           onClick={onDown}
-          className={MOVE}
+          className={`${PANE_BUTTON} gap-[6px]`}
         >
           <ArrowDown size={14} strokeWidth={2.2} />
-          Move down
+          Down
         </Button>
       </div>
-      <div className="mt-[6px] text-[11px] leading-[1.45] text-fp-text-3">
-        Whatever is due soonest is funded first; priority decides between items
-        due around the same time.
-      </div>
+      <p className="-mt-1 text-[12px] leading-[1.45] text-fp-text-3">
+        <b className="font-bold text-fp-text-2">Applies right away.</b> Whatever
+        is due soonest is funded first; priority decides between items due
+        around the same time.
+      </p>
     </div>
   )
 }

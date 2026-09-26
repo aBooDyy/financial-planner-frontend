@@ -1,9 +1,10 @@
 import { useEffect } from 'react'
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router'
+import { Receipt, Target } from 'lucide-react'
 import { MobileTabBar } from '#/components/chrome/MobileTabBar'
 import { TopNav } from '#/components/chrome/TopNav'
 import { useLogout } from '#/features/auth/hooks/useLogout'
-import { setBaseCurrency } from '#/features/balances/data/mutations'
+import { setBaseCurrency } from '#/features/wallets/data/mutations'
 import { RECURRING_KINDS } from '#/features/goals/constants'
 import { swapGoalPositions } from '#/features/goals/data/mutations'
 import { useGoals } from '#/features/goals/hooks/useGoals'
@@ -12,6 +13,7 @@ import { useGoalDetail } from '#/features/goals/hooks/useGoalDetail'
 import { useSessionStore } from '#/stores/session'
 import type { CurrencyCode } from '#/lib/currency'
 import { GoalDetailPanel } from './detail/GoalDetailPanel'
+import { DetailPanelOverlay } from './DetailPanel'
 import { GoalEditor } from './GoalEditor'
 import { GoalListSection } from './GoalListSection'
 import { IncomeSection } from './IncomeSection'
@@ -98,7 +100,7 @@ export function GoalsPage() {
     detail.close()
   }
 
-  // A link from elsewhere (a Balances pot) lands on that goal's detail, once; opening it
+  // A link from elsewhere (a Wallets pot) lands on that goal's detail, once; opening it
   // drops the param so a later close is not undone by it.
   useEffect(() => {
     if (!linkedGoalId || !linkedGoalFound) return
@@ -148,7 +150,11 @@ export function GoalsPage() {
             list={view.goalsList}
             completed={view.completedGoals}
             addLabel="Add goal"
-            emptyText="Add a goal — a target by a date, or a fund you grow each month — and the plan works out what to set aside."
+            empty={{
+              icon: Target,
+              title: 'No goals yet',
+              text: 'Add a goal — a target by a date, or a fund you grow each month — and the plan works out what to set aside.',
+            }}
             selectedId={selectedGoalId}
             dueByGoal={dueByGoal}
             onAdd={() => addGoal('onetime')}
@@ -162,7 +168,11 @@ export function GoalsPage() {
             list={view.obligationsList}
             completed={[]}
             addLabel="Add obligation"
-            emptyText="Add a recurring bill or cost you have to cover, and the plan sets money aside for each due date."
+            empty={{
+              icon: Receipt,
+              title: 'No obligations yet',
+              text: 'Add a recurring bill or cost you have to cover, and the plan sets money aside for each due date.',
+            }}
             selectedId={selectedGoalId}
             dueByGoal={dueByGoal}
             onAdd={() => addGoal('recurring')}
@@ -210,28 +220,32 @@ export function GoalsPage() {
           </div>
         </main>
 
-        {editing ? (
-          <GoalEditor
-            editing={editing}
-            card={editingCard}
-            rankTotal={view.goalCards.length}
-            onMoveUp={() => moveEditing(-1)}
-            onMoveDown={() => moveEditing(1)}
-            nodes={nodes}
-            onField={editor.setField}
-            onKind={editor.setKind}
-            onSave={() => void save()}
-            onDelete={() => void remove()}
-            onClose={editor.close}
-          />
-        ) : detailGoal ? (
-          <GoalDetailPanel
-            key={detailGoal.id}
-            goal={detailGoal}
-            nodes={nodes}
-            onEdit={editGoal}
-            onClose={closePanel}
-          />
+        {editing || detailGoal ? (
+          <DetailPanelOverlay>
+            {editing ? (
+              <GoalEditor
+                editing={editing}
+                card={editingCard}
+                rankTotal={view.goalCards.length}
+                onMoveUp={() => moveEditing(-1)}
+                onMoveDown={() => moveEditing(1)}
+                nodes={nodes}
+                onField={editor.setField}
+                onKind={editor.setKind}
+                onSave={() => void save()}
+                onDelete={remove}
+                onClose={editor.close}
+              />
+            ) : detailGoal ? (
+              <GoalDetailPanel
+                key={detailGoal.id}
+                goal={detailGoal}
+                nodes={nodes}
+                onEdit={editGoal}
+                onClose={closePanel}
+              />
+            ) : null}
+          </DetailPanelOverlay>
         ) : null}
       </div>
 

@@ -12,13 +12,14 @@ export function ContributionMark({ mark, color, size = 10 }: Props) {
     mark === 'confirmed'
       ? { background: color }
       : {
-          border: `1.5px solid ${mark === 'due' ? 'var(--fp-warn)' : 'var(--fp-border-strong)'}`,
+          border: `2px solid ${mark === 'due' ? 'var(--fp-warn)' : 'var(--fp-border-strong)'}`,
+          background: 'var(--fp-surface)',
         }
   return (
     <span
       aria-hidden
       data-mark={mark}
-      className="flex-none rounded-full"
+      className="block flex-none rounded-full"
       style={{ width: size, height: size, ...style }}
     />
   )

@@ -18,7 +18,9 @@ import type {
 import {
   toWireFreq,
   toWireKind,
+  toWireObligationFreq,
   toWireSource,
+  toWireUnit,
 } from '#/features/goals/api/types'
 
 // --- Income streams ------------------------------------------------------------------
@@ -95,6 +97,8 @@ export const serverGoalToLocal = (g: Goal): LocalGoal => ({
   target: g.target,
   saved: g.saved,
   frequency: g.frequency,
+  customInterval: g.customInterval,
+  customUnit: g.customUnit,
   nextDue: g.nextDue,
   dueDate: g.dueDate,
   plannedAt: g.plannedAt,
@@ -110,6 +114,15 @@ export const serverGoalToLocal = (g: Goal): LocalGoal => ({
   deleted: 0,
 })
 
+// Rows stored before custom frequencies carry no interval fields at all.
+const goalRepeatWire = (
+  l: LocalGoal,
+): Pick<CreateGoalWire, 'frequency' | 'custom_interval' | 'custom_unit'> => ({
+  frequency: l.frequency ? toWireObligationFreq(l.frequency) : null,
+  custom_interval: l.customInterval ?? null,
+  custom_unit: l.customUnit ? toWireUnit(l.customUnit) : null,
+})
+
 export const localGoalToCreateWire = (l: LocalGoal): CreateGoalWire => ({
   id: l.id,
   kind: toWireKind(l.kind),
@@ -120,7 +133,7 @@ export const localGoalToCreateWire = (l: LocalGoal): CreateGoalWire => ({
   amount: l.amount,
   target: l.target,
   saved: l.saved,
-  frequency: l.frequency ? toWireFreq(l.frequency) : null,
+  ...goalRepeatWire(l),
   next_due: l.nextDue,
   due_date: l.dueDate,
   ...goalPlanWire(l),
@@ -135,7 +148,7 @@ export const localGoalToUpdateWire = (l: LocalGoal): UpdateGoalWire => ({
   amount: l.amount,
   target: l.target,
   saved: l.saved,
-  frequency: l.frequency ? toWireFreq(l.frequency) : null,
+  ...goalRepeatWire(l),
   next_due: l.nextDue,
   due_date: l.dueDate,
   ...goalPlanWire(l),

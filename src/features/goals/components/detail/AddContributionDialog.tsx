@@ -1,14 +1,19 @@
+import { Check } from 'lucide-react'
 import type { LocalBalanceNode, LocalGoal } from '#/db/types'
 import type {
   ContributionInput,
   ContributionResult,
   GoalPlanView,
 } from '#/features/planned'
+import type { ContributionMode } from '#/features/goals/data/contribution'
 import { useContributionForm } from '#/features/goals/hooks/useContributionForm'
-import { Button } from '#/components/ui/button'
+import { AmountWell } from '#/components/dialog/AmountWell'
+import { DialogActions } from '#/components/dialog/DialogActions'
+import { NoteBox } from '#/components/dialog/NoteBox'
+import { PillSwitch } from '#/components/dialog/PillSwitch'
+import { FieldMessage } from '#/components/FormRow'
 import { ResponsiveDialog } from '#/components/ui/responsive-dialog'
 import { ContributionFields } from './ContributionFields'
-import { ContributionModeSwitch } from './ContributionModeSwitch'
 
 type Props = {
   open: boolean
@@ -20,6 +25,11 @@ type Props = {
   nodes: ReadonlyArray<LocalBalanceNode>
   add: (input: ContributionInput) => Promise<ContributionResult>
 }
+
+const MODES: ReadonlyArray<{ value: ContributionMode; label: string }> = [
+  { value: 'now', label: 'Paid now' },
+  { value: 'later', label: 'Plan for later' },
+]
 
 /** 1b: record money toward the goal now, or plan it for a later date. */
 export function AddContributionDialog({
@@ -47,27 +57,30 @@ export function AddContributionDialog({
       description={subtitle}
       contentClassName="sm:max-w-[400px]"
       footer={
-        <Button
-          onClick={() => void f.submit()}
+        <DialogActions
+          submitLabel={f.cta}
+          onSubmit={() => void f.submit()}
           disabled={!f.canSubmit}
-          className="w-full"
-        >
-          {f.cta}
-        </Button>
+        />
       }
     >
-      <div className="flex flex-col gap-3">
-        <ContributionModeSwitch value={f.mode} onChange={f.setMode} />
-        <ContributionFields f={f} currency={goal.currency} />
-        <p className="rounded-[10px] bg-fp-surface-2 px-[11px] py-[10px] text-[11.5px] leading-normal text-fp-text-2">
-          {f.hint}
-        </p>
-        {f.error ? (
-          <p role="alert" className="text-[12.5px] text-fp-danger">
-            {f.error}
-          </p>
-        ) : null}
-      </div>
+      <PillSwitch
+        label="When"
+        options={MODES}
+        value={f.mode}
+        onChange={f.setMode}
+      />
+      <AmountWell
+        question="How much?"
+        currency={goal.currency}
+        amount={f.amount}
+        onAmount={f.setAmount}
+        unit="code"
+        autoFocus
+      />
+      <ContributionFields f={f} />
+      <NoteBox icon={<Check strokeWidth={2.6} />}>{f.hint}</NoteBox>
+      <FieldMessage error={f.error} />
     </ResponsiveDialog>
   )
 }

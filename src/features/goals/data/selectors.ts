@@ -3,14 +3,15 @@ import { convertMinor, formatMoneyRounded } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
 import { DEFAULT_DATE_FORMAT, formatDate } from '#/lib/date'
 import type { DateFormat } from '#/lib/date'
-import type { GoalFrequency, GoalKind } from '#/features/goals/api/types'
+import type { GoalKind } from '#/features/goals/api/types'
 import {
   FREQUENCIES,
   KINDS,
   RECURRING_KINDS,
   STATUS_COLORS,
 } from '#/features/goals/constants'
-import type { FundingStatus } from '#/features/goals/constants'
+import type { Cadence, FundingStatus } from '#/features/goals/constants'
+import { cycleMonthsOf, frequencyMetaOf, stepDue } from './cadence'
 import {
   addMonths,
   fmtMonth,
@@ -275,7 +276,7 @@ function toTrack(
 ): PlanTrack {
   const steady = g.kind === 'openended'
   const recurs = g.kind === 'recurring' || g.kind === 'sinking'
-  const perYear = FREQUENCIES[g.frequency ?? 'annual'].perYear
+  const freq = frequencyMetaOf(g)
   const cycleAmount = convertMinor(g.amount ?? 0, g.currency, base, rates)
   return {
     id: g.id,
@@ -285,8 +286,9 @@ function toTrack(
     remaining: remainingBase(g, base, rates),
     deadline: setAsidesLeft(dueOf(g), today),
     recurs,
-    cycleMonths: recurs ? Math.max(1, Math.round(12 / perYear)) : 0,
-    cycleAmount: recurs ? cycleAmount : 0,
+    cycleMonths: recurs ? cycleMonthsOf(freq) : 0,
+    // Due more than once a month (weekly, every 10 days…): refill the month's worth each month.
+    cycleAmount: recurs ? cycleAmount * Math.max(1, freq.perYear / 12) : 0,
     target: steady ? convertMinor(g.target ?? 0, g.currency, base, rates) : 0,
     saved: steady ? convertMinor(g.saved, g.currency, base, rates) : 0,
   }
@@ -624,7 +626,7 @@ export function buildGoalsView(
   // --- Completion timeline ---
   const timeline = buildTimeline(planned, today)
 
-  // --- Overall saved-toward-target progress (Balances baseline teaser) ---
+  // --- Overall saved-toward-target progress (Wallets baseline teaser) ---
   let savedSum = 0
   let targetSum = 0
   for (const g of withContributions) {
@@ -762,7 +764,7 @@ function rowMetaFor(
     return (g.target ?? 0) > 0
       ? `${chip} · ${pct}% of target`
       : `${chip} · no deadline`
-  const every = FREQUENCIES[g.frequency ?? 'annual'].every
+  const every = frequencyMetaOf(g).every
   return `${chip} · ${every} · ${fmtDay(parseISO(g.nextDue, today))}`
 }
 
@@ -830,27 +832,16 @@ const DAY_MS = 86_400_000
 /** Every occurrence of a (possibly repeating) date from today through the upcoming window. */
 function occurrencesWithin(
   first: Date,
-  frequency: GoalFrequency | null,
+  cadence: Cadence | null,
   today: Date,
 ): Date[] {
   const limit = today.getTime() + UPCOMING_DAYS * DAY_MS
-  const at = (n: number): Date => {
-    if (!frequency) return first
-    if (frequency === 'weekly')
-      return new Date(
-        first.getFullYear(),
-        first.getMonth(),
-        first.getDate() + 7 * n,
-      )
-    const step = Math.max(1, Math.round(12 / FREQUENCIES[frequency].perYear))
-    return addMonths(first, n * step)
-  }
   const out: Date[] = []
   for (let n = 0; n < 12; n++) {
-    const d = at(n)
+    const d = cadence ? stepDue(first, cadence, n) : first
     if (d.getTime() > limit) break
     if (d.getTime() >= today.getTime()) out.push(d)
-    if (!frequency) break
+    if (!cadence) break
   }
   return out
 }
@@ -891,8 +882,8 @@ function buildUpcoming(
     if (!due) continue
     const amount = g.kind === 'onetime' ? (g.target ?? 0) : (g.amount ?? 0)
     const amountStr = money(convertMinor(amount, g.currency, base, rates))
-    const frequency = g.kind === 'onetime' ? null : (g.frequency ?? 'annual')
-    occurrencesWithin(parseISO(due, today), frequency, today).forEach((at, n) =>
+    const cadence = g.kind === 'onetime' ? null : frequencyMetaOf(g).cadence
+    occurrencesWithin(parseISO(due, today), cadence, today).forEach((at, n) =>
       events.push({
         at,
         event: {
@@ -959,7 +950,7 @@ function coverageLabel(p: Planned, today: Date): string {
   if (plan.completesIn !== null) {
     const month = monthLabel(today, plan.completesIn)
     if (g.kind === 'recurring' || g.kind === 'sinking')
-      return `Due ${month} · repeats ${FREQUENCIES[g.frequency ?? 'annual'].every}`
+      return `Due ${month} · repeats ${frequencyMetaOf(g).every}`
     if (g.kind === 'openended') return `Target reached ${month}`
     return `Covered ${month}`
   }
@@ -978,7 +969,7 @@ function metaFor(g: LocalGoal): string {
       ? `Target ${own(g.target)} · ${own(g.saved)} saved · no deadline`
       : `${own(g.amount ?? 0)}/mo · no deadline`
   }
-  const every = FREQUENCIES[g.frequency ?? 'annual'].every
+  const every = frequencyMetaOf(g).every
   return `${own(g.amount ?? 0)} ${every}${g.saved > 0 ? ` · ${own(g.saved)} saved` : ''}`
 }
 
@@ -998,15 +989,27 @@ function buildVerdict(
   money: (n: number) => string,
 ): Verdict {
   const slipping = planned.filter((p) => p.status === 'red')
-  const ratio = incomeMonthly > 0 ? leftover / incomeMonthly : -1
+  const ratio = incomeMonthly > 0 ? leftover / incomeMonthly : 0
   let status: FundingStatus
   let title: string
   let sub: string
-  if (slipping.length > 0) {
+  if (planned.length === 0) {
+    status = 'green'
+    title = 'Start your plan'
+    sub =
+      incomeMonthly > 0
+        ? `Add a goal or obligation — you have ${money(leftover)}/mo free to put toward it.`
+        : 'Add your income and a first goal to see whether your month balances.'
+  } else if (slipping.length > 0) {
     const shortfall = slipping.reduce((a, p) => a + shortfallOf(p), 0)
     status = 'red'
     title = 'Some goals will slip'
     sub = `${slipping.length} ${slipping.length === 1 ? 'goal' : 'goals'} won’t be met on time — about ${money(shortfall)}/mo short.`
+  } else if (incomeMonthly <= 0) {
+    status = 'amber'
+    title = 'No income yet'
+    sub =
+      'Add an income stream so the plan has something to fund your goals from.'
   } else if (ratio < 0.08) {
     status = 'amber'
     title = 'Tight but on track'

@@ -85,7 +85,7 @@ const renderDialog = () => {
 }
 
 const typeAmount = (value: string) =>
-  fireEvent.change(screen.getByLabelText('Amount'), { target: { value } })
+  fireEvent.change(screen.getByLabelText('How much?'), { target: { value } })
 
 describe('AddContributionDialog', () => {
   it('titles itself after the goal and waits for an amount', () => {

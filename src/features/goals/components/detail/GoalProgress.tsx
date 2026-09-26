@@ -8,7 +8,9 @@ type Props = {
 /** Settled progress (solid) and what waits on a confirm (striped), with its captions. */
 export function GoalProgress({ detail, color }: Props) {
   const { bar } = detail
-  const stripe = `repeating-linear-gradient(45deg, ${color}, ${color} 3px, color-mix(in srgb, ${color} 30%, transparent) 3px, color-mix(in srgb, ${color} 30%, transparent) 6px)`
+  const light = `color-mix(in srgb, ${color} 45%, var(--fp-surface))`
+  const stripe = `repeating-linear-gradient(135deg, ${color} 0 4px, ${light} 4px 8px)`
+  const [lead, ...rest] = detail.savedCaption.split(' · ')
 
   return (
     <div>
@@ -20,7 +22,7 @@ export function GoalProgress({ detail, color }: Props) {
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={Math.round(bar.savedPct)}
-            className="flex h-2 min-w-0 flex-1 gap-[2px] overflow-hidden rounded-[5px] bg-fp-surface-2"
+            className="flex h-3 min-w-0 flex-1 overflow-hidden rounded-full bg-fp-surface-2"
           >
             {bar.savedPct > 0 ? (
               <div
@@ -40,10 +42,17 @@ export function GoalProgress({ detail, color }: Props) {
           </span>
         </div>
       ) : null}
-      <div className="mt-[6px] flex justify-between gap-3 text-[11.5px] text-fp-text-3 tabular-nums">
-        <span>{detail.savedCaption}</span>
+      <div className="mt-2 flex justify-between gap-2 text-[12px] leading-[1.4] tabular-nums">
+        <span>
+          <b className="font-bold text-fp-text">{lead}</b>
+          {rest.length > 0 ? (
+            <span className="text-fp-text-2"> · {rest.join(' · ')}</span>
+          ) : null}
+        </span>
         {detail.leftCaption ? (
-          <span className="whitespace-nowrap">{detail.leftCaption}</span>
+          <span className="whitespace-nowrap text-fp-text-2">
+            {detail.leftCaption}
+          </span>
         ) : null}
       </div>
     </div>

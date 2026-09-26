@@ -56,14 +56,19 @@ export function GoalDetailPanel({ goal, nodes, onEdit, onClose }: Props) {
       subtitle={detail?.subtitle ?? ''}
       onClose={onClose}
       footer={
-        <Button variant="outline" onClick={onEdit} className="gap-[6px]">
+        <Button
+          variant="quiet"
+          size="dialog"
+          onClick={onEdit}
+          className="flex-1 gap-[6px]"
+        >
           <Pencil size={14} strokeWidth={2} />
           Edit
         </Button>
       }
     >
       {detail ? (
-        <div className="flex flex-col gap-4">
+        <>
           <GoalProgress detail={detail} color={goal.color} />
           {detail.plan ? (
             <PlanBox
@@ -85,7 +90,7 @@ export function GoalDetailPanel({ goal, nodes, onEdit, onClose }: Props) {
             onConfirm={setConfirmId}
             onRemoveAllocation={(id) => void deleteAllocation(id)}
           />
-        </div>
+        </>
       ) : (
         <p className="text-[12.5px] text-fp-text-3">Loading the plan…</p>
       )}

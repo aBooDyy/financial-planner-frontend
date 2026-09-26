@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { LocalGoal, LocalIncomeStream } from '#/db/types'
 import type { CurrencyCode } from '#/lib/currency'
-import { buildGoalsView } from './selectors'
+import { buildGoalsView, planGoals } from './selectors'
 
 // Reference point the design plans from (Jun 12, 2026) and its FX table.
 const TODAY = new Date(2026, 5, 12)
@@ -47,6 +47,8 @@ const goal = (over: Partial<LocalGoal>): LocalGoal => ({
   target: null,
   saved: 0,
   frequency: null,
+  customInterval: null,
+  customUnit: null,
   nextDue: null,
   dueDate: null,
   plannedAt: null,
@@ -365,6 +367,36 @@ describe('buildGoalsView funding engine', () => {
     expect(view.goalCards[0]?.statusLabel).toBe('On track')
   })
 
+  it('invites a fresh account to start its plan instead of calling it tight', () => {
+    const view = buildGoalsView([], [], base, RATES, TODAY)
+    expect(view.verdict.title).toBe('Start your plan')
+    expect(view.verdict.sub).not.toMatch(/to spare/)
+  })
+
+  it('points to the free income when there are no goals yet', () => {
+    const view = buildGoalsView(
+      [income({ label: 'Salary', amount: m(5000), day: 1 })],
+      [],
+      base,
+      RATES,
+      TODAY,
+    )
+    expect(view.verdict.title).toBe('Start your plan')
+    expect(view.verdict.sub).toContain('SR 5,000/mo free')
+  })
+
+  it('asks for income when goals exist but none is set up', () => {
+    const view = buildGoalsView(
+      [],
+      [goal({ name: 'Fund', kind: 'openended', amount: m(100), position: 0 })],
+      base,
+      RATES,
+      TODAY,
+    )
+    expect(view.verdict.title).not.toBe('Tight but on track')
+    expect(view.verdict.sub).not.toMatch(/to spare/)
+  })
+
   it('moves goals whose target is fully saved into a separate completed list', () => {
     const view = buildGoalsView(
       [income({ label: 'Salary', amount: m(20000), day: 1 })],
@@ -533,5 +565,33 @@ describe('buildGoalsView sections', () => {
       amountStr: '+SR 1,000',
       incoming: true,
     })
+  })
+})
+
+describe('planGoals — custom frequencies', () => {
+  const refill = (over: Partial<LocalGoal>) =>
+    goal({
+      kind: 'recurring',
+      amount: m(280),
+      frequency: 'custom',
+      customInterval: 28,
+      customUnit: 'day',
+      nextDue: '2026-06-20',
+      ...over,
+    })
+  const plan = (g: LocalGoal) =>
+    planGoals([income({ amount: m(10000) })], [g], base, RATES, TODAY)
+      .entries[0].track
+
+  it('refills a bill due more than once a month by its monthly worth', () => {
+    const track = plan(refill({}))
+    expect(track.cycleMonths).toBe(1)
+    expect(track.cycleAmount).toBeCloseTo((m(280) * 365) / 28 / 12)
+  })
+
+  it('treats a custom every-2-months bill as a two-month cycle', () => {
+    const track = plan(refill({ customInterval: 2, customUnit: 'month' }))
+    expect(track.cycleMonths).toBe(2)
+    expect(track.cycleAmount).toBe(m(280))
   })
 })

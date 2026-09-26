@@ -14,7 +14,7 @@ import type { ContributionMode } from '#/features/goals/data/contribution'
 import { startOfToday, ymd } from '#/features/goals/data/planning'
 import { parseAmountToMinor } from '#/lib/currency'
 import { messageForApiError, messageForCode } from '#/lib/errorMessages'
-import { activeNodes } from '#/features/balances/data/archive'
+import { activeNodes } from '#/features/wallets/data/archive'
 
 /** The "From" select's value for money held outside any wallet. */
 export const EXTERNAL = '__external__'

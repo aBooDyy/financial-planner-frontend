@@ -1,10 +1,8 @@
 import { EXTERNAL } from '#/features/goals/hooks/useContributionForm'
 import type { ContributionForm } from '#/features/goals/hooks/useContributionForm'
-import { amountInputProps } from '#/lib/currency'
-import type { CurrencyCode } from '#/lib/currency'
 import { DateField } from '#/components/DateField'
-import { Input } from '#/components/ui/input'
-import { Label } from '#/components/ui/label'
+import { FieldLabel } from '#/components/FieldLabel'
+import { TextField } from '#/components/TextField'
 import {
   Select,
   SelectContent,
@@ -13,44 +11,19 @@ import {
   SelectValue,
 } from '#/components/ui/select'
 import { usePreferencesStore } from '#/stores/preferences'
-import { FIELD_LABEL } from '../styles'
+import { WalletDot } from '../WalletDot'
 
 const NONE = '__none__'
 
-/** 1b's inputs: amount in the goal's currency, where it comes from, and when. */
-export function ContributionFields({
-  f,
-  currency,
-}: {
-  f: ContributionForm
-  currency: CurrencyCode
-}) {
+/** 1b's source and date, plus where external money is held. */
+export function ContributionFields({ f }: { f: ContributionForm }) {
   const dateFormat = usePreferencesStore((s) => s.dateFormat)
 
   return (
     <>
-      <div>
-        <Label className={FIELD_LABEL} htmlFor="contribution-amount">
-          Amount
-        </Label>
-        <div className="relative">
-          <Input
-            id="contribution-amount"
-            value={f.amount}
-            onChange={(e) => f.setAmount(e.target.value)}
-            {...amountInputProps(currency)}
-            autoFocus
-            className="pe-14 text-[20px] font-extrabold tabular-nums"
-          />
-          <span className="pointer-events-none absolute inset-y-0 inset-e-3 flex items-center text-[12px] font-semibold text-fp-text-3">
-            {currency}
-          </span>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-[1.3fr_1fr] items-start gap-3">
         <div className="min-w-0">
-          <Label className={FIELD_LABEL}>From</Label>
+          <FieldLabel>From</FieldLabel>
           <Select
             value={f.source || NONE}
             onValueChange={(v) => f.setSource(v === NONE ? '' : v)}
@@ -66,6 +39,7 @@ export function ContributionFields({
               ) : null}
               {f.wallets.map((w) => (
                 <SelectItem key={w.id} value={w.id}>
+                  <WalletDot color={w.color} />
                   {w.name}
                 </SelectItem>
               ))}
@@ -76,7 +50,7 @@ export function ContributionFields({
           </Select>
         </div>
         <div className="min-w-0">
-          <Label className={FIELD_LABEL}>Date</Label>
+          <FieldLabel>Date</FieldLabel>
           <DateField
             value={f.date}
             onChange={f.setDate}
@@ -87,17 +61,13 @@ export function ContributionFields({
       </div>
 
       {f.isExternal ? (
-        <div>
-          <Label className={FIELD_LABEL} htmlFor="contribution-external">
-            Held where
-          </Label>
-          <Input
-            id="contribution-external"
-            value={f.externalLabel}
-            onChange={(e) => f.setExternalLabel(e.target.value)}
-            placeholder="e.g. Dad's help, cash at home"
-          />
-        </div>
+        <TextField
+          id="contribution-external"
+          label="Held where?"
+          value={f.externalLabel}
+          onChange={(e) => f.setExternalLabel(e.target.value)}
+          placeholder="e.g. Dad's help, cash at home"
+        />
       ) : null}
     </>
   )

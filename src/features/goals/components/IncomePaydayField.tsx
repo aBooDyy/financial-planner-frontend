@@ -1,13 +1,13 @@
 import { DateField } from '#/components/DateField'
-import { Input } from '#/components/ui/input'
-import { Label } from '#/components/ui/label'
+import { FieldLabel } from '#/components/FieldLabel'
+import { FieldMessage } from '#/components/FormRow'
 import { FREQUENCIES } from '#/features/goals/constants'
 import { nextPaydayOf, usesPaydayAnchor } from '#/features/goals/data/paydays'
 import { shownNextPayday } from '#/features/goals/hooks/useGoalEditor'
 import type { EditorDraft } from '#/features/goals/hooks/useGoalEditor'
 import { formatDate } from '#/lib/date'
 import type { DateFormat } from '#/lib/date'
-import { FIELD_LABEL } from './styles'
+import { DayOfMonthField } from './DayOfMonthField'
 
 type Props = {
   draft: EditorDraft
@@ -31,7 +31,7 @@ export function IncomePaydayField({
   if (usesPaydayAnchor(draft.frequency)) {
     return (
       <div>
-        <Label className={FIELD_LABEL}>Next payday</Label>
+        <FieldLabel>Next payday</FieldLabel>
         <DateField
           value={shownNextPayday(draft, today)}
           onChange={(iso) => {
@@ -39,34 +39,28 @@ export function IncomePaydayField({
           }}
           dateFormat={dateFormat}
           ariaLabel="Next payday"
+          hint
         />
-        <div className="mt-1.5 text-[12px] text-fp-text-3">
-          Then {FREQUENCIES[draft.frequency].every} from this date
-        </div>
+        <FieldMessage
+          help={`Then ${FREQUENCIES[draft.frequency].every} from this date`}
+        />
       </div>
     )
   }
 
   const day = Math.max(1, Math.min(31, parseInt(draft.day, 10) || 1))
+  const next = formatDate(
+    nextPaydayOf({ day, frequency: 'monthly' }, today),
+    dateFormat,
+  )
   return (
-    <div>
-      <Label className={FIELD_LABEL}>Paid on (day of month)</Label>
-      <div className="flex items-center gap-3">
-        <Input
-          value={draft.day}
-          onChange={(e) => onDay(e.target.value)}
-          inputMode="numeric"
-          placeholder="27"
-          className="w-[96px] text-center tabular-nums"
-        />
-        <span className="text-[12px] text-fp-text-3">
-          Next:{' '}
-          {formatDate(
-            nextPaydayOf({ day, frequency: 'monthly' }, today),
-            dateFormat,
-          )}
-        </span>
-      </div>
-    </div>
+    <DayOfMonthField
+      id="income-pay-day"
+      label="Paid on"
+      value={draft.day}
+      onChange={onDay}
+      placeholder="27"
+      help={`Next: ${next}`}
+    />
   )
 }

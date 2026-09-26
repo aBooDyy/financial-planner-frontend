@@ -23,6 +23,9 @@ const draft = (over: Partial<EditorDraft>): EditorDraft => ({
   dueISO: '',
   setAsideDay: '',
   payOnDue: false,
+  customRepeat: false,
+  customInterval: '28',
+  customUnit: 'day',
   ...over,
 })
 
@@ -44,7 +47,7 @@ const renderField = (d: EditorDraft) => {
 describe('IncomePaydayField', () => {
   it('asks a monthly stream for its day of the month', () => {
     renderField(draft({}))
-    expect(screen.getByText('Paid on (day of month)')).toBeTruthy()
+    expect(screen.getByLabelText('Paid on')).toBeTruthy()
     expect(screen.queryByLabelText('Next payday')).toBeNull()
   })
 

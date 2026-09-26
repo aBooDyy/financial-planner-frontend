@@ -1,6 +1,7 @@
+import type { LucideIcon } from 'lucide-react'
+import { EmptyState } from '#/components/EmptyState'
 import type { CompletedGoal, GoalList } from '#/features/goals/data/selectors'
 import { CompletedGoalRow } from './CompletedGoalRow'
-import { EmptyCard } from './EmptyCard'
 import { GoalGroupCard } from './GoalGroupCard'
 import { GoalRow } from './GoalRow'
 import { SectionHeader } from './SectionHeader'
@@ -10,7 +11,7 @@ type Props = {
   list: GoalList
   completed: CompletedGoal[]
   addLabel: string
-  emptyText: string
+  empty: { icon: LucideIcon; title: string; text: string }
   selectedId: string | null
   dueByGoal: Record<string, number>
   onAdd: () => void
@@ -22,7 +23,7 @@ export function GoalListSection({
   list,
   completed,
   addLabel,
-  emptyText,
+  empty,
   selectedId,
   dueByGoal,
   onAdd,
@@ -39,7 +40,13 @@ export function GoalListSection({
         onAction={onAdd}
       />
 
-      {isEmpty ? <EmptyCard text={emptyText} /> : null}
+      {isEmpty ? (
+        <EmptyState
+          {...empty}
+          framed
+          action={{ label: addLabel, onClick: onAdd }}
+        />
+      ) : null}
 
       {list.groups.map((group) => (
         <GoalGroupCard

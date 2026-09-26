@@ -1,3 +1,5 @@
+import { CalendarCheck } from 'lucide-react'
+import { EmptyState } from '#/components/EmptyState'
 import type { UpcomingEvent } from '#/features/goals/data/selectors'
 import { SURFACE_CARD } from './styles'
 
@@ -6,9 +8,12 @@ export function UpcomingCard({ events }: { events: UpcomingEvent[] }) {
     <div className={`px-4 py-[15px] ${SURFACE_CARD}`}>
       <div className="mb-3 text-[13.5px] font-bold">Next 60 days</div>
       {events.length === 0 ? (
-        <span className="text-[12.5px] text-fp-text-3">
-          Nothing due in the next 60 days.
-        </span>
+        <EmptyState
+          icon={CalendarCheck}
+          size="sm"
+          title="Nothing due soon"
+          text="No income, bills or set-asides in the next 60 days."
+        />
       ) : (
         <div className="flex flex-col gap-[10px]">
           {events.map((e) => (

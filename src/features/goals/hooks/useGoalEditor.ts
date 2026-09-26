@@ -1,7 +1,24 @@
 import { useState } from 'react'
 import type { LocalGoal, LocalIncomeStream } from '#/db/types'
-import type { GoalFrequency, GoalKind } from '#/features/goals/api/types'
-import { GOAL_COLORS } from '#/features/goals/constants'
+import type {
+  GoalFrequency,
+  GoalKind,
+  IntervalUnit,
+  ObligationFrequency,
+} from '#/features/goals/api/types'
+import {
+  CUSTOM_INTERVAL_MAX,
+  DEFAULT_CUSTOM_INTERVAL,
+  DEFAULT_CUSTOM_UNIT,
+  GOAL_COLORS,
+  RECURRING_KINDS,
+} from '#/features/goals/constants'
+import type { FreqMeta } from '#/features/goals/constants'
+import {
+  customFrequencyMeta,
+  frequencyMetaOf,
+  isValidInterval,
+} from '#/features/goals/data/cadence'
 import {
   addMonths,
   nextDueDefault,
@@ -45,20 +62,52 @@ export type EditorDraft = {
   setAsideDay: string
   /** One-time goals: also plan the payment on the due date. */
   payOnDue: boolean
+  /** Recurring goals: repeat every `customInterval` `customUnit`s instead of `frequency`. */
+  customRepeat: boolean
+  customInterval: string
+  customUnit: IntervalUnit
 }
 
 export type EditorState = {
   type: EditorType
   id: string | null
   draft: EditorDraft
+  /** The draft as it opened, so closing can tell whether anything would be lost. */
+  initial: EditorDraft
 }
 
-const defaultDueFor = (kind: GoalKind, freq: GoalFrequency): string => {
+export const isEditorDirty = ({ draft, initial }: EditorState): boolean =>
+  (Object.keys(draft) as Array<keyof EditorDraft>).some(
+    (key) => draft[key] !== initial[key],
+  )
+
+type RepeatDraft = Pick<
+  EditorDraft,
+  'frequency' | 'customRepeat' | 'customInterval' | 'customUnit'
+>
+
+/** The repeat a draft would save, if the custom interval it holds is usable. */
+export const draftFrequencyMeta = (draft: RepeatDraft): FreqMeta => {
+  const every = Number(draft.customInterval)
+  return draft.customRepeat && isValidInterval(every)
+    ? customFrequencyMeta(every, draft.customUnit)
+    : frequencyMetaOf({ ...draft, customInterval: null, customUnit: null })
+}
+
+const defaultDueFor = (kind: GoalKind, draft: RepeatDraft): string => {
   const today = startOfToday()
   if (kind === 'openended') return ''
   if (kind === 'onetime') return ymd(addMonths(today, 12))
-  return nextDueDefault(freq, today)
+  return nextDueDefault(draftFrequencyMeta(draft), today)
 }
+
+/** Why the draft can't be saved yet, or null when it can. */
+export const goalSaveBlocker = (draft: EditorDraft): string | null =>
+  RECURRING_KINDS.includes(draft.kind) &&
+  draft.customRepeat &&
+  !isValidInterval(Number(draft.customInterval))
+    ? `Repeat every 1 to ${CUSTOM_INTERVAL_MAX} days, weeks or months`
+    : null
 
 type PaydayDraft = Pick<
   EditorDraft,
@@ -104,6 +153,45 @@ export const parseSetAsideDay = (value: string): number | null => {
   return Number.isFinite(day) && day >= 1 && day <= 28 ? day : null
 }
 
+/** A stored goal's repeat as the editor holds it: a preset, or the custom chip and its interval. */
+function repeatDraftOf(
+  frequency: ObligationFrequency | null,
+  customInterval: number | null | undefined,
+  customUnit: IntervalUnit | null | undefined,
+): Partial<EditorDraft> {
+  if (frequency !== 'custom') return { frequency: frequency ?? 'annual' }
+  return {
+    frequency: 'monthly',
+    customRepeat: true,
+    customInterval: String(customInterval ?? DEFAULT_CUSTOM_INTERVAL),
+    customUnit: customUnit ?? DEFAULT_CUSTOM_UNIT,
+  }
+}
+
+/** The repeat a goal of `kind` saves from the draft. */
+function repeatOf(
+  kind: GoalKind,
+  draft: RepeatDraft,
+): {
+  frequency: ObligationFrequency | null
+  customInterval: number | null
+  customUnit: IntervalUnit | null
+} {
+  if (!RECURRING_KINDS.includes(kind))
+    return { frequency: null, customInterval: null, customUnit: null }
+  if (!draft.customRepeat)
+    return {
+      frequency: draft.frequency,
+      customInterval: null,
+      customUnit: null,
+    }
+  return {
+    frequency: 'custom',
+    customInterval: Number(draft.customInterval),
+    customUnit: draft.customUnit,
+  }
+}
+
 export function useGoalEditor(defaultCurrency: CurrencyCode) {
   const [editing, setEditing] = useState<EditorState | null>(null)
 
@@ -122,17 +210,22 @@ export function useGoalEditor(defaultCurrency: CurrencyCode) {
     dueISO: '',
     setAsideDay: '',
     payOnDue: false,
+    customRepeat: false,
+    customInterval: String(DEFAULT_CUSTOM_INTERVAL),
+    customUnit: DEFAULT_CUSTOM_UNIT,
     ...over,
   })
 
-  const openAddIncome = () =>
-    setEditing({ type: 'income', id: null, draft: baseDraft({}) })
+  const open = (type: EditorType, id: string | null, draft: EditorDraft) =>
+    setEditing({ type, id, draft, initial: draft })
+
+  const openAddIncome = () => open('income', null, baseDraft({}))
 
   const openEditIncome = (s: LocalIncomeStream) =>
-    setEditing({
-      type: 'income',
-      id: s.id,
-      draft: baseDraft({
+    open(
+      'income',
+      s.id,
+      baseDraft({
         name: s.label,
         amount: minorToInputValue(s.amount, s.currency),
         currency: s.currency,
@@ -142,26 +235,26 @@ export function useGoalEditor(defaultCurrency: CurrencyCode) {
         walletId: s.walletId,
         storedAnchor: s.anchorDate ?? null,
       }),
-    })
+    )
 
-  const openAddGoal = (presetKind: GoalKind) =>
-    setEditing({
-      type: 'goal',
-      id: null,
-      draft: baseDraft({
-        currency: defaultCurrency,
-        color: GOAL_COLORS[4],
-        frequency: 'annual',
-        kind: presetKind,
-        dueISO: defaultDueFor(presetKind, 'annual'),
-      }),
+  const openAddGoal = (presetKind: GoalKind) => {
+    const draft = baseDraft({
+      currency: defaultCurrency,
+      color: GOAL_COLORS[4],
+      frequency: 'annual',
+      kind: presetKind,
     })
+    open('goal', null, {
+      ...draft,
+      dueISO: defaultDueFor(presetKind, draft),
+    })
+  }
 
   const openEditGoal = (g: LocalGoal) =>
-    setEditing({
-      type: 'goal',
-      id: g.id,
-      draft: baseDraft({
+    open(
+      'goal',
+      g.id,
+      baseDraft({
         name: g.name,
         amount:
           g.kind === 'onetime'
@@ -173,14 +266,14 @@ export function useGoalEditor(defaultCurrency: CurrencyCode) {
               : '',
         currency: g.currency,
         color: g.color,
-        frequency: g.frequency ?? 'annual',
+        ...repeatDraftOf(g.frequency, g.customInterval, g.customUnit),
         kind: g.kind,
         saved: g.saved ? minorToInputValue(g.saved, g.currency) : '',
         dueISO: (g.kind === 'onetime' ? g.dueDate : g.nextDue) ?? '',
         setAsideDay: g.setAsideDay !== null ? String(g.setAsideDay) : '',
         payOnDue: g.payOnDue,
       }),
-    })
+    )
 
   const close = () => setEditing(null)
 
@@ -196,8 +289,7 @@ export function useGoalEditor(defaultCurrency: CurrencyCode) {
   const setKind = (kind: GoalKind) =>
     setEditing((prev) => {
       if (!prev) return prev
-      const dueISO =
-        prev.draft.dueISO || defaultDueFor(kind, prev.draft.frequency)
+      const dueISO = prev.draft.dueISO || defaultDueFor(kind, prev.draft)
       return { ...prev, draft: { ...prev.draft, kind, dueISO } }
     })
 
@@ -237,8 +329,7 @@ export function useGoalEditor(defaultCurrency: CurrencyCode) {
       amount: kind === 'onetime' ? null : amountMinor,
       target: kind === 'onetime' ? amountMinor : null,
       saved: savedMinor,
-      frequency:
-        kind === 'recurring' || kind === 'sinking' ? draft.frequency : null,
+      ...repeatOf(kind, draft),
       nextDue:
         kind === 'recurring' || kind === 'sinking'
           ? draft.dueISO || null

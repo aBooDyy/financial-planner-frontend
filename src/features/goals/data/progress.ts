@@ -23,7 +23,8 @@ import type {
 } from '#/db/types'
 import { convertMinor } from '#/lib/currency'
 import type { RatesMap } from '#/lib/config/rates'
-import { FREQUENCIES, RECURRING_KINDS } from '#/features/goals/constants'
+import { RECURRING_KINDS } from '#/features/goals/constants'
+import { approxCyclesBetween, frequencyMetaOf, stepDue } from './cadence'
 import { parseISO, ymd } from './planning'
 
 export type GoalProgress = {
@@ -64,35 +65,11 @@ const ONE_CYCLE: Cycles = {
 function cyclesOf(g: LocalGoal, today: Date): Cycles {
   if (!RECURRING_KINDS.includes(g.kind) || !g.nextDue) return ONE_CYCLE
   const anchor = parseISO(g.nextDue, today)
-  const frequency = g.frequency ?? 'annual'
-  const dueAt = (j: number): string =>
-    ymd(
-      frequency === 'weekly'
-        ? new Date(
-            anchor.getFullYear(),
-            anchor.getMonth(),
-            anchor.getDate() + 7 * j,
-          )
-        : new Date(
-            anchor.getFullYear(),
-            anchor.getMonth() +
-              j * Math.max(1, Math.round(12 / FREQUENCIES[frequency].perYear)),
-            anchor.getDate(),
-          ),
-    )
+  const { cadence } = frequencyMetaOf(g)
+  const dueAt = (j: number): string => ymd(stepDue(anchor, cadence, j))
   const firstDue = (date: string, strict: boolean): string => {
     const reached = (due: string) => (strict ? due > date : due >= date)
-    const d = parseISO(date, today)
-    const approxMonths =
-      (d.getFullYear() - anchor.getFullYear()) * 12 +
-      (d.getMonth() - anchor.getMonth())
-    let j =
-      frequency === 'weekly'
-        ? Math.floor((d.getTime() - anchor.getTime()) / (7 * 86_400_000))
-        : Math.floor(
-            approxMonths /
-              Math.max(1, Math.round(12 / FREQUENCIES[frequency].perYear)),
-          )
+    let j = approxCyclesBetween(anchor, parseISO(date, today), cadence)
     while (!reached(dueAt(j))) j += 1
     while (reached(dueAt(j - 1))) j -= 1
     return dueAt(j)
