@@ -1,4 +1,5 @@
 import { db } from '#/db/db'
+import { requeued } from '#/db/syncFailure'
 import { schedulePush } from '#/db/sync'
 import type { LocalCustomCurrency, LocalExchangeRate } from '#/db/types'
 import type { CurrencyCode } from '#/lib/currency'
@@ -36,7 +37,7 @@ async function enqueueCustomCurrencyUpsert(
   const create = entries.find((e) => e.op === 'create')
   if (create) {
     create.payload = localCustomCurrencyToCreateWire(currency)
-    await db.outbox.put(create)
+    await db.outbox.put(requeued(create))
     return
   }
   const update = entries.find((e) => e.op === 'update')
@@ -44,7 +45,7 @@ async function enqueueCustomCurrencyUpsert(
   if (update) {
     update.payload = payload
     update.baseVersion = currency.version
-    await db.outbox.put(update)
+    await db.outbox.put(requeued(update))
     return
   }
   await db.outbox.add({
@@ -163,7 +164,7 @@ export async function setExchangeRate(
     const open = await pending('rate', currency).first()
     if (open) {
       open.payload = payload
-      await db.outbox.put(open)
+      await db.outbox.put(requeued(open))
     } else {
       await db.outbox.add({
         op: 'update',

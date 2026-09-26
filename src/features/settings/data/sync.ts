@@ -86,7 +86,8 @@ async function rebaseCustomCurrency(entry: OutboxEntry): Promise<void> {
       await db.customCurrencies.put(serverCustomCurrencyToLocal(c))
       await db.outbox.delete(entry.seq)
     })
-  } catch {
+  } catch (e) {
+    if (statusOf(e) !== 409) throw e
     await db.transaction('rw', db.customCurrencies, db.outbox, async () => {
       await db.customCurrencies.put(serverCustomCurrencyToLocal(fresh))
       await db.outbox.delete(entry.seq)
@@ -180,7 +181,8 @@ async function rebaseRate(entry: OutboxEntry): Promise<void> {
       dirty: 0,
     })
     await db.outbox.delete(entry.seq)
-  } catch {
+  } catch (e) {
+    if (statusOf(e) !== 409) throw e
     await db.exchangeRates.put({
       currency: fresh.currency,
       rate: fresh.rate,

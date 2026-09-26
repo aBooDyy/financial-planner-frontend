@@ -1,4 +1,5 @@
 import { db } from '#/db/db'
+import { flagEntry, invalidItemFailure } from '#/db/syncFailure'
 import type { LocalTransaction, OutboxEntry } from '#/db/types'
 import {
   transactionsApi,
@@ -99,7 +100,8 @@ async function rebaseTransfer(entry: OutboxEntry): Promise<void> {
       transferToUpdateWire(rebased),
     )
     await storeLegs(entry, legs)
-  } catch {
+  } catch (e) {
+    if (!isConflict(e)) throw e
     await storeLegs(entry, fresh)
   }
 }
@@ -117,8 +119,8 @@ async function pushTransferDelete(entry: OutboxEntry): Promise<void> {
  * A run of queued transfer creates as one `POST /transfers/bulk`, answered per transfer the
  * way `pushTransactionCreates` answers rows: a written transfer stores its legs, a taken id
  * stores the legs the server sends back (or, when the id is not ours, leaves ours clean for
- * the pull to replace), an unusable one is dropped. An entry the response does not mention
- * stays queued.
+ * the pull to replace), an unusable one is flagged and stays queued. An entry the response
+ * does not mention stays queued.
  */
 export async function pushTransferCreates(
   entries: ReadonlyArray<OutboxEntry>,
@@ -134,6 +136,13 @@ export async function pushTransferCreates(
     for (const entry of entries) {
       const result = byId.get(entry.id)
       if (result === undefined) continue
+      if (result.status === 'invalid') {
+        await flagEntry(
+          entry,
+          invalidItemFailure(result.errorCode, result.errorField),
+        )
+        continue
+      }
       if (result.transfer) {
         await db.transactions.bulkPut(
           result.transfer.legs.map(serverTransactionToLocal),
@@ -151,8 +160,8 @@ export async function pushTransferCreates(
 }
 
 /**
- * A run of queued transfer deletes as one `POST /transfers/bulk-delete`. Every answer is
- * terminal, so each mentioned entry is dropped with whatever legs are still held.
+ * A run of queued transfer deletes as one `POST /transfers/bulk-delete`. A deleted or missing
+ * transfer is dropped with whatever legs are still held; an invalid one is flagged.
  */
 export async function pushTransferDeletes(
   entries: ReadonlyArray<OutboxEntry>,
@@ -160,10 +169,18 @@ export async function pushTransferDeletes(
   const results = await transfersApi.bulkDelete(
     entries.map((entry) => entry.id),
   )
-  const answered = new Set(results.map((result) => result.id))
+  const byId = new Map(results.map((result) => [result.id, result]))
   await db.transaction('rw', db.transactions, db.outbox, async () => {
     for (const entry of entries) {
-      if (!answered.has(entry.id)) continue
+      const result = byId.get(entry.id)
+      if (result === undefined) continue
+      if (result.status === 'invalid') {
+        await flagEntry(
+          entry,
+          invalidItemFailure(result.errorCode, result.errorField),
+        )
+        continue
+      }
       await db.transactions.where('transferId').equals(entry.id).delete()
       await db.outbox.delete(entry.seq)
     }

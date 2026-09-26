@@ -21,16 +21,15 @@ export async function confirmImport(
   item: InboundImport,
   input: {
     walletId: string
-    category: string
-    subcategory: string | null
+    /** The leaf filed under: a subcategory's id, else its root's. */
+    categoryId: string
     type: TxType
   } & ConfirmOverrides,
 ): Promise<void> {
-  const { walletId, category, subcategory, type, ...overrides } = input
+  const { walletId, categoryId, type, ...overrides } = input
   const { transaction } = await inboundImportsApi.confirmImport(item.id, {
     wallet_id: walletId,
-    category,
-    subcategory,
+    category_id: categoryId,
     type: toWireTxType(type),
     ...overrides,
   })

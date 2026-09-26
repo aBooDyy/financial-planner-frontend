@@ -1,4 +1,5 @@
 import { db } from '#/db/db'
+import { requeued } from '#/db/syncFailure'
 import { schedulePush } from '#/db/sync'
 import type { LocalMerchant, LocalMerchantAlias } from '#/db/types'
 import { merchantsApi } from '#/features/merchants/api/merchantsApi'
@@ -23,16 +24,14 @@ export type MerchantDraft = {
   displayName: string
   /** Extra spellings beyond the display name itself. */
   aliases?: AliasDraft[]
-  learnedCategory?: string | null
-  learnedSubcategory?: string | null
+  learnedCategoryId?: string | null
   learnedType?: TxType | null
   autoCategorize?: boolean
 }
 
 export type MerchantPatch = Partial<{
   displayName: string
-  learnedCategory: string | null
-  learnedSubcategory: string | null
+  learnedCategoryId: string | null
   learnedType: TxType | null
   autoCategorize: boolean
 }>
@@ -102,7 +101,7 @@ async function refreshQueuedCreate(merchantId: string): Promise<boolean> {
     merchant,
     aliases.filter((a) => a.deleted === 0),
   )
-  await db.outbox.put(create)
+  await db.outbox.put(requeued(create))
   return true
 }
 
@@ -135,8 +134,7 @@ export async function createMerchantWithId(
   const merchant: LocalMerchant = {
     id,
     displayName: draft.displayName.trim(),
-    learnedCategory: draft.learnedCategory ?? null,
-    learnedSubcategory: draft.learnedSubcategory ?? null,
+    learnedCategoryId: draft.learnedCategoryId ?? null,
     learnedType: draft.learnedType ?? null,
     timesSeen: 0,
     timesConfirmed: 0,
@@ -186,14 +184,10 @@ export async function updateMerchant(
   const merchant: LocalMerchant = {
     ...existing,
     displayName,
-    learnedCategory:
-      patch.learnedCategory !== undefined
-        ? patch.learnedCategory
-        : existing.learnedCategory,
-    learnedSubcategory:
-      patch.learnedSubcategory !== undefined
-        ? patch.learnedSubcategory
-        : existing.learnedSubcategory,
+    learnedCategoryId:
+      patch.learnedCategoryId !== undefined
+        ? patch.learnedCategoryId
+        : existing.learnedCategoryId,
     learnedType:
       patch.learnedType !== undefined
         ? patch.learnedType
@@ -218,7 +212,7 @@ export async function updateMerchant(
       if (update) {
         update.payload = payload
         update.baseVersion = merchant.version
-        await db.outbox.put(update)
+        await db.outbox.put(requeued(update))
         return
       }
       await db.outbox.add({

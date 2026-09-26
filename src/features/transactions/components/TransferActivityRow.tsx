@@ -1,6 +1,8 @@
 import { ArrowRight } from 'lucide-react'
 import { TransferGlyph } from '#/components/icons/TransferGlyph'
+import type { SyncFailure } from '#/db/types'
 import type { TransferRow } from '#/features/transactions/data/selectors'
+import { RowSyncBadge } from './RowSyncBadge'
 
 function WalletTag({ name, color }: { name: string; color: string }) {
   return (
@@ -17,9 +19,12 @@ function WalletTag({ name, color }: { name: string; color: string }) {
 /** One transfer in the activity list — neutral, never counted in the day's totals. */
 export function TransferActivityRow({
   row,
+  failure,
   onClick,
 }: {
   row: TransferRow
+  /** Why its last sync failed, when it did. */
+  failure?: SyncFailure
   onClick: () => void
 }) {
   return (
@@ -43,6 +48,9 @@ export function TransferActivityRow({
         </span>
       </div>
       <div className="flex-1" />
+      {failure ? (
+        <RowSyncBadge row={row} failure={failure} onEdit={onClick} />
+      ) : null}
       <div className="flex flex-none flex-col items-end text-end">
         <span className="whitespace-nowrap text-[14px] font-bold tabular-nums text-fp-text-2">
           {row.amountStr}

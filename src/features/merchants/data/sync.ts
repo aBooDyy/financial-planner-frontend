@@ -1,5 +1,6 @@
 import { db } from '#/db/db'
 import { pullDelta } from '#/db/delta'
+import { requeued } from '#/db/syncFailure'
 import type { OutboxEntry } from '#/db/types'
 import { merchantsApi } from '#/features/merchants/api/merchantsApi'
 import type {
@@ -145,7 +146,8 @@ async function rebaseMerchant(entry: OutboxEntry): Promise<void> {
         await db.outbox.delete(entry.seq)
       },
     )
-  } catch {
+  } catch (e) {
+    if (statusOf(e) !== 409) throw e
     await db.transaction(
       'rw',
       db.merchants,
@@ -277,7 +279,9 @@ async function adoptWinner(entry: OutboxEntry, error: ApiError): Promise<void> {
       for (const rewrite of plan.rewrites) {
         const queuedEntry = await db.outbox.get(rewrite.seq)
         if (queuedEntry) {
-          await db.outbox.put({ ...queuedEntry, payload: rewrite.payload })
+          await db.outbox.put(
+            requeued({ ...queuedEntry, payload: rewrite.payload }),
+          )
         }
       }
 

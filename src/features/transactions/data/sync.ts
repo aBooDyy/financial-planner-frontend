@@ -1,5 +1,6 @@
 import { db } from '#/db/db'
 import { pullDelta } from '#/db/delta'
+import { flagEntry, invalidItemFailure } from '#/db/syncFailure'
 import type { OutboxEntry } from '#/db/types'
 import {
   budgetsApi,
@@ -61,8 +62,8 @@ async function pushTransactionCreate(entry: OutboxEntry): Promise<void> {
  *
  * The request is all-or-nothing; the *entries* are not. Each is answered on its own terms:
  * a written row is stored, an id the server already holds is settled from the row it sends
- * back, and an entry it judges unusable is dropped — the same rule the singular path
- * applies to a non-network failure. An entry with no answer stays queued.
+ * back, and an entry it judges unusable is flagged and stays queued — the same rule the
+ * singular path applies to a rejection. An entry with no answer stays queued.
  */
 export async function pushTransactionCreates(
   entries: ReadonlyArray<OutboxEntry>,
@@ -75,6 +76,13 @@ export async function pushTransactionCreates(
     for (const entry of entries) {
       const result = byId.get(entry.id)
       if (result === undefined) continue
+      if (result.status === 'invalid') {
+        await flagEntry(
+          entry,
+          invalidItemFailure(result.errorCode, result.errorField),
+        )
+        continue
+      }
       if (result.transaction) {
         await db.transactions.put(serverTransactionToLocal(result.transaction))
       }
@@ -87,10 +95,10 @@ export async function pushTransactionCreates(
  * Push a run of queued deletes as one request — the mirror of `pushTransactionCreates`,
  * and the reason undoing a 2 608-row import is a handful of requests rather than 2 608.
  *
- * Every answer is terminal, so a mentioned entry is always dropped: the row is gone,
- * nothing of ours ever stood behind that id, or the id is unusable and resending it cannot
- * change that. An entry the response does not mention stays queued, exactly as on the
- * create side, so a half-answered request leaves the rest to the next drain.
+ * `deleted` and `missing` are terminal — the row is gone, or nothing of ours ever stood
+ * behind that id — so those entries are dropped. An `invalid` one is flagged and stays
+ * queued like any rejection. An entry the response does not mention stays queued, exactly
+ * as on the create side, so a half-answered request leaves the rest to the next drain.
  */
 export async function pushTransactionDeletes(
   entries: ReadonlyArray<OutboxEntry>,
@@ -98,10 +106,18 @@ export async function pushTransactionDeletes(
   const results = await transactionsApi.bulkDelete(
     entries.map((entry) => entry.id),
   )
-  const answered = new Set(results.map((result) => result.id))
+  const byId = new Map(results.map((result) => [result.id, result]))
   await db.transaction('rw', db.transactions, db.outbox, async () => {
     for (const entry of entries) {
-      if (!answered.has(entry.id)) continue
+      const result = byId.get(entry.id)
+      if (result === undefined) continue
+      if (result.status === 'invalid') {
+        await flagEntry(
+          entry,
+          invalidItemFailure(result.errorCode, result.errorField),
+        )
+        continue
+      }
       await db.transactions.delete(entry.id)
       await db.outbox.delete(entry.seq)
     }
@@ -149,7 +165,8 @@ async function rebaseTransaction(entry: OutboxEntry): Promise<void> {
       await db.transactions.put(serverTransactionToLocal(tx))
       await db.outbox.delete(entry.seq)
     })
-  } catch {
+  } catch (e) {
+    if (statusOf(e) !== 409) throw e
     await db.transaction('rw', db.transactions, db.outbox, async () => {
       await db.transactions.put(serverTransactionToLocal(fresh))
       await db.outbox.delete(entry.seq)
@@ -229,7 +246,8 @@ async function rebaseBudget(entry: OutboxEntry): Promise<void> {
       await db.budgets.put(serverBudgetToLocal(budget))
       await db.outbox.delete(entry.seq)
     })
-  } catch {
+  } catch (e) {
+    if (statusOf(e) !== 409) throw e
     await db.transaction('rw', db.budgets, db.outbox, async () => {
       await db.budgets.put(serverBudgetToLocal(fresh))
       await db.outbox.delete(entry.seq)
@@ -309,7 +327,8 @@ async function rebaseRecurring(entry: OutboxEntry): Promise<void> {
       await db.recurrings.put(serverRecurringToLocal(r))
       await db.outbox.delete(entry.seq)
     })
-  } catch {
+  } catch (e) {
+    if (statusOf(e) !== 409) throw e
     await db.transaction('rw', db.recurrings, db.outbox, async () => {
       await db.recurrings.put(serverRecurringToLocal(fresh))
       await db.outbox.delete(entry.seq)

@@ -21,12 +21,47 @@ const MESSAGES: Record<string, string> = {
   'balances.settings.base_currency_invalid': 'Choose a supported currency.',
   'settings.category.name_required': 'Give the category a name.',
   'settings.category.slug_taken': 'A category like that already exists.',
+  'settings.category.in_use':
+    'Something is filed under this category — pick where it moves first.',
+  'settings.category.required':
+    'Savings and the two “Other” categories can’t be deleted.',
   'balances.rate.value_invalid': 'Enter a valid exchange rate.',
   'spending.transaction.amount_invalid': 'Enter a valid amount.',
   'spending.transaction.currency_invalid': 'Choose a supported currency.',
   'spending.transaction.date_invalid': 'Enter a valid date.',
   'spending.transaction.category_required': 'Pick a category.',
+  'spending.transaction.category_invalid': 'Choose one of your categories.',
+  'spending.transaction.category_type_mismatch':
+    'Pick a category of the same kind — spending or income.',
+  'spending.recurring.category_invalid': 'Choose one of your categories.',
+  'spending.recurring.category_type_mismatch':
+    'Pick a category of the same kind — spending or income.',
+  'planned.category_invalid': 'Choose one of your categories.',
+  'planned.category_type_mismatch':
+    'Pick a category of the same kind — spending or income.',
+  'spending.budget.category_invalid': 'Choose one of your categories.',
+  'spending.budget.category_not_root':
+    'A budget covers a whole category, not a subcategory.',
+  'spending.budget.wallet_invalid': 'Choose one of your accounts.',
+  'merchants.learned_category_invalid': 'Choose one of your categories.',
+  'integrations.key.category_invalid': 'Choose one of your categories.',
+  'inbound.import.category_invalid': 'Choose one of your categories.',
   'spending.transaction.merchant_invalid': 'Choose one of your merchants.',
+  'spending.transaction.wallet_invalid': 'Choose one of your accounts.',
+  'spending.transaction.goal_invalid': 'That goal is no longer available.',
+  'spending.transaction.type_invalid': 'Choose spending or income.',
+  'spending.transaction.transfer_leg':
+    'This is one side of a transfer — change or delete the transfer instead.',
+  'spending.transaction.transfer_via_transfers':
+    'A transfer between accounts is recorded as a transfer.',
+  'spending.transfer.same_wallet': 'A transfer needs two different accounts.',
+  'spending.transfer.wallet_invalid': 'Choose one of your accounts.',
+  'spending.transfer.amount_invalid': 'Enter a valid amount.',
+  'spending.transfer.to_amount_required':
+    'Enter the amount the other account received.',
+  'spending.transfer.to_amount_mismatch':
+    'Between accounts in one currency, the amount received is the amount sent.',
+  'common.validation': 'Some details weren’t accepted.',
   'spending.transaction.planned_invalid':
     'That planned item is no longer available.',
   'spending.transaction.adjustment_refs':
@@ -150,6 +185,10 @@ const MESSAGES: Record<string, string> = {
   'import.row.wallet_unresolved':
     'This row has no account. Mark the account column in Columns, match its value in Values, or set an account for rows with none.',
   'import.row.category_defaulted': 'Category guessed — no match in the file.',
+  'import.row.category_type_mismatch':
+    'This category is for the other direction — pick one for money in or money out to match the row.',
+  'import.row.category_missing':
+    'This category no longer exists — pick another for this row.',
   'import.row.type_defaulted':
     'Money in or out was guessed — that word isn’t mapped yet.',
   'import.row.ragged': 'This row has fewer columns than the header.',

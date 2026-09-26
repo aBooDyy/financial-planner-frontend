@@ -94,7 +94,8 @@ async function rebaseIncome(entry: OutboxEntry): Promise<void> {
       await db.incomeStreams.put(serverIncomeToLocal(stream))
       await db.outbox.delete(entry.seq)
     })
-  } catch {
+  } catch (e) {
+    if (statusOf(e) !== 409) throw e
     await db.transaction('rw', db.incomeStreams, db.outbox, async () => {
       await db.incomeStreams.put(serverIncomeToLocal(fresh))
       await db.outbox.delete(entry.seq)
@@ -174,7 +175,8 @@ async function rebaseGoal(entry: OutboxEntry): Promise<void> {
       await db.goals.put(serverGoalToLocal(goal))
       await db.outbox.delete(entry.seq)
     })
-  } catch {
+  } catch (e) {
+    if (statusOf(e) !== 409) throw e
     await db.transaction('rw', db.goals, db.outbox, async () => {
       await db.goals.put(serverGoalToLocal(fresh))
       await db.outbox.delete(entry.seq)
@@ -259,7 +261,8 @@ async function rebaseAllocation(entry: OutboxEntry): Promise<void> {
       await db.goalAllocations.put(serverAllocationToLocal(allocation))
       await db.outbox.delete(entry.seq)
     })
-  } catch {
+  } catch (e) {
+    if (statusOf(e) !== 409) throw e
     await db.transaction('rw', db.goalAllocations, db.outbox, async () => {
       await db.goalAllocations.put(serverAllocationToLocal(fresh))
       await db.outbox.delete(entry.seq)

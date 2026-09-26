@@ -1,4 +1,5 @@
 import { db } from '#/db/db'
+import { requeued } from '#/db/syncFailure'
 import { schedulePush } from '#/db/sync'
 import type {
   AllocationSource,
@@ -97,14 +98,14 @@ async function enqueueUpsert(
   const create = entries.find((e) => e.op === 'create')
   if (create) {
     create.payload = createPayload
-    await db.outbox.put(create)
+    await db.outbox.put(requeued(create))
     return
   }
   const update = entries.find((e) => e.op === 'update')
   if (update) {
     update.payload = updatePayload
     update.baseVersion = version
-    await db.outbox.put(update)
+    await db.outbox.put(requeued(update))
     return
   }
   await db.outbox.add({

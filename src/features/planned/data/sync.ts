@@ -1,5 +1,6 @@
 import { db } from '#/db/db'
 import { pullDelta } from '#/db/delta'
+import { flagEntry, invalidItemFailure } from '#/db/syncFailure'
 import type { LocalPlanned, OutboxEntry } from '#/db/types'
 import { plannedApi } from '#/features/planned/api/plannedApi'
 import type {
@@ -85,7 +86,7 @@ async function pushPlannedCreate(entry: OutboxEntry): Promise<void> {
 /**
  * A run of queued creates as one request — the planner's first pass over an existing account
  * writes dozens. Answered per item, like the ledger's bulk: a created row is stored, a taken
- * id is settled as above, an invalid one is dropped, an unanswered one stays queued.
+ * id is settled as above, an invalid one is flagged, an unanswered one stays queued.
  */
 export async function pushPlannedCreates(
   entries: ReadonlyArray<OutboxEntry>,
@@ -117,7 +118,10 @@ export async function pushPlannedCreates(
       }
       await settleTakenId(entry, server)
     } else {
-      await db.outbox.delete(entry.seq)
+      await flagEntry(
+        entry,
+        invalidItemFailure(result.errorCode, result.errorField),
+      )
     }
   }
 }
@@ -167,7 +171,8 @@ async function rebasePlanned(entry: OutboxEntry): Promise<void> {
       await db.plannedTransactions.put(serverPlannedToLocal(row))
       await db.outbox.delete(entry.seq)
     })
-  } catch {
+  } catch (e) {
+    if (statusOf(e) !== 409) throw e
     await db.transaction('rw', db.plannedTransactions, db.outbox, async () => {
       await db.plannedTransactions.put(serverPlannedToLocal(fresh))
       await db.outbox.delete(entry.seq)

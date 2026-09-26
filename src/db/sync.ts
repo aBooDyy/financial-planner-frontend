@@ -46,6 +46,13 @@ import { configLimits } from '#/lib/config/appConfig'
 import { ApiError } from '#/lib/apiError'
 import { db } from './db'
 import { notePlannerInputsPulled } from './pullState'
+import {
+  failureOf,
+  flagEntry,
+  isBackingOff,
+  releaseRejected,
+  rowKey,
+} from './syncFailure'
 import { SETTINGS_KEY } from './types'
 import type { OutboxEntity, OutboxEntry, OutboxOp } from './types'
 
@@ -140,8 +147,6 @@ let pulling = false
 let lastPullAt = 0
 let stopRunningSync: (() => void) | null = null
 
-const isNetworkError = (e: unknown): boolean =>
-  e instanceof ApiError && e.status === 0
 const statusOf = (e: unknown): number => (e instanceof ApiError ? e.status : -1)
 
 // --- Push ----------------------------------------------------------------------------
@@ -155,7 +160,12 @@ export function schedulePush(): void {
   }, PUSH_DEBOUNCE_MS)
 }
 
-/** Drain the outbox now and resolve when it stops. Single-flight, like the timer path. */
+/**
+ * Drain the outbox now and resolve when it stops. Single-flight, like the timer path.
+ *
+ * A pass that settles an entry which had failed before goes round again: a row refused because
+ * something it points at had not reached the server yet may go through now.
+ */
 export async function flushOutbox(): Promise<void> {
   if (pushing) {
     pushQueued = true
@@ -163,14 +173,8 @@ export async function flushOutbox(): Promise<void> {
   }
   pushing = true
   try {
-    // Drain in insertion order; stop on the first network failure to retry later.
-    for (;;) {
-      const page = await db.outbox
-        .orderBy('seq')
-        .limit(pushPageSize())
-        .toArray()
-      if (page.length === 0) break
-      if (!(await pushPage(page))) break
+    while ((await drainPass()) === 'released') {
+      // The released entries are retried by the next pass.
     }
   } finally {
     pushing = false
@@ -180,6 +184,36 @@ export async function flushOutbox(): Promise<void> {
     }
   }
 }
+
+/**
+ * One drain's bookkeeping. `blocked` holds every row whose entry failed, is backing off or is
+ * still queued after its push: a row's later entries never overtake its earlier ones.
+ */
+type Pass = { now: number; blocked: Set<string>; released: boolean }
+
+type PassOutcome = 'done' | 'stopped' | 'released'
+
+/** One walk over the queue in `seq` order. It stops at the first unavailable failure. */
+async function drainPass(): Promise<PassOutcome> {
+  const pass: Pass = { now: Date.now(), blocked: new Set(), released: false }
+  let after = 0
+  for (;;) {
+    const page = await db.outbox
+      .where('seq')
+      .above(after)
+      .limit(pushPageSize())
+      .toArray()
+    if (page.length === 0) break
+    after = page[page.length - 1].seq ?? after
+    if (!(await pushPage(page, pass))) return 'stopped'
+  }
+  if (pass.released && (await releaseRejected()) > 0) return 'released'
+  return 'done'
+}
+
+const isHeld = (entry: OutboxEntry, pass: Pass): boolean =>
+  pass.blocked.has(rowKey(entry.entity, entry.id)) ||
+  isBackingOff(entry, pass.now)
 
 /**
  * How many entries from `at` are independent same-op entries that may go out together. The
@@ -200,20 +234,63 @@ export function bulkRunLength(
   return run
 }
 
-/** Returns true if the whole page was handled, false to stop draining (network). */
-async function pushPage(page: ReadonlyArray<OutboxEntry>): Promise<boolean> {
+/** A bulk run cut short at the first entry this pass holds back. */
+function sendableRunLength(
+  page: ReadonlyArray<OutboxEntry>,
+  at: number,
+  pass: Pass,
+): number {
+  const run = bulkRunLength(page, at)
+  for (let i = 1; i < run; i++) {
+    if (isHeld(page[at + i], pass)) return i
+  }
+  return run
+}
+
+/** Returns true if the whole page was walked, false to stop draining. */
+async function pushPage(
+  page: ReadonlyArray<OutboxEntry>,
+  pass: Pass,
+): Promise<boolean> {
   let at = 0
   while (at < page.length) {
-    const run = bulkRunLength(page, at)
-    if (!(await pushRun(page.slice(at, at + run)))) return false
-    at += run
+    if (isHeld(page[at], pass)) {
+      pass.blocked.add(rowKey(page[at].entity, page[at].id))
+      at += 1
+      continue
+    }
+    const run = page.slice(at, at + sendableRunLength(page, at, pass))
+    const walked = await pushRun(run)
+    await noteOutcomes(run, pass)
+    if (!walked) return false
+    at += run.length
   }
   return true
 }
 
 /**
+ * After a push: an entry still queued blocks its row for the rest of the pass, and an entry
+ * that had failed before and is now gone means its dependants may succeed.
+ */
+async function noteOutcomes(
+  run: ReadonlyArray<OutboxEntry>,
+  pass: Pass,
+): Promise<void> {
+  const seqs = run.map((entry) => entry.seq).filter((seq) => seq !== undefined)
+  const left = await db.outbox.bulkGet(seqs)
+  const stillQueued = new Set(left.map((entry) => entry?.seq))
+  for (const entry of run) {
+    if (stillQueued.has(entry.seq)) {
+      pass.blocked.add(rowKey(entry.entity, entry.id))
+    } else if (entry.failure) {
+      pass.released = true
+    }
+  }
+}
+
+/**
  * A stretch of independent same-op entries, or one entry of anything else. The stretch is
- * cut into request-sized batches and sent a wave at a time. Each push removes its own
+ * cut into request-sized batches and sent a wave at a time. Each push settles its own
  * entries, so a wave that half-succeeds leaves the rest queued — every entry in it is
  * independently valid, which is the same reason they may be sent together at all.
  */
@@ -239,7 +316,7 @@ const chunked = <T>(items: ReadonlyArray<T>, size: number): T[][] => {
   return out
 }
 
-/** Returns true if the batch was handled, false to stop draining (network). */
+/** Returns true to keep draining, false to stop (the server is unavailable). */
 async function pushBatch(
   batch: ReadonlyArray<OutboxEntry>,
   kind: BulkKind,
@@ -248,9 +325,15 @@ async function pushBatch(
     await kind.push(batch)
     return true
   } catch (e) {
-    if (isNetworkError(e)) return false
-    // The batch failed as a whole, so no entry got a verdict of its own. Retrying singly
-    // isolates the one row the server refused instead of discarding the other 999.
+    const failure = failureOf(e)
+    if (!failure) return false
+    if (failure.kind === 'unavailable') {
+      // Only the head is marked: the rest were never judged, so they are plainly pending.
+      await flagEntry(batch[0], failure)
+      return false
+    }
+    // Refused as a whole, so no entry got a verdict of its own. Retrying singly isolates the
+    // one row the server refuses instead of flagging the other 999.
     for (const entry of batch) {
       if (!(await pushEntry(entry))) return false
     }
@@ -258,53 +341,52 @@ async function pushBatch(
   }
 }
 
-/** Returns true if the entry was handled (and removed), false to stop draining (network). */
+/**
+ * Push one entry. A handler settles success and the 404/409 cases it owns; anything it throws
+ * is flagged on the entry, which stays queued. Returns false to stop draining: the server is
+ * unavailable (or the session is ending), so every later entry would fail the same way.
+ */
 async function pushEntry(entry: OutboxEntry): Promise<boolean> {
   try {
-    if (entry.entity === 'settings') {
-      await pushSettings(entry)
-    } else if (
-      entry.entity === 'income' ||
-      entry.entity === 'goal' ||
-      entry.entity === 'allocation'
-    ) {
-      await pushGoalsEntry(entry)
-    } else if (
-      entry.entity === 'transaction' ||
-      entry.entity === 'budget' ||
-      entry.entity === 'recurring'
-    ) {
-      await pushSpendingEntry(entry)
-    } else if (entry.entity === 'transfer') {
-      await pushTransferEntry(entry)
-    } else if (entry.entity === 'category') {
-      await pushCategoryEntry(entry)
-    } else if (entry.entity === 'customCurrency' || entry.entity === 'rate') {
-      await pushSettingsEntry(entry)
-    } else if (
-      entry.entity === 'merchant' ||
-      entry.entity === 'merchantAlias'
-    ) {
-      await pushMerchantsEntry(entry)
-    } else if (entry.entity === 'importTemplate') {
-      await pushImportTemplatesEntry(entry)
-    } else if (entry.entity === 'planned') {
-      await pushPlannedEntry(entry)
-    } else if (entry.op === 'create') {
-      await pushNodeCreate(entry)
-    } else if (entry.op === 'update') {
-      await pushNodeUpdate(entry)
-    } else {
-      await pushNodeDelete(entry)
-    }
+    await dispatch(entry)
     return true
   } catch (e) {
-    if (isNetworkError(e)) return false
-    // A non-network failure means the queued op can never succeed as-is; drop it and let a
-    // pull restore canonical state rather than looping forever.
-    await db.outbox.delete(entry.seq)
-    return true
+    const failure = failureOf(e)
+    if (!failure) return false
+    await flagEntry(entry, failure)
+    return failure.kind === 'rejected'
   }
+}
+
+async function dispatch(entry: OutboxEntry): Promise<void> {
+  if (entry.entity === 'settings') return pushSettings(entry)
+  if (
+    entry.entity === 'income' ||
+    entry.entity === 'goal' ||
+    entry.entity === 'allocation'
+  ) {
+    return pushGoalsEntry(entry)
+  }
+  if (
+    entry.entity === 'transaction' ||
+    entry.entity === 'budget' ||
+    entry.entity === 'recurring'
+  ) {
+    return pushSpendingEntry(entry)
+  }
+  if (entry.entity === 'transfer') return pushTransferEntry(entry)
+  if (entry.entity === 'category') return pushCategoryEntry(entry)
+  if (entry.entity === 'customCurrency' || entry.entity === 'rate') {
+    return pushSettingsEntry(entry)
+  }
+  if (entry.entity === 'merchant' || entry.entity === 'merchantAlias') {
+    return pushMerchantsEntry(entry)
+  }
+  if (entry.entity === 'importTemplate') return pushImportTemplatesEntry(entry)
+  if (entry.entity === 'planned') return pushPlannedEntry(entry)
+  if (entry.op === 'create') return pushNodeCreate(entry)
+  if (entry.op === 'update') return pushNodeUpdate(entry)
+  return pushNodeDelete(entry)
 }
 
 async function pushNodeCreate(entry: OutboxEntry): Promise<void> {
@@ -372,7 +454,8 @@ async function reapplyAfterConflict(entry: OutboxEntry): Promise<void> {
       await db.balanceNodes.put(serverNodeToLocal(node))
       await db.outbox.delete(entry.seq)
     })
-  } catch {
+  } catch (e) {
+    if (statusOf(e) !== 409) throw e
     // Still conflicting — accept the server copy and drop the op rather than loop.
     await db.transaction('rw', db.balanceNodes, db.outbox, async () => {
       await db.balanceNodes.put(serverNodeToLocal(fresh))

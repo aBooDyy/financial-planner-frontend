@@ -1,4 +1,5 @@
 import { db } from '#/db/db'
+import { requeued } from '#/db/syncFailure'
 import { schedulePush } from '#/db/sync'
 import {
   MAX_CONFIG_BYTES,
@@ -7,6 +8,7 @@ import {
 } from '#/features/import/api/types'
 import { ApiError } from '#/lib/apiError'
 import { localTemplateToCreateWire } from './mappers'
+import { remapTemplateCategoryIds } from './templates'
 import type { LocalImportTemplate } from '#/db/types'
 import type { UpdateImportTemplateWire } from '#/features/import/api/types'
 import type { ImportTemplateConfig } from './types'
@@ -82,7 +84,7 @@ async function enqueue(
     .first()
   if (create) {
     create.payload = localTemplateToCreateWire(template)
-    await db.outbox.put(create)
+    await db.outbox.put(requeued(create))
     return
   }
   // No version yet means the row has never reached the server — its create was refused
@@ -108,7 +110,7 @@ async function enqueue(
       version: template.version,
     }
     queued.baseVersion = template.version
-    await db.outbox.put(queued)
+    await db.outbox.put(requeued(queued))
     return
   }
   await db.outbox.add({
@@ -241,6 +243,38 @@ export async function recordTemplateUse(id: string): Promise<void> {
     await enqueue(template, { last_used_at: ts, use_count: template.useCount })
   })
   schedulePush()
+}
+
+/**
+ * A category created on this device can come back from the server under another id (its slug
+ * was taken there). The templates saved meanwhile name the local id, so they are rewritten
+ * in place — the local rows and whatever of them is still queued — before anything pushes.
+ * Nothing new is queued: a config naming the local id has not reached the server yet.
+ */
+export async function remapTemplateCategories(
+  fromId: string,
+  toId: string,
+): Promise<void> {
+  await db.transaction('rw', db.importTemplates, db.outbox, async () => {
+    const templates = await db.importTemplates.toArray()
+    for (const template of templates) {
+      if (template.config === null) continue
+      const config = remapTemplateCategoryIds(template.config, fromId, toId)
+      if (config === template.config) continue
+      await db.importTemplates.put({ ...template, config })
+      const queued = await pending(template.id)
+        .filter((e) => e.op !== 'delete')
+        .toArray()
+      for (const entry of queued) {
+        const payload = entry.payload as { config?: string }
+        if (payload.config === undefined) continue
+        await db.outbox.put({
+          ...entry,
+          payload: { ...payload, config: serializeTemplateConfig(config) },
+        })
+      }
+    }
+  })
 }
 
 export async function deleteImportTemplate(id: string): Promise<void> {

@@ -1,13 +1,18 @@
 import { Scale } from 'lucide-react'
+import type { SyncFailure } from '#/db/types'
 import type { AdjustmentRow } from '#/features/transactions/data/selectors'
 import { ADJUSTMENT_LABEL } from '#/features/transactions/data/selectors'
+import { RowSyncBadge } from './RowSyncBadge'
 
 /** A balance adjustment in the activity list — it corrects a wallet, so never in the day's totals. */
 export function AdjustmentActivityRow({
   row,
+  failure,
   onClick,
 }: {
   row: AdjustmentRow
+  /** Why its last sync failed, when it did. */
+  failure?: SyncFailure
   onClick: () => void
 }) {
   return (
@@ -31,6 +36,9 @@ export function AdjustmentActivityRow({
         </span>
       </div>
       <div className="flex-1" />
+      {failure ? (
+        <RowSyncBadge row={row} failure={failure} onEdit={onClick} />
+      ) : null}
       <div className="flex flex-none flex-col items-end text-end">
         <span className="whitespace-nowrap text-[14px] font-bold tabular-nums text-fp-text-2">
           {row.amountStr}

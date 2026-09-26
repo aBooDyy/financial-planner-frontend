@@ -4,6 +4,7 @@ import { PillSwitch } from '#/components/dialog/PillSwitch'
 import { DateField } from '#/components/DateField'
 import { FieldLabel } from '#/components/FieldLabel'
 import { FieldMessage } from '#/components/FormRow'
+import { RowSyncBanner } from '#/components/sync/RowSyncBanner'
 import { Input } from '#/components/ui/input'
 import type { LocalBalanceNode } from '#/db/types'
 import { adjustmentDeleteCopy } from '#/features/transactions/data/scheduleEditor'
@@ -69,6 +70,8 @@ function AdjustmentForm({ editor, wallets, dateFormat }: Props) {
         onConfirm: () => void editor.remove(),
       }}
     >
+      <RowSyncBanner entity="transaction" id={editing.id} />
+
       <PillSwitch
         label="Direction"
         options={DIRECTIONS}

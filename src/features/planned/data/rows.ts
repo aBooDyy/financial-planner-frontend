@@ -5,6 +5,7 @@
  * Nothing here schedules a push; callers push once for the whole change.
  */
 import { db } from '#/db/db'
+import { requeued } from '#/db/syncFailure'
 import type {
   LocalGoalAllocation,
   LocalPlanned,
@@ -55,14 +56,14 @@ export async function savePlanned(row: LocalPlanned): Promise<void> {
     const create = entries.find((e) => e.op === 'create')
     if (create) {
       create.payload = localPlannedToCreateWire(saved)
-      await db.outbox.put(create)
+      await db.outbox.put(requeued(create))
       return
     }
     const update = entries.find((e) => e.op === 'update')
     if (update) {
       update.payload = localPlannedToUpdateWire(saved)
       update.baseVersion = saved.version
-      await db.outbox.put(update)
+      await db.outbox.put(requeued(update))
       return
     }
     await db.outbox.add({

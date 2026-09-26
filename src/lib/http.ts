@@ -120,8 +120,7 @@ async function runRefresh(): Promise<void> {
     // we could not ask: an offline client keeps its session and its unsynced local data.
     if (error instanceof ApiError && error.isUnauthenticated) await endSession()
     // The refresh failure replaces the caller's 401 deliberately — a transient one carries
-    // `common.network`, which the sync engine already treats as "keep the outbox and back
-    // off", whereas a 401 would make it drop the queued writes.
+    // `common.network`, which reads as "the server is unreachable", not as a verdict.
     throw error
   }
 }

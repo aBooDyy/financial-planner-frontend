@@ -1,14 +1,18 @@
 import { db } from '#/db/db'
+import { isUnavailableStatus } from '#/db/syncFailure'
 import { clearWatermark } from '#/db/watermarks'
-import type { OutboxEntry } from '#/db/types'
+import type { LocalCategory, OutboxEntry } from '#/db/types'
 import { categoriesApi } from '#/features/categories/api/categoriesApi'
 import type {
   CreateCategoryWire,
   DeleteCategoryWire,
   UpdateCategoryWire,
 } from '#/features/categories/api/types'
+import { remapTemplateCategories } from '#/features/import/data/mutations'
 import { ApiError } from '#/lib/apiError'
 import { localCategoryToUpdateWire, serverCategoryToLocal } from './mappers'
+import { refileTables, remapLocally } from './refile'
+import { uniqueSlug } from './slug'
 
 /**
  * Push/pull handlers for the category tree, plugged into the shared sync engine. They
@@ -26,14 +30,66 @@ async function pushCategoryCreate(entry: OutboxEntry): Promise<void> {
       await db.outbox.delete(entry.seq)
     })
   } catch (e) {
-    if (statusOf(e) === 409) {
-      // Id or slug already taken server-side — adopt the server set.
-      await db.outbox.delete(entry.seq)
-      await pullCategories()
-      return
-    }
+    if (statusOf(e) === 409) return adoptServerCategory(entry)
     throw e
   }
+}
+
+/**
+ * The id or the slug is already taken server-side. An id clash is a retried create the server
+ * already holds. A slug clash means another device created the same category first: the
+ * server's row wins, and everything this device filed under its own id moves onto it. A root
+ * slug is unique across both types, so a clash with a root of the other type is not the same
+ * category: this one takes the next free slug and its create goes out again.
+ */
+async function adoptServerCategory(entry: OutboxEntry): Promise<void> {
+  const server = await categoriesApi.list()
+  const local = await db.categories.get(entry.id)
+  const same = server.find((c) => c.id === entry.id)
+  const clash =
+    local && !same
+      ? server.find(
+          (c) => c.parentId === local.parentId && c.slug === local.slug,
+        )
+      : undefined
+  if (local && clash && clash.type !== local.type) {
+    const onDevice = await db.categories.toArray()
+    return reslugCreate(
+      entry,
+      local,
+      [...server, ...onDevice].filter((c) => c.parentId === local.parentId),
+    )
+  }
+  const twin = clash
+  await db.transaction('rw', refileTables(), async () => {
+    await db.outbox.delete(entry.seq)
+    const adopted = same ?? twin
+    if (adopted) await db.categories.put(serverCategoryToLocal(adopted))
+    if (twin) {
+      await remapLocally(entry.id, twin.id)
+      await db.categories.delete(entry.id)
+    }
+  })
+  if (twin) await remapTemplateCategories(entry.id, twin.id)
+  await pullCategories()
+}
+
+async function reslugCreate(
+  entry: OutboxEntry,
+  local: LocalCategory,
+  siblings: ReadonlyArray<{ slug: string }>,
+): Promise<void> {
+  const slug = uniqueSlug(
+    local.slug,
+    siblings.map((c) => c.slug),
+  )
+  await db.transaction('rw', db.categories, db.outbox, async () => {
+    await db.categories.put({ ...local, slug })
+    await db.outbox.put({
+      ...entry,
+      payload: { ...(entry.payload as CreateCategoryWire), slug },
+    })
+  })
 }
 
 async function pushCategoryUpdate(entry: OutboxEntry): Promise<void> {
@@ -77,7 +133,8 @@ async function rebaseCategory(entry: OutboxEntry): Promise<void> {
       await db.categories.put(serverCategoryToLocal(c))
       await db.outbox.delete(entry.seq)
     })
-  } catch {
+  } catch (e) {
+    if (statusOf(e) !== 409) throw e
     await db.transaction('rw', db.categories, db.outbox, async () => {
       await db.categories.put(serverCategoryToLocal(fresh))
       await db.outbox.delete(entry.seq)
@@ -91,10 +148,16 @@ async function pushCategoryDelete(entry: OutboxEntry): Promise<void> {
     await categoriesApi.remove(entry.id, moveTo)
   } catch (e) {
     const status = statusOf(e)
-    if (status === 0) throw e
-    // The server re-filed nothing, but this device already did: forget the ledger's
-    // watermarks so the next pull restores what the server actually holds.
-    if (moveTo) await forgetRefiledWatermarks()
+    if (isUnavailableStatus(status)) throw e
+    // This device already moved or unlinked what was filed under the category, whatever the
+    // server did: forget the delta watermarks so the next pull restores what it holds.
+    await forgetRewrittenWatermarks()
+    if (status === 409) {
+      // In use, or one the user cannot delete: the server keeps it, and so does this device.
+      await db.outbox.delete(entry.seq)
+      await pullCategories()
+      return
+    }
     if (status !== 404) throw e
   }
   await db.transaction('rw', db.categories, db.outbox, async () => {
@@ -103,9 +166,10 @@ async function pushCategoryDelete(entry: OutboxEntry): Promise<void> {
   })
 }
 
-async function forgetRefiledWatermarks(): Promise<void> {
+async function forgetRewrittenWatermarks(): Promise<void> {
   await clearWatermark('transaction')
   await clearWatermark('planned')
+  await clearWatermark('merchant')
 }
 
 /** Push one category outbox entry. Throws on network/unexpected errors. */
