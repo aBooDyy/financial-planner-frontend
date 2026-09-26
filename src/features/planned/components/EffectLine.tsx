@@ -1,20 +1,34 @@
+import { Check } from 'lucide-react'
+import { NoteBox } from '#/components/dialog/NoteBox'
+import type { NoteTone } from '#/components/dialog/NoteBox'
 import type { Effect, EffectTone } from '#/features/planned/data/confirmCopy'
 
-const TONE: Record<EffectTone, string> = {
-  neutral: 'border-fp-border bg-fp-surface-2 text-fp-text-2',
-  good: 'border-transparent bg-fp-accent-soft text-fp-accent-ink',
-  partial: 'border-fp-warn/25 bg-fp-warn/10 text-fp-warn',
+const TONE: Record<EffectTone, NoteTone> = {
+  neutral: 'neutral',
+  good: 'accent',
+  partial: 'warn',
 }
+
+const PARTIAL = 'Partial:'
 
 /** The confirm dialog's live "what this does" line. */
 export function EffectLine({ effect }: { effect: Effect }) {
+  const lead = effect.text.startsWith(PARTIAL) ? PARTIAL : null
   return (
-    <p
-      aria-live="polite"
-      data-tone={effect.tone}
-      className={`rounded-[11px] border px-3 py-[10px] text-[12.5px] leading-[1.45] ${TONE[effect.tone]}`}
-    >
-      {effect.text}
-    </p>
+    <div aria-live="polite" data-tone={effect.tone}>
+      <NoteBox
+        tone={TONE[effect.tone]}
+        icon={effect.tone === 'good' ? <Check strokeWidth={2.4} /> : undefined}
+      >
+        {lead ? (
+          <>
+            <b className="font-extrabold">{lead}</b>
+            {effect.text.slice(lead.length)}
+          </>
+        ) : (
+          effect.text
+        )}
+      </NoteBox>
+    </div>
   )
 }

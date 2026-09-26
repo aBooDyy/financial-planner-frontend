@@ -9,7 +9,12 @@ import type {
   LocalRecurring,
 } from '#/db/types'
 import type { GoalFrequency } from '#/features/goals/api/types'
-import { FREQUENCIES } from '#/features/goals/constants'
+import {
+  approxCyclesBetween,
+  cycleMonthsOf,
+  frequencyMetaOf,
+  stepDue,
+} from '#/features/goals/data/cadence'
 import { clampSetAsideDay, datedSchedule } from '#/features/goals/data/planning'
 import { paydaysOf } from '#/features/goals/data/paydays'
 import type { GoalPlanEntry, GoalsPlan } from '#/features/goals/data/selectors'
@@ -18,7 +23,7 @@ import { convertMinor } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
 import type { RatesMap } from '#/lib/config/rates'
 import { advanceDue } from '#/features/transactions/data/planning'
-import { addDaysISO, isoOf } from './dates'
+import { addDaysISO, dateOf, isoOf } from './dates'
 import { plannedIdFor } from './ids'
 import { legacyMarkerOf } from './settle'
 
@@ -101,9 +106,6 @@ export const isFinitePlan = (goal: LocalGoal): boolean =>
 /** Recurring obligations are paid each cycle; everything else only saves. */
 const paysEachCycle = (goal: LocalGoal): boolean => goal.kind === 'recurring'
 
-const cycleMonthsOf = (frequency: GoalFrequency): number =>
-  Math.max(1, Math.round(12 / FREQUENCIES[frequency].perYear))
-
 /** Occurrences of a schedule anchored on `first`, stepping as the Spending schedules do. */
 function occurrencesFrom(
   first: string,
@@ -125,6 +127,23 @@ function occurrencesFrom(
   return out
 }
 
+/** A goal's dues from `from` through `to`, stepped from its `nextDue` without drift. */
+function goalDuesFrom(
+  goal: LocalGoal,
+  nextDue: string,
+  from: string,
+  to: string,
+): string[] {
+  const { cadence } = frequencyMetaOf(goal, 'monthly')
+  const anchor = dateOf(nextDue)
+  const dueAt = (n: number) => isoOf(stepDue(anchor, cadence, n))
+  let n = Math.max(0, approxCyclesBetween(anchor, dateOf(from), cadence) - 1)
+  while (dueAt(n) < from) n += 1
+  const out: string[] = []
+  for (; dueAt(n) <= to && out.length < MAX_CATCH_UP; n += 1) out.push(dueAt(n))
+  return out
+}
+
 function goalRows(
   entry: GoalPlanEntry,
   input: GeneratorInput,
@@ -142,7 +161,7 @@ function goalRows(
     clampSetAsideDay(goal.setAsideDay),
   )
   const wantsSetAsides =
-    goal.kind !== 'recurring' || cycleMonthsOf(goal.frequency ?? 'annual') > 1
+    goal.kind !== 'recurring' || cycleMonthsOf(frequencyMetaOf(goal)) > 1
   const setAsides = wantsSetAsides
     ? dated
         .filter((d) => d.amount > 0.5)
@@ -171,12 +190,7 @@ function goalRows(
   }
 
   if (paysEachCycle(goal) && goal.nextDue && (goal.amount ?? 0) > 0) {
-    for (const due of occurrencesFrom(
-      goal.nextDue,
-      goal.frequency ?? 'monthly',
-      today,
-      until,
-    )) {
+    for (const due of goalDuesFrom(goal, goal.nextDue, today, until)) {
       seeds.push({
         origin: 'goal',
         originId: goal.id,

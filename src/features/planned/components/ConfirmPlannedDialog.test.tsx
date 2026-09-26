@@ -74,7 +74,7 @@ beforeEach(async () => {
   ])
 })
 
-const amountField = () => screen.getByLabelText<HTMLInputElement>('Amount')
+const amountField = () => screen.getByLabelText<HTMLInputElement>(/^How much/)
 
 describe('ConfirmPlannedDialog', () => {
   it('prefills the open remainder and confirms a set-aside as a reservation', async () => {
@@ -107,8 +107,9 @@ describe('ConfirmPlannedDialog', () => {
     render(<ConfirmPlannedDialog plannedId="sep" onOpenChange={vi.fn()} />)
     await waitFor(() => expect(amountField().value).toBe('1500'))
     fireEvent.change(amountField(), { target: { value: '1000' } })
+    expect(await screen.findByText('Partial:')).toBeTruthy()
     expect(
-      await screen.findByText(/^Partial: SR 500\.00 stays open on this item\./),
+      screen.getByText(/^SR 500\.00 stays open on this item\./),
     ).toBeTruthy()
     expect(
       screen.getByRole('button', { name: 'Confirm partial SR 1,000.00' }),
@@ -141,11 +142,12 @@ describe('ConfirmPlannedDialog', () => {
     })
   })
 
-  it('skips the item', async () => {
+  it('skips the item once asked', async () => {
     const onOpenChange = vi.fn()
     render(<ConfirmPlannedDialog plannedId="sep" onOpenChange={onOpenChange} />)
     await waitFor(() => expect(amountField().value).toBe('1500'))
     fireEvent.click(screen.getByRole('button', { name: 'Skip this one' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Skip it' }))
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
     expect((await db.plannedTransactions.get('sep'))?.status).toBe('skipped')
   })

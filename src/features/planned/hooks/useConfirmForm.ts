@@ -18,7 +18,7 @@ import { messageForApiError, messageForCode } from '#/lib/errorMessages'
 import { minorToInputValue, parseAmountToMinor } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
 import { useConfirmPlanned } from './useConfirmPlanned'
-import { activeNodes } from '#/features/balances/data/archive'
+import { activeNodes } from '#/features/wallets/data/archive'
 
 /** The "External…" choice in the wallet select (set-asides only). */
 export const EXTERNAL = '__external__'

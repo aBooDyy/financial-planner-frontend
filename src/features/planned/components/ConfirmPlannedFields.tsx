@@ -1,23 +1,16 @@
+import { AmountWell } from '#/components/dialog/AmountWell'
+import { NoteBox } from '#/components/dialog/NoteBox'
+import { DateField } from '#/components/DateField'
+import { FieldLabel } from '#/components/FieldLabel'
+import { Input } from '#/components/ui/input'
 import { EXTERNAL } from '#/features/planned/hooks/useConfirmForm'
 import type { ConfirmForm } from '#/features/planned/hooks/useConfirmForm'
-import { amountInputProps, formatMoney } from '#/lib/currency'
-import { DateField } from '#/components/DateField'
-import { Input } from '#/components/ui/input'
-import { Label } from '#/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '#/components/ui/select'
+import { formatMoney } from '#/lib/currency'
 import { usePreferencesStore } from '#/stores/preferences'
+import { ConfirmWalletSelect } from './ConfirmWalletSelect'
 import { EffectLine } from './EffectLine'
 
-const LABEL = 'mb-[6px] block text-[12px] font-semibold text-fp-text-2'
-const NONE = '__none__'
-
-/** The 1d inputs: amount (with "of X"), wallet (or an external source), date, effect line. */
+/** The 1d inputs: amount (with "of X planned"), wallet (or an external source), date, effect line. */
 export function ConfirmPlannedFields({ f }: { f: ConfirmForm }) {
   const dateFormat = usePreferencesStore((s) => s.dateFormat)
   if (!f.form || !f.item) return null
@@ -26,70 +19,48 @@ export function ConfirmPlannedFields({ f }: { f: ConfirmForm }) {
 
   return (
     <>
-      <div>
-        <div className="flex items-baseline justify-between">
-          <Label className={LABEL} htmlFor="confirm-amount">
-            Amount
-          </Label>
-          <span className="text-[12px] text-fp-text-3 tabular-nums">
-            of {formatMoney(item.amount, item.currency)}
-          </span>
-        </div>
-        <div className="relative">
-          <Input
-            id="confirm-amount"
-            value={form.amount}
-            onChange={(e) => f.setAmount(e.target.value)}
-            {...amountInputProps(item.currency)}
-            className="pe-14 text-[16px] font-bold tabular-nums"
-          />
-          <span className="pointer-events-none absolute inset-y-0 inset-e-3 flex items-center text-[12px] font-semibold text-fp-text-3">
-            {item.currency}
-          </span>
-        </div>
-      </div>
+      <AmountWell
+        question={
+          isIncome ? 'How much came in?' : 'How much are you confirming?'
+        }
+        currency={item.currency}
+        amount={form.amount}
+        onAmount={f.setAmount}
+      >
+        <span className="-mt-[6px] text-[12.5px] font-semibold text-fp-text-2 tabular-nums">
+          of {formatMoney(item.amount, item.currency)} planned
+        </span>
+      </AmountWell>
 
-      <div className="flex gap-[10px]">
-        <div className="min-w-0 flex-1">
-          <Label className={LABEL}>{isIncome ? 'Into' : 'From'}</Label>
-          <Select
-            value={form.source || NONE}
-            onValueChange={(v) => f.setSource(v === NONE ? '' : v)}
-          >
-            <SelectTrigger aria-label={isIncome ? 'Into' : 'From'}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {f.wallets.length === 0 ? (
-                <SelectItem value={NONE}>No wallets yet</SelectItem>
-              ) : null}
-              {f.wallets.map((w) => (
-                <SelectItem key={w.id} value={w.id}>
-                  {w.name}
-                </SelectItem>
-              ))}
-              {f.allowExternal ? (
-                <SelectItem value={EXTERNAL}>External…</SelectItem>
-              ) : null}
-            </SelectContent>
-          </Select>
+      <div className="grid grid-cols-[1.3fr_1fr] items-start gap-3">
+        <div className="min-w-0">
+          <FieldLabel htmlFor="confirm-wallet">
+            {isIncome ? 'Into' : 'From'}
+          </FieldLabel>
+          <ConfirmWalletSelect
+            id="confirm-wallet"
+            label={isIncome ? 'Into' : 'From'}
+            wallets={f.wallets}
+            value={form.source}
+            allowExternal={f.allowExternal}
+            onChange={f.setSource}
+          />
         </div>
-        <div className="w-[44%]">
-          <Label className={LABEL}>{isIncome ? 'Received' : 'Paid'}</Label>
+        <div className="min-w-0">
+          <FieldLabel>{isIncome ? 'Received' : 'Paid'}</FieldLabel>
           <DateField
             value={form.date}
             onChange={f.setDate}
             dateFormat={dateFormat}
             ariaLabel="Date"
+            hint
           />
         </div>
       </div>
 
       {form.source === EXTERNAL ? (
         <div>
-          <Label className={LABEL} htmlFor="confirm-external">
-            Held where
-          </Label>
+          <FieldLabel htmlFor="confirm-external">Held where</FieldLabel>
           <Input
             id="confirm-external"
             value={form.externalLabel}
@@ -101,9 +72,9 @@ export function ConfirmPlannedFields({ f }: { f: ConfirmForm }) {
 
       {f.effect ? <EffectLine effect={f.effect} /> : null}
       {f.error ? (
-        <p role="alert" className="text-[12.5px] text-fp-danger">
-          {f.error}
-        </p>
+        <div role="alert">
+          <NoteBox tone="danger">{f.error}</NoteBox>
+        </div>
       ) : null}
     </>
   )

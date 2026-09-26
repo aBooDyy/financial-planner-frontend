@@ -178,6 +178,45 @@ describe('desiredPlanned — goals', () => {
     ).toEqual([m(1500), m(1500)])
   })
 
+  it('plans a custom 28-day obligation every 28 days from its next due, no set-asides', () => {
+    const refill = goal({
+      id: 'refill',
+      name: 'Pills refill',
+      kind: 'recurring',
+      amount: m(250),
+      frequency: 'custom',
+      customInterval: 28,
+      customUnit: 'day',
+      nextDue: '2026-10-01',
+    })
+    const out = generate({ goals: [refill], income: [SALARY] })
+    expect(rows(out, 'refill', 'set_aside')).toEqual([])
+    expect(rows(out, 'refill', 'payment').map((r) => r.occurrence)).toEqual([
+      '2026-10-01',
+      '2026-10-29',
+      '2026-11-26',
+    ])
+  })
+
+  it('saves toward a custom every-2-months obligation between its payments', () => {
+    const water = goal({
+      id: 'water',
+      name: 'Water bill',
+      kind: 'recurring',
+      amount: m(400),
+      frequency: 'custom',
+      customInterval: 2,
+      customUnit: 'month',
+      nextDue: '2026-10-31',
+    })
+    const out = generate({ goals: [water], income: [SALARY] })
+    // Stepped from the anchor, so a 31st keeps landing on the month's own 31st or end.
+    expect(rows(out, 'water', 'payment').map((r) => r.occurrence)).toEqual([
+      '2026-10-31',
+    ])
+    expect(rows(out, 'water', 'set_aside').length).toBeGreaterThan(0)
+  })
+
   it('plans the final payment of a pay-on-due obligation for its whole target, on its due date', () => {
     const tuition = umrah({
       id: 'tuition',

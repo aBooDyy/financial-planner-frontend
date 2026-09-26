@@ -23,12 +23,13 @@ export function ConfirmPlannedDialog({
   const open = plannedId !== null
 
   const footer = (
-    <div className="flex w-full flex-col gap-[10px]">
+    <div className="flex w-full flex-col gap-2">
       <Button
         type="button"
+        size="dialog"
         onClick={f.confirm}
         disabled={!f.canConfirm}
-        className="w-full rounded-[11px] py-[11px]"
+        className="w-full"
       >
         {f.primaryLabel || 'Confirm'}
       </Button>
@@ -36,15 +37,14 @@ export function ConfirmPlannedDialog({
     </div>
   )
 
-  // The design puts "Planned for Sep 1 · 23 days ago" above the name.
   const title = (
-    <span className="flex flex-col gap-[2px]">
+    <span className="flex flex-col">
       {f.headerLine ? (
-        <span className="text-[12px] font-semibold tracking-normal text-fp-text-3">
+        <span className="mb-[2px] truncate text-[12.5px] font-semibold tracking-normal text-fp-text-3">
           {f.headerLine}
         </span>
       ) : null}
-      <span>{f.item?.name ?? 'Planned item'}</span>
+      <span className="truncate">{f.item?.name ?? 'Planned item'}</span>
     </span>
   )
 
@@ -56,9 +56,7 @@ export function ConfirmPlannedDialog({
       footer={f.ready ? footer : undefined}
     >
       {f.ready ? (
-        <div className="flex flex-col gap-[15px]">
-          <ConfirmPlannedFields f={f} />
-        </div>
+        <ConfirmPlannedFields f={f} />
       ) : (
         <p className="py-6 text-center text-[13px] text-fp-text-3">
           {f.item === null && open ? 'Loading…' : null}

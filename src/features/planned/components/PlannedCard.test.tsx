@@ -65,7 +65,7 @@ const renderCard = (rows: ReturnType<typeof planned>[]) => {
 describe('PlannedCard', () => {
   it('points to Goals when nothing is planned', () => {
     renderCard([])
-    expect(screen.getByText(/Nothing planned\./)).toBeTruthy()
+    expect(screen.getByText('Nothing planned')).toBeTruthy()
     expect(
       screen.getByRole('link', { name: 'Go to Goals' }).getAttribute('href'),
     ).toBe('/goals')

@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { CalendarCheck } from 'lucide-react'
+import { EmptyState } from '#/components/EmptyState'
 import type { LocalPlanned } from '#/db/types'
 import type {
   PlannedListView,
@@ -109,9 +111,11 @@ export function PlannedCard({
             {view.next.length > 0 ? (
               view.next.map(muted)
             ) : (
-              <p className="px-4 py-[14px] text-[12.5px] text-fp-text-3">
-                Nothing in the next {NEXT_DAYS} days.
-              </p>
+              <EmptyState
+                icon={CalendarCheck}
+                size="sm"
+                title={`Nothing in the next ${NEXT_DAYS} days`}
+              />
             )}
           </section>
 
