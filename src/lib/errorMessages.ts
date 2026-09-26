@@ -60,7 +60,6 @@ const MESSAGES: Record<string, string> = {
   'inbound.import.already_resolved': 'This import was already reviewed.',
   'inbound.import.not_found': 'That import is no longer available.',
   'inbound.import.wallet_invalid': 'Choose one of your accounts.',
-  'email_sync.connection.wallet_invalid': 'Choose one of your accounts.',
   'email_sync.connection.not_found': 'That inbox is no longer connected.',
   'email_sync.provider.fetch_failed':
     'Couldn’t reach your inbox provider. Try again.',
@@ -70,6 +69,30 @@ const MESSAGES: Record<string, string> = {
     'Pick a scan window between 1 and 180 days.',
   'email_sync.sync.limit_invalid':
     'That scan is too large. Try a shorter window.',
+  'email_sync.sync.message_failed':
+    'Some alerts in this inbox couldn’t be imported. They’ll be retried.',
+  'email_sync.rule.invalid': 'That rule couldn’t be saved.',
+  'email_sync.rule.limit_reached':
+    'An inbox can have up to 20 rules. Remove one to add another.',
+  'email_sync.rule.name_required':
+    'Give the rule a name of 120 characters or fewer.',
+  'email_sync.rule.senders_invalid':
+    'Add between 1 and 10 sender addresses, each a full email address.',
+  'email_sync.rule.term_invalid':
+    'Each word or phrase must be 1–100 characters, up to 10 per list.',
+  'email_sync.rule.template_invalid':
+    'Pick what to read again — this rule’s reading no longer works.',
+  'email_sync.rule.decimal_invalid': 'Choose how the amount writes decimals.',
+  'email_sync.rule.currency_invalid':
+    'Choose a currency Means knows, or read it from the email.',
+  'email_sync.rule.wallet_invalid': 'Choose one of your accounts.',
+  'email_sync.rule.category_invalid': 'Choose one of your categories.',
+  'email_sync.rule.auto_confirm_needs_wallet':
+    'Choose an account first — Means needs to know where to post.',
+  'email_sync.rule.pick_invalid':
+    'That line isn’t in the sample email any more. Tap it again.',
+  'email_sync.rule.samples_invalid':
+    'Those sample emails couldn’t be read. Reload the inbox and try again.',
   // Not a failure: the inbox is being read right now, and nothing asked for is lost.
   'email_sync.sync.in_progress':
     'A scan of your inbox is already running. This one will pick up where it leaves off.',

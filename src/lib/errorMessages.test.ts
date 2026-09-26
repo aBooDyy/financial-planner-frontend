@@ -28,7 +28,27 @@ const INTEGRATION_CODES = [
   'integrations.rate.limited',
 ]
 
+const EMAIL_RULE_CODES = [
+  'email_sync.rule.invalid',
+  'email_sync.rule.limit_reached',
+  'email_sync.rule.name_required',
+  'email_sync.rule.senders_invalid',
+  'email_sync.rule.term_invalid',
+  'email_sync.rule.template_invalid',
+  'email_sync.rule.decimal_invalid',
+  'email_sync.rule.currency_invalid',
+  'email_sync.rule.wallet_invalid',
+  'email_sync.rule.category_invalid',
+  'email_sync.rule.auto_confirm_needs_wallet',
+  'email_sync.rule.pick_invalid',
+  'email_sync.rule.samples_invalid',
+]
+
 describe('error messages', () => {
+  it.each(EMAIL_RULE_CODES)('has a message for %s', (code) => {
+    expect(messageForCode(code)).not.toBe(FALLBACK)
+  })
+
   it.each(INTEGRATION_CODES)('has a message for %s', (code) => {
     expect(messageForCode(code)).not.toBe(FALLBACK)
   })
