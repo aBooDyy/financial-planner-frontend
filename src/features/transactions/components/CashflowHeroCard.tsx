@@ -61,7 +61,7 @@ export function CashflowHeroCard({ view }: { view: CashflowView }) {
                 {st.label}
               </div>
               <div
-                className="text-[26px] font-extrabold leading-none tracking-[-0.02em] tabular-nums"
+                className="fp-sensitive text-[26px] font-extrabold leading-none tracking-[-0.02em] tabular-nums"
                 style={
                   st.accent
                     ? { color: st.accent === 'pos' ? 'var(--fp-accent)' : RED }

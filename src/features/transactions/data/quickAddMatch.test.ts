@@ -8,6 +8,8 @@ import {
   wallet,
 } from '#/features/planned/testing/fixtures'
 import {
+  DIALOG_MATCH,
+  findAmountMatch,
   findQuickAddMatch,
   goalIdForMatch,
   plannedWalletOf,
@@ -188,5 +190,46 @@ describe('quickAddTarget', () => {
     expect(
       quickAddTarget({ ...base, walletId: null, plannedWallet: null }),
     ).toBeNull()
+  })
+})
+
+describe('findAmountMatch', () => {
+  const findLoose = (
+    items: LocalPlanned[],
+    over: Partial<Parameters<typeof findAmountMatch>[0]> = {},
+  ) =>
+    findAmountMatch({
+      type: 'spend',
+      amount: m(4500),
+      currency: 'SAR',
+      date: '2026-09-28',
+      planned: items,
+      remainderOf: (p) => p.amount,
+      rates: RATES,
+      withinDays: DIALOG_MATCH.days,
+      tolerance: DIALOG_MATCH.tolerance,
+      ...over,
+    })?.id ?? null
+  const rent = planned({
+    id: 'rent',
+    role: 'payment',
+    goalId: 'rent',
+    amount: m(4500),
+    occurrence: '2026-09-30',
+  })
+
+  it('takes an amount within 10% of the open remainder', () => {
+    expect(findLoose([rent])).toBe('rent')
+    expect(findLoose([rent], { amount: m(4050) })).toBe('rent')
+    expect(findLoose([rent], { amount: m(4950) })).toBe('rent')
+    expect(findLoose([rent], { amount: m(4049) })).toBeNull()
+    expect(findLoose([rent], { amount: m(4951) })).toBeNull()
+  })
+
+  it('takes an item dated within a week of the entry', () => {
+    expect(findLoose([rent], { date: '2026-10-07' })).toBe('rent')
+    expect(findLoose([rent], { date: '2026-10-08' })).toBeNull()
+    expect(findLoose([rent], { date: '2026-09-23' })).toBe('rent')
+    expect(findLoose([rent], { date: '2026-09-22' })).toBeNull()
   })
 })

@@ -19,7 +19,7 @@ import type { RangeMode } from '#/features/transactions/constants'
 import type { DateWindow } from './planning'
 import type { CategoryCatalog } from '#/features/categories/data/catalog'
 import { walletLiveBalances } from './ledger'
-import { activeNodes } from '#/features/balances/data/archive'
+import { activeNodes } from '#/features/wallets/data/archive'
 import { GROUP_ICON, WALLET_ICON, iconIdOr } from '#/lib/icons/fallbacks'
 import type { IconId } from '#/lib/icons/catalog.gen'
 import {
@@ -124,7 +124,7 @@ export type ScopeSection = {
 }
 
 /**
- * The account filter, shaped like the Balances tree: everything, then one section per
+ * The account filter, shaped like the Wallets tree: everything, then one section per
  * top-level group with its wallets and subgroups nested beneath, then the wallets in no
  * group. Archived accounts are left out.
  */
@@ -362,7 +362,7 @@ export function buildCashflow(
     netStr: `${net >= 0 ? '+' : '−'}${formatMoneyRounded(Math.abs(net), data.base)}`,
     hasSaved: saved > 0,
     netPositive: net >= 0,
-    pillLabel: net >= 0 ? 'Net positive' : 'Overspending',
+    pillLabel: net >= 0 ? 'Net positive' : 'Net negative',
     txCount: txns.length,
     txCountStr: `${txns.length} transaction${txns.length === 1 ? '' : 's'}`,
     segments: [
@@ -541,6 +541,7 @@ export type DayGroup = {
 export type ActivityListView = {
   groups: DayGroup[]
   empty: boolean
+  emptyTitle: string
   emptyText: string
   countStr: string
 }
@@ -808,12 +809,16 @@ export function buildActivityList(
         ? `${count} on ${fmtShort(anchor)}`
         : `${count} in ${rangeLabel(anchor, mode, win, DEFAULT_DATE_FORMAT)}`
 
+  const emptyTitle =
+    scope.type === 'all'
+      ? 'No transactions in this period'
+      : 'Nothing for this account'
   const emptyText =
     scope.type === 'all'
-      ? 'No transactions in this period — add one with the quick-add panel.'
-      : 'Nothing for this account.'
+      ? 'Add one with the quick-add panel.'
+      : 'Nothing was recorded on this account in this period.'
 
-  return { groups, empty: count === 0, emptyText, countStr }
+  return { groups, empty: count === 0, emptyTitle, emptyText, countStr }
 }
 
 // --- Calendar (day grid that unfolds to a month; month grid for the year) ------------

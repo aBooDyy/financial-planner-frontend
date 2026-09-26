@@ -32,9 +32,8 @@ export function QuickTransferForm({ wallets, base, rates }: Props) {
           </span>
           <input
             value={t.amount}
-            onChange={(e) => t.changeAmount(e.target.value)}
             aria-label="Amount"
-            {...amountInputProps(t.fromCurrency)}
+            {...amountInputProps(t.fromCurrency, t.changeAmount)}
             className={AMOUNT_INPUT}
           />
         </div>
@@ -45,9 +44,8 @@ export function QuickTransferForm({ wallets, base, rates }: Props) {
             </span>
             <input
               value={t.received}
-              onChange={(e) => t.setReceived(e.target.value)}
               aria-label={`Received (${t.toCurrency})`}
-              {...amountInputProps(t.toCurrency)}
+              {...amountInputProps(t.toCurrency, t.setReceived)}
               className={AMOUNT_INPUT}
             />
           </div>
@@ -61,7 +59,6 @@ export function QuickTransferForm({ wallets, base, rates }: Props) {
             onTo={t.pickTo}
             onSwap={t.swap}
             invalid={t.sameAccount}
-            compact
           />
         </div>
         <Button

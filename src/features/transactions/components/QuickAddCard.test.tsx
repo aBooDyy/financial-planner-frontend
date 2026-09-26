@@ -6,6 +6,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react'
 import {
   afterAll,
@@ -28,6 +29,9 @@ import {
 import { QuickAddCard } from './QuickAddCard'
 
 vi.mock('#/db/sync', () => ({ schedulePush: () => undefined }))
+
+// Mounting the portalled category popover in jsdom is slow when the suite runs in parallel.
+vi.setConfig({ testTimeout: 20000 })
 
 const SAVINGS = wallet({ id: 'w1', name: 'Savings' })
 const MAIN = wallet({ id: 'w2', name: 'Main Checking' })
@@ -136,5 +140,55 @@ describe('QuickAddCard · match hint', () => {
     expect(tx.walletId).toBe('w1')
     expect(tx.note).toBeNull()
     expect((await db.plannedTransactions.get('pay-sep'))?.status).toBe('open')
+  })
+})
+
+describe('QuickAddCard · category', () => {
+  beforeAll(() => {
+    globalThis.ResizeObserver = class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+    Element.prototype.scrollIntoView = () => {}
+    Element.prototype.hasPointerCapture = () => false
+  })
+
+  it('files the entry under the picked subcategory', async () => {
+    renderCard()
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'More categories' }),
+    )
+    fireEvent.change(screen.getByPlaceholderText(/search categories/i), {
+      target: { value: 'cafés' },
+    })
+    fireEvent.click(await screen.findByRole('option', { name: 'Cafés' }))
+    expect(
+      screen.getByRole('button', { name: 'Category: Dining · Cafés' }),
+    ).toBeDefined()
+
+    typeAmount('18')
+    fireEvent.click(screen.getByTitle('Add'))
+    const tx = await saved()
+    expect(tx.category).toBe('dining')
+    expect(tx.subcategory).toBe('cafes')
+  })
+
+  it('drops a pick that does not fit the new type', async () => {
+    renderCard()
+    fireEvent.click(screen.getByRole('button', { name: 'Income' }))
+    expect(
+      await screen.findByRole('button', { name: 'Salary', pressed: true }),
+    ).toBeDefined()
+  })
+
+  it('offers the first categories as one-tap chips before any history', async () => {
+    renderCard()
+    const group = await screen.findByRole('group', { name: 'Category' })
+    const chips = within(group).getAllByRole('button', { pressed: false })
+    expect(chips.length).toBeGreaterThan(0)
+    expect(
+      within(group).getByRole('button', { name: 'More categories' }),
+    ).toBeDefined()
   })
 })

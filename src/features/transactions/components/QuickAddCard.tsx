@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { MoreHorizontal, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import type { LocalBalanceNode } from '#/db/types'
 import { useCategoryCatalog } from '#/features/categories/hooks/useCategoryCatalog'
 import type { TxType } from '#/features/transactions/api/types'
@@ -7,14 +7,15 @@ import type { EditorTxType } from '#/features/transactions/hooks/useTxEditor'
 import { createTransaction } from '#/features/transactions/data/mutations'
 import { quickAddTarget } from '#/features/transactions/data/quickAddMatch'
 import { useQuickAddMatch } from '#/features/transactions/hooks/useQuickAddMatch'
+import { useQuickChips } from '#/features/transactions/hooks/useQuickChips'
+import type { QuickChip } from '#/features/transactions/data/quickChips'
 import { startOfToday, ymd } from '#/features/transactions/data/planning'
 import type { RatesMap } from '#/lib/config/rates'
 import { amountInputProps, parseAmountToMinor } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
 import { Button } from '#/components/ui/button'
-import { Icon } from '#/components/icons/Icon'
-import { CategoryPickerDialog } from './CategoryPickerDialog'
 import { QuickAddMatchHint } from './QuickAddMatchHint'
+import { QuickCategoryChips } from './QuickCategoryChips'
 import { QuickTransferForm } from './QuickTransferForm'
 
 type Props = {
@@ -52,10 +53,14 @@ export function QuickAddCard({
   const [type, setType] = useState<TxType>('spend')
   const [amount, setAmount] = useState('')
   const [note, setNote] = useState('')
-  const [category, setCategory] = useState(
-    () => catalog.byType('spend')[0]?.slug ?? 'other',
-  )
-  const [pickerOpen, setPickerOpen] = useState(false)
+  // Until the user picks, the entry files under their most-used category for this type.
+  const [picked, setPicked] = useState<QuickChip | null>(null)
+  const chips = useQuickChips(type)
+  const { category, subcategory } = picked ??
+    chips.at(0) ?? {
+      category: catalog.byType(type)[0]?.slug ?? 'other',
+      subcategory: null,
+    }
   const match = useQuickAddMatch({ type, amount, currency })
 
   const switchTab = (next: EditorTxType) => {
@@ -64,10 +69,12 @@ export function QuickAddCard({
   }
 
   const switchType = (next: TxType) => {
+    if (next !== type) setPicked(null)
     setType(next)
-    const valid = catalog.byType(next).map((c) => c.slug)
-    if (!valid.includes(category)) setCategory(valid[0])
   }
+
+  const chooseCategory = (next: string, nextSub: string | null) =>
+    setPicked({ category: next, subcategory: nextSub })
 
   const add = async () => {
     const minor = parseAmountToMinor(amount, currency)
@@ -85,7 +92,7 @@ export function QuickAddCard({
       type,
       ...target,
       category,
-      subcategory: null,
+      subcategory,
       goalId: link?.goalId ?? null,
       plannedId: link?.plannedId ?? null,
       date: ymd(startOfToday()),
@@ -94,15 +101,6 @@ export function QuickAddCard({
     setAmount('')
     setNote('')
   }
-
-  const first = catalog.byType(type).slice(0, 3)
-  const selectedInChips = first.some((c) => c.slug === category)
-  const selectedCat = catalog.get(category)
-
-  const chip = (active: boolean) =>
-    `inline-flex items-center gap-[6px] whitespace-nowrap rounded-full border px-[11px] py-[7px] text-[12px] font-semibold ${
-      active ? '' : 'border-fp-border bg-fp-surface-2 text-fp-text-2'
-    }`
 
   return (
     <div className="rounded-[18px] border border-fp-accent bg-fp-surface p-4 shadow-fp">
@@ -135,8 +133,7 @@ export function QuickAddCard({
               </span>
               <input
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                {...amountInputProps(currency)}
+                {...amountInputProps(currency, setAmount)}
                 className="w-[78px] border-none bg-transparent py-[11px] text-[18px] font-extrabold tabular-nums text-fp-text outline-none"
               />
             </div>
@@ -166,67 +163,15 @@ export function QuickAddCard({
             />
           ) : null}
 
-          <div className="flex flex-wrap gap-[6px]">
-            {first.map((c) => {
-              const active = c.slug === category
-              return (
-                <button
-                  key={c.slug}
-                  type="button"
-                  onClick={() => setCategory(c.slug)}
-                  className={chip(active)}
-                  style={
-                    active
-                      ? {
-                          borderColor: c.color,
-                          background: `${c.color}1A`,
-                          color: c.color,
-                        }
-                      : undefined
-                  }
-                >
-                  <Icon id={c.icon} size={15} />
-                  <span>{c.name}</span>
-                </button>
-              )
-            })}
-            <button
-              type="button"
-              onClick={() => setPickerOpen(true)}
-              className={chip(!selectedInChips)}
-              style={
-                !selectedInChips
-                  ? {
-                      borderColor: selectedCat.color,
-                      background: `${selectedCat.color}1A`,
-                      color: selectedCat.color,
-                    }
-                  : undefined
-              }
-            >
-              {selectedInChips ? (
-                <MoreHorizontal size={15} strokeWidth={1.9} />
-              ) : (
-                <Icon id={selectedCat.icon} size={15} />
-              )}
-              <span>{selectedInChips ? 'More' : selectedCat.name}</span>
-            </button>
-          </div>
+          <QuickCategoryChips
+            type={type}
+            chips={chips}
+            category={category}
+            subcategory={subcategory}
+            onChange={chooseCategory}
+          />
         </>
       )}
-
-      {pickerOpen ? (
-        <CategoryPickerDialog
-          type={type}
-          selected={category}
-          allowSubcategory={false}
-          onSelect={(id) => {
-            setCategory(id)
-            setPickerOpen(false)
-          }}
-          onClose={() => setPickerOpen(false)}
-        />
-      ) : null}
     </div>
   )
 }

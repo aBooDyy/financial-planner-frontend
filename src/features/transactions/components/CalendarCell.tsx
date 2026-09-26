@@ -79,14 +79,14 @@ export function CalendarCell({ cell, showBreakdown, height, onPick }: Props) {
       </span>
       {cell.hasActivity ? (
         <span
-          className="mt-px text-[10px] font-extrabold leading-[1.1] tabular-nums md:text-[12px]"
+          className="fp-sensitive mt-px text-[10px] font-extrabold leading-[1.1] tabular-nums md:text-[12px]"
           style={{ color: p.net }}
         >
           {cell.netStr}
         </span>
       ) : null}
       {showBreakdown ? (
-        <div className="flex items-center gap-1 leading-none">
+        <div className="fp-sensitive flex items-center gap-1 leading-none">
           <span
             className="text-[8.5px] font-bold tabular-nums md:text-[10px]"
             style={{ color: p.inc }}

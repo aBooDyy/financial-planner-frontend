@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams, useSearch } from '@tanstack/react-router'
-import { Download, Inbox, Plus } from 'lucide-react'
+import { Inbox } from 'lucide-react'
 import { MobileTabBar } from '#/components/chrome/MobileTabBar'
 import { TopNav } from '#/components/chrome/TopNav'
 import { ReviewScanPrompt } from '#/features/email-sync/components/ReviewScanPrompt'
 import { PendingReviewModal } from '#/features/inbound-imports/components/PendingReviewModal'
 import { usePendingImports } from '#/features/inbound-imports/hooks/usePendingImports'
 import { useLogout } from '#/features/auth/hooks/useLogout'
-import { setBaseCurrency } from '#/features/balances/data/mutations'
+import { setBaseCurrency } from '#/features/wallets/data/mutations'
 import { useSessionStore } from '#/stores/session'
 import { usePreferencesStore } from '#/stores/preferences'
 import { currencySymbol } from '#/lib/currency'
@@ -52,11 +52,11 @@ import { AdjustmentEditor } from './AdjustmentEditor'
 import { BreakdownCard } from './BreakdownCard'
 import { BudgetHealthCard, BudgetsCard } from './BudgetsCard'
 import { CashflowHeroCard } from './CashflowHeroCard'
+import { ConnectedTxEditor } from './ConnectedTxEditor'
 import { DaysCard } from './DaysCard'
 import { QuickAddCard } from './QuickAddCard'
 import { RecurringCard, UpcomingCard } from './RecurringCard'
 import { TransactionList } from './TransactionList'
-import { TxEditor } from './TxEditor'
 import { ScopeSelect } from './ScopeSelect'
 
 const viewSeg = (active: boolean) =>
@@ -271,14 +271,6 @@ export function TransactionsPage() {
                 </span>
               </button>
             ) : null}
-            <Link
-              to="/import"
-              title="Import transactions from your inbox or a file"
-              className="inline-flex items-center gap-2 rounded-[11px] border border-fp-border-strong bg-fp-surface-2 px-[13px] py-[9px] text-[13px] font-semibold text-fp-text hover:border-fp-accent"
-            >
-              <Download size={15} strokeWidth={2} />
-              Import
-            </Link>
             <ScopeSelect
               sections={sections}
               value={scope}
@@ -380,40 +372,16 @@ export function TransactionsPage() {
         </div>
       </div>
 
-      {/* Mobile floating add (activity only) */}
-      {view === 'activity' ? (
-        <button
-          type="button"
-          onClick={editor.openAddTx}
-          title="Add transaction"
-          className="absolute bottom-[74px] right-[18px] z-40 flex h-14 w-14 items-center justify-center rounded-full bg-fp-accent text-white shadow-[0_12px_26px_-6px_var(--fp-accent)] md:hidden"
-        >
-          <Plus size={26} strokeWidth={2.4} />
-        </button>
-      ) : null}
-
       <MobileTabBar active="budget" />
 
-      {editor.editing ? (
-        <TxEditor
-          editing={editor.editing}
-          wallets={editorWallets}
-          archivedWalletIds={archivedWalletIds}
-          goals={goals}
-          onField={editor.setField}
-          onType={editor.setType}
-          onSwapTransfer={editor.swapTransferWallets}
-          base={base}
-          onCategory={editor.setCategory}
-          onGoal={editor.setGoal}
-          onMerchant={editor.setMerchant}
-          onApplySuggestion={editor.applySuggestion}
-          onScopeType={editor.setScopeType}
-          onSave={(link) => void editor.save(link)}
-          onDelete={() => void editor.remove()}
-          onClose={editor.close}
-        />
-      ) : null}
+      <ConnectedTxEditor
+        editor={editor}
+        wallets={editorWallets}
+        archivedWalletIds={archivedWalletIds}
+        goals={goals}
+        base={base}
+        data={data}
+      />
 
       <AdjustmentEditor
         editor={adjustment}

@@ -1,8 +1,9 @@
-import { Plus, Wallet } from 'lucide-react'
+import { Gauge, Plus, Wallet } from 'lucide-react'
 import type {
   BudgetRow,
   BudgetsView,
 } from '#/features/transactions/data/selectors'
+import { EmptyState } from '#/components/EmptyState'
 import { Button } from '#/components/ui/button'
 import { CategoryIcon } from './CategoryIcon'
 
@@ -43,7 +44,7 @@ function Row({ b, onEdit }: { b: BudgetRow; onEdit: (id: string) => void }) {
             {b.scopeSub}
           </div>
         </div>
-        <div className="flex-none text-right">
+        <div className="fp-sensitive flex-none text-right">
           <div className="text-[14.5px] font-extrabold tabular-nums">
             {b.spentStr}
             <span className="text-[12px] font-semibold text-fp-text-3">
@@ -101,9 +102,12 @@ export function BudgetsCard({ view, onAdd, onEdit }: Props) {
           <Row key={b.id} b={b} onEdit={onEdit} />
         ))}
         {view.empty ? (
-          <div className="px-4 py-[34px] text-center text-[13.5px] text-fp-text-3">
-            No budgets yet — set your first cap.
-          </div>
+          <EmptyState
+            icon={Gauge}
+            title="No budgets yet"
+            text="Set a spending cap for a category, account or period, and see how close you are as you go."
+            action={{ label: 'New budget', onClick: onAdd }}
+          />
         ) : null}
       </div>
     </div>
@@ -142,7 +146,7 @@ export function BudgetHealthCard({
       </div>
       <div className="mb-[7px] flex justify-between text-[12.5px]">
         <span className="font-semibold text-fp-text-2">Spent this month</span>
-        <span className="font-bold tabular-nums">
+        <span className="fp-sensitive font-bold tabular-nums">
           {h.spentStr} / {h.totalStr}
         </span>
       </div>
@@ -152,7 +156,9 @@ export function BudgetHealthCard({
           style={{ width: `${h.pct}%`, background: h.barColor }}
         />
       </div>
-      <div className="mt-[9px] text-[12px] text-fp-text-3">{h.leftStr}</div>
+      <div className="fp-sensitive mt-[9px] text-[12px] text-fp-text-3">
+        {h.leftStr}
+      </div>
       <Button
         type="button"
         variant="outline"

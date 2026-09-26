@@ -699,7 +699,7 @@ describe('transfers', () => {
       id: 'w3',
     })
     expect(view.empty).toBe(true)
-    expect(view.emptyText).toBe('Nothing for this account.')
+    expect(view.emptyTitle).toBe('Nothing for this account')
   })
 
   it('shows a dash for a day that holds only transfers', () => {
@@ -710,7 +710,7 @@ describe('transfers', () => {
   it('keeps the quick-add hint as the empty text across all accounts', () => {
     const view = activity(withTransfer([]))
     expect(view.empty).toBe(true)
-    expect(view.emptyText).toMatch(/^No transactions in this period/)
+    expect(view.emptyTitle).toBe('No transactions in this period')
   })
 
   it('shows a leg whose partner is gone as a transfer to a deleted account', () => {

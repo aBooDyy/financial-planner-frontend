@@ -1,3 +1,5 @@
+import { ChartPie } from 'lucide-react'
+import { EmptyState } from '#/components/EmptyState'
 import type { BreakdownView } from '#/features/transactions/data/selectors'
 
 export function BreakdownCard({ view }: { view: BreakdownView }) {
@@ -13,7 +15,7 @@ export function BreakdownCard({ view }: { view: BreakdownView }) {
           >
             <div className="flex h-[62px] w-[62px] flex-col items-center justify-center rounded-full bg-fp-surface">
               <span className="text-[9px] font-bold text-fp-text-3">SPENT</span>
-              <span className="text-[13px] font-extrabold tabular-nums">
+              <span className="fp-sensitive text-[13px] font-extrabold tabular-nums">
                 {view.centerStr}
               </span>
             </div>
@@ -37,9 +39,12 @@ export function BreakdownCard({ view }: { view: BreakdownView }) {
           </div>
         </div>
       ) : (
-        <div className="py-2 text-[12.5px] text-fp-text-3">
-          No spending in this window yet.
-        </div>
+        <EmptyState
+          icon={ChartPie}
+          size="sm"
+          title="No spending yet"
+          text="Spending in this window is broken down here by category."
+        />
       )}
     </div>
   )

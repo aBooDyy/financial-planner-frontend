@@ -1,15 +1,19 @@
+import { useState } from 'react'
+import { AmountWell } from '#/components/dialog/AmountWell'
+import { PillSwitch } from '#/components/dialog/PillSwitch'
 import { DateField } from '#/components/DateField'
-import { Button } from '#/components/ui/button'
+import { FieldLabel } from '#/components/FieldLabel'
+import { FieldMessage } from '#/components/FormRow'
 import { Input } from '#/components/ui/input'
-import { Label } from '#/components/ui/label'
-import { ResponsiveDialog } from '#/components/ui/responsive-dialog'
 import type { LocalBalanceNode } from '#/db/types'
+import { adjustmentDeleteCopy } from '#/features/transactions/data/scheduleEditor'
 import type {
   AdjustmentDirection,
   AdjustmentEditor as AdjustmentEditorApi,
 } from '#/features/transactions/hooks/useAdjustmentEditor'
-import { amountInputProps, currencySymbol } from '#/lib/currency'
+import { parseAmountToMinor } from '#/lib/currency'
 import type { DateFormat } from '#/lib/date'
+import { EditorDialog } from './EditorDialog'
 
 type Props = {
   editor: AdjustmentEditorApi
@@ -17,121 +21,103 @@ type Props = {
   dateFormat: DateFormat
 }
 
-const LABEL = 'mb-[6px] block text-[12px] font-semibold text-fp-text-2'
-
 const DIRECTIONS: ReadonlyArray<{ value: AdjustmentDirection; label: string }> =
   [
     { value: 'in', label: 'Added to balance' },
     { value: 'out', label: 'Taken from balance' },
   ]
 
-const segment = (active: boolean) =>
-  `flex-1 rounded-[8px] py-2 text-[13px] ${
-    active
-      ? 'bg-fp-surface font-bold text-fp-text shadow-[0_1px_2px_rgba(0,0,0,0.06)]'
-      : 'bg-transparent font-semibold text-fp-text-2'
-  }`
-
 /** Edit a balance adjustment: which way, how much, when, and why — or delete it. */
 export function AdjustmentEditor({ editor, wallets, dateFormat }: Props) {
   const { editing } = editor
   if (!editing) return null
-  const wallet = wallets.find((w) => w.id === editing.walletId)
+  return (
+    <AdjustmentForm
+      key={editing.id}
+      editor={editor}
+      wallets={wallets}
+      dateFormat={dateFormat}
+    />
+  )
+}
+
+function AdjustmentForm({ editor, wallets, dateFormat }: Props) {
+  const [attempted, setAttempted] = useState(false)
+  const editing = editor.editing
+  if (!editing) return null
+  const wallet = wallets.find((w) => w.id === editing.walletId) ?? null
+  const amountMinor = parseAmountToMinor(editing.amount, editing.currency)
+  const amountMissing = attempted && (amountMinor ?? 0) <= 0
+  const hint = editor.canSave
+    ? null
+    : editing.date
+      ? 'Add an amount to continue'
+      : 'Pick a date to continue'
 
   return (
-    <ResponsiveDialog
-      open
-      onOpenChange={(o) => {
-        if (!o) editor.close()
-      }}
+    <EditorDialog
       title="Edit balance adjustment"
+      onClose={editor.close}
       contentClassName="sm:max-w-[440px]"
-      footer={
-        <>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => void editor.remove()}
-            className="text-fp-danger hover:text-fp-danger"
-          >
-            Delete
-          </Button>
-          <div className="flex-1" />
-          <Button type="button" variant="outline" onClick={editor.close}>
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            onClick={() => void editor.save()}
-            disabled={!editor.canSave}
-          >
-            Save
-          </Button>
-        </>
+      hint={hint}
+      submitLabel="Save"
+      onSubmit={() =>
+        editor.canSave ? void editor.save() : setAttempted(true)
       }
+      remove={{
+        ...adjustmentDeleteCopy(wallet?.name ?? null),
+        onConfirm: () => void editor.remove(),
+      }}
     >
-      <div className="flex flex-col gap-[15px]">
-        <div
-          role="radiogroup"
-          aria-label="Direction"
-          className="inline-flex w-full rounded-[12px] border border-fp-border bg-fp-surface-2 p-[3px]"
-        >
-          {DIRECTIONS.map((d) => (
-            <button
-              key={d.value}
-              type="button"
-              role="radio"
-              aria-checked={editing.direction === d.value}
-              onClick={() => editor.setField('direction', d.value)}
-              className={segment(editing.direction === d.value)}
-            >
-              {d.label}
-            </button>
-          ))}
-        </div>
+      <PillSwitch
+        label="Direction"
+        options={DIRECTIONS}
+        value={editing.direction}
+        onChange={(d) => editor.setField('direction', d)}
+      />
 
-        <div>
-          <Label className={LABEL}>
-            Amount{' '}
-            <span className="font-medium text-fp-text-3">
-              ({currencySymbol(editing.currency)})
-            </span>
-          </Label>
-          <Input
-            value={editing.amount}
-            onChange={(e) => editor.setField('amount', e.target.value)}
-            aria-label="Amount"
-            {...amountInputProps(editing.currency)}
-            className="tabular-nums"
-          />
-        </div>
-
-        <div>
-          <Label className={LABEL}>Date</Label>
-          <DateField
-            value={editing.date}
-            onChange={(iso) => editor.setField('date', iso)}
-            dateFormat={dateFormat}
-            ariaLabel="Date"
-          />
-        </div>
-
-        <div>
-          <Label className={LABEL}>
-            Note <span className="font-medium text-fp-text-3">(optional)</span>
-          </Label>
-          <Input
-            value={editing.note}
-            onChange={(e) => editor.setField('note', e.target.value)}
-            placeholder="e.g. Matched bank statement"
-          />
-        </div>
-
-        <p className="text-[12px] text-fp-text-3">
-          {wallet ? `Corrects ${wallet.name}'s balance` : 'Corrects a balance'}{' '}
-          · not counted as spending or income
-        </p>
+      <div>
+        <AmountWell
+          question="How much?"
+          currency={editing.currency}
+          amount={editing.amount}
+          onAmount={(v) => editor.setField('amount', v)}
+          invalid={amountMissing}
+          tone="neutral"
+        />
+        <FieldMessage
+          error={amountMissing ? 'Enter an amount above 0.' : null}
+        />
       </div>
-    </ResponsiveDialog>
+
+      <div>
+        <FieldLabel>Date</FieldLabel>
+        <DateField
+          value={editing.date}
+          onChange={(iso) => editor.setField('date', iso)}
+          dateFormat={dateFormat}
+          ariaLabel="Date"
+          invalid={attempted && !editing.date}
+          hint
+        />
+      </div>
+
+      <div>
+        <FieldLabel htmlFor="adjustment-note" optional>
+          Note
+        </FieldLabel>
+        <Input
+          id="adjustment-note"
+          value={editing.note}
+          onChange={(e) => editor.setField('note', e.target.value)}
+          placeholder="e.g. Matched bank statement"
+        />
+      </div>
+
+      <p className="text-center text-[12px] leading-[1.45] text-fp-text-3">
+        {wallet ? `Corrects ${wallet.name}’s balance` : 'Corrects a balance'} ·
+        not counted as spending or income
+      </p>
+    </EditorDialog>
   )
 }

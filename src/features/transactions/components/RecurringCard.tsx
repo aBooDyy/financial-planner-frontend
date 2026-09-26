@@ -1,8 +1,9 @@
-import { Repeat } from 'lucide-react'
+import { CalendarCheck, Repeat } from 'lucide-react'
 import type {
   RecurringRow,
   RecurringView,
 } from '#/features/transactions/data/selectors'
+import { EmptyState } from '#/components/EmptyState'
 import { Button } from '#/components/ui/button'
 import { CategoryIcon } from './CategoryIcon'
 
@@ -89,9 +90,12 @@ export function RecurringCard({ view, onAdd, onEdit }: Props) {
           <Row key={r.id} r={r} onEdit={onEdit} />
         ))}
         {view.empty ? (
-          <div className="px-4 py-[34px] text-center text-[13.5px] text-fp-text-3">
-            No recurring items yet.
-          </div>
+          <EmptyState
+            icon={Repeat}
+            title="No recurring items yet"
+            text="Add a bill, subscription or payday that repeats, and it is posted for you when it comes due."
+            action={{ label: 'New recurring', onClick: onAdd }}
+          />
         ) : null}
       </div>
     </div>
@@ -153,9 +157,11 @@ export function UpcomingCard({
         })}
       </div>
       {view.upcomingEmpty ? (
-        <div className="py-[6px] text-[12.5px] text-fp-text-3">
-          Nothing else due this month.
-        </div>
+        <EmptyState
+          icon={CalendarCheck}
+          size="sm"
+          title="Nothing else due this month"
+        />
       ) : null}
       <Button
         type="button"

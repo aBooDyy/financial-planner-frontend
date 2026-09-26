@@ -1,10 +1,11 @@
-import { Plus } from 'lucide-react'
+import { Plus, ReceiptText } from 'lucide-react'
 import type {
   ActivityListView,
   ActivityRow,
   TxRow,
 } from '#/features/transactions/data/selectors'
 import { TX_TAG_LABEL } from '#/features/transactions/data/selectors'
+import { EmptyState } from '#/components/EmptyState'
 import { TagPill } from '#/components/TagPill'
 import { Button } from '#/components/ui/button'
 import { AdjustmentActivityRow } from './AdjustmentActivityRow'
@@ -117,9 +118,11 @@ export function TransactionList({ view, onAdd, onRowClick }: Props) {
           </div>
         ))}
         {view.empty ? (
-          <div className="px-4 py-10 text-center text-[13.5px] text-fp-text-3">
-            {view.emptyText}
-          </div>
+          <EmptyState
+            icon={ReceiptText}
+            title={view.emptyTitle}
+            text={view.emptyText}
+          />
         ) : null}
       </div>
     </div>

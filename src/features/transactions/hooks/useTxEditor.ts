@@ -83,6 +83,9 @@ export type TxEditorDraft = {
   currency: CurrencyCode
 }
 
+/** What "Counts toward" resolved: the planned item settled and, for a spend, the goal paid. */
+export type SaveLink = { plannedId: string | null; goalId?: string | null }
+
 export type TxEditorState = {
   kind: TxEditorKind
   id: string | null
@@ -306,6 +309,15 @@ export function useTxEditor(
         : prev,
     )
 
+  const resetReceived = () =>
+    setEditing((prev) =>
+      prev
+        ? {
+            ...prev,
+            draft: withReceived({ ...prev.draft, toAmountEdited: false }),
+          }
+        : prev,
+    )
   // Switching spend/income re-defaults the category to a valid one for that type.
   const setType = (type: EditorTxType) =>
     setEditing((prev) => {
@@ -424,8 +436,8 @@ export function useTxEditor(
       return { ...prev, draft: { ...prev.draft, scopeType, target } }
     })
 
-  /** `link` overrides the draft's planned link — the "Counts toward" field resolves it. */
-  const save = async (link?: { plannedId: string | null }) => {
+  /** `link` overrides the draft's planned link and goal — the "Counts toward" field resolves them. */
+  const save = async (link?: SaveLink) => {
     if (!editing) return
     const { kind, id, draft } = editing
 
@@ -463,7 +475,7 @@ export function useTxEditor(
         category: draft.category,
         subcategory: draft.subcategory,
         walletId: draft.walletId,
-        goalId: draft.type === 'spend' ? draft.goalId : null,
+        goalId: draft.type === 'spend' ? (link?.goalId ?? draft.goalId) : null,
         plannedId: link ? link.plannedId : draft.plannedId,
         merchantId: draft.merchantId,
         date: draft.date,
@@ -539,6 +551,7 @@ export function useTxEditor(
     setField,
     setType,
     swapTransferWallets,
+    resetReceived,
     setCategory,
     setGoal,
     setMerchant,
@@ -549,3 +562,5 @@ export function useTxEditor(
     close,
   }
 }
+
+export type TxEditorApi = ReturnType<typeof useTxEditor>

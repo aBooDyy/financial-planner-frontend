@@ -1,7 +1,7 @@
 /**
  * Cross-feature derivation: transactions are the ledger, so wallet balances and goal saved
  * progress are computed from them (never stored twice). These pure helpers are shared by the
- * Balances and Goals views as well as the Spending views. All figures are minor units.
+ * Wallets and Goals views as well as the Spending views. All figures are minor units.
  */
 import { convertMinor } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
