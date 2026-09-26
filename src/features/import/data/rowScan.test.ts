@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { catId } from '#/features/categories/__fixtures__/categories'
 import { testContext, testMapping } from './__fixtures__/mapping'
 import { loadFixture } from './csv/__fixtures__/fixtures'
 import { readCsv } from './csv/read'
@@ -42,7 +43,7 @@ const LEDGER: LedgerTransaction[] = [
     amount: 450,
     currency: 'SAR',
     walletId: 'w1',
-    merchantId: null,
+    categoryId: catId('other'),
     note: 'DUPLICATE COFFEE',
   },
 ]

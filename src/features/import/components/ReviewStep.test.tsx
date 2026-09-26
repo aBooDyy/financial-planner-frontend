@@ -27,7 +27,7 @@ const LEDGER: LedgerTransaction[] = [
     amount: 50000,
     currency: 'SAR',
     walletId: 'w1',
-    merchantId: null,
+    categoryId: 'cat-groceries',
     note: 'ATM WITHDRAWAL',
   },
 ]

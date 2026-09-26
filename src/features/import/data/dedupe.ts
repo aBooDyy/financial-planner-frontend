@@ -50,41 +50,36 @@ export type FingerprintParts = {
   amount: number
   currency: string
   walletId: string
-  /** Undefined and null both mean "no merchant on this row". */
-  merchantId?: string | null
-  note: string | null
+  categoryId: string | null
   /** Money moved between wallets or a balance corrected, rather than earned or spent. */
   movement?: boolean
 }
 
 /**
- * The label every movement shares. The two sides of a transfer carry different notes ("Send
- * to X" / "Received from Y") while the ledger keeps one for both legs, so a movement is
- * matched on amount, direction, wallet and date alone. `normalizeKey` never yields `~`, so
- * no cash-flow label can collide with it.
+ * A cash-flow row repeats another when it lands on the same day, for the same amount, in the
+ * same category — the wallet, merchant and note are free to differ, since a hand-typed entry
+ * rarely spells them the way the statement does.
+ *
+ * A movement has no category, so it is matched on direction and wallet instead. The two
+ * sides of a transfer carry different notes ("Send to X" / "Received from Y"), which is why
+ * the note never takes part.
  */
-const MOVEMENT_LABEL = '~'
-
-/**
- * The counterparty half of the key: merchant and the whole note, so only a row that repeats
- * another on every field is flagged. The reference suffix is stripped so a row imported with
- * a reference still matches the same row typed in by hand.
- */
-const labelOf = (parts: FingerprintParts): string => {
-  if (parts.movement === true) return MOVEMENT_LABEL
-  const note = normalizeKey(stripReference(parts.note) ?? '')
-  return `m:${parts.merchantId ?? ''}|${note}`
-}
-
 export const fingerprintOf = (parts: FingerprintParts): string =>
-  [
-    parts.date,
-    parts.type,
-    parts.amount,
-    parts.currency,
-    parts.walletId,
-    labelOf(parts),
-  ].join('|')
+  parts.movement === true
+    ? [
+        parts.date,
+        parts.amount,
+        parts.currency,
+        '~',
+        parts.type,
+        parts.walletId,
+      ].join('|')
+    : [
+        parts.date,
+        parts.amount,
+        parts.currency,
+        `c:${parts.categoryId ?? ''}`,
+      ].join('|')
 
 // --- The ledger index ----------------------------------------------------------------
 
@@ -96,7 +91,7 @@ export type LedgerTransaction = {
   amount: number
   currency: string
   walletId: string
-  merchantId: string | null
+  categoryId: string | null
   note: string | null
   movement?: boolean
 }
@@ -113,7 +108,7 @@ export const toLedgerEntry = (row: {
   amount: number
   currency: string
   walletId: string
-  merchantId: string | null
+  categoryId: string | null
   note: string | null
 }): LedgerTransaction =>
   isCashflow(row.type)
@@ -176,7 +171,7 @@ export const emptySeen = (): SeenRows => ({
  * `seen`; later ones are marked but never hidden, because two identical coffees on one day
  * are a real thing a person may want to keep.
  *
- * Run this **after** the merchant prediction: binding a merchant changes the fingerprint.
+ * Run this **after** the merchant prediction: a learned category changes the fingerprint.
  */
 export const markRow = (
   row: ParsedRow,
@@ -200,16 +195,25 @@ export const markRow = (
       : (ledger.byKey.get(row.fingerprint) ?? null)
   if (ledgerHit !== null) return { ledgerId: ledgerHit, earlierIndex: null }
 
+  const fileKey = inFileKey(row.fingerprint, row.draft.note)
   const fileHit =
     key !== null
       ? (seen.references.get(key) ?? null)
-      : earlierRow(seen.index, row.fingerprint)
+      : earlierRow(seen.index, fileKey)
   if (fileHit !== null) return { ledgerId: null, earlierIndex: fileHit }
 
   if (key !== null) seen.references.set(key, row.index)
-  else add(seen.index, String(row.index), row.fingerprint)
+  else add(seen.index, String(row.index), fileKey)
   return null
 }
+
+/**
+ * Two rows of one statement are both the bank's record, so they only repeat each other when
+ * the narrative matches too — otherwise every same-day, same-price purchase in a category
+ * would be excluded.
+ */
+const inFileKey = (fingerprint: string, note: string | null): string =>
+  `${fingerprint}|${normalizeKey(stripReference(note) ?? '')}`
 
 /** Lay a mark on the row it belongs to. A row that repeats nothing is returned untouched. */
 export const withDuplicate = (

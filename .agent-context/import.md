@@ -46,7 +46,7 @@ File → parseCsvFile (worker) → CsvReadResult{dialect, headers, rows}   ← t
 ```
 
 **The order inside a row is load-bearing.** `predictRow` runs _before_ `markRow` because
-binding a merchant changes a row's fingerprint; the other way round finds different
+a learned category changes a row's fingerprint; the other way round finds different
 duplicates. `scanRows` keeps them in that order for every row it touches.
 
 ### Nothing is derived before it is asked for
@@ -334,9 +334,10 @@ income. They are recognised in step ③ and settled in the pass.
   leg changed since. The dialog, history row and done card count "N transactions · M transfers"
   (`data/importCounts.ts`).
 - **Dedupe.** `toLedgerEntry` files existing legs and adjustments by direction on their own
-  wallet, and a movement's fingerprint label is a shared `~` instead of the note — the two sides
-  of a transfer carry different notes while the ledger keeps one — so re-importing a file, or the
-  other wallet's statement, flags them. A cash-flow row never matches a movement.
+  wallet, and a movement's fingerprint is keyed on direction + wallet (it has no category) and
+  never the note — the two sides of a transfer carry different notes while the ledger keeps one —
+  so re-importing a file, or the other wallet's statement, flags them. A cash-flow row never
+  matches a movement.
 
 ## Matching accounts: the group is a name too, and a tie is a question
 
@@ -382,12 +383,13 @@ card explains and review shows the flagged rows.
   `import.row.category_defaulted` exist because silently defaulting a direction or a category
   is exactly the silence this feature must avoid.
 - `dedupe.ts` gives every row **two keys**: the bank's own reference when the file has one,
-  and a fingerprint `date|type|amount|currency|walletId|label` when it does not — where
-  `label` is `m:<merchantId or empty>|normalizeKey(stripReference(note))` (a transfer leg or
-  adjustment uses the shared movement label instead). Both are matched against the existing
-  ledger **and** against earlier rows of the same file **exactly** — same day, every field. The
-  ±days window was removed on purpose (2026-09-25, user decision): a repeat that isn't exact on
-  everything is not flagged.
+  and a fingerprint when it does not. A cash-flow fingerprint is `date|amount|currency|c:<categoryId>`
+  — **same day, same amount, same category** (2026-09-27, user decision): wallet, merchant and
+  note are ignored, because a hand-typed entry rarely spells them like the statement. A transfer
+  leg or adjustment uses `date|amount|currency|~|type|walletId`. Against the ledger the
+  fingerprint alone decides; against **earlier rows of the same file** the normalised note is
+  appended (`inFileKey`), since two rows of one statement are both real unless their narrative
+  matches too. No ±days window (removed 2026-09-25, user decision).
 - A mapped `reference` rides at the **end of the note** as ` · ref:<id>`, because
   `t_transactions` has one `source` column and the batch marker has to win it.
 - **`markRow` decides one row against a running `SeenRows`**, which is what lets the check ride

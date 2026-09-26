@@ -52,7 +52,7 @@ export const merchantLookup = (index: MerchantIndex): MerchantLookup => {
 
 /**
  * Bind the merchant this row names and pre-fill its learned category. Run **before** the
- * duplicate check: a bound merchant is part of a row's fingerprint.
+ * duplicate check: a learned category is part of a row's fingerprint.
  *
  * The row is returned as it came when nothing matched — a prediction pass must not cost an
  * allocation per row of the file.

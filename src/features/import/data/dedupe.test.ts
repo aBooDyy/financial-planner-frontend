@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { catId } from '#/features/categories/__fixtures__/categories'
 import { testContext, testMapping } from './__fixtures__/mapping'
 import { loadFixture } from './csv/__fixtures__/fixtures'
 import { readCsv } from './csv/read'
@@ -58,7 +59,6 @@ const asLedger = (rows: ReadonlyArray<ParsedRow>): LedgerTransaction[] =>
       ...row.draft!,
       note: row.draft!.note,
     }))
-    .map((row) => ({ ...row, merchantId: row.merchantId ?? null }))
 
 describe('the reference suffix', () => {
   it('round-trips through the note', () => {
@@ -88,43 +88,35 @@ describe('fingerprintOf', () => {
     amount: 4215,
     currency: 'GBP',
     walletId: 'w1',
-    merchantId: null,
-    note: 'TESCO STORES 3411',
+    categoryId: 'groceries',
   }
 
-  it('reads the same for the same row spelled two ways', () => {
-    expect(fingerprintOf({ ...base, note: 'Tesco  stores, 3411' })).toBe(
-      fingerprintOf(base),
-    )
+  it('ignores the wallet a cash-flow row sits in', () => {
+    expect(fingerprintOf({ ...base, walletId: 'w2' })).toBe(fingerprintOf(base))
   })
 
-  it('keeps the note alongside a bound merchant, so only an exact repeat matches', () => {
-    expect(fingerprintOf({ ...base, merchantId: 'm1' })).not.toBe(
-      fingerprintOf({
-        ...base,
-        merchantId: 'm1',
-        note: 'CARREFOUR HYPER 4471',
-      }),
-    )
-  })
-
-  it('ignores a reference the note happens to carry', () => {
-    expect(fingerprintOf({ ...base, note: 'TESCO STORES 3411 · ref:X1' })).toBe(
-      fingerprintOf(base),
-    )
-  })
-
-  it('separates rows that differ in anything that matters', () => {
+  it('separates cash-flow rows by day, amount, currency and category', () => {
     const keys = new Set([
       fingerprintOf(base),
       fingerprintOf({ ...base, amount: 4216 }),
-      fingerprintOf({ ...base, walletId: 'w2' }),
-      fingerprintOf({ ...base, type: 'income' }),
       fingerprintOf({ ...base, currency: 'USD' }),
       fingerprintOf({ ...base, date: '2026-06-17' }),
-      fingerprintOf({ ...base, note: 'SAINSBURYS' }),
+      fingerprintOf({ ...base, categoryId: 'dining' }),
     ])
-    expect(keys.size).toBe(7)
+    expect(keys.size).toBe(5)
+  })
+
+  it('matches a movement on direction and wallet rather than category', () => {
+    const movement = { ...base, categoryId: null, movement: true }
+    expect(fingerprintOf({ ...movement, walletId: 'w2' })).not.toBe(
+      fingerprintOf(movement),
+    )
+    expect(fingerprintOf({ ...movement, type: 'income' })).not.toBe(
+      fingerprintOf(movement),
+    )
+    expect(fingerprintOf(movement)).not.toBe(
+      fingerprintOf({ ...base, categoryId: null }),
+    )
   })
 })
 
@@ -138,7 +130,7 @@ describe('markRow — against the ledger', () => {
     amount: 450,
     currency: 'SAR',
     walletId: 'w1',
-    merchantId: null,
+    categoryId: catId('other'),
     note: 'DUPLICATE COFFEE',
     ...overrides,
   })
@@ -177,12 +169,20 @@ describe('markRow — against the ledger', () => {
     expect(row.excluded).toBe(false)
   })
 
-  it('does not match a different amount, wallet or counterparty', () => {
+  it('matches whatever the note or wallet says', () => {
+    const [row] = markAll(
+      coffee().slice(0, 1),
+      buildDedupeIndex([ledgerRow({ walletId: 'w2', note: 'Coffee' })]),
+      EXACT,
+    )
+    expect(row.duplicateOf).toBe('existing')
+  })
+
+  it('does not match a different amount, currency or category', () => {
     const others = [
       ledgerRow({ id: 'a', amount: 451 }),
-      ledgerRow({ id: 'b', walletId: 'w2' }),
-      ledgerRow({ id: 'c', note: 'SOMETHING ELSE' }),
-      ledgerRow({ id: 'd', type: 'income' }),
+      ledgerRow({ id: 'b', currency: 'USD' }),
+      ledgerRow({ id: 'c', categoryId: catId('groceries') }),
     ]
     const [row] = markAll(coffee().slice(0, 1), buildDedupeIndex(others), EXACT)
     expect(row.duplicateOf).toBeNull()
@@ -250,7 +250,7 @@ describe('markRow — by reference', () => {
         amount: 1,
         currency: 'SAR',
         walletId: 'w9',
-        merchantId: null,
+        categoryId: null,
         note: 'ANYTHING · ref:TXN8841003',
       },
     ])
@@ -280,7 +280,7 @@ describe('movements in the ledger index', () => {
       amount: 30000,
       currency: 'SAR',
       walletId,
-      merchantId: null,
+      categoryId: null,
       note: 'Send to STC Pay',
     })
 
@@ -300,7 +300,7 @@ describe('movements in the ledger index', () => {
       amount: 30000,
       currency: 'SAR',
       walletId: 'w2',
-      note: 'Received from Albilad Bank',
+      categoryId: null,
     }
     const row = {
       ...buildRows(
