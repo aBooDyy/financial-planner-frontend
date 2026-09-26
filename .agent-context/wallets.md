@@ -188,11 +188,10 @@ The main place to move money between wallets (Spending records it; see
 [transactions.md](transactions.md#transfers-between-wallets)). Recreated from the design's
 "Transfer money" dialog (1a).
 
-- **Entry points.** Desktop: an outline "Transfer" button (⇄ `TransferGlyph`) beside "Add
-  wallet" in the `WalletsGroupsCard` header, `md:` and up only. Mobile: a full-width outline
-  "Transfer" button under the total in `TotalHeroCard`, below `md` only. Both are omitted
-  unless the user has at least two wallets (`onTransfer` is undefined). Same dialog either
-  way: `ResponsiveDialog`, so a centred dialog on desktop and a bottom sheet on mobile.
+- **Entry point.** An outline "Transfer" button (⇄ `TransferGlyph`) between "New group" and
+  "Add wallet" in the `WalletsGroupsCard` header, on every screen size (on mobile the three
+  share the row equally). Omitted unless the user has at least two wallets (`onTransfer` is
+  undefined). `ResponsiveDialog`, so a centred dialog on desktop and a bottom sheet on mobile.
 - **Balances are live.** `transferWallets(nodes, deltas, base)` gives each wallet its opening
   `amount` + the ledger deltas `useWallets` already computes — the figure the wallet row
   shows. Before (struck through) → after appear once an amount exists; FROM's after turns

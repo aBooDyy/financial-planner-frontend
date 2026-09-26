@@ -1,8 +1,6 @@
 import { SegmentedBar } from '#/components/SegmentedBar'
 import { ValueOrSkeleton } from '#/components/ValueOrSkeleton'
 import { Skeleton } from '#/components/ui/skeleton'
-import { TransferGlyph } from '#/components/icons/TransferGlyph'
-import { Button } from '#/components/ui/button'
 import type { CurrencyCode } from '#/lib/currency'
 import type { WalletsView } from '#/features/wallets/data/selectors'
 
@@ -11,11 +9,9 @@ type Props = {
   /** The balances are still loading: the tree's counts show, its figures do not. */
   loading: boolean
   base: CurrencyCode
-  /** Mobile-only entry; absent when there aren't two wallets. */
-  onTransfer?: () => void
 }
 
-export function TotalHeroCard({ view, loading, base, onTransfer }: Props) {
+export function TotalHeroCard({ view, loading, base }: Props) {
   const figure = (value: string) => (loading ? null : value)
   return (
     <div className="rounded-[18px] border border-fp-border bg-fp-surface p-5 shadow-fp md:p-7">
@@ -54,18 +50,6 @@ export function TotalHeroCard({ view, loading, base, onTransfer }: Props) {
             </span>
           </span>
         </div>
-      ) : null}
-
-      {onTransfer ? (
-        <Button
-          variant="outline"
-          onClick={onTransfer}
-          title="Transfer money between wallets"
-          className="mt-[14px] w-full gap-[6px] rounded-[12px] py-[11px] text-[14px] font-bold md:hidden"
-        >
-          <TransferGlyph size={16} strokeWidth={2} />
-          Transfer
-        </Button>
       ) : null}
 
       {loading ? (

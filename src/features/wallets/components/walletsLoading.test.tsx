@@ -62,12 +62,11 @@ const hasMoney = (el: HTMLElement) => /\d\.\d\d|SR\s?\d/.test(el.textContent)
 describe('Wallets while the balances load', () => {
   it('the hero keeps its title, base and counts, and no total', () => {
     const { container } = render(
-      <TotalHeroCard view={VIEW} loading base="SAR" onTransfer={noop} />,
+      <TotalHeroCard view={VIEW} loading base="SAR" />,
     )
     expect(screen.getByText('Total liquid cash')).toBeTruthy()
     expect(screen.getByText('SAR')).toBeTruthy()
     expect(screen.getByText(/2 wallets/)).toBeTruthy()
-    expect(screen.getByRole('button', { name: /transfer/i })).toBeTruthy()
     expect(hasMoney(container)).toBe(false)
     expect(skeletons(container)).toBeGreaterThanOrEqual(2)
   })

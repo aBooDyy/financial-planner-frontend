@@ -105,12 +105,7 @@ export function WalletsPage() {
           className="mx-auto grid w-full max-w-[1180px] grid-cols-1 items-start gap-4 px-[14px] py-4 pb-[30px] md:grid-cols-[minmax(0,1fr)_330px] md:gap-6 md:px-6 md:py-[26px] md:pb-[90px]"
         >
           <div className="flex min-w-0 flex-col gap-4">
-            <TotalHeroCard
-              view={view}
-              loading={balancesLoading}
-              base={base}
-              onTransfer={onTransfer}
-            />
+            <TotalHeroCard view={view} loading={balancesLoading} base={base} />
             <WalletsGroupsCard
               rows={view.rows}
               loading={balancesLoading}

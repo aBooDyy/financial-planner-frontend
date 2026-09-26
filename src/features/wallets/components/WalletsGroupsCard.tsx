@@ -61,7 +61,7 @@ export function WalletsGroupsCard({
               variant="outline"
               onClick={onTransfer}
               title="Transfer money between wallets"
-              className="hidden gap-[5px] rounded-[11px] px-3 py-2 text-[13px] font-bold hover:border-fp-accent md:inline-flex"
+              className="gap-[5px] px-3 py-[9px] text-[13px] hover:border-fp-accent"
             >
               <TransferGlyph size={15} strokeWidth={2} />
               Transfer
