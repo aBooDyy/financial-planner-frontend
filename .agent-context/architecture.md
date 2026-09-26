@@ -74,6 +74,11 @@ The app is a **standard client-rendered SPA**. **No SSR, no Node server in produ
 `vite build` emits static assets served from any CDN/static host with an SPA fallback to
 `index.html`. The only backend is FastAPI.
 
+**Hosting (Cloudflare Pages):** the SPA fallback is `public/_redirects` (`/* /index.html 200`),
+copied into `dist/` by Vite. Without it a deep link or refresh on e.g. `/auth/login` hits
+Cloudflare's "There is nothing here yet" 404. Real files in `dist/` (assets, icons,
+manifest) are still served as-is — Pages matches static files before redirect rules.
+
 **Why (not SSR):** data lives in the browser's IndexedDB (local-first), so the server can't
 render real data anyway — SSR would paint an empty shell the client immediately re-fills
 from the local DB. An offline-capable PWA loads from cached static assets via the service
