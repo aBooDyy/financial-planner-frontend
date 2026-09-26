@@ -76,7 +76,7 @@ export function useOnboardingFlow(user: User, hasInbox: boolean) {
   }, [draft, name, selected, setUser])
 
   const openApp = useCallback(async () => {
-    await navigate({ to: '/balances' })
+    await navigate({ to: '/wallets' })
     draft.clear()
   }, [draft, navigate])
 

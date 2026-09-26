@@ -33,7 +33,11 @@ export type Pack = {
 }
 
 /** Kept whatever the user picks — the backend's `REQUIRED_CATEGORIES`. */
-export const REQUIRED_SLUGS: readonly string[] = ['savings', 'other']
+export const REQUIRED_SLUGS: readonly string[] = [
+  'savings',
+  'other',
+  'other_income',
+]
 
 export const INTENTS: readonly Intent[] = [
   {
@@ -94,7 +98,8 @@ export const PACKS: readonly Pack[] = [
       'health',
       'shopping',
       'personal_care',
-      'government',
+      'debt',
+      'taxes',
       'salary',
       'refund',
     ],
@@ -112,6 +117,7 @@ export const PACKS: readonly Pack[] = [
       'health',
       'insurance',
       'subscriptions',
+      'debt',
       'salary',
       'investment',
     ],
@@ -123,6 +129,7 @@ export const PACKS: readonly Pack[] = [
     slugs: [
       'groceries',
       'family',
+      'pets',
       'housing',
       'utilities',
       'transport',
@@ -148,10 +155,9 @@ export const PACKS: readonly Pack[] = [
       'utilities',
       'subscriptions',
       'education',
-      'government',
-      'freelance',
+      'taxes',
+      'business',
       'refund',
-      'other_income',
     ],
   },
   {
@@ -183,7 +189,7 @@ export const PACKS: readonly Pack[] = [
       'shopping',
       'entertainment',
       'insurance',
-      'government',
+      'taxes',
       'salary',
       'refund',
     ],
