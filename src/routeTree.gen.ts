@@ -9,9 +9,9 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WalletsRouteImport } from './routes/wallets'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as ImportRouteImport } from './routes/import'
-import { Route as BalancesRouteImport } from './routes/balances'
 import { Route as TransactionsRouteRouteImport } from './routes/transactions/route'
 import { Route as SettingsRouteRouteImport } from './routes/settings/route'
 import { Route as GoalsRouteRouteImport } from './routes/goals/route'
@@ -24,6 +24,7 @@ import { Route as SettingsPreferencesRouteImport } from './routes/settings/prefe
 import { Route as SettingsNotificationsRouteImport } from './routes/settings/notifications'
 import { Route as SettingsMerchantsRouteImport } from './routes/settings/merchants'
 import { Route as SettingsIntegrationsRouteImport } from './routes/settings/integrations'
+import { Route as SettingsImportRouteImport } from './routes/settings/import'
 import { Route as SettingsEmailSyncRouteImport } from './routes/settings/email-sync'
 import { Route as SettingsDataRouteImport } from './routes/settings/data'
 import { Route as SettingsCurrenciesRouteImport } from './routes/settings/currencies'
@@ -36,6 +37,11 @@ import { Route as AuthLoginRouteImport } from './routes/auth/login'
 import { Route as SettingsEmailSyncCallbackRouteImport } from './routes/settings_.email-sync.callback'
 import { Route as AuthGoogleCallbackRouteImport } from './routes/auth/google.callback'
 
+const WalletsRoute = WalletsRouteImport.update({
+  id: '/wallets',
+  path: '/wallets',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SetupRoute = SetupRouteImport.update({
   id: '/setup',
   path: '/setup',
@@ -44,11 +50,6 @@ const SetupRoute = SetupRouteImport.update({
 const ImportRoute = ImportRouteImport.update({
   id: '/import',
   path: '/import',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BalancesRoute = BalancesRouteImport.update({
-  id: '/balances',
-  path: '/balances',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TransactionsRouteRoute = TransactionsRouteRouteImport.update({
@@ -109,6 +110,11 @@ const SettingsMerchantsRoute = SettingsMerchantsRouteImport.update({
 const SettingsIntegrationsRoute = SettingsIntegrationsRouteImport.update({
   id: '/integrations',
   path: '/integrations',
+  getParentRoute: () => SettingsRouteRoute,
+} as any)
+const SettingsImportRoute = SettingsImportRouteImport.update({
+  id: '/import',
+  path: '/import',
   getParentRoute: () => SettingsRouteRoute,
 } as any)
 const SettingsEmailSyncRoute = SettingsEmailSyncRouteImport.update({
@@ -173,9 +179,9 @@ export interface FileRoutesByFullPath {
   '/goals': typeof GoalsRouteRouteWithChildren
   '/settings': typeof SettingsRouteRouteWithChildren
   '/transactions': typeof TransactionsRouteRouteWithChildren
-  '/balances': typeof BalancesRoute
   '/import': typeof ImportRoute
   '/setup': typeof SetupRoute
+  '/wallets': typeof WalletsRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/signup': typeof AuthSignupRoute
   '/goals/$section': typeof GoalsSectionRoute
@@ -185,6 +191,7 @@ export interface FileRoutesByFullPath {
   '/settings/currencies': typeof SettingsCurrenciesRoute
   '/settings/data': typeof SettingsDataRoute
   '/settings/email-sync': typeof SettingsEmailSyncRoute
+  '/settings/import': typeof SettingsImportRoute
   '/settings/integrations': typeof SettingsIntegrationsRoute
   '/settings/merchants': typeof SettingsMerchantsRoute
   '/settings/notifications': typeof SettingsNotificationsRoute
@@ -198,9 +205,9 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/balances': typeof BalancesRoute
   '/import': typeof ImportRoute
   '/setup': typeof SetupRoute
+  '/wallets': typeof WalletsRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/signup': typeof AuthSignupRoute
   '/goals/$section': typeof GoalsSectionRoute
@@ -210,6 +217,7 @@ export interface FileRoutesByTo {
   '/settings/currencies': typeof SettingsCurrenciesRoute
   '/settings/data': typeof SettingsDataRoute
   '/settings/email-sync': typeof SettingsEmailSyncRoute
+  '/settings/import': typeof SettingsImportRoute
   '/settings/integrations': typeof SettingsIntegrationsRoute
   '/settings/merchants': typeof SettingsMerchantsRoute
   '/settings/notifications': typeof SettingsNotificationsRoute
@@ -227,9 +235,9 @@ export interface FileRoutesById {
   '/goals': typeof GoalsRouteRouteWithChildren
   '/settings': typeof SettingsRouteRouteWithChildren
   '/transactions': typeof TransactionsRouteRouteWithChildren
-  '/balances': typeof BalancesRoute
   '/import': typeof ImportRoute
   '/setup': typeof SetupRoute
+  '/wallets': typeof WalletsRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/signup': typeof AuthSignupRoute
   '/goals/$section': typeof GoalsSectionRoute
@@ -239,6 +247,7 @@ export interface FileRoutesById {
   '/settings/currencies': typeof SettingsCurrenciesRoute
   '/settings/data': typeof SettingsDataRoute
   '/settings/email-sync': typeof SettingsEmailSyncRoute
+  '/settings/import': typeof SettingsImportRoute
   '/settings/integrations': typeof SettingsIntegrationsRoute
   '/settings/merchants': typeof SettingsMerchantsRoute
   '/settings/notifications': typeof SettingsNotificationsRoute
@@ -257,9 +266,9 @@ export interface FileRouteTypes {
     | '/goals'
     | '/settings'
     | '/transactions'
-    | '/balances'
     | '/import'
     | '/setup'
+    | '/wallets'
     | '/auth/login'
     | '/auth/signup'
     | '/goals/$section'
@@ -269,6 +278,7 @@ export interface FileRouteTypes {
     | '/settings/currencies'
     | '/settings/data'
     | '/settings/email-sync'
+    | '/settings/import'
     | '/settings/integrations'
     | '/settings/merchants'
     | '/settings/notifications'
@@ -282,9 +292,9 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/balances'
     | '/import'
     | '/setup'
+    | '/wallets'
     | '/auth/login'
     | '/auth/signup'
     | '/goals/$section'
@@ -294,6 +304,7 @@ export interface FileRouteTypes {
     | '/settings/currencies'
     | '/settings/data'
     | '/settings/email-sync'
+    | '/settings/import'
     | '/settings/integrations'
     | '/settings/merchants'
     | '/settings/notifications'
@@ -310,9 +321,9 @@ export interface FileRouteTypes {
     | '/goals'
     | '/settings'
     | '/transactions'
-    | '/balances'
     | '/import'
     | '/setup'
+    | '/wallets'
     | '/auth/login'
     | '/auth/signup'
     | '/goals/$section'
@@ -322,6 +333,7 @@ export interface FileRouteTypes {
     | '/settings/currencies'
     | '/settings/data'
     | '/settings/email-sync'
+    | '/settings/import'
     | '/settings/integrations'
     | '/settings/merchants'
     | '/settings/notifications'
@@ -339,9 +351,9 @@ export interface RootRouteChildren {
   GoalsRouteRoute: typeof GoalsRouteRouteWithChildren
   SettingsRouteRoute: typeof SettingsRouteRouteWithChildren
   TransactionsRouteRoute: typeof TransactionsRouteRouteWithChildren
-  BalancesRoute: typeof BalancesRoute
   ImportRoute: typeof ImportRoute
   SetupRoute: typeof SetupRoute
+  WalletsRoute: typeof WalletsRoute
   AuthLoginRoute: typeof AuthLoginRoute
   AuthSignupRoute: typeof AuthSignupRoute
   AuthGoogleCallbackRoute: typeof AuthGoogleCallbackRoute
@@ -350,6 +362,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/wallets': {
+      id: '/wallets'
+      path: '/wallets'
+      fullPath: '/wallets'
+      preLoaderRoute: typeof WalletsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/setup': {
       id: '/setup'
       path: '/setup'
@@ -362,13 +381,6 @@ declare module '@tanstack/react-router' {
       path: '/import'
       fullPath: '/import'
       preLoaderRoute: typeof ImportRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/balances': {
-      id: '/balances'
-      path: '/balances'
-      fullPath: '/balances'
-      preLoaderRoute: typeof BalancesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/transactions': {
@@ -453,6 +465,13 @@ declare module '@tanstack/react-router' {
       path: '/integrations'
       fullPath: '/settings/integrations'
       preLoaderRoute: typeof SettingsIntegrationsRouteImport
+      parentRoute: typeof SettingsRouteRoute
+    }
+    '/settings/import': {
+      id: '/settings/import'
+      path: '/import'
+      fullPath: '/settings/import'
+      preLoaderRoute: typeof SettingsImportRouteImport
       parentRoute: typeof SettingsRouteRoute
     }
     '/settings/email-sync': {
@@ -556,6 +575,7 @@ interface SettingsRouteRouteChildren {
   SettingsCurrenciesRoute: typeof SettingsCurrenciesRoute
   SettingsDataRoute: typeof SettingsDataRoute
   SettingsEmailSyncRoute: typeof SettingsEmailSyncRoute
+  SettingsImportRoute: typeof SettingsImportRoute
   SettingsIntegrationsRoute: typeof SettingsIntegrationsRoute
   SettingsMerchantsRoute: typeof SettingsMerchantsRoute
   SettingsNotificationsRoute: typeof SettingsNotificationsRoute
@@ -570,6 +590,7 @@ const SettingsRouteRouteChildren: SettingsRouteRouteChildren = {
   SettingsCurrenciesRoute: SettingsCurrenciesRoute,
   SettingsDataRoute: SettingsDataRoute,
   SettingsEmailSyncRoute: SettingsEmailSyncRoute,
+  SettingsImportRoute: SettingsImportRoute,
   SettingsIntegrationsRoute: SettingsIntegrationsRoute,
   SettingsMerchantsRoute: SettingsMerchantsRoute,
   SettingsNotificationsRoute: SettingsNotificationsRoute,
@@ -599,9 +620,9 @@ const rootRouteChildren: RootRouteChildren = {
   GoalsRouteRoute: GoalsRouteRouteWithChildren,
   SettingsRouteRoute: SettingsRouteRouteWithChildren,
   TransactionsRouteRoute: TransactionsRouteRouteWithChildren,
-  BalancesRoute: BalancesRoute,
   ImportRoute: ImportRoute,
   SetupRoute: SetupRoute,
+  WalletsRoute: WalletsRoute,
   AuthLoginRoute: AuthLoginRoute,
   AuthSignupRoute: AuthSignupRoute,
   AuthGoogleCallbackRoute: AuthGoogleCallbackRoute,

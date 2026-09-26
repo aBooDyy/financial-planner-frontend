@@ -44,7 +44,7 @@ function RootLayout() {
           <Outlet />
         </PayloadViewContext.Provider>
         <TanStackDevtools
-          config={{ position: 'bottom-right' }}
+          config={{ position: 'bottom-left' }}
           plugins={[
             {
               name: 'Tanstack Router',
