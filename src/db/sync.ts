@@ -1,13 +1,13 @@
-import { balancesApi } from '#/features/balances/api/balancesApi'
+import { walletsApi } from '#/features/wallets/api/walletsApi'
 import type {
   CreateNodeWire,
   UpdateNodeWire,
-} from '#/features/balances/api/types'
+} from '#/features/wallets/api/types'
 import {
   localNodeToUpdateWire,
   serverNodeToLocal,
   serverSettingsToLocal,
-} from '#/features/balances/data/mappers'
+} from '#/features/wallets/data/mappers'
 import {
   pullCategories,
   pushCategoryEntry,
@@ -309,7 +309,7 @@ async function pushEntry(entry: OutboxEntry): Promise<boolean> {
 
 async function pushNodeCreate(entry: OutboxEntry): Promise<void> {
   try {
-    const node = await balancesApi.createNode(entry.payload as CreateNodeWire)
+    const node = await walletsApi.createNode(entry.payload as CreateNodeWire)
     await db.transaction('rw', db.balanceNodes, db.outbox, async () => {
       await db.balanceNodes.put(serverNodeToLocal(node))
       await db.outbox.delete(entry.seq)
@@ -328,7 +328,7 @@ async function pushNodeCreate(entry: OutboxEntry): Promise<void> {
 async function pushNodeUpdate(entry: OutboxEntry): Promise<void> {
   const id = entry.id
   try {
-    const node = await balancesApi.updateNode(
+    const node = await walletsApi.updateNode(
       id,
       entry.payload as UpdateNodeWire,
     )
@@ -356,7 +356,7 @@ async function pushNodeUpdate(entry: OutboxEntry): Promise<void> {
 
 /** Last-write-wins, client re-apply: rebase the local edit on the server version, retry once. */
 async function reapplyAfterConflict(entry: OutboxEntry): Promise<void> {
-  const fresh = (await balancesApi.listNodes()).find((n) => n.id === entry.id)
+  const fresh = (await walletsApi.listNodes()).find((n) => n.id === entry.id)
   const local = await db.balanceNodes.get(entry.id)
   if (!fresh || !local) {
     await db.outbox.delete(entry.seq)
@@ -364,7 +364,7 @@ async function reapplyAfterConflict(entry: OutboxEntry): Promise<void> {
   }
   const rebased = { ...local, version: fresh.version }
   try {
-    const node = await balancesApi.updateNode(
+    const node = await walletsApi.updateNode(
       entry.id,
       localNodeToUpdateWire(rebased),
     )
@@ -383,7 +383,7 @@ async function reapplyAfterConflict(entry: OutboxEntry): Promise<void> {
 
 async function pushNodeDelete(entry: OutboxEntry): Promise<void> {
   try {
-    await balancesApi.deleteNode(entry.id)
+    await walletsApi.deleteNode(entry.id)
   } catch (e) {
     if (statusOf(e) !== 404) throw e // 404 ⇒ already gone, treat as success
   }
@@ -395,7 +395,7 @@ async function pushNodeDelete(entry: OutboxEntry): Promise<void> {
 
 async function pushSettings(entry: OutboxEntry): Promise<void> {
   try {
-    const settings = await balancesApi.updateSettings(
+    const settings = await walletsApi.updateSettings(
       entry.payload as { version: string; base_currency: string },
     )
     await db.transaction('rw', db.balanceSettings, db.outbox, async () => {
@@ -404,10 +404,10 @@ async function pushSettings(entry: OutboxEntry): Promise<void> {
     })
   } catch (e) {
     if (statusOf(e) === 409) {
-      const fresh = await balancesApi.getSettings()
+      const fresh = await walletsApi.getSettings()
       const local = await db.balanceSettings.get(SETTINGS_KEY)
       const base = local?.baseCurrency ?? fresh.baseCurrency
-      const settings = await balancesApi.updateSettings({
+      const settings = await walletsApi.updateSettings({
         version: fresh.version,
         base_currency: base,
       })
@@ -450,7 +450,7 @@ export async function pullAll(): Promise<void> {
 }
 
 async function pullNodes(): Promise<void> {
-  const server = await balancesApi.listNodes()
+  const server = await walletsApi.listNodes()
   const serverIds = new Set(server.map((n) => n.id))
   await db.transaction('rw', db.balanceNodes, async () => {
     for (const n of server) {
@@ -470,7 +470,7 @@ async function pullNodes(): Promise<void> {
 }
 
 export async function pullSettings(): Promise<void> {
-  const settings = await balancesApi.getSettings()
+  const settings = await walletsApi.getSettings()
   const local = await db.balanceSettings.get(SETTINGS_KEY)
   if (!local || local.dirty === 0) {
     await db.balanceSettings.put(serverSettingsToLocal(settings))
@@ -478,7 +478,7 @@ export async function pullSettings(): Promise<void> {
 }
 
 async function pullRates(): Promise<void> {
-  const rates = await balancesApi.listRates()
+  const rates = await walletsApi.listRates()
   const currencies = new Set(rates.map((r) => r.currency))
   await db.transaction('rw', db.exchangeRates, async () => {
     for (const r of rates) {

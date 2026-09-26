@@ -1,7 +1,12 @@
 import type { AppConfig } from '#/lib/config/appConfig'
 import type { CurrencyCode } from '#/lib/currency'
-import type { NodeKind } from '#/features/balances/api/types'
-import type { GoalFrequency, GoalKind } from '#/features/goals/api/types'
+import type { NodeKind } from '#/features/wallets/api/types'
+import type {
+  GoalFrequency,
+  GoalKind,
+  IntervalUnit,
+  ObligationFrequency,
+} from '#/features/goals/api/types'
 import type {
   ImportSource,
   ImportTemplateConfig,
@@ -142,7 +147,10 @@ export type LocalGoal = {
   amount: number | null
   target: number | null
   saved: number
-  frequency: GoalFrequency | null
+  frequency: ObligationFrequency | null
+  /** "Every `customInterval` `customUnit`s" — set only when `frequency` is 'custom'. */
+  customInterval: number | null
+  customUnit: IntervalUnit | null
   nextDue: string | null
   dueDate: string | null
   // The stored plan's header (null until the planner first generates this goal's rows).
@@ -323,11 +331,15 @@ export type EmailProvider = 'google' | 'outlook'
 export type ScanFrequency = '15m' | 'hourly' | 'daily'
 export type ConnectionStatus = 'pending_setup' | 'connected'
 
-export type TrackedSender = {
+/** One of an inbox's email rules, as the settings list shows it. */
+export type EmailRuleSummary = {
   id: string
-  senderEmail: string
-  senderName: string | null
-  defaultCategory: string | null
+  name: string
+  enabled: boolean
+  senders: string[]
+  walletId: string | null
+  type: TxType
+  autoConfirm: boolean
 }
 
 export type LocalEmailConnection = {
@@ -335,12 +347,10 @@ export type LocalEmailConnection = {
   provider: EmailProvider
   email: string
   autoSync: boolean
-  autoConfirm: boolean
   scanFrequency: ScanFrequency
-  defaultWalletId: string | null
   status: ConnectionStatus
   lastSyncedAt: string | null
-  rules: TrackedSender[]
+  rules: EmailRuleSummary[]
   createdAt: string
   updatedAt: string
   version: string
@@ -397,6 +407,7 @@ export type LocalInboundImport = {
   source: InboundSource
   connectionId: string | null
   keyId: string | null
+  ruleId: string | null
   merchantId: string | null
   /** Inbox: the sender address. Webhook: the key's token prefix. */
   sourceRef: string | null

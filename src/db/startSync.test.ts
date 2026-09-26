@@ -16,8 +16,8 @@ const track =
     return Promise.resolve()
   }
 
-vi.mock('#/features/balances/api/balancesApi', () => ({
-  balancesApi: {
+vi.mock('#/features/wallets/api/walletsApi', () => ({
+  walletsApi: {
     listNodes: () => {
       pulls.push('nodes')
       return Promise.resolve([])

@@ -98,8 +98,8 @@ vi.mock('#/features/transactions/api/transactionsApi', () => ({
   recurringsApi: { list: () => Promise.resolve([]) },
 }))
 
-vi.mock('#/features/balances/api/balancesApi', () => ({
-  balancesApi: {
+vi.mock('#/features/wallets/api/walletsApi', () => ({
+  walletsApi: {
     createNode: (payload: { id: string }) => {
       order.push(`node:${payload.id}`)
       return Promise.resolve({
