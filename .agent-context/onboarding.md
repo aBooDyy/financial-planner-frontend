@@ -40,11 +40,11 @@ Pure data and helpers, unit-tested in `packs.test.ts`:
   — `packs.test.ts` checks that against `buildCatalog([])`, and that every built-in root is
   offered by at least one pack. The design's mock set was adapted to our real catalog: its
   "Fun"/"Subs" became `entertainment`/`subscriptions`, and a **Saver** pack (with
-  `investment`) was added for the "Save and grow my money" goal. The 2026-09-24 roots are
-  spread where they fit: `family` + `giving` (Family), `personal_care` (Essentials, Student),
-  `insurance` (Saver, Family, Traveler), `government` (Essentials, Freelancer, Traveler),
-  `other_income` (Freelancer).
-- `REQUIRED_SLUGS` = `savings` + `other`, mirroring the backend's `REQUIRED_CATEGORIES`. They
+  `investment`) was added for the "Save and grow my money" goal. The other roots are spread
+  where they fit: `family` + `pets` + `giving` (Family), `personal_care` (Essentials,
+  Student), `insurance` (Saver, Family, Traveler), `debt` (Essentials, Saver), `taxes`
+  (Essentials, Freelancer, Traveler), `business` (Freelancer).
+- `REQUIRED_SLUGS` = `savings` + `other` + `other_income`, mirroring the backend's `REQUIRED_CATEGORIES`. They
   are in every pack, render as locked chips, and `toggleSlug` refuses to drop them.
 
 Names, colours, icons and subcategories come from `useCategoryCatalog()`, never from the pack
@@ -61,7 +61,7 @@ early if a background pull happened to be in flight. A `409 onboarding.already_c
 
 The flow hook moves to the welcome step **before** `setUser(updated)`, so there is never a
 render where the user is onboarded but the wizard is still on step 5. "Open Means" navigates
-to `/balances`, then clears the draft.
+to `/wallets`, then clears the draft.
 
 Online-only, like sign-up itself: the categories prune and the marker are server decisions.
 
@@ -71,8 +71,9 @@ Online-only, like sign-up itself: the categories prune and the marker are server
 (`features/email-sync/data/connect.ts`), which stores the return path in sessionStorage
 before leaving; the OAuth callback route reads it back with `takeConnectReturnPath()`
 ([email-sync.md](email-sync.md)). Back on `/setup`, the restored draft is on step 5 and the
-connection (now in the `emailConnections` cache) shows as connected. Mapping which alerts to
-read is left to Settings → Email sync, which resumes the wizard for a `PENDING_SETUP` inbox.
+connection (now in the `emailConnections` cache) shows as connected. Writing the inbox's
+rules is left to Settings → Email sync, where an inbox without rules says so and offers
+_Add a rule_ ([email-sync.md](email-sync.md)).
 
 ## Layout
 

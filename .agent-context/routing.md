@@ -43,7 +43,8 @@ Routing uses **TanStack Router** with file-based routes under `src/routes/` (cod
   store**, not router `beforeLoad`/loaders. `__root.tsx` calls `useSessionBootstrap()` once
   (a `GET /auth/me` that resolves the session from the cookie). Guarded routes wrap their
   content in **`SessionGate`** (`src/components/SessionGate.tsx`): `loading` → `Splash`,
-  `anonymous` → `/auth/login`, signed in but not onboarded → `/setup`. Use it for every new
+  `anonymous` → `/auth/login`, signed in but not onboarded → `/setup`. It also mounts the
+  app-wide add-transaction FAB + sheet ([transactions.md](transactions.md)). Use it for every new
   authed route rather than branching on `status` by hand. `RedirectTo`
   (`src/components/RedirectTo.tsx`) is a tiny imperative-redirect helper since TanStack's
   `redirect()` is loader-only. Revisit toward a guarded layout route + `beforeLoad` once more
@@ -58,8 +59,8 @@ back button moves between them. `routes/settings/route.tsx` is the layout — th
 plus `SettingsLayout` (TopNav, rail, `Outlet`, MobileTabBar) — and each pane is a thin file
 rendering its feature component directly:
 
-`account` · `preferences` · `currencies` · `categories` · `merchants` · `email-sync` ·
-`integrations` · `notifications` · `data`.
+`account` · `preferences` · `currencies` · `categories` · `merchants` · `import` ·
+`email-sync` · `integrations` · `notifications` · `archived` · `data`.
 
 - `routes/settings/index.tsx` **redirects** `/settings` → `/settings/account` in
   `beforeLoad`, so nobody ever sees an empty `Outlet`.
@@ -67,13 +68,17 @@ rendering its feature component directly:
   comes from the URL, not component state.
 - The sections became **self-sufficient** when the page that fed them props went away:
   `AccountSection` reads the session store, `PreferencesSection`/`CurrenciesSection` read
-  `useBalances`, `DataSection` uses `useLogout`. Route files stay wiring-only.
+  `useWallets`, `DataSection` uses `useLogout`. Route files stay wiring-only.
 - **`routes/settings_.email-sync.callback.tsx` keeps its `settings_` escape.** Its URL
   (`/settings/email-sync/callback`) is what the provider apps whitelist, but it must not
   render inside the Settings layout — it is a redirect target, not a pane.
 - **Typed search on a pane:** `/settings/integrations` validates `?key=` and `?sample=`
   (`IntegrationsSearch`) — the deep link the review queue's "Fix the rule" and a
-  transaction's "View key" use. `/transactions?review=1` is the other search-driven entry.
+  transaction's "View key" use. `/settings/email-sync` validates `?inbox=` with either
+  `&fresh=1` (the OAuth callback: open the new inbox onto its first rule) or `&sample=` and
+  an optional `&rule=` (the queue's "Fix the rule" for an inbox row) — `EmailSyncSearch`;
+  every id must be uuid-shaped or the whole intent is dropped. `/transactions?review=1` is the
+  other search-driven entry.
 
 ## Goals and Spending tabs
 
@@ -95,12 +100,13 @@ the page mounted across tab switches, since TanStack only remounts a route's com
 param change when `remountDeps` asks it to. Tabs are `<Link>`s; the pages read the tab with
 `useParams` and navigate with `to: '/goals/$section'` / `'/transactions/$view'`.
 
-## Import hub (`/import`)
+## Import wizard (`/import`)
 
-`routes/import.tsx` renders `features/import/components/ImportPage`, guarded exactly like
-`/balances` and `/transactions` (session-store branch + `RedirectTo`). It is **not** a
-`NAV_SECTIONS` entry — it's a sub-page reached from the Spending header (**Import**) and from
-Settings → Data & privacy (**Import a file**), so `TopNav`/`MobileTabBar` render with no
-`active` section, as `/settings/*` does.
+`routes/import.tsx` renders `features/import/components/ImportPage` — the CSV wizard only,
+full width so the review grid has room — guarded exactly like `/wallets` and
+`/transactions`. The import **hub** (sources, recent imports, templates) is the Settings pane
+`/settings/import`; its "Choose a file" is the only link here, and "Cancel import" / "Back to
+Import" navigate back to it. Not a `NAV_SECTIONS` entry, so `TopNav`/`MobileTabBar` render
+with no `active` section, as `/settings/*` does.
 
 > Record concrete route-tree decisions and any guard/loader conventions here as they land.

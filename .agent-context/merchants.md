@@ -11,7 +11,8 @@ server owns creation and uniqueness. Backend counterpart:
 ```
 src/features/merchants/
 ├── api/{merchantsApi.ts,types.ts}
-├── components/MerchantPicker.tsx          # search existing / create, reused by TxEditor
+├── components/MerchantOptions.tsx         # search existing / create — the transaction dialog's merchant pane
+├── hooks/useMerchantName.ts              # a merchant's display name by id, with a just-created fallback
 ├── data/{mappers.ts,matching.ts,adopt.ts,mutations.ts,sync.ts}
 │   └── __fixtures__/normalize_key_cases.json   # copied verbatim from the backend suite
 └── hooks/{useMerchants.ts,useMerchantMatch.ts}
@@ -131,7 +132,7 @@ than guessing. It therefore needs a connection, and failures surface in the dial
 
 ## UI
 
-- **`TxEditor`** has a Merchant field (transactions only — recurring schedules have no
+- **The transaction dialog** has a "Where?" merchant field, opening `MerchantOptions` as a pane (transactions only — recurring schedules have no
   `merchant_id`), so a hand-entered row can finally be tagged. A learned category the flag did
   not auto-apply shows as a one-tap "Usually Groceries — use it" chip.
 - **Settings → Merchants** lists them by `times_seen` descending, which puts the near-duplicates

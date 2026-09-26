@@ -98,8 +98,9 @@ user's own currencies**, which is why those gates let a user-defined code throug
 `decimalsFor` sizes its amounts correctly: `decimalsFor` (0 for JPY, 3 for KWD/BHD/IQD/…, 2
 otherwise), `isSupportedCurrency`, `currencySymbol`, `currencyName`, `supportedCurrencies()`. `toMinor`/`toMajor`/`parseAmountToMinor`/`minorToInputValue`/
 `formatMoney`/`convertMinor` kept their signatures and take their scale from `decimalsFor`,
-so every money path was fixed by fixing the data. `amountInputProps(code)` gives an amount
-field its `inputMode`/`step`/`placeholder` — a JPY input takes no decimals, a KWD input three.
+so every money path was fixed by fixing the data. `amountInputProps(code, onValue)` gives an amount
+field its keypad, typing guard and placeholder — a JPY input takes no decimals, a KWD input
+three (guard rules in [conventions.md](conventions.md#money--dates)).
 
 ## Currencies the user defines
 
@@ -129,7 +130,7 @@ through, `CurrencyPicker` offers it, `mergeRates` prices it.
 The backend no longer seeds per-user rate rows. `GET /exchange-rates` returns **overrides
 only** (empty for a fresh user); the published rates come from config. So every rates map is
 built once with `useMergedRates(rateRows)` — **config seed, then a custom currency's own
-rate, then the user's override** — in `useBalances`, `useGoals` and `useTransactions`
+rate, then the user's override** — in `useWallets`, `useGoals` and `useTransactions`
 (`mergeRates` is the same thing outside React). A currency in none of them (CUP, IRR, KPW,
 SSP, SYP, VES, ZWG ship no rate) simply has no rate, and `convertMinor` keeps returning `0`
 for that pair rather than inventing one.
@@ -156,14 +157,18 @@ a config default (the server creates the row), and the stored `version` once a r
     BASE", what the field edits) alongside the absolute stored rate, so switching base
     re-reads every row without rewriting one.
   - Held currencies sort to the top and wear a badge — `heldCurrencies(base, sources)` in
-    `features/balances/data/selectors.ts`, via `useBalances().held`.
+    `features/wallets/data/selectors.ts`, via `useWallets().held`.
   - The list is **windowed** (`hooks/useVirtualRows`, shared with the import review grid):
     ~150 rows each carrying an input costs more than the screen is worth. Rows are therefore
     fixed-height (`RATE_ROW_HEIGHT`) — keep them that way.
   - An edited row shows an "Edited" badge and a **reset** control that writes the published
     rate back (there is no delete-override endpoint).
 - **Email sync** takes its bounds from `limits`: the manual-scan limit is capped by
-  `email_sync_max_limit` and the lookback options by `email_sync_max_lookback_days`.
+  `email_sync_max_limit` and the lookback options by `email_sync_max_lookback_days`. The rule
+  editor reads `emailRulesMax` (the "n of 20" and _Add rule_), `emailRuleSamplesMax` (how many
+  emails one learn/test call carries), `emailRuleSendersMax` and `emailRuleTermsMax` (the chip
+  inputs' ceilings). The wire fields are optional; a server that does not publish them gets the
+  bundled numbers.
 
 ## Limits are read, not re-declared
 

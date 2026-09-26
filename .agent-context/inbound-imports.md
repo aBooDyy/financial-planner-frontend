@@ -69,9 +69,13 @@ the fast path, and expands into the **stored body** plus every editable value
 - **A truncated JSON body is shown as text.** The backend caps the stored body at 32 000
   chars (the payload cap is 64 KiB), and a cut-off body never parses, so `BodyPreview` does
   not try: it shows the raw text with a "only the first part was kept" footnote.
-- **"Fix the rule".** A webhook row that needs details and still has its key shows a link to
-  `/settings/integrations?key=<keyId>&sample=<importId>` (`FixRuleLink`) — the rule editor
-  with this payload as its sample. The route's `validateSearch` owns that contract.
+- **"Fix the rule".** A row that needs details shows `FixRuleLink`, which takes the row and
+  links to the rule editor of whatever staged it, with this body as the sample: a webhook row
+  that still has its key → `/settings/integrations?key=<keyId>&sample=<importId>`; an inbox row
+  with a body → `/settings/email-sync?inbox=<connectionId>&sample=<importId>[&rule=<ruleId>]`
+  (the inbox editor opens that rule, or a new one, on the stored email). The queue knows only
+  each source's settings **route**, never its code; each route's `validateSearch` owns its
+  contract. `ruleId` (wire `rule_id`) is on the cached row for this.
 - **A failed parse is not a dead end.** When the backend couldn't read an amount/currency the
   row opens expanded with a _Needs details_ chip, and the user types the values in. `confirm`
   sends them as overrides; the backend keeps them on the import too.
@@ -90,6 +94,17 @@ the fast path, and expands into the **stored body** plus every editable value
   user filed it under before (`MerchantHint`); the next import from that merchant arrives with
   `suggestedCategory`/`suggestedSubcategory` already set by the backend. The merchant field is
   only sent on confirm when it was **edited** — resending it would re-count the sighting.
+
+**The row's shape** (Means R1). 560px dialog, no footer, full-bleed rows. Each row: an
+initial tile, who / source · day, the amount or a _Needs details_ pill (and a faint warm tint);
+labelled Category / Account quick picks; "View email & details" expands into `BodyPreview`
+(a card, with `FixRuleLink` as its `footer`) and `ImportDetailsFields`. Confirm reads as
+unavailable until an account and an amount are there (`ready`) but stays pressable: pressing it
+without an amount sets `amountError` under the Amount field and a danger note; both are derived,
+so they clear once the amount is typed or tapped. **"Not a transaction" is undoable**: the
+backend has no undismiss, so `useUndoableDismiss` holds the row as "Marked as not a
+transaction · Undo" for `DISMISS_UNDO_MS` and only then calls dismiss — at once if the row
+unmounts (the review closes). A failed dismiss brings the row back with the reason.
 
 Form state lives in `useImportReview` (one per row): prefill (type and account from the
 suggestion), the tapped-line fill, the payload pick target, validation, and the
@@ -130,7 +145,7 @@ on demand; a JSON payload renders read-only (no pick bar).
 
 `InboundImportWire` carries `source`, `connection_id` / `integration_key_id` (one is null),
 `source_ref`, `source_label`, `occurred_on`, `merchant_id`, `suggested_subcategory`,
-`suggested_type` (`'SPEND' | 'INCOME' | null`), `suggested_wallet_id`, `has_body` and
+`suggested_type` (`'SPEND' | 'INCOME' | null`), `suggested_wallet_id`, `rule_id`, `has_body` and
 `body_format`; the body itself only comes from the detail endpoints
 (`GET /inbound-imports/{id}` and `GET /inbound-imports/by-transaction/{transactionId}`, both →
 `ImportDetailWire { inbound_import, body_lines, body_truncated, merchant }`). Confirm returns
@@ -146,5 +161,5 @@ optional overrides. Backend counterpart:
 flight, a pull overtaken by sign-out), `api/inboundImportsApi.test.ts` (ids encoded into paths), `hooks/useImportReview.test.ts` (prefill from suggestions, late wallets, payload
 picks), `components/BodyPreview.test.tsx` (text lines, the tree via the slot, truncated
 fallback), `components/PendingImportRow.test.tsx` (a webhook row renders, opens on its
-payload, fills from taps and confirms; the inbox row keeps its copy),
+payload, fills from taps and confirms; the inbox row keeps its copy; an unread inbox row links to its inbox's rule editor with `rule` and `sample`; "Not a transaction" undoes, sends after the wait, and sends at once on unmount),
 `components/SourceSection.test.tsx` (email, webhook, deleted key).

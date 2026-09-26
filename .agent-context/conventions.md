@@ -23,6 +23,11 @@ minimal non-stale comments).
 - App-level wrappers in `src/components/` (`Button`, `TextField`, `PasswordField`, `Checkbox`,
   `Divider`) and settings `Toggle`/`Segmented` are thin layers over the shadcn primitives that
   keep their existing public APIs — prefer them where they already exist.
+- **Empty lists/sections use `EmptyState`** (`#/components/EmptyState`): accent icon tile,
+  a bold title in `fp-text`, supporting copy in `fp-text-2`, optional add `action`. Never a
+  lone gray (`fp-text-3`) sentence — it reads like a caption. `size="md"` when it fills a
+  list or tab, `size="sm"` in side cards and sub-lists; `framed` only when it isn't already
+  inside a card. Picker "no matches" text (`CommandEmpty`) and inline form hints stay plain.
 
 ## Hooks
 
@@ -76,6 +81,13 @@ minimal non-stale comments).
 
 - Never format money/dates by hand. Use the `lib/` helpers built on `Intl`, locale- and
   direction-aware. Money matches the wire representation end-to-end.
+- **Every numeric field is guarded.** An amount input spreads `amountInputProps(code, onValue)`
+  (`lib/currency.ts`) instead of writing its own `onChange`/`inputMode`; any other decimal
+  field (FX rates) spreads `numericInputProps(rules, onValue)` (`lib/numericInput.ts`). Both
+  open the phone's number keypad and pass `onValue` only sanitized text: Arabic-Indic digits
+  and `٫` become ASCII, letters/commas never appear, one point, the fraction capped at the
+  currency's decimals, and a leading `-` only with `{ signed: true }` (balances can go
+  negative; transfer, spend and goal amounts can't). The caret stays where the user typed.
 
 ## Comments
 

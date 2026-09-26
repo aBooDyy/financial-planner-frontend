@@ -30,7 +30,9 @@ standalone`, and `start_url`.
 
 ## Native-like mobile UX
 
-- **Bottom navigation** (thumb-reachable tab bar) as the primary mobile nav.
+- **Bottom navigation** (thumb-reachable tab bar) as the primary mobile nav. Its centre slot is
+  a raised "add transaction" button (desktop gets a floating one bottom-end instead) — see
+  [transactions.md](transactions.md).
 - Respect **safe areas** (`env(safe-area-inset-*)`), full-height layouts, no desktop-style
   chrome on mobile.
 - Native-feeling interactions: momentum scrolling, large tap targets, sheets/drawers instead

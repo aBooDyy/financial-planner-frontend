@@ -50,6 +50,24 @@ duplicates the base rule and will drift.
 - Theme choice (system/light/dark) is stored in a global Zustand store, persisted, and
   applied by toggling a class/attribute on `<html>` in the root layout.
 
+## Privacy mode — `.fp-sensitive`
+
+An eye button in `TopNav` (`components/chrome/PrivacyToggle.tsx`) flips `usePrivacyStore`
+(`src/stores/privacy.ts`, persisted as `fp-privacy`), which sets `data-privacy` on `<html>`.
+`theme.css` then blurs every element carrying the **`fp-sensitive`** class (`blur(0.45em)`, so
+it scales with the figure's size; width is kept, so nothing reflows). Hiding is pure CSS — no
+component reads the store, and the formatted strings are untouched.
+
+- **Tag figures, not labels**: put `fp-sensitive` on the element holding a money amount (the
+  label "available", "Income" etc. stays readable). Tag the smallest element that holds only
+  the figure; if a line mixes a figure with a short word ("SR 10 in bank"), tag the line.
+- **What is tagged**: balances (total hero, group/wallet rows, pots, by-currency card, the
+  Spending scope picker), the cashflow hero, the "Where it went" centre total, calendar-cell
+  totals, budget spent/limit/left, and the Goals monthly ledger. Individual transaction rows
+  and editor inputs are deliberately not blurred.
+- Any new summary/balance figure should carry `fp-sensitive`.
+- `BrandMark`'s wordmark goes `sr-only` below 400px so the top bar fits its extra button at 320px.
+
 ## RTL / LTR — first-class, non-negotiable
 
 RTL is a core requirement. Build for it from the start:
@@ -118,6 +136,12 @@ Palette (from the Means design's `THEMES` const): warm-neutral surfaces, emerald
 Concrete light/dark hex values are recorded in the agent memory `means-design-tokens`.
 Added beyond the design: `fp-danger` (form errors) — light `#B42318`, dark `#F2998E`; `fp-warn`
 (a warning that is not yet an error, e.g. a key expiring soon) — light `#B54708`, dark `#F5B35C`.
+The transaction dialog's type tints: `fp-spend` / `fp-spend-soft` (light `#B4561A` on
+`rgba(232,131,58,.11)`, dark `#F4A66E`) and `fp-transfer` / `fp-transfer-soft` (light `#2457B8` on
+`rgba(59,130,246,.10)`, dark `#8DB4F8`); income uses the accent.
+
+`ResponsiveDialog` also takes `onBack`: a back button replaces the close button before the title,
+for a sub-view of the dialog (the transaction dialog's in-place pickers).
 
 - Theme is a Zustand store (`src/stores/theme.ts`, `light|dark|system`, persisted) that
   toggles `.dark` on `<html>`. Direction is `src/stores/direction.ts` (`en→ltr`, `ar→rtl`,
@@ -128,6 +152,26 @@ Added beyond the design: `fp-danger` (form errors) — light `#B42318`, dark `#F
 
 > When you add a token, add it to the `@theme` block (and the dark overrides) — that's the
 > single source of truth. Record palette decisions here.
+
+## The dialog kit — `src/components/dialog/`
+
+Every dialog and side pane is built from the same parts (design: "Dialogs & side panes", shared
+patterns P1–P7). Labels are questions (`FieldLabel` / `FormRow`, with an `optional` suffix);
+values sit in field wells.
+
+- `AmountWell` — the one big amount on a tint, when money is the point of the dialog.
+- `Chip`/`ChipRow` (one-tap picks: cadences, dates), `PillSwitch` (2–4 way segmented track),
+  `OptionTiles` (choices that need a description line), `ColorSwatches`, `ToggleCard`, `NoteBox`
+  (tinted "what this will do" line).
+- `DialogActions` — the footer: hint line, `[Delete] [extra] [Cancel] [Primary flex-1]`; `ready`
+  keeps the primary pressable while it looks disabled, so pressing shows what's missing.
+- `ConfirmDialog` — every "are you sure" (P3 delete in `danger`, archive in `neutral`), with
+  consequence `bullets` and an optional grey `note`. Every delete goes through one.
+- `useDiscardGuard` — P4 "Discard your changes?" for editors whose close would lose edits.
+- `DoneState` — P5 check + Undo/Done body for create flows that land something undoable.
+- `DateField` takes `hint` ("in 5d" / "12 days ago" via `relativeDayLabel`, or a fixed word).
+- Side pane (P6): the goals `DetailPanel` — a 330px rail floating 12px in from the page's end
+  edge, same header as a dialog, footer pinned; a bottom sheet on mobile.
 
 ## shadcn/ui integration
 
@@ -148,15 +192,22 @@ scale — existing components rely on it; shadcn keeps the default radius scale.
 
 **Primitives are restyled to the Means look**, so feature code can use them plainly (no
 per-call className needed for the base look): `button.tsx` (accent CTA = `default` variant,
-`rounded-xl`, accent shadow, `font-bold`), `input.tsx`/`textarea.tsx`/`select.tsx` trigger
-(`rounded-xl`, `bg-fp-surface-2`, `py-3`, soft accent focus ring), `switch.tsx`/`checkbox.tsx`
-(fp sizing + colors). When you re-run `shadcn add` for a new component, re-apply this fp-
+`rounded-xl`, accent shadow, `font-bold`; plus `quiet` / `danger-soft` variants and the
+`dialog` size every dialog button uses), `input.tsx`/`textarea.tsx`/`select.tsx` trigger (the
+**field well** — `FIELD_WELL` in `ui/field-well.ts`: `bg-fp-surface-2`, 14px radius, a hairline
+in `fp-border` that reads as borderless, accent on focus, red tint when `aria-invalid`), the
+select popover (16px radius, 10px-radius items, accent-soft checked row, uppercase group
+labels), `switch.tsx`/`checkbox.tsx` (fp sizing + colors). Don't pass border/radius/background
+overrides to these per call — only layout (width). When you re-run `shadcn add` for a new component, re-apply this fp-
 styling to its base classes (and check RTL — the `Switch` thumb uses `rtl:` to flip).
 
 **Modals → `ResponsiveDialog`** (`src/components/ui/responsive-dialog.tsx`): one primitive for
 all editors/dialogs — a centered Radix `Dialog` on desktop and a vaul `Drawer` bottom-sheet on
 mobile (via `useIsDesktop()` in `src/hooks/useMediaQuery.ts`). It supplies the Means modal
-chrome (title + close, scrollable body, pinned footer). Controlled with `open`/`onOpenChange`;
+chrome from the "Dialogs & side panes" design (title + `description` as the subtitle + close,
+a scrollable body that stacks its children `gap-[14px]`, a footer pinned under a hairline;
+470px default). `icon` + `tone` turn it into an alert (tinted icon circle, no close,
+equal-width buttons); `hideHeader` keeps the title for screen readers only (a done state). Controlled with `open`/`onOpenChange`;
 pass fields as `children` and action buttons as `footer`. Never hand-roll `fixed inset-0`
 overlays anymore. `dismissible={false}` removes the close button and blocks Escape, backdrop
 and drag-to-close (Radix `preventDefault` / vaul `dismissible`) — only for a dialog whose
@@ -210,13 +261,13 @@ utilities in any custom classes you add to a shadcn component, and when you re-r
 convert the physical ones it ships with — the upstream defaults are LTR-only.
 
 **`SegmentedBar` — the one stacked bar** (`src/components/SegmentedBar.tsx`). The Cashflow hero
-(Spending) and the Total hero (Balances) both draw a proportional stack of coloured parts, so the
+(Spending) and the Total hero (Wallets) both draw a proportional stack of coloured parts, so the
 stack itself is a shared primitive: it takes `BarSegment[]` (`key`, `label`, `color`, `pct`,
 `valueStr`, `pctStr`, optional `note`) and reveals a part's figures on hover, keyboard focus and
 tap. A segment is a real `<button>` with an `aria-label` carrying the same three facts, so the bar
 is reachable without a pointer; non-active segments dim to 0.4 so the one being read stands out.
 The numbers are **built by the selectors, not the bar** — `buildCashflow`/`buildRecurringView`
-(`CashflowSegment`) and `buildBalancesView` (`GroupBar`) already hold the catalog, the base
+(`CashflowSegment`) and `buildWalletsView` (`GroupBar`) already hold the catalog, the base
 currency and the denominator, and money is never formatted in a component.
 
 Its tooltips are shadcn `Tooltip`s driven **fully controlled — `open` is passed, `onOpenChange`

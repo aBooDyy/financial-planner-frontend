@@ -11,7 +11,7 @@ root product [`.agent-context/`](../../.agent-context/). Keep
 - [data-layer-and-sync.md](data-layer-and-sync.md) — local DB (Dexie/IndexedDB), the
   outbox/sync engine, bulk push, the incremental (delta) pull and its watermarks, optimistic
   updates, conflict (`409`) handling, and the silent refresh on `401`.
-- [balances.md](balances.md) — the Balances feature (first synced entity): how the Dexie +
+- [wallets.md](wallets.md) — the Wallets feature (first synced entity): how the Dexie +
   sync engine, money/derivation, and the recreated UI are realized; the transfer and
   adjust-balance dialogs.
 - [goals.md](goals.md) — the Goals planning feature: income streams + ranked goals, the
@@ -26,8 +26,8 @@ root product [`.agent-context/`](../../.agent-context/). Keep
   recalc + undo, auto-post), settlement mutations, the id-taken sync branch, the hooks the
   Planned tab and goal detail read, and the Planned tab + confirm dialog components.
 - [categories.md](categories.md) — Categories: the two-level model, the synced tree and its
-  Dexie/sync branch, `buildCatalog` and the `CategoryCatalog` every surface reads, the Settings
-  list/editor, and the subtree-aware delete.
+  Dexie/sync branch, `buildCatalog` and the `CategoryCatalog` every surface reads, the shared
+  searchable `CategoryPicker`, the Settings list/editor, and the subtree-aware delete.
 - [onboarding.md](onboarding.md) — the `/setup` first-run wizard: `SessionGate`, the
   sessionStorage draft, starter packs over the category catalog, the one commit call, the
   inbox connect round trip.
@@ -35,8 +35,9 @@ root product [`.agent-context/`](../../.agent-context/). Keep
   copy-on-write categories, editable FX rates, and the local preferences store.
 - [merchants.md](merchants.md) — Merchants: the shared `normalizeKey` port, the scored local
   matcher, `auto_categorize`, and the adopt-and-remap sync branch.
-- [email-sync.md](email-sync.md) — the Email sync feature: the connect/map wizard, scanning on
-  demand, and how an inbox feeds the shared review queue.
+- [email-sync.md](email-sync.md) — the Email sync feature: inboxes and their ordered email
+  rules, the rule editor (grouped samples, learned templates, filter test), Sync now, and how an
+  inbox feeds the shared review queue.
 - [inbound-imports.md](inbound-imports.md) — the shared review queue every automatic source
   stages into: reviewing against the stored body, filling in a failed parse, merchant learning,
   the delta pull, and why the queue is its own slice.
@@ -60,8 +61,8 @@ root product [`.agent-context/`](../../.agent-context/). Keep
   lazy path + search chunks, `<Icon>` / `IconChip` / `IconPicker`, the fallback table, and the
   chrome-vs-content rule.
 - [styling-and-theming.md](styling-and-theming.md) — Tailwind v4, the `fp-` design tokens,
-  light/dark, **RTL/LTR** support, and the shadcn/Radix layer (the direction provider, the
-  logical-property conversions, and what stays physical).
+  light/dark, privacy mode (`.fp-sensitive`), **RTL/LTR** support, and the shadcn/Radix layer (the direction provider, the
+  logical-property conversions, and what stays physical), and the **dialog kit** (`src/components/dialog/`: field wells, amount well, chips, confirm/discard/done patterns, the side pane).
 - [pwa-and-mobile.md](pwa-and-mobile.md) — PWA/service worker, offline, native-like mobile,
   responsive/platform-specific nav.
 - [conventions.md](conventions.md) — component size, naming, structure, style.

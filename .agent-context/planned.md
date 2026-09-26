@@ -22,7 +22,7 @@ contract) until folded into the root knowledge base; this file is how the fronte
   follows settlements through two hooks in `data/rows.ts`, called by every settlement write
   path (transactions create/update/delete/bulk-delete, allocations create/update/delete):
   `closeCovered` (open → done once covered) and `reopenUnderSettled` (done → open once not).
-  So saving a transaction with a `plannedId` from the TxEditor closes the item exactly like
+  So saving a transaction with a `plannedId` from the transaction dialog closes the item exactly like
   confirming it does, and deleting it re-opens the item.
 - A legacy Spending auto-post (`source = recurring:<id>:<date>`, no `plannedId`) settles the
   matching RECURRING occurrence (`legacyMarkerOf`), so the switch-over never double posts.
@@ -152,7 +152,7 @@ Everything the UI needs is on the public surface, `features/planned/index.ts`:
 awaiting segment, contributions timeline + `collapseContributions`, `recalc()`, `lastRecalc`
 with its undo, `addContribution`), `useConfirmPlanned(id)` (dialog defaults + `preview()` —
 the effect line re-derives the plan with the settlement added), `usePlannedMatch(ref, roles,
-date)` (TxEditor "Counts toward" hint; `findMatch`: oldest open item of the origin and role
+date)` (the transaction dialog's "Counts toward" banner; `findMatch`: oldest open item of the origin and role
 within −45/+15 days), `useRecalcAll()`. QuickAdd's stricter hint (exact open amount, ±3 days,
 no origin chosen) is the Spending slice's own `transactions/data/quickAddMatch.ts`, fed by
 `usePlannedData` + `remainderOf` — see [transactions.md](transactions.md). They all sit on
@@ -166,7 +166,7 @@ settings, rates), the last one to unmount closes them (`openPlannerReads()` repo
 are open). Per-table queries keep a write to one table from re-reading the others. The
 derivation is shared too: `liveInputs` / `derivePlannerState` / the live nodes are memoised at
 module level on the table arrays' identity (plus base, rates, user, day), so however many
-hooks a page mounts — the Goals page's detail + Recalculate-all card, Spending's tab + TxEditor
+hooks a page mounts — the Goals page's detail + Recalculate-all card, Spending's tab + transaction dialog
 + confirm dialog + QuickAdd — the tables are read once and the plan derived once. No provider
 is needed, so the hooks work unchanged in tests and in any tree. A consumer that mounts while
 others are open renders the current snapshot at once (no loading flash).
@@ -194,15 +194,19 @@ The Spending page composes these; they read only the public hooks above.
 - **`ConfirmPlannedDialog`** (1d) — `{ plannedId: string | null; onOpenChange }`, open while
   `plannedId` is set; also imported by the Goals slice. State lives in `hooks/useConfirmForm`
   (seeded once per opening from `useConfirmPlanned().defaults`: remainder, suggested wallet or
-  the first wallet, today). Fields: amount with "of X", From/Into wallet (+ "External…" with a
-  label for set-asides), date; the effect line and the primary label come from the pure
+  the first wallet, today). Fields: an `AmountWell` ("How much are you confirming?" / "How much
+  came in?", "of X planned" under it), From/Into `ConfirmWalletSelect` (+ "External…" with a
+  label for set-asides) beside the Paid/Received `DateField` (relative hint); the effect line and the primary label come from the pure
   `data/confirmCopy.ts` (`effectLine`, `primaryLabel`, `plannedForLine` — the small line above the title,
-  "Planned for Sep 1 · 23 days ago"). Tones: full = accent-soft, partial = amber-soft, over /
-  empty = neutral. Secondary: Move date (inline `DateField` → `movePlanned`), Skip this one,
-  Close the rest (partials) as two equal outlined buttons under a full-width primary. `PlannedActionError` codes map to copy via
+  "Planned for Sep 1 · 23 days ago"). `EffectLine` is a `NoteBox`: full = accent (with a check), partial = warn with a bold
+  "Partial:", over / empty = neutral. Secondary: Move date (`MovePlannedPanel` replaces the row:
+  "Move to" `DateField`, "A moved date is pinned…", Cancel / Move → `movePlanned`), Skip this one
+  (asks first through a light `ConfirmDialog`), Close the rest (partials) as two equal quiet
+  buttons under a full-width primary. `PlannedActionError` codes map to copy via
   `messageForCode('planned.<code>')` (`plannedErrorMessage`).
-- Amber is `fp-warn` at 10 % / 25 % (`bg-fp-warn/10`, `border-fp-warn/25`) — there is no
-  separate amber-soft token.
+- Amber on the Planned tab (due band, nudge, due rows) is `fp-warn` at 10 % / 25 %
+  (`bg-fp-warn/10`, `border-fp-warn/25`) — there is no separate amber-soft token. The confirm
+  dialog's partial line instead uses the dialog kit's `warn` (`fp-spend` on `fp-spend-soft`).
 
 ## Where the UI reads it
 

@@ -149,15 +149,16 @@ colour, icon or child list calls this; pure functions take the result as a param
 
 ## `data/defaults.ts` — the seed and the fallback, and nothing else
 
-The built-in two-level catalog (`CATEGORIES`: 24 parents — 18 spending, 6 income — with
+The built-in two-level catalog (`CATEGORIES`: 26 parents — 20 spending, 6 income — with
 their children, each with a colour and an `IconId`; children inherit type and colour). It is
 what a brand-new user's rows are seeded from on the server and what an unknown slug falls back
 to here. **Its `id` values are the slugs transactions persist**, so it must match the
 backend's `app/config/categories.py` exactly — same slugs, names, icons, colours and order;
-change the two together. The current set (2026-09-24) is Saudi-flavoured: Family, Personal
-care, Insurance, Government & fees (Iqama, visas), Gifts & giving (Eidiah, charity & zakat),
-and Other income sit beside the usual roots. Required roots stay `savings` + `other`; the
-fallback stays `other`. `savings` is the home for goal contributions (`SAVINGS_CATEGORY_ID`
+change the two together. The current set (2026-09-25) targets a wide general audience: one
+root per kind of spend so reports never split the same money across two parents (e.g. Family
+& kids holds childcare/kids/support, not family groceries), 3–5 children each, and the
+mainstream roots Pets, Debt & loans and Taxes & fees. Required roots are `savings` + `other`
++ `other_income`; the fallback stays `other`. `savings` is the home for goal contributions (`SAVINGS_CATEGORY_ID`
 lives in `features/transactions/constants.ts`, its only consumer). Onboarding's starter packs
 must list only these root slugs ([onboarding.md](onboarding.md#packs--datapacksts)).
 
@@ -192,7 +193,7 @@ place, before enqueuing a new one.
 ### Deleting is subtree-aware
 
 The server cascades, so a delete is **one** op for the subtree root — the same shape as
-`features/balances`. The local side has to mirror that inside a single Dexie transaction:
+`features/wallets`. The local side has to mirror that inside a single Dexie transaction:
 
 ```
 deleteCategory(id)
@@ -237,24 +238,52 @@ and recorded as a sync pattern in
   shows "· N subcategories", hidden below `sm` because at 390px it stole the row and
   truncated the parent name. `+ Add subcategory` is the last item inside an expanded parent,
   which is how the feature announces itself on a parent with no children yet.
-- **`useCategoryEditor` / `CategoryEditor`** — a `ResponsiveDialog` with the 56px `IconChip`
-  as the picker's trigger (it re-tints live as the colour changes), the name field, the
-  `CAT_COLORS` swatch row (`features/categories/constants.ts`), and two rows that are
-  controls only on create: **Type** is a `Segmented` when creating at top level and a locked
-  row otherwise, and **In** is a `Select` of the user's roots of that type plus "— Top
-  level —" on create, a locked row with the can't-be-moved explanation afterwards. Choosing
-  a parent adopts its type and its colour. Editing loads from Dexie and narrows a
-  stored-but-unknown icon id to `null`.
+- **`useCategoryEditor` / `CategoryEditor`** — a `ResponsiveDialog` (440px): the 56px `IconChip`
+  with a "Change" caption as the picker's trigger (it re-tints live as the colour changes)
+  beside the **Name** well, the shared `ColorSwatches` over `CAT_COLORS`
+  (`features/categories/constants.ts`), and a **Type | In** pair that is a control only on
+  create: **Type** is a `PillSwitch` (Spending | Income) when creating at top level and a
+  `LockedField` (lock glyph in the field well) otherwise; **In** is a `ParentCategorySelect`
+  (the roots of that type with their icon chips, plus "Top level") on create and a locked well
+  afterwards. The reason for the locks is one help line under the pair. Choosing a parent
+  adopts its type and its colour. The footer is `DialogActions` (**Add category / Add
+  subcategory / Save**); an empty name keeps the primary looking unready and pressing it shows
+  "Give it a name." The form (`CategoryEditorForm`) mounts per opening, so that state resets.
+  Editing loads from Dexie and narrows a stored-but-unknown icon id to `null`.
   **The `IconPicker` is a child of that dialog, not a sibling** — see
   [icons.md](icons.md#a-nested-picker-goes-inside-the-parent-dialogs-children).
-- **`DeleteCategoryDialog`** names the subcategories about to go with the parent and,
-  when anything is filed under it (`txCount` / `recurringCount` from `useCategoryTree`),
-  asks what happens to it: **Move them to another category** (default, with
+- **`ParentCategorySelect`** is shared with the import wizard's `CreateCategoryDialog`; only the
+  top-level option's wording differs (`noneLabel`).
+- **`DeleteCategoryDialog`** is a `ConfirmDialog` (trash icon, danger tone). It names the
+  subcategories about to go with the parent and, when anything is filed under it (`txCount` /
+  `recurringCount` from `useCategoryTree`), asks what happens to it as two radio cards:
+  **Move them to another category** (default; the chosen card holds a "Move them to"
   `MoveTargetSelect`) or **Keep them as they are**. With nothing filed it is a plain
-  confirm. `useDeleteChoice` holds the decision and resets when the dialog opens on another
-  row; `data/moveTargets.ts` (pure, tested) lists the targets — same type, never the
+  confirm ("Nothing is filed under it. This can't be undone."). The confirm reads **Delete &
+  move** or **Delete**. `useDeleteChoice` holds the decision and resets when the dialog opens
+  on another row; `data/moveTargets.ts` (pure, tested) lists the targets — same type, never the
   deleted row or a child it cascades to — and suggests one: a subcategory's parent, else
   `other`, else the first root left.
+
+## The picker — `CategoryPicker`
+
+`components/CategoryPicker` is the one control for choosing a category **or** a subcategory
+(quick-add and the transaction/recurring editor). Props: `type`, `category`, `subcategory`,
+`onChange(category, subcategory)`. The trigger is an `IconChip` (the child's icon/colour when
+one is chosen) + "Parent › Sub" (parent muted, child bold); its accessible name is
+`"Category: Parent › Sub"`. It opens a Popover + cmdk `Command` (`components/CategoryOptions`)
+built **only while open** — the same pattern as `CurrencyPicker`:
+
+- Every parent is a **pickable row** (28px chip, semibold); its children sit indented on a
+  rail under the parent's chip (22px chip, muted). The current pick has a check + accent ink
+  (`data-checked`), and the list scrolls it into view on open.
+- Matching is by hand (`shouldFilter={false}`) in the pure `data/pickerSections.ts`: a parent
+  whose name matches brings **all** its children; otherwise a parent appears with just its
+  matching children; sections sort by best `commandFilter` score. Item values are
+  `pickerValue(slug, sub)` → `slug` / `slug/sub`. The highlight resets to the top hit on every
+  new result, so Enter picks the best match; arrow keys walk parents and children alike.
+- Inside a `ResponsiveDialog` (`ScheduleEditor`) it works like `CurrencyPicker` in the node and
+  goal editors — no nested dialog is needed.
 
 ## Who reads the catalog
 
@@ -262,19 +291,21 @@ and recorded as a sync pattern in
 | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `features/transactions/data/selectors.ts`                          | `buildCashflow` / `buildBreakdown` / `buildActivityList` / `buildBudgetsView` / `buildRecurringView` take `catalog: CategoryCatalog` as a **required second parameter**                     |
 | `useTransactions`                                                  | returns `catalog` alongside `SpendingData`; `TransactionsPage` threads it                                                                                                                   |
-| `CategoryPickerDialog`, `TxEditor`, `QuickAddCard`, `CategoryIcon` | `useCategoryCatalog()` directly                                                                                                                                                             |
+| `CategoryPicker`, `TransactionDialog`, `QuickAddCard`, `CategoryIcon`       | `useCategoryCatalog()` directly                                                                                                                                                             |
 | `features/import`                                                  | `useCsvImport` builds the catalog from its own Dexie read; `categoryOptions(catalog)` flattens it for the matcher, `fallbackCategoryOf(catalog)` picks the default ([import.md](import.md)) |
 | `features/inbound-imports/hooks/useImportReview`                   | takes a `CategoryCatalog` and normalises the suggested pair against it ([inbound-imports.md](inbound-imports.md))                                                                           |
 | `features/settings/components/MerchantRow`                         | resolves the remembered category for its chip                                                                                                                                               |
 
-`features/balances` does **not** read it — a wallet's icon is its own column, resolved in
-`buildBalancesView` ([balances.md](balances.md)).
+`features/wallets` does **not** read it — a wallet's icon is its own column, resolved in
+`buildWalletsView` ([wallets.md](wallets.md)).
 
 ## Tests
 
 `data/catalog.test.ts` (nesting, ordering, orphans, colour and icon inheritance, the
 unknown-slug paths, the empty-rows-yields-defaults case), `data/mutations.test.ts`
 (sibling-scoped slugs, the create/update coalescing, and the two subtree-delete cases),
+`data/pickerSections.test.ts` (the search rules), `components/CategoryPicker.test.tsx`
+(lazy rows, trigger label, type filter, parent/child/keyboard picks, the check),
 `data/defaults.test.ts` (every icon id is in the pack; slugs are unique per sibling set) and
 `data/slug.test.ts`. Selector tests build a catalog from fixture rows with `buildCatalog`,
 one line per test, so they stay pure.

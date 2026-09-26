@@ -18,7 +18,7 @@ pattern changes. Index: [`.agent-context/README.md`](.agent-context/README.md).
 - [icons.md](.agent-context/icons.md) — Icons: the generated Phosphor pack, its manifest + generator, the lazy path/search chunks, `<Icon>`/`IconChip`/`IconPicker`, fallbacks, and the chrome-vs-content rule.
 - [styling-and-theming.md](.agent-context/styling-and-theming.md) — Tailwind, the `fp-` design tokens, light/dark, **RTL/LTR** (incl. Radix's direction provider).
 - [pwa-and-mobile.md](.agent-context/pwa-and-mobile.md) — PWA setup, offline, native-like mobile UX, responsive nav.
-- [balances.md](.agent-context/balances.md) — Balances: the first synced entity, money/derivation, the wallets/groups tree.
+- [wallets.md](.agent-context/wallets.md) — Wallets: the first synced entity, money/derivation, the wallets/groups tree.
 - [goals.md](.agent-context/goals.md) — Goals: income streams + ranked goals, the client-side funding engine.
 - [transactions.md](.agent-context/transactions.md) — Spending: ledger + budgets + recurring, derived balances, settlement links, transfers between wallets, balance adjustments.
 - [planned.md](.agent-context/planned.md) — Planned transactions: generator + reconciler, the app-level planner, deterministic ids, confirm/skip/recalc, the hooks the Planned tab and goal detail read.

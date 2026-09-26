@@ -5,8 +5,8 @@ The Settings page (Means `SettingsApp` design) reached from the **avatar menu**
 `routes/settings.tsx` → `features/settings/components/SettingsPage`. The page reuses the
 shared shell (`TopNav` / `MobileTabBar`, whose `active` prop is now optional so no nav item
 highlights) and lists its panes in `SettingsRail` (desktop left rail / mobile chips): Account,
-Preferences, Currencies & rates, Categories, Merchants, Email sync
-([email-sync.md](email-sync.md)), Integrations ([integrations.md](integrations.md)),
+Preferences, Currencies & rates, Categories, Merchants, Import ([import.md](import.md)), Email
+sync ([email-sync.md](email-sync.md)), Integrations ([integrations.md](integrations.md)),
 Notifications, Archived, Data & privacy. Each pane is its own route — see
 [routing.md](routing.md#settings-settings).
 
@@ -34,26 +34,32 @@ Notifications, Archived, Data & privacy. Each pane is its own route — see
   once it differs. The UI edits "1 X = n base"; persisted as the absolute reference rate
   (`display × baseRate`) via `setExchangeRate`, which is **copy-on-write** — the first edit of
   a currency creates its row and sends no `version`. Defaults live in `GET /config`
-  ([app-config.md](app-config.md)). Auto-update toggle is a preference.
+  ([app-config.md](app-config.md)). Auto-update toggle is a preference. Deleting one of the
+  user's own currencies confirms first (`DeleteCustomCurrencyDialog`); so does deleting a
+  merchant (`DeleteMerchantDialog`, in Merchants). `CustomCurrencyDialog` shows its field
+  errors after a first press of the (ready-styled) submit.
 - **Categories** (`CategoriesSection`): full CRUD over the **synced**, copy-on-write,
   **two-level** category tree — the entity, the resolver and the list/editor components all
   belong to `features/categories/`, and this section only composes them, the same way
   `MerchantRow` composes `features/merchants/`. A type `Segmented` filters the list;
   `useCategoryTree` supplies a live per-row transaction count. Everything about the model,
   the resolved catalog and the subtree delete is in [categories.md](categories.md).
-- **Archived** (`ArchivedSection` + `ArchivedRow` + `DeleteArchivedDialog`): every archived
+- **Archived** (`ArchivedSection` + `ArchivedRow` + balances' `DeleteNodeDialog` with `archived`): every archived
   wallet/group, newest first, from `useArchivedNodes` → pure `buildArchivedList`
-  (`features/balances/data/archivedList.ts`): balance (a group's in base currency), wallet
+  (`features/wallets/data/archivedList.ts`): balance (a group's in base currency), wallet
   count, archive date (honours `dateFormat`), former group, and a "stranded" note when that
   group is archived too. **Restore** is one tap (`restoreNode`); **Delete** confirms first,
   because it is the ordinary `deleteNode` and takes the ledger with it. See
-  [balances.md](balances.md#archiving).
+  [wallets.md](wallets.md#archiving).
 - **Notifications**: five toggles → `usePreferencesStore`.
-- **Data & privacy**: Import a file (→ `/import`), real **CSV/JSON export** from the local DB
-  (`data/exportData.ts`), **Import templates** (`ImportTemplatesCard` + `ImportTemplateRow`:
-  rename / delete / see what a saved mapping recognises, and the "needs rebuilding" and
-  "rename to finish syncing" states — see
-  [data-layer-and-sync.md](data-layer-and-sync.md#exception-import-templates-importtemplatename_taken)),
+- **Import** (`features/import/components/ImportSection`): the import hub — inbox + file
+  source cards ("Choose a file" → the full-width wizard at `/import`), recent imports with
+  undo, and **Import templates** (`ImportTemplatesCard` + `ImportTemplateRow`: rename / delete
+  / see what a saved mapping recognises, and the "needs rebuilding" and "rename to finish
+  syncing" states — see
+  [data-layer-and-sync.md](data-layer-and-sync.md#exception-import-templates-importtemplatename_taken)).
+  This is the only entry point to importing; the Spending header has no Import button.
+- **Data & privacy**: real **CSV/JSON export** from the local DB (`data/exportData.ts`),
   auto-backup preference, Sign out (real), Delete account (disabled — no backend endpoint).
 
 ## Data layer (Dexie + sync)
@@ -62,7 +68,7 @@ Notifications, Archived, Data & privacy. Each pane is its own route — see
   index carries the two-level tree, [categories.md](categories.md)); `exchangeRates` carries a
   `dirty` index (rates are per-user editable, so a background pull must not clobber a local
   edit — `pullRates` respects `dirty`, like `pullNodes`). `clearLocalDb` clears both.
-- `features/settings/` keeps the **rate** half: the rate update lives on `balancesApi`,
+- `features/settings/` keeps the **rate** half: the rate update lives on `walletsApi`,
   profile on `authApi`, and `data/mutations.ts` owns `setExchangeRate`. The **category**
   half — `api/`, `data/mappers.ts`, `data/mutations.ts`, `data/sync.ts` and the pure
   `data/slug.ts` — belongs to `features/categories/`. Both plug into the shared engine

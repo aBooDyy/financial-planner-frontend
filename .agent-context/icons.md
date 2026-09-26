@@ -5,7 +5,7 @@ The app draws from **two** icon sets, on purpose. Controls and affordances are
 Phosphor glyphs generated into `src/lib/icons/` and rendered by `<Icon>`. A category, a
 subcategory, a wallet and a group each store an **icon id** (`piggy-bank`, `fork-knife`):
 a short lowercase-kebab string that the backend validates for shape only and never
-interprets ([categories.md](categories.md), [balances.md](balances.md)).
+interprets ([categories.md](categories.md), [wallets.md](wallets.md)).
 
 ## The pack
 
@@ -167,8 +167,8 @@ export const iconTint = (color: string) =>
 `IconChip` is the visual primitive that replaced the bare colour swatch everywhere: the
 glyph in the entity's colour on a 12%-tint square of the same colour, `rounded-[10px]`,
 `size` 36 by default (34 in the Settings category list, 56 for an editor's icon trigger),
-`iconSize` defaulting to half the square. `iconTint` is exported because the picker tints a
-selected tile with the same mix.
+`iconSize` defaulting to half the square. `iconTint` is exported for surfaces that tint with
+the same mix without a chip.
 
 ## Fallbacks
 
@@ -193,7 +193,7 @@ iconIdOr(id: string | null | undefined, fallback: IconId): IconId
 **The stored field is `string | null`, not `IconId | null`.** `LocalCategory.icon` and
 `LocalBalanceNode.icon` are plain strings because the database is not the place to enforce
 a union that the pack can redefine. Narrowing happens at the **render boundary** —
-`iconIdOr` in the resolvers (`buildCatalog`, `buildBalancesView`), `isIconId` in the editor
+`iconIdOr` in the resolvers (`buildCatalog`, `buildWalletsView`), `isIconId` in the editor
 hooks — so a `BalanceRow.icon` or a `ResolvedCategory.icon` handed to a component is always
 an `IconId`. An editor hook narrows a stored-but-unknown id to `null` rather than freezing
 it into the draft, so an id from a newer pack degrades to "the default for this kind"
@@ -235,11 +235,14 @@ type IconPickerModel = {
   localStorage, not synced, filtered through `isIconId`) followed by the manifest's 15
   groups in manifest order. A recent tile's cmdk value is prefixed `recent:` so a repeat is
   not a duplicate key in the list.
-- **Tiles are 44×44**, six columns on mobile and eight from `sm`, each drawn in the entity's
-  current colour and carrying `aria-label={label}`. The chosen one gets a `ring-2` and the
-  `iconTint` background.
-- **The footer** shows `{258} icons` and a **Use the default icon** action that hands back
-  `null`.
+- **Tiles are square and fill the grid** (six columns on mobile, eight from `sm`, 8px gaps),
+  each drawn in the entity's current colour on a 12% tint of it and carrying
+  `aria-label={label}`; the highlighted (pointer / arrow-key) tile deepens to 22%. The chosen
+  one is ringed in its colour (a 2px surface gap, then 2px of colour), which is why the list is
+  inset 4px — its clipping would cut the ring. The search is the shared `CommandInput` recast
+  as a field well from the `Command`'s class list.
+- **The footer** shows `{258} icons` and a quiet **Use the default icon** button that hands
+  back `null`.
 - **The highlight is driven, not inferred.** The `Command` runs `shouldFilter={false}` with
   a controlled `value`: cmdk only tracks the best match itself while it owns filtering, so
   the picker pins the highlight to the entity's own icon at open and to the top hit as

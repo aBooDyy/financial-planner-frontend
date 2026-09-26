@@ -18,7 +18,7 @@ the server makes it), so there is no offline write and no outbox entity. Dexie `
 | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `api/`        | `types.ts` (key wire ↔ domain, `settingsOf`), `integrationKeysApi.ts` (list/create/update/rotate/remove), `ruleTypes.ts` (rule, locator, dry-run shapes + mappers), `integrationRulesApi.ts` (list / replace / dryRun), `deliveryTypes.ts` + `integrationDeliveriesApi.ts` (the delivery log)                                                                                                                                                                                                                                                                                          |
 | `data/`       | keys: `cache.ts` (pull + write generation, `recordRuleCount`), `mutations.ts`, `errors.ts` (`keyFailure`), `health.ts`, `describe.ts`, `draft.ts`, `expiry.ts`, `curl.ts`, `mappers.ts`. rules: `ruleEditorState.ts` (the reducer), `ruleDraft.ts` (bind, hop, `sendable`, summaries), `ruleFields.ts`, `payloadTree.ts`, `tokens.ts` (pattern suggestion), `treeMarks.ts`, `fieldStatus.ts`, `ruleErrors.ts`, `verdicts.ts`, `lastPayload.ts`, `prettyJson.ts`. log: `deliveryText.ts` (outcome headlines + fixes), `throttle.ts` (the row's quota notice)                                                 |
-| `hooks/`      | `useIntegrationKeys`, `useKeyFlow`, `useCreateKeyForm`, `useKeyEditor`, `useCopy`; `useRuleEditor` (the rule editor's state machine), `useDryRun` (debounced tester), `useDragReorder`, `useFieldStatusContext`; `useDeliveries`, `useBuildFromDelivery`                                                                                                                                                                                                                                                                                                 |
+| `hooks/`      | `useIntegrationKeys`, `useKeyFlow`, `useCreateKeyForm`, `useKeyEditor`, `useCopy`; `useRuleEditor` (the rule editor's state machine), `useDryRun` (debounced tester), `useFieldStatusContext` (the list's `useDragReorder` is shared, in `src/hooks/`); `useDeliveries`, `useBuildFromDelivery`                                                                                                                                                                                                                                                                                                 |
 | `components/` | `IntegrationsSection` → `EndpointCard`, `KeyList` → `KeyRow`, `NoKeysCard`, `CreateKeyDialog`, `TokenRevealDialog`, `ConfirmKeyActionDialog`, `KeyEditorDialog` → `KeySettingsForm` + `KeyRulesSection` → `RuleList` → `RuleListItem`; opening a rule swaps in `RuleEditor` → `MatchConditionRow`, `TraceBanner`, `SamplePayloadPane` → `PayloadTree` → `PayloadTreeItem`, `ReferenceWarning`, `FieldList` → `FieldRow` → `LocatorInputs` (+ `ConstantInput`, `PatternHelp`), `FieldOptions`, `FieldStatusText`; under both panes `DeliveryLog` → `DeliveryRow` → `DeliveryDetails` → `DeliveryFieldReport` |
 
 ## The secret exists once
@@ -66,6 +66,16 @@ Category/subcategory selects read the live `CategoryCatalog` ([categories.md](ca
 One **Save** stores whatever changed: the settings PATCH (key `version`), then the rule set's
 PUT (the set's own `version`). Either failing keeps the dialog open with the error in the
 footer. The rules pane sits in the end column on desktop and below the settings on a phone.
+
+**The dialogs' shape** (Means "Dialogs & side panes", I1–I4). Create: name (example chips
+while it is empty), optional default account, expiry as chips (`ExpiryField variant="chips"`;
+the editor keeps the select), `DialogActions` with the offline sentence as its hint. Reveal:
+the token in a white `CopyField` with a soft "Copy", a warn `NoteBox`, one full-width button.
+Rotate/revoke/delete go through the shared `ConfirmDialog` (rotate: warn tint + green button;
+revoke/delete: red) with busy labels. The key editor (920px) closes through `useDiscardGuard`
+when the settings or the rule set changed; the rule view's back/Esc/Cancel does the same for
+the open rule — `OpenRule.base` is the rule as opened and `openDirty` compares against it.
+Deleting a rule from the list asks first (`ConfirmDialog` in `KeyRulesSection`).
 
 ## Errors
 

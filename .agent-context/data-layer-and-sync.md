@@ -183,7 +183,7 @@ called by `RootLayout` and gated on `session.status === 'authenticated'`. It is 
 navigation does not unmount, so the loops live for the session and stop at logout.
 
 **Never start it from a page.** One pull fans out to _every_ collection (12 endpoints today), so a
-page-level `startSync()` refetches the whole dataset on each navigation — opening Balances would
+page-level `startSync()` refetches the whole dataset on each navigation — opening Wallets would
 fetch goals, budgets, recurrings, merchants and import templates. It also restarts the 5-minute
 interval from zero each time, so a user who changes tabs more often than that never gets a
 background pull at all. Both were live bugs: sync was started from five page components until the
@@ -337,10 +337,10 @@ carrying the backend's stable `code` + field `details`. The remote-only auth cal
 user to a `camelCase` `User` at the boundary. Session lives in `src/stores/session.ts`
 (`status: loading|authenticated|anonymous`), bootstrapped once via `GET /auth/me`.
 
-**Implemented (Balances slice):** Dexie + the outbox/sync engine described here now exist —
+**Implemented (Wallets slice):** Dexie + the outbox/sync engine described here now exist —
 `src/db/` (`db.ts`, `sync.ts`, `types.ts`) with tables `balanceNodes`, `balanceSettings`,
 `exchangeRates`, `outbox`, plus optimistic mutations and the `409` rebase-and-retry loop.
-This is the first synced entity; see [balances.md](balances.md) for the concrete realization.
+This is the first synced entity; see [wallets.md](wallets.md) for the concrete realization.
 
 ## One entry, two rows: transfers
 
@@ -372,10 +372,10 @@ operation, so it is called directly and followed by a pull instead of being queu
 Two entities are trees — `balanceNodes` (groups holding wallets) and `categories`
 (categories holding subcategories) — and the server deletes a subtree by cascade. The local
 side has to mirror that exactly, and the pattern is the same in both
-(`features/balances/data/mutations.deleteNode`,
+(`features/wallets/data/mutations.deleteNode`,
 `features/categories/data/mutations.deleteCategory`):
 
-1. Collect the subtree locally. Balances walks to arbitrary depth; categories reads one
+1. Collect the subtree locally. Wallets walks to arbitrary depth; categories reads one
    level, because two is the cap ([categories.md](categories.md)).
 2. In **one** Dexie transaction, **drop every descendant's pending outbox entries** and
    delete their local rows, then the root's.
@@ -463,16 +463,18 @@ stages into (`features/inbound-imports/`, Dexie `inboundImports`) are
 server-owned and online-only — email sync talks to Gmail / Microsoft Graph — so they
 **deliberately do not use the offline outbox**. The Dexie tables are a read cache of server truth: `data/cache.ts` pulls
 replace the cached set, and `data/mutations.ts` call the API directly then update the cache
-(toggle / confirm / dismiss / disconnect / saveRules / completeOAuth). No `dirty`/`deleted`
+(settings / confirm / dismiss / disconnect / saveRules / completeOAuth). No `dirty`/`deleted`
 flags. The staged imports are the exception within the exception: they are read as a **delta**
 (see [Incremental pull](#incremental-pull-the-delta-streams) and
 [inbound-imports.md](inbound-imports.md#refreshing-the-staged-set) for why).
-`pullConnections()` still replaces the whole connection set. Connecting is a provider OAuth
+`pullConnections()` still replaces the whole connection set, with a write generation (like
+integration keys) so a list overtaken by a connect, save or disconnect is dropped; an inbox's
+rules are fetched when its editor opens and never cached. Connecting is a provider OAuth
 redirect → frontend callback route
 `/settings/email-sync/callback` → `POST /email-connections/oauth/callback`; the scan is
 client-triggered on login (`useEmailSyncBootstrap` → `POST /email-connections/sync`).
 Confirming a staged import inserts the promoted transaction straight into the local
-`transactions` ledger (clean, already-synced) so Balances/Spending reflect it immediately.
+`transactions` ledger (clean, already-synced) so Wallets/Spending reflect it immediately.
 
 **Integration keys** (`features/integrations/`, Dexie `integrationKeys`) follow the same
 exception: server-minted, so a pull replaces the set and mutations call the API then cache —

@@ -1,11 +1,13 @@
 # Import (CSV on the device · templates · batches · undo)
 
-Bringing transactions in from outside the app. Two sources share one hub at `/import`: a
+Bringing transactions in from outside the app. Two sources share one hub, the **Settings › Import** pane
+(`/settings/import`, `ImportSection`), which also lists recent batches and saved templates: a
 connected **inbox** (server-side, online-only — see [email-sync.md](email-sync.md)) and a
 **CSV file**, which is read, mapped, reviewed and committed **entirely in the browser**.
 No upload endpoint exists and none is wanted: the ledger's source of truth is already Dexie,
 imported rows travel the same outbox as a hand-typed one, and a bank statement never leaves
-the device. The backend's only part in the CSV path is remembering the _mapping_
+the device. The file wizard itself runs on its own full-width page at `/import` (`ImportPage`)
+so the review grid has room; cancelling or finishing returns to the pane. The backend's only part in the CSV path is remembering the _mapping_
 (`financial-planner-backend/.agent-context/import-templates.md`).
 
 ## Slice
@@ -120,13 +122,19 @@ turned out to be longer than it looks:
   `kind` bound once per group, because a callback built per row is a new prop on every render.
   `Intl.NumberFormat` is module-level — constructing one costs more than formatting the number
   does.
-- **Option elements are not built for a closed select**, and the subtlety is worth keeping
-  written down because the obvious fix is wrong. **Radix evaluates `SelectContent`'s children
-  whether or not the menu is open** (into a detached `DocumentFragment`), and it takes a closed
-  trigger's label from a **mounted** `SelectItemText`. So "render nothing when closed" would blank
-  every trigger on the screen, and "render everything" builds thousands of elements per answer. A
-  closed row mounts exactly **one** item — the chosen one — and `chosenLabel` resolves its text
-  without building the list.
+- **Option elements are not built for a closed picker.** Step ③'s wallet/category/merchant/
+  type answers, and the row editor's account and category fields, use `TargetPicker` (Popover +
+  cmdk, `shouldFilter={false}`): searchable, icon chips from `TargetOption.icon/color`, parents as
+  group headings with subcategories indented (`TargetOption.name` is the short in-group label),
+  a check on the chosen option. Its sections are only built while open; the closed trigger
+  resolves the chosen option with a lookup. `categoryTargetGroups` (`data/values.ts`) is the one
+  builder for category groups, shared by step ③ and the review step's row editor.
+  It files spending parents before income ones under sticky _Money out_ / _Money in_ bands
+  (`TargetGroup.section`; transfer/adjustment sit under _Other_), and the trigger wears the
+  chosen category's direction as a badge (`TargetOption.tag`). Search is substring-per-word,
+  case- and accent-blind, over the option and its group name — not cmdk's fuzzy scorer, which
+  matched letters scattered across unrelated names. jsdom tests
+  that open it need a `ResizeObserver` stub.
 
 `hooks/useValueMapping.cost.test.ts` counts the two quantities that were multiplying, **rows
 walked** and **matcher calls**, and asserts that forty answers over a 4 000-row file add **zero**
@@ -292,8 +300,9 @@ income. They are recognised in step ③ and settled in the pass.
   adjustment" in the category cell and a neutral amount (`tone`). The tally returns
   `plan: {transactions, transfers}` (a pair counts once) for the footer ("Import 1 204
   transactions · 243 transfers") and a line under the summary; `committable` puts a paired row's
-  partner straight after it. `RowEditDialog` offers **Spend | Income | Transfer | Adjustment**
-  (`RowKindField`), a money-out/in toggle under the last two, and an **Other account** select
+  partner straight after it. `RowEditDialog` leads with the amount in an `AmountWell` (tinted by
+  the row's kind, the currency as a pill under it), then offers **Spend | Income | Transfer |
+  Adjustment** as a `PillSwitch` (`RowKindField`), a money-out/in switch under the last two, and an **Other account** select
   (`WalletSelect`, own wallet excluded) for a transfer; its form logic is `data/rowEditForm.ts`.
 - **Commit.** Cash flow and adjustments stream through `bulkAddTransactions` (an adjustment as
   `adjustment_in/out` by direction, no links); transfer rows are collected — a paired side waits
@@ -356,11 +365,11 @@ card explains and review shows the flagged rows.
   is exactly the silence this feature must avoid.
 - `dedupe.ts` gives every row **two keys**: the bank's own reference when the file has one,
   and a fingerprint `date|type|amount|currency|walletId|label` when it does not — where
-  `label` is `m:<merchantId>` if a merchant is bound, else
-  `normalizeKey(stripReference(note)).slice(0, 40)`. Both are matched against the existing
-  ledger **and** against earlier rows of the same file, inside `windowDays` (default 3) so a
-  bank that posts a day late still matches. The fixtures find planted duplicates with zero
-  false positives; a ±5-day repost correctly does not match.
+  `label` is `m:<merchantId or empty>|normalizeKey(stripReference(note))` (a transfer leg or
+  adjustment uses the shared movement label instead). Both are matched against the existing
+  ledger **and** against earlier rows of the same file **exactly** — same day, every field. The
+  ±days window was removed on purpose (2026-09-25, user decision): a repeat that isn't exact on
+  everything is not flagged.
 - A mapped `reference` rides at the **end of the note** as ` · ref:<id>`, because
   `t_transactions` has one `source` column and the batch marker has to win it.
 - **`markRow` decides one row against a running `SeenRows`**, which is what lets the check ride
@@ -528,6 +537,8 @@ table `importTemplates` (**v9**), synced through the ordinary outbox.
   import was actually mapped with has its `lastUsedAt`/`useCount` bumped even when the user
   declines to save the mapping, because that use is a fact and it is what orders the picker
   next month.
+- **Deleting one asks first** (`DeleteTemplateDialog`, a `ConfirmDialog`): the imported rows
+  stay, only the mapping is forgotten.
 - `409 import.template.name_taken` is a **name** conflict and must never be rebased; the sync
   branch and the parked-row behaviour live in
   [data-layer-and-sync.md](data-layer-and-sync.md#exception-import-templates-importtemplatename_taken).
@@ -556,9 +567,9 @@ local-only presentation. Undo, the edited-since rule and the chunking rationale 
 
 ## The inbox source
 
-The hub's other card is **Scan now** over a connected inbox — `ScanNowControl`,
+The pane's other source card is **Sync now** over a connected inbox — `ScanNowControl`,
 `useManualScan`, and the "any field present means manual" contract — all owned by the email
-sync slice; see [email-sync.md](email-sync.md#scanning-on-demand). The two sources have
+sync slice; see [email-sync.md](email-sync.md#sync-now). The two sources have
 deliberately opposite architectures: CSV is local-first because it can be, email sync is
 server-side and online-only because OAuth tokens and provider APIs cannot live in a browser.
 
@@ -660,7 +671,7 @@ endpoints — see [data-layer-and-sync.md](data-layer-and-sync.md).
 - **`MAX_CONFIG_BYTES` (64 KiB) is hard-coded** in `api/types.ts` to match the backend's
   `import_template_rules.py`; `GET /config`'s `limits` does not publish it, so the two
   constants move together by hand until it does.
-- **A parked `nameConflict` template surfaces only in Settings.** The app has no global
+- **A parked `nameConflict` template surfaces only in Settings › Import.** The app has no global
   sync/offline indicator of any kind, so the cue belongs with that indicator when it is built;
   inventing global chrome whose only occupant is one parked template would be the wrong shape.
 - **`lib/errorMessages.ts` is a single-locale map.** Every `import.*` code the client can
