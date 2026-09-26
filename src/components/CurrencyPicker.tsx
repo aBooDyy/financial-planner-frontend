@@ -21,6 +21,7 @@ import { currencySymbol } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
 import { usePreferencesStore } from '#/stores/preferences'
 import { cn } from '#/lib/utils'
+import { FIELD_WELL } from '#/components/ui/field-well'
 
 type Props = {
   value: CurrencyCode
@@ -35,10 +36,19 @@ type Props = {
    *  can't be one the user defined and priced themselves. */
   isoOnly?: boolean
   align?: 'start' | 'center' | 'end'
+  /** `pill`: a compact "Currency SAR ▾" chip, e.g. under an amount well or at a well's end. */
+  appearance?: 'well' | 'pill'
+  /** A quiet word before the code ("Currency"); a pill drops the symbol after it. */
+  prefix?: string
 }
 
-const TRIGGER =
-  'flex h-auto w-full cursor-pointer items-center justify-between gap-2 rounded-xl border border-input bg-fp-surface-2 px-[13px] py-3 text-[14px] text-fp-text whitespace-nowrap transition outline-none focus-visible:border-fp-accent focus-visible:ring-[3px] focus-visible:ring-fp-accent/15 disabled:cursor-not-allowed disabled:opacity-50'
+const TRIGGER = {
+  well: cn(
+    FIELD_WELL,
+    'flex h-auto w-full cursor-pointer items-center justify-between gap-2 whitespace-nowrap',
+  ),
+  pill: 'flex w-max max-w-full cursor-pointer items-center gap-[6px] rounded-full border border-fp-border bg-fp-surface px-3 py-[6px] text-[13px] whitespace-nowrap text-fp-text transition outline-none hover:border-fp-border-strong focus-visible:border-fp-accent focus-visible:ring-[3px] focus-visible:ring-fp-accent/15 disabled:cursor-not-allowed disabled:opacity-50',
+}
 
 /** What cmdk matches and sorts on — code first, so "usd" beats a name that merely contains it. */
 const optionValue = (c: CurrencyMeta) => `${c.code} ${c.name}`
@@ -87,6 +97,11 @@ const CurrencyRow = memo(function CurrencyRow({
     <CommandItem
       value={optionValue(currency)}
       onSelect={() => onPick(currency.code)}
+      className={
+        selected
+          ? 'bg-fp-accent-soft data-[selected=true]:bg-fp-accent-soft'
+          : undefined
+      }
     >
       <span className="w-[34px] shrink-0 text-[12.5px] font-bold text-fp-text-2 tabular-nums">
         {currency.symbol}
@@ -214,7 +229,10 @@ export function CurrencyPicker({
   className,
   align = 'start',
   isoOnly = false,
+  appearance = 'well',
+  prefix,
 }: Props) {
+  const pill = appearance === 'pill'
   const [open, setOpen] = useState(false)
   const all = useCurrencyList()
   const currencies = useMemo(
@@ -243,13 +261,28 @@ export function CurrencyPicker({
       <PopoverTrigger
         disabled={disabled}
         aria-label={label}
-        className={cn(TRIGGER, className)}
+        className={cn(TRIGGER[appearance], className)}
       >
-        <span className="min-w-0 truncate font-semibold">{value}</span>
-        <span className="truncate text-[12.5px] text-fp-text-3">
-          {currencySymbol(value)}
+        {prefix ? (
+          <span className="flex-none font-medium text-fp-text-3">{prefix}</span>
+        ) : null}
+        <span
+          className={cn(
+            'min-w-0 truncate',
+            pill ? 'font-extrabold' : 'font-semibold',
+          )}
+        >
+          {value}
         </span>
-        <ChevronDown size={16} className="ms-auto shrink-0 opacity-50" />
+        {pill ? null : (
+          <span className="truncate text-[12.5px] text-fp-text-3">
+            {currencySymbol(value)}
+          </span>
+        )}
+        <ChevronDown
+          size={pill ? 14 : 16}
+          className="ms-auto shrink-0 text-fp-text-3"
+        />
       </PopoverTrigger>
       <PopoverContent
         align={align}

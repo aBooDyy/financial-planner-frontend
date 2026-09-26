@@ -78,7 +78,7 @@ function CommandGroup({
     <CommandPrimitive.Group
       data-slot="command-group"
       className={cn(
-        'overflow-hidden p-1 text-fp-text [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-bold [&_[cmdk-group-heading]]:tracking-wide [&_[cmdk-group-heading]]:text-fp-text-3 [&_[cmdk-group-heading]]:uppercase',
+        'overflow-hidden p-[6px] text-fp-text [&_[cmdk-group-heading]]:px-[10px] [&_[cmdk-group-heading]]:pt-2 [&_[cmdk-group-heading]]:pb-[2px] [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-bold [&_[cmdk-group-heading]]:tracking-wide [&_[cmdk-group-heading]]:text-fp-text-3 [&_[cmdk-group-heading]]:uppercase',
         className,
       )}
       {...props}
@@ -107,7 +107,7 @@ function CommandItem({
     <CommandPrimitive.Item
       data-slot="command-item"
       className={cn(
-        "relative flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-[13.5px] outline-hidden select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-[selected='true']:bg-fp-surface-2 data-[selected='true']:text-fp-text",
+        "relative flex cursor-pointer items-center gap-[10px] rounded-[10px] px-[10px] py-[9px] text-[13.5px] font-semibold outline-hidden select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-[selected='true']:bg-fp-surface-2 data-[selected='true']:text-fp-text",
         className,
       )}
       {...props}

@@ -1,6 +1,7 @@
 import { Calendar } from 'lucide-react'
-import { formatDate, parseISODate } from '#/lib/date'
+import { formatDate, parseISODate, relativeDayLabel } from '#/lib/date'
 import type { DateFormat } from '#/lib/date'
+import { cn } from '#/lib/utils'
 
 type Props = {
   // Wire value, `YYYY-MM-DD` (or '' for none).
@@ -15,11 +16,17 @@ type Props = {
   // override for a compact inline control.
   boxClassName?: string
   iconSize?: number
+  /**
+   * The quiet word at the end of the well in place of the calendar icon: `true` shows how far
+   * away the date is ("in 5d", "12 days ago"), a string shows itself ("past due").
+   */
+  hint?: boolean | string
 }
 
 const BOX_BASE =
-  'flex items-center justify-between gap-2 border bg-fp-surface-2 focus-within:shadow-[0_0_0_3px_var(--fp-accent-soft)]'
-const BOX_DEFAULT = 'w-full rounded-[11px] px-3 py-[11px] text-[14px]'
+  'flex items-center justify-between gap-[10px] border-[1.5px] bg-fp-surface-2 focus-within:shadow-[0_0_0_3px_var(--fp-accent-soft)]'
+const BOX_DEFAULT =
+  'w-full rounded-[14px] px-[14px] py-3 text-[14px] font-semibold'
 
 /**
  * A date field that *displays* its value in the user's chosen format. A native `<input
@@ -37,34 +44,59 @@ export function DateField({
   className = '',
   boxClassName = BOX_DEFAULT,
   iconSize = 16,
+  hint,
 }: Props) {
   const parsed = value ? parseISODate(value) : null
   const display = parsed ? formatDate(parsed, dateFormat) : ''
+  const hintText =
+    typeof hint === 'string'
+      ? hint
+      : hint && value
+        ? relativeDayLabel(value)
+        : null
 
   return (
     <div className={`relative ${className}`}>
       <div
-        className={`${BOX_BASE} ${boxClassName} ${
+        className={cn(
+          BOX_BASE,
+          boxClassName,
           invalid
-            ? 'border-fp-danger'
-            : 'border-fp-border-strong focus-within:border-fp-accent'
-        }`}
+            ? 'border-fp-danger bg-fp-danger/[0.07]'
+            : 'border-fp-border focus-within:border-fp-accent',
+        )}
       >
         <span
-          className={display ? 'tabular-nums text-fp-text' : 'text-fp-text-3'}
+          className={
+            display
+              ? 'truncate text-fp-text tabular-nums'
+              : 'truncate font-medium text-fp-text-3'
+          }
         >
           {display || placeholder}
         </span>
-        <Calendar
-          size={iconSize}
-          strokeWidth={1.9}
-          className="shrink-0 text-fp-text-3"
-        />
+        {hintText ? (
+          <span
+            className={cn(
+              'flex-none text-[12px] font-bold whitespace-nowrap',
+              invalid ? 'text-fp-danger' : 'text-fp-text-3',
+            )}
+          >
+            {hintText}
+          </span>
+        ) : (
+          <Calendar
+            size={iconSize}
+            strokeWidth={1.9}
+            className="shrink-0 text-fp-text-3"
+          />
+        )}
       </div>
       <input
         type="date"
         value={value}
         aria-label={ariaLabel}
+        aria-invalid={invalid || undefined}
         onChange={(e) => onChange(e.target.value)}
         onClick={(e) => {
           try {

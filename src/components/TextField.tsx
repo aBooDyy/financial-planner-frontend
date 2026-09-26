@@ -1,25 +1,24 @@
 import { forwardRef } from 'react'
 import type { InputHTMLAttributes } from 'react'
 import { Input } from '#/components/ui/input'
-import { Label } from '#/components/ui/label'
+import { FieldLabel } from './FieldLabel'
+import { FieldMessage } from './FormRow'
 
 type Props = InputHTMLAttributes<HTMLInputElement> & {
   label: string
   error?: string
+  optional?: boolean
 }
 
 export const TextField = forwardRef<HTMLInputElement, Props>(function TextField(
-  { label, error, id, className, ...rest },
+  { label, error, optional, id, className, ...rest },
   ref,
 ) {
   return (
     <div>
-      <Label
-        htmlFor={id}
-        className="mb-[7px] text-[12.5px] font-semibold text-fp-text-2"
-      >
+      <FieldLabel htmlFor={id} optional={optional}>
         {label}
-      </Label>
+      </FieldLabel>
       <Input
         id={id}
         ref={ref}
@@ -27,9 +26,7 @@ export const TextField = forwardRef<HTMLInputElement, Props>(function TextField(
         className={className}
         {...rest}
       />
-      {error ? (
-        <p className="mt-1.5 text-[12px] text-fp-danger">{error}</p>
-      ) : null}
+      <FieldMessage error={error} />
     </div>
   )
 })

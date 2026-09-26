@@ -19,10 +19,16 @@ const buttonVariants = cva(
         secondary:
           'bg-secondary text-secondary-foreground hover:bg-secondary/80',
         ghost: 'hover:bg-fp-surface-2 hover:text-fp-text',
+        quiet:
+          'border-[1.5px] border-fp-border bg-fp-surface text-fp-text-2 hover:border-fp-border-strong hover:text-fp-text',
+        'danger-soft':
+          'border-[1.5px] border-transparent bg-fp-danger/10 text-fp-danger hover:bg-fp-danger/15',
         link: 'text-primary underline-offset-4 hover:underline',
       },
       size: {
         default: 'h-auto px-4 py-[11px] has-[>svg]:px-3',
+        dialog:
+          'h-auto rounded-[14px] px-4 py-3 text-[14px] font-bold data-[variant=default]:font-extrabold data-[variant=default]:shadow-[0_6px_16px_-8px_var(--fp-accent)] data-[variant=destructive]:font-extrabold data-[variant=destructive]:shadow-[0_6px_16px_-8px_var(--fp-danger)]',
         xs: "h-6 gap-1 rounded-md px-2 text-xs has-[>svg]:px-1.5 [&_svg:not([class*='size-'])]:size-3",
         sm: 'h-8 gap-1.5 rounded-md px-3 has-[>svg]:px-2.5',
         lg: 'h-10 rounded-md px-6 has-[>svg]:px-4',

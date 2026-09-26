@@ -25,6 +25,10 @@
   --color-fp-accent-soft: var(--fp-accent-soft);
   --color-fp-danger: var(--fp-danger);
   --color-fp-warn: var(--fp-warn);
+  --color-fp-spend: var(--fp-spend);
+  --color-fp-spend-soft: var(--fp-spend-soft);
+  --color-fp-transfer: var(--fp-transfer);
+  --color-fp-transfer-soft: var(--fp-transfer-soft);
 
   --shadow-fp: var(--fp-shadow);
   --font-sans: 'Hanken Grotesk', system-ui, sans-serif;
@@ -70,6 +74,11 @@
   --fp-accent-soft: rgba(31, 157, 107, 0.1);
   --fp-danger: #b42318;
   --fp-warn: #b54708;
+  /* The transaction dialog's type tints; income wears the accent. */
+  --fp-spend: #b4561a;
+  --fp-spend-soft: rgba(232, 131, 58, 0.11);
+  --fp-transfer: #2457b8;
+  --fp-transfer-soft: rgba(59, 130, 246, 0.1);
   --fp-shadow:
     0 1px 2px rgba(20, 18, 12, 0.05), 0 12px 30px -18px rgba(20, 18, 12, 0.22);
 
@@ -111,6 +120,10 @@
   --fp-accent-soft: rgba(47, 189, 139, 0.14);
   --fp-danger: #f2998e;
   --fp-warn: #f5b35c;
+  --fp-spend: #f4a66e;
+  --fp-spend-soft: rgba(232, 131, 58, 0.14);
+  --fp-transfer: #8db4f8;
+  --fp-transfer-soft: rgba(59, 130, 246, 0.14);
   --fp-shadow:
     0 1px 2px rgba(0, 0, 0, 0.4), 0 18px 40px -22px rgba(0, 0, 0, 0.7);
 }
@@ -142,6 +155,18 @@
   [aria-disabled='true'],
   [data-disabled] {
     cursor: default;
+  }
+}
+
+/* Privacy mode. The blur is em-based so it scales with each figure's
+   size, and the figure keeps its width so nothing reflows when it toggles. */
+@layer components {
+  .fp-sensitive {
+    transition: filter 180ms ease;
+  }
+  :root[data-privacy] .fp-sensitive {
+    filter: blur(0.45em);
+    user-select: none;
   }
 }
 

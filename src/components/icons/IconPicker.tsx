@@ -1,6 +1,6 @@
 import { memo, useState } from 'react'
+import type { CSSProperties } from 'react'
 import { Icon } from './Icon'
-import { iconTint } from './IconChip'
 import { useIconPicker } from './useIconPicker'
 import type { IconPickerGroup } from './useIconPicker'
 import { Button } from '#/components/ui/button'
@@ -15,7 +15,6 @@ import {
 import { ResponsiveDialog } from '#/components/ui/responsive-dialog'
 import { ICON_IDS } from '#/lib/icons/catalog.gen'
 import { usePreferencesStore } from '#/stores/preferences'
-import { cn } from '#/lib/utils'
 import type { IconId } from '#/lib/icons/catalog.gen'
 
 type Props = {
@@ -30,11 +29,18 @@ type Props = {
   title?: string
 }
 
-const GRID =
-  '[&_[cmdk-group-items]]:grid [&_[cmdk-group-items]]:grid-cols-6 [&_[cmdk-group-items]]:justify-items-center [&_[cmdk-group-items]]:gap-1 sm:[&_[cmdk-group-items]]:grid-cols-8'
+const COLUMNS = 'grid grid-cols-6 gap-2 sm:grid-cols-8'
 
+const GROUP =
+  'overflow-visible p-0 pb-[10px] [&_[cmdk-group-heading]]:px-0 [&_[cmdk-group-heading]]:pt-0 [&_[cmdk-group-heading]]:pb-[10px] [&_[cmdk-group-heading]]:tracking-[0.06em] [&_[cmdk-group-items]]:grid [&_[cmdk-group-items]]:grid-cols-6 [&_[cmdk-group-items]]:gap-2 sm:[&_[cmdk-group-items]]:grid-cols-8'
+
+/** The shared command input, recast as the dialog's soft search well. */
+const SEARCH_WELL =
+  'flex flex-col gap-[10px] overflow-visible rounded-none [&_[data-slot=command-input-wrapper]]:gap-[10px] [&_[data-slot=command-input-wrapper]]:rounded-[14px] [&_[data-slot=command-input-wrapper]]:border-[1.5px] [&_[data-slot=command-input-wrapper]]:border-fp-border [&_[data-slot=command-input-wrapper]]:bg-fp-surface-2 [&_[data-slot=command-input-wrapper]]:px-[14px] [&_[data-slot=command-input-wrapper]]:transition [&_[data-slot=command-input-wrapper]]:focus-within:border-fp-accent [&_[data-slot=command-input-wrapper]]:focus-within:ring-[3px] [&_[data-slot=command-input-wrapper]]:focus-within:ring-fp-accent/15 [&_[data-slot=command-input]]:h-auto [&_[data-slot=command-input]]:py-3 [&_[data-slot=command-input]]:font-medium'
+
+// The glyph's colour at 12% for every tile, a touch deeper under the pointer or arrow keys.
 const TILE =
-  'h-11 w-11 justify-center gap-0 rounded-[10px] p-0 data-[selected=true]:bg-fp-surface-2'
+  'aspect-square w-full justify-center gap-0 rounded-[11px] p-0 bg-[color-mix(in_oklab,var(--tile)_12%,transparent)] data-[selected=true]:bg-[color-mix(in_oklab,var(--tile)_22%,transparent)]'
 
 const SKELETON_TILES = 48
 
@@ -62,13 +68,16 @@ const IconTile = memo(function IconTile({
       onSelect={() => onPick(id)}
       aria-label={label}
       title={label}
-      className={cn(TILE, picked && 'ring-2')}
-      style={{
-        color,
-        ...(picked
-          ? { background: iconTint(color), '--tw-ring-color': color }
-          : null),
-      }}
+      className={TILE}
+      style={
+        {
+          color,
+          '--tile': color,
+          boxShadow: picked
+            ? `0 0 0 2px var(--fp-surface), 0 0 0 4px ${color}`
+            : undefined,
+        } as CSSProperties
+      }
     >
       <Icon id={id} size={20} />
     </CommandItem>
@@ -92,7 +101,7 @@ const IconGroup = memo(function IconGroup({
 }: GroupProps) {
   if (group.ids.length === 0) return null
   return (
-    <CommandGroup heading={group.label} className={GRID}>
+    <CommandGroup heading={group.label} className={GROUP}>
       {group.ids.map((id) => (
         <IconTile
           key={`${group.key}-${id}`}
@@ -110,11 +119,11 @@ const IconGroup = memo(function IconGroup({
 
 function SkeletonGrid() {
   return (
-    <div className="grid grid-cols-6 justify-items-center gap-1 p-1 sm:grid-cols-8">
+    <div className={COLUMNS}>
       {Array.from({ length: SKELETON_TILES }, (_, i) => (
         <div
           key={i}
-          className="h-11 w-11 animate-pulse rounded-[10px] bg-fp-surface-2"
+          className="aspect-square animate-pulse rounded-[11px] bg-fp-surface-2"
         />
       ))}
     </div>
@@ -152,13 +161,19 @@ function IconOptions({ value, color, onPick }: BodyProps) {
   }
 
   return (
-    <Command shouldFilter={false} value={active} onValueChange={setActive}>
+    <Command
+      shouldFilter={false}
+      value={active}
+      onValueChange={setActive}
+      className={SEARCH_WELL}
+    >
       <CommandInput
         value={query}
         onValueChange={setQuery}
         placeholder="Search icons…"
       />
-      <CommandList className="max-h-[min(52vh,340px)]">
+      {/* Inset by the chosen tile's ring, so the list's clipping never cuts it. */}
+      <CommandList className="-mx-1 max-h-[min(52vh,340px)] px-1 pt-1">
         {ready ? (
           <>
             <CommandEmpty>{`No icon matches "${query.trim()}".`}</CommandEmpty>
@@ -212,22 +227,20 @@ export function IconPicker({
       onOpenChange={onOpenChange}
       title={title}
       contentClassName="sm:max-w-[440px]"
-      bodyClassName="px-2 pb-0 sm:px-2"
+      bodyClassName="gap-[10px]"
       footer={
         <>
-          <span className="text-[12px] text-fp-text-3">
+          <span className="min-w-0 flex-1 text-[12.5px] font-semibold text-fp-text-3">
             {ICON_IDS.length} icons
           </span>
-          <Button variant="ghost" size="sm" className="ms-auto" onClick={clear}>
+          <Button variant="quiet" size="dialog" onClick={clear}>
             Use the default icon
           </Button>
         </>
       }
     >
       {/* Mounting 258 tiles for a closed picker is exactly what the lazy chunks avoid. */}
-      {open ? (
-        <IconOptions value={value} color={color} onPick={pick} />
-      ) : null}
+      {open ? <IconOptions value={value} color={color} onPick={pick} /> : null}
     </ResponsiveDialog>
   )
 }
