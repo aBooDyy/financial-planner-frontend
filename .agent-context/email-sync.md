@@ -47,7 +47,8 @@ which dialog is open and why the editor was opened (`EditorIntent`: `fresh` / `f
 - **`InboxRow`**: a status dot (`inboxHealth`: accent = reading, hollow = every rule paused,
   warn = no rules — with the sentence "Nothing is read from this inbox until it has a rule" and
   an _Add a rule_ button in place of Sync now), the address, `describeInbox` (provider · rules ·
-  last sync), **Sync now**, edit, and a ⋯ menu (Sync now, Sync older emails → 7/30/90/180 days,
+  last sync), **Sync now**, edit, and a ⋯ menu (Sync now, Sync older emails → 7/30/90/180 days
+  or _From a date…_,
   Add a rule, Disconnect). The row owns its own `useManualScan`, so the menu's backfill and the
   button share one result line (`ScanResultLine`). On a phone the button hides and the menu has it.
 - **Connecting** (`ConnectInboxDialog`) picks the provider and leaves via `beginInboxConnect`.
@@ -151,7 +152,9 @@ editor and the import hub, compact in the review queue, and `InboxRow`'s own but
   summary; if the cap is hit it says "There's more to read — sync again to keep going."
 - **Older emails** re-read a 7/30/90/180-day window (trimmed to `emailSyncMaxLookbackDays`)
   under today's rules; already-staged mail is never restaged, and mail no rule matched is
-  re-evaluated.
+  re-evaluated. _From a date…_ opens `CustomWindowDialog`: any start date up to today, turned
+  into `lookbackDays` by `lookbackSince` (days back + 1, so the whole picked day is read) —
+  no contract change. The backend has no end date, so a range always runs to now.
 - **`lastSyncedAt` is not the scan result.** A narrow backfill deliberately does not advance the
   server cursor, so the outcome is read from the response, never from the connection row.
 - **Single-flight twice.** A second `scan()` while one is in the air is dropped on the client;

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { MoreVertical, Pencil } from 'lucide-react'
 import { Button } from '#/components/ui/button'
 import {
@@ -17,6 +18,7 @@ import { windowLabel, windowOptions } from '#/features/email-sync/data/windows'
 import { useManualScan } from '#/features/email-sync/hooks/useManualScan'
 import { useConfigLimits } from '#/lib/config/appConfig'
 import { useDirectionStore } from '#/stores/direction'
+import { CustomWindowDialog } from './CustomWindowDialog'
 import { ScanResultLine } from './ScanResultLine'
 import { SyncNowButton } from './SyncNowButton'
 
@@ -52,6 +54,9 @@ export function InboxRow({
   const health = inboxHealth(connection)
   const running = state.status === 'scanning' || state.status === 'busy'
   const sync = () => void scan({ connectionId: connection.id })
+  const backfill = (days: number) =>
+    void scan({ connectionId: connection.id, lookbackDays: days })
+  const [customOpen, setCustomOpen] = useState(false)
 
   return (
     <li className="flex flex-col gap-2 border-b border-fp-border px-[18px] py-[13px] last:border-b-0">
@@ -119,18 +124,14 @@ export function InboxRow({
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
                 {windowOptions(maxLookbackDays).map((days) => (
-                  <DropdownMenuItem
-                    key={days}
-                    onSelect={() =>
-                      void scan({
-                        connectionId: connection.id,
-                        lookbackDays: days,
-                      })
-                    }
-                  >
+                  <DropdownMenuItem key={days} onSelect={() => backfill(days)}>
                     {windowLabel(days)}
                   </DropdownMenuItem>
                 ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => setCustomOpen(true)}>
+                  From a date…
+                </DropdownMenuItem>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
             <DropdownMenuItem disabled={!online} onSelect={onAddRule}>
@@ -155,6 +156,12 @@ export function InboxRow({
       <div className="ps-[21px]">
         <ScanResultLine state={state} summary={summary} onRetry={sync} />
       </div>
+      {customOpen ? (
+        <CustomWindowDialog
+          onClose={() => setCustomOpen(false)}
+          onPick={backfill}
+        />
+      ) : null}
     </li>
   )
 }

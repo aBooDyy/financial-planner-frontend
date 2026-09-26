@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { Button } from '#/components/ui/button'
 import {
@@ -5,10 +6,12 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu'
 import { windowLabel, windowOptions } from '#/features/email-sync/data/windows'
 import { useConfigLimits } from '#/lib/config/appConfig'
+import { CustomWindowDialog } from './CustomWindowDialog'
 
 type Props = {
   onPick: (days: number) => void
@@ -21,30 +24,43 @@ type Props = {
  */
 export function OlderEmailsMenu({ onPick, disabled = false }: Props) {
   const maxLookbackDays = useConfigLimits().emailSyncMaxLookbackDays
+  const [customOpen, setCustomOpen] = useState(false)
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          variant="quiet"
-          disabled={disabled}
-          className="shrink-0 gap-1 px-3 py-[9px] text-[13px] font-bold"
-        >
-          Older emails
-          <ChevronDown size={14} strokeWidth={2} />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-[210px]">
-        <DropdownMenuLabel className="text-[12px] font-normal text-fp-text-3">
-          Read again under today’s rules. What you already reviewed stays
-          reviewed.
-        </DropdownMenuLabel>
-        {windowOptions(maxLookbackDays).map((days) => (
-          <DropdownMenuItem key={days} onSelect={() => onPick(days)}>
-            {windowLabel(days)}
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="quiet"
+            disabled={disabled}
+            className="shrink-0 gap-1 px-3 py-[9px] text-[13px] font-bold"
+          >
+            Older emails
+            <ChevronDown size={14} strokeWidth={2} />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-[210px]">
+          <DropdownMenuLabel className="text-[12px] font-normal text-fp-text-3">
+            Read again under today’s rules. What you already reviewed stays
+            reviewed.
+          </DropdownMenuLabel>
+          {windowOptions(maxLookbackDays).map((days) => (
+            <DropdownMenuItem key={days} onSelect={() => onPick(days)}>
+              {windowLabel(days)}
+            </DropdownMenuItem>
+          ))}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => setCustomOpen(true)}>
+            From a date…
           </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {customOpen ? (
+        <CustomWindowDialog
+          onClose={() => setCustomOpen(false)}
+          onPick={onPick}
+        />
+      ) : null}
+    </>
   )
 }
