@@ -5,6 +5,7 @@ import {
   ChevronRight,
   ChevronsUpDown,
 } from 'lucide-react'
+import { useSwipe } from '#/hooks/useSwipe'
 import type { RangeMode } from '#/features/transactions/constants'
 import type { CalendarView } from '#/features/transactions/data/selectors'
 import { DayGrid } from './DayGrid'
@@ -55,13 +56,17 @@ export function DaysCard({
   onPickDay,
   onPickMonth,
 }: Props) {
+  const swipe = useSwipe((step) => (step === 1 ? onNext() : onPrev()))
   const unit = calendar.grid === 'months' ? 'year' : 'month'
   const expandTitle = calOpen
     ? `Fold the ${unit} back`
     : `Unfold the full ${unit}`
 
   return (
-    <div className="rounded-[18px] border border-fp-border bg-fp-surface p-[14px] shadow-fp">
+    <div
+      {...swipe}
+      className="touch-pan-y rounded-[18px] border border-fp-border bg-fp-surface p-[14px] shadow-fp"
+    >
       <div className="flex flex-wrap items-center gap-[10px]">
         <div className="inline-flex rounded-[11px] border border-fp-border bg-fp-surface-2 p-[3px]">
           {MODES.map((m) => (

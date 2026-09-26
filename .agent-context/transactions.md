@@ -141,7 +141,9 @@ tx/budget/recurring editor state machine. Components are dumb (`components/`): p
   `CashflowSegment` carries `label`/`valueStr`/`pctStr` and not just a colour and a width:
   the builder holds the catalog and the base currency, the bar holds neither.
   `buildRecurringView` fills the same shape per recurring item (name, monthly equivalent).
-- `DaysCard` (period header + toggle) with `DayGrid`/`MonthGrid` and the
+- `DaysCard` (period header + toggle; a sideways swipe anywhere on it steps the period like the
+  arrows — `useSwipe` in `src/hooks/`, mirrored in RTL, `touch-pan-y` so vertical scroll still
+  works) with `DayGrid`/`MonthGrid` and the
   shared `CalendarCell`, `TransactionList`, `QuickAddCard` (single-line desktop;
   mobile uses the tab bar's add button — see _App-wide add_ below), `BreakdownCard`,
   `BudgetsCard`/`BudgetHealthCard`, `RecurringCard`/`UpcomingCard`, `TransactionDialog`,
