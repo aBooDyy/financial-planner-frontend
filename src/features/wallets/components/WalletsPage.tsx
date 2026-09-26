@@ -33,7 +33,8 @@ export function WalletsPage() {
   const user = useSessionStore((s) => s.user)
   const logout = useLogout()
   const dateFormat = usePreferencesStore((s) => s.dateFormat)
-  const { base, nodes, deltas, rates, view, archivedCount } = useWallets()
+  const { base, nodes, deltas, rates, view, archivedCount, balancesLoading } =
+    useWallets()
   const editor = useNodeEditor(base)
   const wallets = transferWallets(nodes, deltas, base)
   const transfer = useTransferDialog(wallets, rates)
@@ -96,11 +97,23 @@ export function WalletsPage() {
       />
 
       <div className="flex-1 overflow-auto">
-        <div className="mx-auto grid w-full max-w-[1180px] grid-cols-1 items-start gap-4 px-[14px] py-4 pb-[30px] md:grid-cols-[minmax(0,1fr)_330px] md:gap-6 md:px-6 md:py-[26px] md:pb-[90px]">
+        <span role="status" className="sr-only">
+          {balancesLoading ? 'Loading your balances…' : ''}
+        </span>
+        <div
+          aria-busy={balancesLoading}
+          className="mx-auto grid w-full max-w-[1180px] grid-cols-1 items-start gap-4 px-[14px] py-4 pb-[30px] md:grid-cols-[minmax(0,1fr)_330px] md:gap-6 md:px-6 md:py-[26px] md:pb-[90px]"
+        >
           <div className="flex min-w-0 flex-col gap-4">
-            <TotalHeroCard view={view} base={base} onTransfer={onTransfer} />
+            <TotalHeroCard
+              view={view}
+              loading={balancesLoading}
+              base={base}
+              onTransfer={onTransfer}
+            />
             <WalletsGroupsCard
               rows={view.rows}
+              loading={balancesLoading}
               onAddWallet={() => editor.openAdd('wallet')}
               onTransfer={onTransfer}
               onAddGroup={() => editor.openAdd('group')}
@@ -117,7 +130,11 @@ export function WalletsPage() {
           </div>
 
           <div className="flex flex-col gap-4">
-            <CurrencyBreakdownCard breakdown={view.breakdown} base={base} />
+            <CurrencyBreakdownCard
+              breakdown={view.breakdown}
+              loading={balancesLoading}
+              base={base}
+            />
             <BaselineTeaserCard />
           </div>
         </div>
@@ -137,9 +154,11 @@ export function WalletsPage() {
           onDelete={() => setDeletingId(editor.editing?.id ?? null)}
           onClose={editor.close}
           currentBalance={
-            editingWallet
-              ? formatMoney(editingWallet.balance, editingWallet.currency)
-              : undefined
+            !editingWallet
+              ? undefined
+              : balancesLoading
+                ? null
+                : formatMoney(editingWallet.balance, editingWallet.currency)
           }
           onAdjust={
             editingWallet ? () => adjust.openFor(editingWallet.id) : undefined

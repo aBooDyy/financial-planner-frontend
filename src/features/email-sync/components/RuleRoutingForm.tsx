@@ -3,23 +3,15 @@ import { ToggleCard } from '#/components/dialog/ToggleCard'
 import { FieldLabel } from '#/components/FieldLabel'
 import { FieldMessage, FormRow } from '#/components/FormRow'
 import { Input } from '#/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '#/components/ui/select'
 import { WalletSelect } from '#/features/wallets/components/WalletSelect'
 import type { WalletGroupOption } from '#/features/wallets/data/selectors'
 import type { CategoryCatalog } from '#/features/categories/data/catalog'
+import { SuggestedCategorySelect } from '#/features/categories/components/SuggestedCategorySelect'
 import { RULE_NAME_MAX } from '#/features/email-sync/data/ruleDraft'
 import type { RuleDraft } from '#/features/email-sync/data/ruleDraft'
 import type { RuleSettingsPatch } from '#/features/email-sync/data/ruleEditorState'
 import type { RuleProblem } from '#/features/email-sync/data/ruleErrors'
 import type { TxType } from '#/features/transactions/api/types'
-
-const NONE = '__none__'
 
 const TYPES: { value: TxType; label: string }[] = [
   { value: 'spend', label: 'Spend' },
@@ -45,8 +37,6 @@ export function RuleRoutingForm({
   problem,
   nameError,
 }: Props) {
-  const categories = catalog.byType(draft.type)
-  const subs = draft.category ? catalog.subsOf(draft.category) : []
   const noWallet = draft.walletId === null
   const autoConfirmError = problem?.autoConfirm
 
@@ -97,48 +87,16 @@ export function RuleRoutingForm({
         />
       </div>
 
-      <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2">
-        <FormRow id="rule-category" label="Category" error={problem?.category}>
-          <Select
-            value={draft.category ?? NONE}
-            onValueChange={(v) => onEdit({ category: v === NONE ? null : v })}
-          >
-            <SelectTrigger id="rule-category" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NONE}>Decide when reviewing</SelectItem>
-              {categories.map((c) => (
-                <SelectItem key={c.slug} value={c.slug}>
-                  {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </FormRow>
-        {subs.length > 0 ? (
-          <FormRow id="rule-subcategory" label="Subcategory">
-            <Select
-              value={draft.subcategory ?? NONE}
-              onValueChange={(v) =>
-                onEdit({ subcategory: v === NONE ? null : v })
-              }
-            >
-              <SelectTrigger id="rule-subcategory" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NONE}>None</SelectItem>
-                {subs.map((s) => (
-                  <SelectItem key={s.slug} value={s.slug}>
-                    {s.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </FormRow>
-        ) : null}
-      </div>
+      <FormRow id="rule-category" label="Category" error={problem?.category}>
+        <SuggestedCategorySelect
+          id="rule-category"
+          type={draft.type}
+          catalog={catalog}
+          value={draft.categoryId}
+          onChange={(categoryId) => onEdit({ categoryId })}
+          invalid={Boolean(problem?.category)}
+        />
+      </FormRow>
 
       <div className="min-w-0">
         <ToggleCard

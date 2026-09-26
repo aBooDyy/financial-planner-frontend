@@ -16,9 +16,9 @@ import { FIELD_WELL } from '#/components/ui/field-well'
 type Props = {
   /** Only this type's categories are offered. */
   type: TxType
-  category: string
-  subcategory: string | null
-  onChange: (category: string, subcategory: string | null) => void
+  /** The picked leaf: a subcategory's id, or a category's. */
+  categoryId: string
+  onChange: (categoryId: string) => void
   label?: string
   className?: string
   align?: 'start' | 'center' | 'end'
@@ -34,8 +34,7 @@ const TRIGGER = cn(
 /** A searchable pick of a category or one of its subcategories, shown as "Parent › Sub". */
 export function CategoryPicker({
   type,
-  category,
-  subcategory,
+  categoryId,
   onChange,
   label = 'Category',
   className,
@@ -44,8 +43,9 @@ export function CategoryPicker({
 }: Props) {
   const [open, setOpen] = useState(false)
   const catalog = useCategoryCatalog()
-  const parent = catalog.get(category)
-  const sub = catalog.sub(category, subcategory)
+  const parent = catalog.rootOf(categoryId)
+  const picked = catalog.get(categoryId)
+  const sub = picked.parentId === null ? null : picked
 
   // Built only while open: a closed picker must not pay for the whole tree.
   const categories = useMemo(
@@ -53,8 +53,8 @@ export function CategoryPicker({
     [open, catalog, type],
   )
 
-  const pick = (next: string, nextSub: string | null) => {
-    onChange(next, nextSub)
+  const pick = (next: string) => {
+    onChange(next)
     setOpen(false)
   }
 
@@ -99,8 +99,7 @@ export function CategoryPicker({
         {open ? (
           <CategoryOptions
             categories={categories}
-            category={category}
-            subcategory={subcategory}
+            value={categoryId}
             onPick={pick}
           />
         ) : null}

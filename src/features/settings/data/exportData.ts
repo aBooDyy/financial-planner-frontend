@@ -6,8 +6,9 @@ import { toMajor } from '#/lib/currency'
 
 /**
  * Export the user's data straight from the local-first DB — no server round-trip needed. CSV
- * gives a flat transaction ledger (the most useful for spreadsheets); JSON is a full backup of
- * every local table.
+ * gives a flat transaction ledger with category names (the most useful for spreadsheets); JSON
+ * is a full backup of every local table, rows referencing categories by id alongside the
+ * categories themselves.
  */
 
 const live = <T extends { deleted?: number }>(rows: T[]): T[] =>
@@ -52,9 +53,14 @@ export async function exportCsv(): Promise<void> {
     db.categories.toArray(),
   ])
   const walletName = new Map(nodes.map((n) => [n.id, n.name]))
-  // Resolved through the catalog, so a child is named under its own parent and a slug the
-  // user has since deleted still exports as the label its rows were filed under.
+  // Rows name a leaf id; a spreadsheet wants the names, root and child in their own columns.
   const catalog = buildCatalog(categories)
+  const categoryCells = (id: string | null): [string, string] => {
+    if (id === null) return ['', '']
+    const parent = catalog.parentOf(id)
+    const name = catalog.get(id).name
+    return parent ? [parent.name, name] : [name, '']
+  }
 
   const header = [
     'date',
@@ -74,12 +80,7 @@ export async function exportCsv(): Promise<void> {
         typeCell(t),
         amountCell(t),
         t.currency,
-        t.category === null ? '' : catalog.get(t.category).name,
-        t.category === null
-          ? ''
-          : (catalog.sub(t.category, t.subcategory)?.name ??
-            t.subcategory ??
-            ''),
+        ...categoryCells(t.categoryId),
         walletName.get(t.walletId) ?? t.walletId,
         t.note ?? '',
       ]

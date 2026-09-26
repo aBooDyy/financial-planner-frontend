@@ -4,10 +4,11 @@ import { FoldingGrid } from './FoldingGrid'
 type Props = {
   grid: DayGridView
   open: boolean
+  loading: boolean
   onPick: (key: string) => void
 }
 
-export function DayGrid({ grid, open, onPick }: Props) {
+export function DayGrid({ grid, open, loading, onPick }: Props) {
   return (
     <>
       <div className="mb-[6px] grid grid-cols-7 gap-[6px]">
@@ -25,6 +26,7 @@ export function DayGrid({ grid, open, onPick }: Props) {
         rows={grid}
         cols="grid-cols-7"
         open={open}
+        loading={loading}
         showBreakdown={(c) => c.hasBoth}
         onPick={onPick}
       />

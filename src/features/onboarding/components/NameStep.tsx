@@ -40,7 +40,7 @@ export function NameStep({ onSubmit }: Props) {
           autoComplete="given-name"
           maxLength={255}
           autoFocus
-          className="h-auto rounded-[14px] border-fp-border-strong bg-fp-surface px-4 py-[15px] text-[18px] font-semibold md:text-[18px]"
+          className="h-auto rounded-[14px] border-fp-border-strong px-4 py-[15px] text-[18px] font-semibold md:text-[18px]"
         />
         {firstName && (
           <p className="mt-3.5 text-[14.5px] text-fp-text-2">

@@ -6,16 +6,10 @@ import { FieldLabel } from '#/components/FieldLabel'
 import { FieldMessage, FormRow } from '#/components/FormRow'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '#/components/ui/select'
 import { WalletSelect } from '#/features/wallets/components/WalletSelect'
 import type { WalletGroupOption } from '#/features/wallets/data/selectors'
 import type { CategoryCatalog } from '#/features/categories/data/catalog'
+import { SuggestedCategorySelect } from '#/features/categories/components/SuggestedCategorySelect'
 import {
   RATE_LIMIT_MAX,
   RATE_LIMIT_MIN,
@@ -26,8 +20,6 @@ import type { TxType } from '#/features/transactions/api/types'
 import { TYPE_TINT } from '#/features/transactions/data/txDialog'
 import type { CurrencyCode } from '#/lib/currency'
 import { ExpiryField } from './ExpiryField'
-
-const NONE = '__none__'
 
 const TYPES = [
   { value: 'spend', label: 'Spend' },
@@ -52,10 +44,6 @@ export function KeySettingsForm({
   baseCurrency,
 }: Props) {
   const { draft, set, errorFor } = editor
-  const categories = catalog.byType(draft.defaultType)
-  const subs = draft.defaultCategory
-    ? catalog.subsOf(draft.defaultCategory)
-    : []
   const noWallet = draft.defaultWalletId === null
   const rateError = errorFor('rateLimitPerMinute')
 
@@ -114,23 +102,19 @@ export function KeySettingsForm({
       </div>
 
       <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2">
-        <FormRow id="key-category" label="Default category">
-          <Select
-            value={draft.defaultCategory ?? NONE}
-            onValueChange={(v) => set('defaultCategory', v === NONE ? null : v)}
-          >
-            <SelectTrigger id="key-category">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NONE}>Decide when reviewing</SelectItem>
-              {categories.map((c) => (
-                <SelectItem key={c.slug} value={c.slug}>
-                  {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <FormRow
+          id="key-category"
+          label="Default category"
+          error={errorFor('defaultCategoryId')}
+        >
+          <SuggestedCategorySelect
+            id="key-category"
+            type={draft.defaultType}
+            catalog={catalog}
+            value={draft.defaultCategoryId}
+            onChange={(v) => set('defaultCategoryId', v)}
+            invalid={Boolean(errorFor('defaultCategoryId'))}
+          />
         </FormRow>
         <FormRow
           id="key-currency"
@@ -144,28 +128,6 @@ export function KeySettingsForm({
             onChange={(code) => set('defaultCurrency', code)}
           />
         </FormRow>
-        {subs.length > 0 ? (
-          <FormRow id="key-subcategory" label="Subcategory" optional>
-            <Select
-              value={draft.defaultSubcategory ?? NONE}
-              onValueChange={(v) =>
-                set('defaultSubcategory', v === NONE ? null : v)
-              }
-            >
-              <SelectTrigger id="key-subcategory">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NONE}>None</SelectItem>
-                {subs.map((s) => (
-                  <SelectItem key={s.slug} value={s.slug}>
-                    {s.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </FormRow>
-        ) : null}
       </div>
 
       <div className="flex flex-col">

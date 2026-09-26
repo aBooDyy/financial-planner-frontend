@@ -80,8 +80,7 @@ let seq = 0
 const merchant = (over: Partial<LocalMerchant> = {}): LocalMerchant => ({
   id: `m${(seq += 1)}`,
   displayName: 'Carrefour',
-  learnedCategory: null,
-  learnedSubcategory: null,
+  learnedCategoryId: null,
   learnedType: null,
   timesSeen: 0,
   timesConfirmed: 0,

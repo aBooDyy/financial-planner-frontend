@@ -19,7 +19,14 @@ import {
 import { db } from '#/db/db'
 import { isoOf } from '#/features/planned/data/dates'
 import { shortDate } from '#/features/planned/data/views'
-import { goal, m, planned, wallet } from '#/features/planned/testing/fixtures'
+import {
+  goal,
+  m,
+  planned,
+  tx,
+  wallet,
+} from '#/features/planned/testing/fixtures'
+import { defaultCategoryRows } from '#/features/categories/__fixtures__/categories'
 import { ConfirmPlannedDialog } from './ConfirmPlannedDialog'
 
 vi.mock('#/db/sync', () => ({ schedulePush: () => undefined }))
@@ -45,6 +52,7 @@ const daysAgo = (n: number) => {
 
 beforeEach(async () => {
   await Promise.all(db.tables.map((t) => t.clear()))
+  await db.categories.bulkPut(defaultCategoryRows())
   await db.balanceNodes.put(
     wallet({ id: 'w1', name: 'Main Checking', amount: m(20000) }),
   )
@@ -140,6 +148,25 @@ describe('ConfirmPlannedDialog', () => {
       plannedId: 'pay',
       amount: m(12000),
     })
+  })
+
+  it('counts every entry on the wallet in its balance, linked or not', async () => {
+    await db.transactions.bulkPut([
+      tx({ amount: m(35) }),
+      tx({ type: 'income', amount: m(500) }),
+      tx({ type: 'transfer_out', transferId: 'x1', amount: m(70) }),
+      tx({ type: 'transfer_in', transferId: 'x2', amount: m(40) }),
+      tx({ type: 'adjustment_in', amount: m(10) }),
+      tx({ type: 'adjustment_out', amount: m(5) }),
+      tx({ amount: m(999), deleted: 1 }),
+      tx({ walletId: 'w2', amount: m(1000) }),
+    ])
+    render(<ConfirmPlannedDialog plannedId="pay" onOpenChange={vi.fn()} />)
+    await waitFor(() => expect(amountField().value).toBe('12000'))
+    // 20,000 − 35 + 500 − 70 + 40 + 10 − 5 + 12,000
+    expect(
+      await screen.findByText('Main Checking goes to SR 32,440.00.'),
+    ).toBeTruthy()
   })
 
   it('skips the item once asked', async () => {

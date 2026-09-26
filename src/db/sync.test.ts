@@ -28,8 +28,7 @@ const serverTransaction = (id: string) => ({
   type: 'spend',
   amount: 1,
   currency: 'SAR',
-  category: 'groceries',
-  subcategory: null,
+  categoryId: 'cat-groceries',
   walletId: 'w1',
   goalId: null,
   merchantId: null,
@@ -68,6 +67,7 @@ vi.mock('#/features/transactions/api/transactionsApi', () => ({
               status === 'invalid'
                 ? 'spending.transaction.wallet_invalid'
                 : null,
+            errorField: status === 'invalid' ? 'wallet_id' : null,
           }
         }),
       )
@@ -86,11 +86,16 @@ vi.mock('#/features/transactions/api/transactionsApi', () => ({
       inFlight.now -= 1
       const answeredIds = halfAnswered ? ids.slice(0, 1) : ids
       return await Promise.resolve(
-        answeredIds.map((id) => ({
-          id,
-          status: deleteAnswers.get(id) ?? 'deleted',
-          errorCode: null,
-        })),
+        answeredIds.map((id) => {
+          const status = deleteAnswers.get(id) ?? 'deleted'
+          return {
+            id,
+            status,
+            errorCode:
+              status === 'invalid' ? 'spending.transaction.transfer_leg' : null,
+            errorField: status === 'invalid' ? 'id' : null,
+          }
+        }),
       )
     },
   },
@@ -131,8 +136,7 @@ const txEntry = (i: number): OutboxEntry => ({
     type: 'SPEND',
     amount: 1,
     currency: 'SAR',
-    category: 'groceries',
-    subcategory: null,
+    category_id: 'cat-groceries',
     wallet_id: 'w1',
     goal_id: null,
     merchant_id: null,
@@ -327,7 +331,7 @@ describe('flushOutbox', () => {
     expect(await db.transactions.count()).toBe(10)
   })
 
-  it('settles an id the server already holds and drops one it refuses', async () => {
+  it('settles an id the server already holds and flags one it refuses', async () => {
     const { db } = await import('./db')
     const { flushOutbox } = await import('./sync')
     await db.outbox.clear()
@@ -338,11 +342,16 @@ describe('flushOutbox', () => {
 
     await flushOutbox()
 
-    expect(await db.outbox.count()).toBe(0)
     // The taken id comes back with the row behind it, so the local copy stops being dirty.
     expect((await db.transactions.get('tx-1'))?.version).toBe('v-tx-1')
-    // The refused one can never succeed as posted; it leaves the queue unwritten.
-    expect(await db.transactions.get('tx-2')).toBeUndefined()
+    // The refused one stays queued, flagged with the server's reason, never dropped.
+    const left = await db.outbox.toArray()
+    expect(left.map((entry) => entry.id)).toEqual(['tx-2'])
+    expect(left[0].failure).toMatchObject({
+      kind: 'rejected',
+      code: 'spending.transaction.wallet_invalid',
+      field: 'wallet_id',
+    })
   })
 
   it('keeps the batch queued when the network is gone', async () => {
@@ -358,15 +367,15 @@ describe('flushOutbox', () => {
     expect(await db.outbox.count()).toBe(2)
   })
 
-  it('falls back to one request per row when the batch fails as a whole', async () => {
+  it('falls back to one request per row when the batch is refused as a whole', async () => {
     const { db } = await import('./db')
     const { flushOutbox } = await import('./sync')
     await db.outbox.clear()
     await db.transactions.clear()
     bulkFailure = new ApiError({
-      code: 'internal',
+      code: 'common.validation',
       message: 'the batch judged no entry',
-      status: 500,
+      status: 422,
     })
     await db.outbox.bulkAdd([txEntry(0), txEntry(1)])
 
@@ -375,6 +384,29 @@ describe('flushOutbox', () => {
     expect(order).toEqual(['tx:tx-0', 'tx:tx-1'])
     expect(await db.outbox.count()).toBe(0)
     expect(await db.transactions.count()).toBe(2)
+  })
+
+  it('keeps the batch queued when the server is down, flagging only its head', async () => {
+    const { db } = await import('./db')
+    const { flushOutbox } = await import('./sync')
+    await db.outbox.clear()
+    await db.transactions.clear()
+    bulkFailure = new ApiError({
+      code: 'common.unavailable',
+      message: 'down',
+      status: 503,
+    })
+    await db.outbox.bulkAdd([txEntry(0), txEntry(1)])
+
+    await flushOutbox()
+
+    // No row-by-row retry against a server that is down.
+    expect(order).toEqual([])
+    const left = await db.outbox.orderBy('seq').toArray()
+    expect(left.map((entry) => entry.failure?.kind)).toEqual([
+      'unavailable',
+      undefined,
+    ])
   })
 
   it('sends a run of transaction deletes as one request', async () => {
@@ -411,7 +443,7 @@ describe('flushOutbox', () => {
     expect(await db.outbox.count()).toBe(0)
   })
 
-  it('drops an id the server no longer holds, and the unusable one too', async () => {
+  it('drops an id the server no longer holds, and flags one it refuses', async () => {
     const { db } = await import('./db')
     const { flushOutbox } = await import('./sync')
     await db.outbox.clear()
@@ -426,9 +458,13 @@ describe('flushOutbox', () => {
 
     await flushOutbox()
 
-    // Every answer is terminal: there is nothing left to retry for any of the three.
-    expect(await db.outbox.count()).toBe(0)
-    expect(await db.transactions.count()).toBe(0)
+    // Deleted and missing are settled; the refused delete stays queued with its reason.
+    const left = await db.outbox.toArray()
+    expect(left.map((entry) => entry.id)).toEqual(['tx-2'])
+    expect(left[0].failure).toMatchObject({
+      kind: 'rejected',
+      code: 'spending.transaction.transfer_leg',
+    })
   })
 
   it('keeps a delete batch queued when the network is gone', async () => {
@@ -470,15 +506,15 @@ describe('flushOutbox', () => {
     expect(await db.outbox.count()).toBe(0)
   })
 
-  it('falls back to one request per row when the delete batch fails as a whole', async () => {
+  it('falls back to one request per row when the delete batch is refused as a whole', async () => {
     const { db } = await import('./db')
     const { flushOutbox } = await import('./sync')
     await db.outbox.clear()
     await db.transactions.clear()
     bulkDeleteFailure = new ApiError({
-      code: 'internal',
+      code: 'common.validation',
       message: 'the batch judged no entry',
-      status: 500,
+      status: 422,
     })
     await db.outbox.bulkAdd([txDeleteEntry(0), txDeleteEntry(1)])
 

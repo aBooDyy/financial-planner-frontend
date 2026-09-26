@@ -1,7 +1,11 @@
 import 'fake-indexeddb/auto'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '#/db/db'
-import { buildCatalog } from '#/features/categories/data/catalog'
+import {
+  catId,
+  defaultCatalog,
+  defaultCategoryRows,
+} from '#/features/categories/__fixtures__/categories'
 import { goalProgress } from '#/features/goals/data/progress'
 import {
   deleteAllocation,
@@ -70,6 +74,7 @@ beforeEach(async () => {
       db.outbox,
     ].map((t) => t.clear()),
   )
+  await db.categories.bulkPut(defaultCategoryRows())
   await db.balanceNodes.put(MAIN)
   await db.goals.put(UMRAH)
   await db.plannedTransactions.put(SEP_SET_ASIDE)
@@ -163,9 +168,46 @@ describe('confirmPlanned', () => {
       amount: m(12000),
       walletId: 'w1',
       goalId: null,
-      category: 'salary',
+      categoryId: catId('salary'),
       plannedId: 'payday',
     })
+  })
+
+  it('files an entry under its type’s fallback when the category it names is of the other type', async () => {
+    await db.plannedTransactions.put(
+      planned({
+        id: 'payday',
+        origin: 'income',
+        role: 'income',
+        goalId: null,
+        incomeStreamId: 'salary',
+        walletId: 'w1',
+        amount: m(12000),
+        occurrence: '2026-09-27',
+      }),
+    )
+    await confirmPlanned('payday', { categoryId: catId('housing') })
+    const [income] = await txOf('payday')
+    expect(income.categoryId).toBe(catId('salary'))
+  })
+
+  it('files a payday under the income fallback when the user has no Salary category', async () => {
+    await db.categories.bulkDelete([catId('salary')])
+    await db.plannedTransactions.put(
+      planned({
+        id: 'payday',
+        origin: 'income',
+        role: 'income',
+        goalId: null,
+        incomeStreamId: 'salary',
+        walletId: 'w1',
+        amount: m(12000),
+        occurrence: '2026-09-27',
+      }),
+    )
+    await confirmPlanned('payday')
+    const [income] = await txOf('payday')
+    expect(income.categoryId).toBe(catId('other_income'))
   })
 
   it('records an obligation payment as a spend on the goal, in the user’s own category', async () => {
@@ -179,12 +221,15 @@ describe('confirmPlanned', () => {
         occurrence: '2026-10-01',
       }),
     )
-    await confirmPlanned('rent-oct', { walletId: 'w1', category: 'housing' })
+    await confirmPlanned('rent-oct', {
+      walletId: 'w1',
+      categoryId: catId('housing'),
+    })
     const [payment] = await txOf('rent-oct')
     expect(payment).toMatchObject({
       type: 'spend',
       goalId: 'umrah',
-      category: 'housing',
+      categoryId: catId('housing'),
       plannedId: 'rent-oct',
     })
   })
@@ -260,8 +305,7 @@ describe('re-opening when a settlement goes away', () => {
       type: 'spend',
       amount: m(3500),
       currency: 'SAR',
-      category: 'housing',
-      subcategory: null,
+      categoryId: catId('housing'),
       walletId: 'w1',
       goalId: 'umrah',
       date: '2026-09-30',
@@ -373,7 +417,7 @@ describe('addContribution', () => {
 
 describe('planned rows never touch the ledger’s totals', () => {
   it('leaves wallet deltas, cashflow and budgets alone — before and after a set-aside confirm', async () => {
-    const catalog = buildCatalog([])
+    const catalog = defaultCatalog()
     const payday = planned({
       id: 'payday',
       origin: 'income',
@@ -388,7 +432,8 @@ describe('planned rows never touch the ledger’s totals', () => {
     await db.budgets.put({
       id: 'b1',
       scopeType: 'overall',
-      target: null,
+      categoryId: null,
+      walletId: null,
       period: 'monthly',
       customDays: null,
       limit: m(5000),

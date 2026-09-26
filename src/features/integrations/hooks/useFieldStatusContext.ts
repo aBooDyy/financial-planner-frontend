@@ -1,8 +1,12 @@
 import { useMemo } from 'react'
 import type { CategoryCatalog } from '#/features/categories/data/catalog'
+import { DELETED_CATEGORY_ID } from '#/features/categories/data/catalog'
 import type { Extraction } from '#/features/integrations/api/ruleTypes'
 import type { IntegrationKey } from '#/features/integrations/api/types'
-import type { StatusContext } from '#/features/integrations/data/fieldStatus'
+import type {
+  CategoryWords,
+  StatusContext,
+} from '#/features/integrations/data/fieldStatus'
 import { formatMoney } from '#/lib/currency'
 import { formatDate, parseISODate } from '#/lib/date'
 import { usePreferencesStore } from '#/stores/preferences'
@@ -17,13 +21,13 @@ export function useFieldStatusContext(
 ): StatusContext {
   const dateFormat = usePreferencesStore((s) => s.dateFormat)
   return useMemo(() => {
-    const categoryName = (slug: string): string | null => {
-      for (const category of catalog.all) {
-        if (category.slug === slug) return category.name
-        const sub = catalog.subsOf(category.slug).find((s) => s.slug === slug)
-        if (sub) return sub.name
-      }
-      return null
+    const category = (id: string): CategoryWords | null => {
+      const entry = catalog.get(id)
+      if (entry.id === DELETED_CATEGORY_ID) return null
+      const parent = catalog.parentOf(id)
+      return parent
+        ? { root: parent.name, sub: entry.name }
+        : { root: entry.name, sub: null }
     }
     return {
       hasSample,
@@ -33,13 +37,14 @@ export function useFieldStatusContext(
         walletName: apiKey.defaultWalletId
           ? (walletNames.get(apiKey.defaultWalletId) ?? null)
           : null,
-        categoryName: apiKey.defaultCategory
-          ? categoryName(apiKey.defaultCategory)
-          : null,
+        categoryName:
+          apiKey.defaultCategoryId && catalog.has(apiKey.defaultCategoryId)
+            ? catalog.labelOf(apiKey.defaultCategoryId)
+            : null,
         type: apiKey.defaultType === 'income' ? 'INCOME' : 'SPEND',
       },
       walletName: (id) => walletNames.get(id) ?? null,
-      categoryName,
+      category,
       formatAmount: (minor, currency) => formatMoney(minor, currency),
       formatDate: (iso) => {
         const parsed = parseISODate(iso)

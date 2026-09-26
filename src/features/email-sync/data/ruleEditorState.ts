@@ -51,13 +51,7 @@ export type RuleEditorState = {
 export type RuleSettingsPatch = Partial<
   Pick<
     RuleDraft,
-    | 'name'
-    | 'enabled'
-    | 'walletId'
-    | 'type'
-    | 'category'
-    | 'subcategory'
-    | 'autoConfirm'
+    'name' | 'enabled' | 'walletId' | 'type' | 'categoryId' | 'autoConfirm'
   >
 >
 
@@ -190,12 +184,8 @@ export function ruleEditorReducer(
     case 'edit':
       return withOpen(state, (open) => {
         const draft = { ...open.draft, ...action.patch }
-        if (action.patch.type && action.patch.type !== open.draft.type) {
-          draft.category = null
-          draft.subcategory = null
-        }
-        if ('category' in action.patch && !('subcategory' in action.patch))
-          draft.subcategory = null
+        if (action.patch.type && action.patch.type !== open.draft.type)
+          draft.categoryId = null
         if (draft.walletId === null) draft.autoConfirm = false
         return { ...open, draft }
       })

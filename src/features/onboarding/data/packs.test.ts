@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildCatalog } from '#/features/categories/data/catalog'
+import { defaultCatalog } from '#/features/categories/__fixtures__/categories'
 import {
   PACKS,
   REQUIRED_SLUGS,
@@ -31,7 +31,7 @@ describe('packSelection', () => {
   })
 
   it('lists only root categories the built-in set has', () => {
-    const roots = new Set(buildCatalog([]).all.map((c) => c.slug))
+    const roots = new Set(defaultCatalog().all.map((c) => c.slug))
     for (const pack of PACKS) {
       for (const slug of packSelection(pack.id)) expect(roots).toContain(slug)
     }
@@ -39,7 +39,7 @@ describe('packSelection', () => {
 
   it('offers every built-in root in at least one pack', () => {
     const offered = new Set(PACKS.flatMap((p) => packSelection(p.id)))
-    for (const c of buildCatalog([]).all) expect(offered).toContain(c.slug)
+    for (const c of defaultCatalog().all) expect(offered).toContain(c.slug)
   })
 
   it('never repeats a slug', () => {

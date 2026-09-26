@@ -12,6 +12,7 @@ import {
 import type { WalletGroupOption } from '#/features/wallets/data/selectors'
 import type { CategoryOption } from '#/features/import/data/matching'
 import type { MappingDefaults as Defaults } from '#/features/import/data/types'
+import type { TxType } from '#/features/transactions/api/types'
 import type { CurrencyCode } from '#/lib/currency'
 
 type Props = {
@@ -25,6 +26,11 @@ type Props = {
 const NO_WALLET = 'none'
 const LABEL = 'mb-[6px] block text-[11.5px] font-semibold text-fp-text-2'
 
+const CATEGORY_LABEL: Readonly<Record<TxType, string>> = {
+  spend: 'Category for money out when the file says none',
+  income: 'Category for money in when the file says none',
+}
+
 /** What a row falls back to when the file itself says nothing. */
 export function MappingDefaults({
   defaults,
@@ -33,10 +39,11 @@ export function MappingDefaults({
   baseCurrency,
   onChange,
 }: Props) {
-  const parents = categories.filter((option) => option.subcategory === null)
+  const setCategory = (type: TxType, id: string) =>
+    onChange({ categoryIds: { ...defaults.categoryIds, [type]: id } })
 
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <div>
         <Label className={LABEL} htmlFor="default-wallet">
           Account for rows with none
@@ -75,28 +82,34 @@ export function MappingDefaults({
         />
       </div>
 
-      <div>
-        <Label className={LABEL} htmlFor="default-category">
-          Category when the file says none
-        </Label>
-        <Select
-          value={defaults.category}
-          onValueChange={(category) =>
-            onChange({ category, subcategory: null })
-          }
-        >
-          <SelectTrigger id="default-category">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {parents.map((option) => (
-              <SelectItem key={option.category} value={option.category}>
-                {option.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      {(['spend', 'income'] as const).map((type) => (
+        <div key={type}>
+          <Label className={LABEL} htmlFor={`default-category-${type}`}>
+            {CATEGORY_LABEL[type]}
+          </Label>
+          <Select
+            value={defaults.categoryIds[type]}
+            onValueChange={(id) => setCategory(type, id)}
+          >
+            <SelectTrigger id={`default-category-${type}`}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {categories
+                .filter((option) => option.type === type)
+                .map((option) => (
+                  <SelectItem
+                    key={option.id}
+                    value={option.id}
+                    className={option.parentId === null ? undefined : 'ps-8'}
+                  >
+                    {option.name}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ))}
     </div>
   )
 }

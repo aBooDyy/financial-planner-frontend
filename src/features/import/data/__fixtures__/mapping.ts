@@ -1,3 +1,8 @@
+import {
+  catId,
+  defaultCatalog,
+} from '#/features/categories/__fixtures__/categories'
+import { categoryTypesOf } from '../mapping'
 import { DEFAULT_DEDUPE, emptyAliases } from '../types'
 import type { Dialect, Mapping, RowContext, RowFacts } from '../types'
 
@@ -25,8 +30,7 @@ export const testMapping = (overrides: Partial<Mapping> = {}): Mapping => ({
     walletId: 'w1',
     currency: 'SAR',
     type: 'spend',
-    category: 'other',
-    subcategory: null,
+    categoryIds: { spend: catId('other'), income: catId('other_income') },
   },
   aliases: emptyAliases(),
   dedupe: DEFAULT_DEDUPE,
@@ -39,6 +43,7 @@ export const testContext = (
   today: '2026-06-20',
   walletCurrencies: { w1: 'SAR' },
   walletNames: { w1: 'Main' },
+  categoryTypes: categoryTypesOf(defaultCatalog(), {}),
   ...overrides,
 })
 
@@ -57,8 +62,7 @@ export const testFacts = (overrides: Partial<RowFacts> = {}): RowFacts => ({
   currencyCell: '',
   walletId: 'w1',
   walletSkipped: false,
-  category: 'groceries',
-  subcategory: null,
+  categoryId: catId('groceries'),
   categoryDefaulted: false,
   intent: 'cashflow',
   counterpartId: null,

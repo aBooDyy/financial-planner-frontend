@@ -1,11 +1,18 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { messageForApiError } from '#/lib/errorMessages'
-import { commitImport } from '#/features/import/data/commit'
+import {
+  commitImport,
+  liveCreatedCategories,
+} from '#/features/import/data/commit'
 import { saveTemplateForImport } from '#/features/import/data/mutations'
 import { downloadSkippedRows } from '#/features/import/data/skippedCsv'
+import { withCreatedCategories } from '#/features/import/data/templates'
 import { ONE_TIME_TEMPLATE } from '#/features/import/hooks/useCsvImport'
 import type { CommitResult, CommitSource } from '#/features/import/data/commit'
-import type { TemplateSaveOutcome } from '#/features/import/data/mutations'
+import type {
+  TemplateSaveOutcome,
+  TemplateSession,
+} from '#/features/import/data/mutations'
 import type { CsvImport } from '#/features/import/hooks/useCsvImport'
 import type { ReviewRows } from '#/features/import/hooks/useReviewRows'
 import type { TemplateSave } from '#/features/import/hooks/useTemplateSave'
@@ -23,6 +30,15 @@ export type CommitState =
   | { status: 'failed'; message: string }
 
 const NOT_SAVED: TemplateSaveOutcome = { kind: 'none' }
+
+/** The mapping as saved once the commit has given every created category its id. */
+const settledSession = (
+  session: TemplateSession,
+  result: CommitResult,
+): TemplateSession => ({
+  ...session,
+  config: withCreatedCategories(session.config, result.createdCategories),
+})
 
 export function useImportCommit(
   csv: CsvImport,
@@ -73,7 +89,10 @@ export function useImportCommit(
       let saved = NOT_SAVED
       if (plan !== null && session !== null) {
         try {
-          saved = await saveTemplateForImport(plan, session)
+          saved = await saveTemplateForImport(
+            plan,
+            settledSession(session, result),
+          )
         } catch (error) {
           saved = { kind: 'failed', message: messageForApiError(error) }
         }
@@ -89,15 +108,23 @@ export function useImportCommit(
   }, [actions, mapping, file, templateId, review, source, plan, session])
 
   /** For the person who changes their mind on the Done screen, which is when they know. */
+  const committed = state.status === 'done' ? state.result : null
   const saveAsTemplate = useCallback(
     async (name: string) => {
-      if (session === null) return
+      if (session === null || committed === null) return
       let saved: TemplateSaveOutcome
       try {
+        const createdCategories = await liveCreatedCategories(
+          session.config.aliases.categories,
+          committed.createdCategories,
+        )
         // The use was already recorded at commit, so this is only the save.
         saved = await saveTemplateForImport(
           { mode: 'new', name },
-          { ...session, usedTemplateId: null },
+          {
+            ...settledSession(session, { ...committed, createdCategories }),
+            usedTemplateId: null,
+          },
         )
       } catch (error) {
         saved = { kind: 'failed', message: messageForApiError(error) }
@@ -106,7 +133,7 @@ export function useImportCommit(
         current.status === 'done' ? { ...current, saved } : current,
       )
     },
-    [session],
+    [session, committed],
   )
 
   // Built only when asked for: the file the user downloads is the only reason these rows

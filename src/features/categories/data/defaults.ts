@@ -2,11 +2,9 @@ import type { IconId } from '#/lib/icons/catalog.gen'
 import type { TxType } from '#/features/transactions/api/types'
 
 /**
- * The built-in two-level catalog: what a brand-new user's rows are seeded from on the server,
- * and what an unknown slug falls back to here. `id` is the stable slug transactions persist —
- * `t_transactions.category` holds a parent's, `.subcategory` a child's — so these must match
- * the backend's `app/config/categories.py` exactly. `savings` is the home for goal
- * contributions.
+ * The built-in two-level catalog the server seeds a new user's rows from. Here it only
+ * supplies the default icon for a row whose own is unset, looked up by slug — so `id` (the
+ * slug) and `icon` must match the backend's `app/config/categories.py`.
  */
 export type DefaultSubcategory = { id: string; name: string; icon: IconId }
 
@@ -344,38 +342,15 @@ export const CATEGORIES: DefaultCategory[] = [
   },
 ]
 
-const BY_ID = new Map<string, DefaultCategory>(CATEGORIES.map((c) => [c.id, c]))
+const BY_SLUG = new Map<string, DefaultCategory>(
+  CATEGORIES.map((c) => [c.id, c]),
+)
 
-// A safe fallback so a row never crashes on an unknown/legacy slug.
-export const FALLBACK_CATEGORY: DefaultCategory =
-  BY_ID.get('other') ?? CATEGORIES[0]
-
-export const defaultCategory = (id: string): DefaultCategory | undefined =>
-  BY_ID.get(id)
+export const defaultCategory = (slug: string): DefaultCategory | undefined =>
+  BY_SLUG.get(slug)
 
 export const defaultSubcategory = (
-  categoryId: string,
-  subId: string,
+  parentSlug: string,
+  slug: string,
 ): DefaultSubcategory | undefined =>
-  BY_ID.get(categoryId)?.subs.find((s) => s.id === subId)
-
-export const categoriesByType = (type: TxType): DefaultCategory[] =>
-  CATEGORIES.filter((c) => c.type === type)
-
-export const categoryOf = (id: string): DefaultCategory =>
-  BY_ID.get(id) ?? FALLBACK_CATEGORY
-
-export const subcategoriesOf = (categoryId: string): DefaultSubcategory[] =>
-  BY_ID.get(categoryId)?.subs ?? []
-
-export const subcategoryName = (
-  categoryId: string,
-  subId: string | null,
-): string | null => {
-  if (!subId) return null
-  const found = subcategoriesOf(categoryId).find((s) => s.id === subId)
-  return found ? found.name : null
-}
-
-// The category goal contributions default to.
-export const SAVINGS_CATEGORY_ID = 'savings'
+  BY_SLUG.get(parentSlug)?.subs.find((s) => s.id === slug)

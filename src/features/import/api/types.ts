@@ -1,4 +1,5 @@
-import type { ImportTemplateConfig } from '#/features/import/data/types'
+import { TEMPLATE_CONFIG_VERSION } from '#/features/import/data/types'
+import type { StoredTemplateConfig } from '#/features/import/data/types'
 
 /**
  * Import-template contracts. The one unusual thing here is `config`: an opaque JSON
@@ -28,7 +29,7 @@ export type ImportTemplate = {
   sourceKind: 'csv'
   signature: string
   /** Null when the blob could not be read — see `parseTemplateConfig`. */
-  config: ImportTemplateConfig | null
+  config: StoredTemplateConfig | null
   lastUsedAt: string | null
   useCount: number
   createdAt: string
@@ -75,6 +76,25 @@ export const MAX_CONFIG_BYTES = 64 * 1024
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
+/**
+ * The default category, as each version names it: version 2 by id per direction, version 1
+ * by the slug `upgradeTemplateConfig` looks up.
+ */
+const hasDefaultCategory = (
+  version: unknown,
+  defaults: Record<string, unknown>,
+): boolean => {
+  if (typeof version === 'number' && version >= TEMPLATE_CONFIG_VERSION) {
+    const ids = defaults.categoryIds
+    return (
+      isRecord(ids) &&
+      typeof ids.spend === 'string' &&
+      typeof ids.income === 'string'
+    )
+  }
+  return typeof defaults.category === 'string'
+}
+
 /** The parts `applyTemplateConfig` reads unguarded, so their absence is a parse failure. */
 const hasShape = (value: Record<string, unknown>): boolean => {
   const aliases = value.aliases
@@ -82,6 +102,7 @@ const hasShape = (value: Record<string, unknown>): boolean => {
     isRecord(value.dialect) &&
     Array.isArray(value.roles) &&
     isRecord(value.defaults) &&
+    hasDefaultCategory(value.version, value.defaults) &&
     isRecord(value.dedupe) &&
     isRecord(aliases) &&
     isRecord(aliases.wallets) &&
@@ -97,7 +118,7 @@ const hasShape = (value: Record<string, unknown>): boolean => {
  */
 export const parseTemplateConfig = (
   raw: string,
-): ImportTemplateConfig | null => {
+): StoredTemplateConfig | null => {
   let parsed: unknown
   try {
     parsed = JSON.parse(raw)
@@ -106,13 +127,13 @@ export const parseTemplateConfig = (
   }
   if (!isRecord(parsed)) return null
   if (!hasShape(parsed)) return null
-  return parsed as unknown as ImportTemplateConfig
+  return parsed as unknown as StoredTemplateConfig
 }
 
-export const serializeTemplateConfig = (config: ImportTemplateConfig): string =>
+export const serializeTemplateConfig = (config: StoredTemplateConfig): string =>
   JSON.stringify(config)
 
-export const configByteLength = (config: ImportTemplateConfig): number =>
+export const configByteLength = (config: StoredTemplateConfig): number =>
   new TextEncoder().encode(serializeTemplateConfig(config)).length
 
 export const toImportTemplate = (w: ImportTemplateWire): ImportTemplate => ({

@@ -34,9 +34,9 @@ const COLUMNS = 'grid grid-cols-6 gap-2 sm:grid-cols-8'
 const GROUP =
   'overflow-visible p-0 pb-[10px] [&_[cmdk-group-heading]]:px-0 [&_[cmdk-group-heading]]:pt-0 [&_[cmdk-group-heading]]:pb-[10px] [&_[cmdk-group-heading]]:tracking-[0.06em] [&_[cmdk-group-items]]:grid [&_[cmdk-group-items]]:grid-cols-6 [&_[cmdk-group-items]]:gap-2 sm:[&_[cmdk-group-items]]:grid-cols-8'
 
-/** The shared command input, recast as the dialog's soft search well. */
+/** The shared command input's well, flush and a touch taller for the dialog. */
 const SEARCH_WELL =
-  'flex flex-col gap-[10px] overflow-visible rounded-none [&_[data-slot=command-input-wrapper]]:gap-[10px] [&_[data-slot=command-input-wrapper]]:rounded-[14px] [&_[data-slot=command-input-wrapper]]:border-[1.5px] [&_[data-slot=command-input-wrapper]]:border-fp-border [&_[data-slot=command-input-wrapper]]:bg-fp-surface-2 [&_[data-slot=command-input-wrapper]]:px-[14px] [&_[data-slot=command-input-wrapper]]:transition [&_[data-slot=command-input-wrapper]]:focus-within:border-fp-accent [&_[data-slot=command-input-wrapper]]:focus-within:ring-[3px] [&_[data-slot=command-input-wrapper]]:focus-within:ring-fp-accent/15 [&_[data-slot=command-input]]:h-auto [&_[data-slot=command-input]]:py-3 [&_[data-slot=command-input]]:font-medium'
+  'flex flex-col gap-[10px] overflow-visible rounded-none [&_[data-slot=command-input-wrapper]]:m-0 [&_[data-slot=command-input]]:h-auto [&_[data-slot=command-input]]:py-3'
 
 // The glyph's colour at 12% for every tile, a touch deeper under the pointer or arrow keys.
 const TILE =

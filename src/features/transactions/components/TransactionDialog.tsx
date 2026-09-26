@@ -1,7 +1,10 @@
 import { useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { LocalGoal, LocalMerchant } from '#/db/types'
+import { SyncFailureBanner } from '#/components/sync/SyncFailureBanner'
 import { ResponsiveDialog } from '#/components/ui/responsive-dialog'
+import { useRowSyncFailure } from '#/hooks/useRowSyncFailure'
+import { describeSyncFailure } from '#/lib/syncFailureMessages'
 import type { TransferWallet } from '#/features/wallets/data/transferDialog'
 import { CategoryOptions } from '#/features/categories/components/CategoryOptions'
 import { useCategoryCatalog } from '#/features/categories/hooks/useCategoryCatalog'
@@ -21,6 +24,7 @@ import {
   transferBlock,
 } from '#/features/transactions/data/txDialog'
 import { useCountsToward } from '#/features/transactions/hooks/useCountsToward'
+import { useFlaggedField } from '#/features/transactions/hooks/useFlaggedField'
 import { useQuickChips } from '#/features/transactions/hooks/useQuickChips'
 import type {
   EditorTxType,
@@ -57,7 +61,7 @@ type Props = {
   onType: (t: EditorTxType) => void
   onSwapTransfer: () => void
   onResetReceived: () => void
-  onCategory: (category: string, subcategory: string | null) => void
+  onCategory: (categoryId: string) => void
   onGoal: (id: string | null) => void
   onMerchant: (merchant: LocalMerchant | null) => void
   onApplySuggestion: () => void
@@ -101,6 +105,8 @@ export function TransactionDialog({
   const dateFormat = usePreferencesStore((s) => s.dateFormat)
 
   const isTransfer = draft.type === 'transfer'
+  const sync = useRowSyncFailure(isTransfer ? 'transfer' : 'transaction', id)
+  const flagged = useFlaggedField(sync.failure, draft)
   const flowType = draft.type === 'income' ? 'income' : 'spend'
   const inUse = [draft.walletId, draft.toWalletId]
   const choices = accounts.filter(
@@ -209,10 +215,9 @@ export function TransactionDialog({
       {pane === 'category' ? (
         <CategoryOptions
           categories={categories}
-          category={draft.category}
-          subcategory={draft.subcategory}
-          onPick={(category, subcategory) => {
-            onCategory(category, subcategory)
+          value={draft.categoryId}
+          onPick={(categoryId) => {
+            onCategory(categoryId)
             back()
           }}
           listClassName={PANE_LIST}
@@ -241,6 +246,15 @@ export function TransactionDialog({
             { '--tx-ink': tint.ink, '--tx-soft': tint.soft } as CSSProperties
           }
         >
+          {sync.failure ? (
+            <SyncFailureBanner
+              kind={sync.failure.kind}
+              text={describeSyncFailure(sync.failure)}
+              onRetry={sync.retry}
+              retrying={sync.retrying}
+            />
+          ) : null}
+
           <TxTypeSwitch
             value={draft.type}
             isLocked={(t) => id !== null && (t === 'transfer') !== isTransfer}
@@ -252,7 +266,12 @@ export function TransactionDialog({
             currency={currency}
             amount={draft.amount}
             onAmount={(v) => onField('amount', v)}
-            invalid={amountMissing || walletMissing}
+            invalid={
+              amountMissing ||
+              walletMissing ||
+              flagged === 'amount' ||
+              flagged === 'to_amount'
+            }
           >
             {isTransfer ? null : (
               <TxAccountPill
@@ -264,7 +283,11 @@ export function TransactionDialog({
                 chosen={wallet}
                 archived={walletArchived}
                 onChange={(walletId) => onField('walletId', walletId)}
-                invalid={walletMissing}
+                invalid={
+                  walletMissing ||
+                  flagged === 'wallet_id' ||
+                  flagged === 'currency'
+                }
               />
             )}
           </TxAmountHero>
@@ -301,6 +324,7 @@ export function TransactionDialog({
               missingSide={missingSide}
               rates={rates}
               dateFormat={dateFormat}
+              flaggedField={flagged}
               onField={onField}
               onSwap={onSwapTransfer}
               onResetReceived={onResetReceived}
@@ -311,12 +335,11 @@ export function TransactionDialog({
               chips={chips}
               merchantName={merchantName}
               suggestion={
-                suggestion
-                  ? catalog.labelOf(suggestion.category, suggestion.subcategory)
-                  : null
+                suggestion ? catalog.labelOf(suggestion.categoryId) : null
               }
               counts={counts}
               dateFormat={dateFormat}
+              flaggedField={flagged}
               onField={onField}
               onCategory={onCategory}
               onApplySuggestion={onApplySuggestion}

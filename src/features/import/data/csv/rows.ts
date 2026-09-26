@@ -1,7 +1,13 @@
 import { decimalsFor } from '#/lib/currency'
 import { fingerprintOf, withReference } from '../dedupe'
 import { matchCurrency, matchType, normalizeKey } from '../matching'
-import { hasErrors, lookup, roleColumn } from '../types'
+import {
+  ROW_ISSUES,
+  hasErrors,
+  lookup,
+  pendingCategoryId,
+  roleColumn,
+} from '../types'
 import { validateRow } from '../validate'
 import { parseAmountCell } from './amounts'
 import { parseDateCell } from './dates'
@@ -192,8 +198,7 @@ const readWallet = (
 }
 
 type CategoryRead = {
-  category: string
-  subcategory: string | null
+  categoryId: string
   defaulted: boolean
   intent: RowIntent
 }
@@ -201,10 +206,10 @@ type CategoryRead = {
 const readCategory = (
   cells: ReadonlyArray<string>,
   mapping: Mapping,
+  type: TxType,
 ): CategoryRead => {
   const fallback = {
-    category: mapping.defaults.category,
-    subcategory: mapping.defaults.subcategory,
+    categoryId: mapping.defaults.categoryIds[type],
     intent: 'cashflow' as const,
   }
   const cell = cellAt(cells, roleColumn(mapping.roles, 'category')).trim()
@@ -226,10 +231,9 @@ const readCategory = (
   if (target.kind === 'transfer' || target.kind === 'adjustment') {
     return { ...fallback, defaulted: false, intent: target.kind }
   }
-  // Both a binding and a create name the pair — a category still to be made can be a child.
   return {
-    category: target.category,
-    subcategory: target.subcategory,
+    categoryId:
+      target.kind === 'create' ? pendingCategoryId(target) : target.categoryId,
     defaulted: false,
     intent: 'cashflow',
   }
@@ -266,7 +270,7 @@ export const readRow = (
   const amount = readAmountCells(cells, mapping, currency)
   const { type, defaulted: typeDefaulted } = readType(cells, mapping, amount)
   const { walletId, skipped } = readWallet(cells, mapping)
-  const category = readCategory(cells, mapping)
+  const category = readCategory(cells, mapping, type)
   const merchant = readMerchant(cells, mapping)
 
   const reference =
@@ -297,8 +301,7 @@ export const readRow = (
     currencyCell,
     walletId,
     walletSkipped: skipped,
-    category: category.category,
-    subcategory: category.subcategory,
+    categoryId: category.categoryId,
     categoryDefaulted: category.defaulted,
     intent: category.intent,
     counterpartId: null,
@@ -314,7 +317,12 @@ const draftFrom = (
   facts: RowFacts,
   issues: ReadonlyArray<RowIssue>,
 ): TransactionDraft | null => {
-  if (hasErrors(issues)) return null
+  // A category of the other direction is fixed in the row editor, which opens on the draft;
+  // `isCommittable` still holds the row back on the error.
+  const unreadable = issues.filter(
+    (issue) => issue.code !== ROW_ISSUES.categoryTypeMismatch,
+  )
+  if (hasErrors(unreadable)) return null
   if (
     facts.date === null ||
     facts.currency === null ||
@@ -327,8 +335,7 @@ const draftFrom = (
     type: facts.type,
     amount: facts.amountMinor,
     currency: facts.currency,
-    category: facts.category,
-    subcategory: facts.subcategory,
+    categoryId: facts.categoryId,
     walletId: facts.walletId,
     goalId: null,
     merchantId: facts.merchantId,

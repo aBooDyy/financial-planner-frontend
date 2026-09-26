@@ -19,7 +19,8 @@ type Props = {
   /** The disclosure control, rendered before the chip on a parent row. */
   disclosure?: ReactNode
   onEdit: () => void
-  onDelete: () => void
+  /** Absent for a category that can't be deleted. */
+  onDelete?: () => void
 }
 
 /** One row of the Settings category list — a parent or a child, same anatomy. */
@@ -64,16 +65,20 @@ export function CategoryTreeRow({
       >
         <Pencil size={15} strokeWidth={1.8} />
       </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        onClick={onDelete}
-        title="Delete"
-        className={`${ICON_BTN} hover:text-fp-danger`}
-      >
-        <Trash2 size={15} strokeWidth={1.8} />
-      </Button>
+      {onDelete ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={onDelete}
+          title="Delete"
+          className={`${ICON_BTN} hover:text-fp-danger`}
+        >
+          <Trash2 size={15} strokeWidth={1.8} />
+        </Button>
+      ) : (
+        <div aria-hidden className="w-[30px] shrink-0" />
+      )}
     </div>
   )
 }

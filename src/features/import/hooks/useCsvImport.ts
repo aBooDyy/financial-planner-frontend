@@ -10,8 +10,9 @@ import { CsvFileError } from '#/features/import/data/csv/errors'
 import { buildDedupeIndex, toLedgerEntry } from '#/features/import/data/dedupe'
 import { buildCatalog } from '#/features/categories/data/catalog'
 import {
+  categoryTypesOf,
   draftForFile,
-  fallbackCategoryOf,
+  fallbackCategoriesOf,
   toMapping,
 } from '#/features/import/data/mapping'
 import { categoryOptions } from '#/features/import/data/matching'
@@ -26,6 +27,7 @@ import type { CsvReadResult } from '#/features/import/data/csv/read'
 import type { MappingDraft } from '#/features/import/data/mapping'
 import type { RowScan } from '#/features/import/data/rowScan'
 import type {
+  Aliases,
   ColumnRole,
   Dialect,
   Mapping,
@@ -121,6 +123,8 @@ const IDLE_SCAN: ScanProgress = { running: false, done: 0, total: 0 }
 const WHOLE_FILE_STEPS: ReadonlyArray<ImportStep> = ['columns', 'review']
 
 const NO_MATRIX: ReadonlyArray<ReadonlyArray<string>> = []
+
+const NO_CATEGORY_ALIASES: Aliases['categories'] = {}
 
 type SyncedRow = {
   id: string
@@ -220,7 +224,17 @@ export function useCsvImport() {
     [catalog],
   )
 
-  const fallbackCategory = fallbackCategoryOf(catalog)
+  const fallbackCategories = useMemo(
+    () => fallbackCategoriesOf(catalog),
+    [catalog],
+  )
+
+  // Keyed on the category answers alone: only a category the import will create adds one.
+  const categoryAliases = draft?.aliases.categories ?? NO_CATEGORY_ALIASES
+  const categoryTypes = useMemo(
+    () => categoryTypesOf(catalog, categoryAliases),
+    [catalog, categoryAliases],
+  )
 
   const context: RowContext = useMemo(() => {
     const walletCurrencies: Record<string, CurrencyCode> = {}
@@ -230,8 +244,8 @@ export function useCsvImport() {
       walletNames[node.id] = node.name
       if (node.currency) walletCurrencies[node.id] = node.currency
     }
-    return { today, walletCurrencies, walletNames }
-  }, [nodes, today])
+    return { today, walletCurrencies, walletNames, categoryTypes }
+  }, [nodes, today, categoryTypes])
 
   const ledgerIndex = useMemo(
     () => buildDedupeIndex(transactions.map(toLedgerEntry)),
@@ -296,7 +310,7 @@ export function useCsvImport() {
           headers: result.headers,
           matrix: result.rows,
           currency: baseCurrency,
-          fallbackCategory,
+          fallbackCategories,
         })
         setDraft(seed)
         setSuggestedRoles(seed.roles)
@@ -317,7 +331,7 @@ export function useCsvImport() {
         if (readAbort.current === controller) readAbort.current = null
       }
     },
-    [baseCurrency, fallbackCategory],
+    [baseCurrency, fallbackCategories],
   )
 
   const openFile = useCallback(
@@ -520,7 +534,7 @@ export function useCsvImport() {
     walletGroups,
     catalog,
     categories,
-    fallbackCategory,
+    fallbackCategories,
     // The same index the pass ran against, so step ③'s badges and the rows it shows can
     // never disagree about which merchant a spelling matched.
     merchantIndex,

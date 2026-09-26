@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { draftForFile } from '#/features/import/data/mapping'
 import {
   applyTemplateConfig,
-  categoryKeyOf,
   needsReread,
   rankTemplates,
   signatureOf,
@@ -44,8 +43,8 @@ export function useTemplatePicker(csv: CsvImport): TemplatePicker {
   const { templates } = useSavedTemplates()
   const locale = useDirectionStore((s) => s.locale)
   const { updateMapping, setDialect, goTo, next } = csv.actions
-  const { file, templateId, baseCurrency, walletGroups, categories } = csv
-  const fallbackCategory = csv.fallbackCategory
+  const { file, templateId, baseCurrency, walletGroups, catalog } = csv
+  const fallbackCategories = csv.fallbackCategories
   const [unknown, setUnknown] = useState<UnknownAlias[]>([])
 
   // Keyed by template *and* by how the file is currently read: restoring a saved dialect
@@ -84,14 +83,10 @@ export function useTemplatePicker(csv: CsvImport): TemplatePicker {
       walletIds: new Set(
         walletGroups.flatMap((group) => group.wallets.map((w) => w.id)),
       ),
-      categoryKeys: new Set(
-        categories.map((option) =>
-          categoryKeyOf(option.category, option.subcategory),
-        ),
-      ),
+      categories: catalog,
       merchantIds: new Set(csv.merchantIndex.merchants.map((m) => m.id)),
     }),
-    [walletGroups, categories, csv.merchantIndex],
+    [walletGroups, catalog, csv.merchantIndex],
   )
 
   const applied = useMemo(
@@ -114,7 +109,7 @@ export function useTemplatePicker(csv: CsvImport): TemplatePicker {
             headers: file.headers,
             matrix,
             currency: baseCurrency,
-            fallbackCategory,
+            fallbackCategories,
           }),
         )
       }
@@ -124,6 +119,8 @@ export function useTemplatePicker(csv: CsvImport): TemplatePicker {
     const template = ranked.find((t) => t.id === templateId)
     const config = template?.config
     if (!config) return
+    // Read against a catalog not loaded yet, every category answer would read as deleted.
+    if (catalog.all.length === 0) return
 
     const token = `${templateId}|${dialectKey(file.dialect)}`
     if (appliedToken.current === token) return
@@ -145,9 +142,10 @@ export function useTemplatePicker(csv: CsvImport): TemplatePicker {
     file,
     templateId,
     ranked,
+    catalog,
     catalogue,
     baseCurrency,
-    fallbackCategory,
+    fallbackCategories,
     updateMapping,
     setDialect,
   ])

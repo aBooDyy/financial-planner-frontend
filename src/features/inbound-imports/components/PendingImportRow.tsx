@@ -43,8 +43,8 @@ function MerchantHint({
   return (
     <NoteBox icon={<Sparkles />}>
       {merchant.displayName} — you filed it under{' '}
-      {merchant.learnedCategory
-        ? catalog.get(merchant.learnedCategory).name
+      {merchant.learnedCategoryId && catalog.has(merchant.learnedCategoryId)
+        ? catalog.labelOf(merchant.learnedCategoryId)
         : 'a category'}{' '}
       {merchant.timesConfirmed === 1
         ? 'last time'

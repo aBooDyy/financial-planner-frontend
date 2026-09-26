@@ -39,8 +39,8 @@ type Props = {
   onArchive: () => void
   onDelete: () => void
   onClose: () => void
-  /** A saved wallet's live balance, formatted; absent for a group or a new wallet. */
-  currentBalance?: string
+  /** A saved wallet's live balance; `null` while it loads, absent for anything else. */
+  currentBalance?: string | null
   onAdjust?: () => void
   /** A dialog opened from this one; nested so using it cannot close the editor. */
   children?: ReactNode
@@ -118,7 +118,7 @@ export function NodeEditor({
         />
       ) : null}
 
-      {isWallet && onAdjust && currentBalance ? (
+      {isWallet && onAdjust && currentBalance !== undefined ? (
         <BalanceNowStrip balance={currentBalance} onAdjust={onAdjust} />
       ) : null}
 

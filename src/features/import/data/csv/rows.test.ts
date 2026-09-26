@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { catId } from '#/features/categories/__fixtures__/categories'
 import { testContext, testMapping } from '../__fixtures__/mapping'
 import { ROW_ISSUES } from '../types'
 import { loadFixture } from './__fixtures__/fixtures'
@@ -30,8 +31,7 @@ describe('buildRows — a split-column statement', () => {
       walletId: 'w1',
       currency: 'GBP',
       type: 'spend',
-      category: 'other',
-      subcategory: null,
+      categoryIds: { spend: catId('other'), income: catId('other_income') },
     },
   })
   const context = testContext({ walletCurrencies: { w1: 'GBP' } })
@@ -53,8 +53,7 @@ describe('buildRows — a split-column statement', () => {
         type: 'spend',
         amount: 4215,
         currency: 'GBP',
-        category: 'other',
-        subcategory: null,
+        categoryId: catId('other'),
         walletId: 'w1',
         goalId: null,
         merchantId: null,
@@ -149,10 +148,9 @@ describe('buildRows — our own export', () => {
       categories: {
         'groceries supermarket': {
           kind: 'category',
-          category: 'groceries',
-          subcategory: 'supermarket',
+          categoryId: catId('supermarket', 'groceries'),
         },
-        salary: { kind: 'category', category: 'salary', subcategory: null },
+        salary: { kind: 'category', categoryId: catId('salary') },
       },
       merchants: {},
       types: {},
@@ -184,14 +182,13 @@ describe('buildRows — our own export', () => {
     const rows = build(matrix, EXPORT_MAPPING, context)
     expect(rows[0].draft).toMatchObject({
       type: 'income',
-      category: 'salary',
+      categoryId: catId('salary'),
       walletId: 'w1',
       note: 'June salary',
     })
     expect(rows[1].draft).toMatchObject({
       type: 'spend',
-      category: 'groceries',
-      subcategory: 'supermarket',
+      categoryId: catId('supermarket', 'groceries'),
       walletId: 'w1',
       note: 'Carrefour, Riyadh Park',
     })
@@ -200,8 +197,38 @@ describe('buildRows — our own export', () => {
 
   it('falls back to the default category, and says so', () => {
     const rows = build(matrix, EXPORT_MAPPING, context)
-    expect(rows[2].draft?.category).toBe('other')
+    expect(rows[2].draft?.categoryId).toBe(catId('other'))
     expect(codes(rows[2])).toEqual([ROW_ISSUES.categoryDefaulted])
+  })
+
+  it('files money in under the income default, never the spending one', () => {
+    const rows = build(
+      matrix,
+      {
+        ...EXPORT_MAPPING,
+        aliases: { ...EXPORT_MAPPING.aliases, categories: {} },
+      },
+      context,
+    )
+    expect(rows[0].draft).toMatchObject({
+      type: 'income',
+      categoryId: catId('other_income'),
+    })
+  })
+
+  it('holds back a row filed under a category of the other direction', () => {
+    const typed = testContext({
+      ...context,
+      categoryTypes: {
+        [catId('salary')]: 'income',
+        [catId('supermarket', 'groceries')]: 'income',
+      },
+    })
+    const rows = build(matrix, EXPORT_MAPPING, typed)
+    expect(codes(rows[0])).not.toContain(ROW_ISSUES.categoryTypeMismatch)
+    expect(codes(rows[1])).toEqual([ROW_ISSUES.categoryTypeMismatch])
+    // The draft stays, so the row editor opens on it.
+    expect(rows[1].draft?.categoryId).toBe(catId('supermarket', 'groceries'))
   })
 })
 

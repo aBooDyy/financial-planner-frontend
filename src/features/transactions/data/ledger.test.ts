@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { LocalBalanceNode, LocalGoal, LocalTransaction } from '#/db/types'
 import { contributionsByGoal, walletLiveBalances } from './ledger'
+import { catId } from '#/features/categories/__fixtures__/categories'
 
 const RATES = { SAR: 1, USD: 3.75 }
 
@@ -31,8 +32,7 @@ const tx = (over: Partial<LocalTransaction>): LocalTransaction => ({
   type: 'spend',
   amount: 0,
   currency: 'SAR',
-  category: 'groceries',
-  subcategory: null,
+  categoryId: catId('groceries'),
   walletId: 'w1',
   goalId: null,
   merchantId: null,
@@ -112,7 +112,7 @@ describe('walletLiveBalances', () => {
       wallet({ id: 'w1', amount: 100_000 }),
       wallet({ id: 'w2', amount: 0 }),
     ]
-    const leg = { category: null, transferId: 'tr1', amount: 40_000 }
+    const leg = { categoryId: null, transferId: 'tr1', amount: 40_000 }
     const txns = [
       tx({ ...leg, walletId: 'w1', type: 'transfer_out' }),
       tx({ ...leg, walletId: 'w2', type: 'transfer_in' }),
@@ -132,7 +132,7 @@ describe('walletLiveBalances', () => {
       tx({
         walletId: 'w1',
         type: 'transfer_out',
-        category: null,
+        categoryId: null,
         transferId: 'tr1',
         amount: 375_000,
         currency: 'SAR',
@@ -140,7 +140,7 @@ describe('walletLiveBalances', () => {
       tx({
         walletId: 'w2',
         type: 'transfer_in',
-        category: null,
+        categoryId: null,
         transferId: 'tr1',
         amount: 99_000,
         currency: 'USD',
@@ -157,7 +157,7 @@ describe('walletLiveBalances', () => {
       wallet({ id: 'w1', amount: 100_000 }),
       wallet({ id: 'w2', amount: 100_000 }),
     ]
-    const adjustment = { category: null, amount: 12_500 }
+    const adjustment = { categoryId: null, amount: 12_500 }
     const txns = [
       tx({ ...adjustment, walletId: 'w1', type: 'adjustment_in' }),
       tx({ ...adjustment, walletId: 'w2', type: 'adjustment_out' }),

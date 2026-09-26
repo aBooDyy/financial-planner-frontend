@@ -4,15 +4,17 @@ import { FoldingGrid } from './FoldingGrid'
 type Props = {
   grid: MonthGridView
   open: boolean
+  loading: boolean
   onPick: (key: string) => void
 }
 
-export function MonthGrid({ grid, open, onPick }: Props) {
+export function MonthGrid({ grid, open, loading, onPick }: Props) {
   return (
     <FoldingGrid
       rows={grid}
       cols="grid-cols-4"
       open={open}
+      loading={loading}
       showBreakdown={(c) => c.hasActivity}
       onPick={onPick}
     />

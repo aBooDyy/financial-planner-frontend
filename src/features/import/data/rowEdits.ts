@@ -4,6 +4,7 @@ import type { TxType } from '#/features/transactions/api/types'
 import type { CurrencyCode } from '#/lib/currency'
 import type {
   Mapping,
+  MappingDefaults,
   ParsedRow,
   RowContext,
   RowFacts,
@@ -22,8 +23,7 @@ export type RowPatch = {
   currency?: CurrencyCode
   type?: TxType
   walletId?: string
-  category?: string
-  subcategory?: string | null
+  categoryId?: string
   note?: string | null
   intent?: RowIntent
   /** The other wallet of a transfer with no partner in the file. */
@@ -51,9 +51,14 @@ export const isEmptyPatch = (patch: RowPatch): boolean =>
 
 /**
  * A corrected value is a fact, not a guess: setting one clears the "we fell back to the
- * default" flags that would otherwise warn about a cell the user just answered.
+ * default" flags that would otherwise warn about a cell the user just answered. A row still
+ * on the default category follows its direction to the other type's default.
  */
-const patchFacts = (facts: RowFacts, patch: RowPatch): RowFacts => {
+const patchFacts = (
+  facts: RowFacts,
+  patch: RowPatch,
+  defaults: MappingDefaults,
+): RowFacts => {
   const next = { ...facts }
   if (patch.date !== undefined) {
     next.date = patch.date
@@ -71,14 +76,21 @@ const patchFacts = (facts: RowFacts, patch: RowPatch): RowFacts => {
   if (patch.type !== undefined) {
     next.type = patch.type
     next.typeDefaulted = false
+    // Also a row that sits on its old direction's default without it being a guess: a
+    // skipped category, or a movement turned into spending.
+    if (
+      facts.categoryDefaulted ||
+      facts.categoryId === defaults.categoryIds[facts.type]
+    ) {
+      next.categoryId = defaults.categoryIds[patch.type]
+    }
   }
   if (patch.walletId !== undefined) {
     next.walletId = patch.walletId
     next.walletSkipped = false
   }
-  if (patch.category !== undefined) {
-    next.category = patch.category
-    next.subcategory = patch.subcategory ?? null
+  if (patch.categoryId !== undefined) {
+    next.categoryId = patch.categoryId
     next.categoryDefaulted = false
   }
   if (patch.note !== undefined) next.note = patch.note
@@ -105,7 +117,11 @@ export const applyRowPatch = (
   context: RowContext,
 ): ParsedRow => {
   if (isEmptyPatch(patch)) return row
-  const facts = patchFacts(readRow(row.raw, row.index, mapping), patch)
+  const facts = patchFacts(
+    readRow(row.raw, row.index, mapping),
+    patch,
+    mapping.defaults,
+  )
   return settleTransfer(
     {
       ...rowFromFacts(facts, mapping, context),

@@ -64,8 +64,7 @@ const serverLeg = (
 ): Transaction => ({
   amount: 80_000,
   currency: 'SAR',
-  category: null,
-  subcategory: null,
+  categoryId: null,
   walletId: 'w1',
   goalId: null,
   merchantId: null,
@@ -110,7 +109,7 @@ describe('createTransfer', () => {
       type: 'transfer_out',
       walletId: 'w1',
       amount: 80_000,
-      category: null,
+      categoryId: null,
       dirty: 1,
     })
     expect(inLeg).toMatchObject({ type: 'transfer_in', walletId: 'w2' })
@@ -414,7 +413,7 @@ describe('bulkDeleteTransfers', () => {
 })
 
 describe('pushTransferCreates', () => {
-  it('stores what was written, settles a taken id and drops an unusable one', async () => {
+  it('stores what was written, settles a taken id and flags an unusable one', async () => {
     await bulkAddTransfers(
       [
         { id: 't1', draft },
@@ -427,14 +426,28 @@ describe('pushTransferCreates', () => {
     api.bulkCreate.mockResolvedValue([
       { id: 't1', status: 'created', transfer: echoed, errorCode: null },
       { id: 't2', status: 'taken', transfer: null, errorCode: 'x' },
-      { id: 't3', status: 'invalid', transfer: null, errorCode: 'y' },
+      {
+        id: 't3',
+        status: 'invalid',
+        transfer: null,
+        errorCode: 'spending.transfer.same_wallet',
+        errorField: 'to_wallet_id',
+      },
     ])
     api.list.mockResolvedValue([])
 
     await pushTransferCreates(await queued())
 
     expect(api.bulkCreate).toHaveBeenCalledTimes(1)
-    expect(await queued()).toHaveLength(0)
+    // Only the refused transfer stays queued, flagged with the server's reason.
+    const left = await queued()
+    expect(left.map((e) => e.id)).toEqual(['t3'])
+    expect(left[0].failure).toMatchObject({
+      kind: 'rejected',
+      code: 'spending.transfer.same_wallet',
+      field: 'to_wallet_id',
+    })
+    expect(await legsOf('t3')).toHaveLength(2)
     const t1 = await legsOf('t1')
     expect(t1.every((leg) => leg.dirty === 0)).toBe(true)
     // A taken id that is not ours is left clean for the pull, which then drops it.

@@ -239,9 +239,10 @@ export const matchWallet = (
 // --- Categories ----------------------------------------------------------------------
 
 export type CategoryOption = {
-  /** Parent slug — what a transaction stores. */
-  category: string
-  subcategory: string | null
+  /** What a transaction stores: a root's id, or a child's. */
+  id: string
+  /** A child's root; null for a root. */
+  parentId: string | null
   name: string
   type: TxType
   icon?: IconId
@@ -250,21 +251,21 @@ export type CategoryOption = {
 
 /**
  * Every category a row may be filed under, flattened out of the user's own catalog: each
- * parent, then each of its children as the pair a transaction stores.
+ * parent, then each of its children.
  */
 export const categoryOptions = (catalog: CategoryCatalog): CategoryOption[] =>
   catalog.all.flatMap((category) => [
     {
-      category: category.slug,
-      subcategory: null,
+      id: category.id,
+      parentId: null,
       name: category.name,
       type: category.type,
       icon: category.icon,
       color: category.color,
     },
     ...category.subs.map((sub) => ({
-      category: category.slug,
-      subcategory: sub.slug,
+      id: sub.id,
+      parentId: category.id,
       name: sub.name,
       type: category.type,
       icon: sub.icon,
@@ -274,10 +275,10 @@ export const categoryOptions = (catalog: CategoryCatalog): CategoryOption[] =>
 
 const categoryKeys = (
   option: CategoryOption,
-  parentName: (slug: string) => string | undefined,
+  parentName: (id: string) => string | undefined,
 ): string[] => {
-  if (option.subcategory === null) return [option.name]
-  const parent = parentName(option.category)
+  if (option.parentId === null) return [option.name]
+  const parent = parentName(option.parentId)
   return parent ? [option.name, `${parent} ${option.name}`] : [option.name]
 }
 
@@ -287,14 +288,14 @@ export const matchCategory = (
 ): Scored<CategoryOption> | null => {
   const parents = new Map(
     options
-      .filter((option) => option.subcategory === null)
-      .map((option) => [option.category, option.name]),
+      .filter((option) => option.parentId === null)
+      .map((option) => [option.id, option.name]),
   )
   return bestCandidate(
     raw,
     options.map((option) => ({
       target: option,
-      keys: categoryKeys(option, (slug) => parents.get(slug)),
+      keys: categoryKeys(option, (id) => parents.get(id)),
     })),
   )
 }

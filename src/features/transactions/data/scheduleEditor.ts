@@ -33,13 +33,14 @@ export const customDaysValid = (customDays: string): boolean =>
 export function budgetBlock(args: {
   limitMinor: number | null
   scopeType: BudgetScope
-  target: string
+  /** The chosen wallet or category id; unread for an overall budget. */
+  targetId: string
   period: BudgetPeriod
   customDays: string
 }): string | null {
   if (args.limitMinor === null || args.limitMinor <= 0)
     return 'Add an amount to continue'
-  if (args.scopeType !== 'overall' && !args.target)
+  if (args.scopeType !== 'overall' && !args.targetId)
     return args.scopeType === 'wallet'
       ? 'Pick an account first'
       : 'Pick a category first'

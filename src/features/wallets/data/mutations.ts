@@ -1,4 +1,5 @@
 import { db } from '#/db/db'
+import { requeued } from '#/db/syncFailure'
 import { schedulePush } from '#/db/sync'
 import { SETTINGS_KEY } from '#/db/types'
 import type { LocalBalanceNode, OutboxEntry } from '#/db/types'
@@ -46,7 +47,7 @@ async function enqueueNodeUpsert(node: LocalBalanceNode): Promise<void> {
   if (create) {
     // Never synced yet — keep it a create, just refresh the payload.
     create.payload = localNodeToCreateWire(node)
-    await db.outbox.put(create)
+    await db.outbox.put(requeued(create))
     return
   }
   const update = entries.find((e) => e.op === 'update')
@@ -54,7 +55,7 @@ async function enqueueNodeUpsert(node: LocalBalanceNode): Promise<void> {
   if (update) {
     update.payload = payload
     update.baseVersion = node.version
-    await db.outbox.put(update)
+    await db.outbox.put(requeued(update))
     return
   }
   await db.outbox.add({
@@ -244,7 +245,7 @@ export async function setBaseCurrency(code: CurrencyCode): Promise<void> {
     const existing = await pending('settings', SETTINGS_KEY).first()
     if (existing) {
       existing.payload = payload
-      await db.outbox.put(existing)
+      await db.outbox.put(requeued(existing))
     } else {
       await db.outbox.add({
         op: 'update',

@@ -3,10 +3,8 @@ import type { KeyboardEvent } from 'react'
 import { Checkbox } from '#/components/ui/checkbox'
 import { useIsDesktop } from '#/hooks/useMediaQuery'
 import { planLabel } from '#/features/import/data/importCounts'
-import {
-  categoryTargetGroups,
-  categoryValue,
-} from '#/features/import/data/values'
+import { categoryTargetGroups } from '#/features/import/data/values'
+import { pendingCategoryId } from '#/features/import/data/types'
 import { useDuplicateTargets } from '#/features/import/hooks/useDuplicateTargets'
 import { useVirtualRows } from '#/hooks/useVirtualRows'
 import { formatDate, parseISODate } from '#/lib/date'
@@ -73,19 +71,17 @@ const categoryGroupsFor = (
   categories: CsvImport['categories'],
   draft: MappingDraft,
 ): TargetGroup[] => {
-  const nameOf = (slug: string): string =>
-    categories.find(
-      (option) => option.category === slug && option.subcategory === null,
-    )?.name ?? slug
+  const nameOf = (id: string): string =>
+    categories.find((option) => option.id === id)?.name ?? ''
   const groups = categoryTargetGroups(categories)
   const pending = Object.values(draft.aliases.categories)
     .filter((target) => target.kind === 'create')
     .map((target) => ({
-      value: categoryValue(target.category, target.subcategory),
+      value: pendingCategoryId(target),
       label:
-        target.subcategory === null
+        target.parentId === null
           ? target.name
-          : `${nameOf(target.category)} › ${target.name}`,
+          : `${nameOf(target.parentId)} › ${target.name}`,
     }))
   return pending.length === 0
     ? groups
@@ -139,10 +135,7 @@ export function ReviewStep({ csv, draft, review, onBack, onCommit }: Props) {
     }
     return {
       wallet: (id) => (id === null ? '—' : (wallets.get(id) ?? 'Unknown')),
-      category: (category, subcategory) =>
-        categories.get(categoryValue(category, subcategory)) ??
-        categories.get(categoryValue(category, null)) ??
-        category,
+      category: (id) => categories.get(id) ?? 'Deleted category',
       merchant: (id) => (id === null ? null : (merchants.get(id) ?? null)),
       date: (iso) => {
         const parsed = parseISODate(iso)

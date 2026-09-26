@@ -56,8 +56,9 @@ const theOldWay = (
   const merchants = merchantLookup(NO_MERCHANTS)
   const index = buildDedupeIndex(ledger)
   const seen = emptySeen()
-  return buildRows(matrix, mapping, testContext())
-    .map((row) => predictRow(row, mapping, merchants))
+  const context = testContext()
+  return buildRows(matrix, mapping, context)
+    .map((row) => predictRow(row, mapping, merchants, context.categoryTypes))
     .map((row) =>
       withDuplicate(
         row,

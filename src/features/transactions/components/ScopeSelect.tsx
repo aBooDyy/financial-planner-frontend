@@ -16,12 +16,19 @@ import { AccountTreeGroups } from './AccountTreeGroups'
 
 type Props = {
   sections: ScopeSection[]
+  /** The option balances are still being summed. */
+  balancesLoading: boolean
   value: Scope
   onChange: (scope: Scope) => void
 }
 
 /** The Spending page's account filter, laid out like the Wallets tree. */
-export function ScopeSelect({ sections, value, onChange }: Props) {
+export function ScopeSelect({
+  sections,
+  balancesLoading,
+  value,
+  onChange,
+}: Props) {
   return (
     <Select
       value={scopeToValue(value)}
@@ -34,7 +41,11 @@ export function ScopeSelect({ sections, value, onChange }: Props) {
         <SelectValue />
       </SelectTrigger>
       <SelectContent className="min-w-[260px]">
-        <AccountTreeGroups sections={sections} groupsSelectable />
+        <AccountTreeGroups
+          sections={sections}
+          groupsSelectable
+          amountsLoading={balancesLoading}
+        />
       </SelectContent>
     </Select>
   )

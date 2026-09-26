@@ -106,6 +106,21 @@ describe('validateRow', () => {
     ])
   })
 
+  it('blocks a row filed under a category that no longer exists', () => {
+    expect(codes(check({ categoryId: 'new-category::fuel' }))).toEqual([
+      ROW_ISSUES.categoryMissing,
+    ])
+    expect(codes(check({ categoryId: '' }))).toEqual([
+      ROW_ISSUES.categoryMissing,
+    ])
+  })
+
+  it('blocks a row filed under a category of the other direction', () => {
+    expect(codes(check({ type: 'income' }))).toEqual([
+      ROW_ISSUES.categoryTypeMismatch,
+    ])
+  })
+
   it('warns about a short row', () => {
     const issues = check({ ragged: true, raw: ['2026-06-16', 'Bakery'] })
     expect(issues).toEqual([

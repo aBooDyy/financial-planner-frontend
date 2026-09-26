@@ -1,9 +1,11 @@
 import { useCallback, useMemo, useState } from 'react'
 import { buildCatalog } from '#/features/categories/data/catalog'
+import { defaultCategoryRows } from '#/features/categories/__fixtures__/categories'
 import { buildDedupeIndex } from '#/features/import/data/dedupe'
 import {
+  categoryTypesOf,
   draftForFile,
-  fallbackCategoryOf,
+  fallbackCategoriesOf,
   toMapping,
 } from '#/features/import/data/mapping'
 import { categoryOptions } from '#/features/import/data/matching'
@@ -40,7 +42,7 @@ export type StubSeed = {
   matrix: string[][]
   walletGroups?: WalletGroupOption[]
   walletCurrencies?: Record<string, CurrencyCode>
-  /** The user's own category rows; empty means the built-in catalog. */
+  /** The user's own category rows; absent means a freshly seeded account's. */
   categoryRows?: LocalCategory[]
   merchantIndex?: MerchantIndex
   ledger?: LedgerTransaction[]
@@ -60,10 +62,13 @@ export function useStubImport(seed: StubSeed): CsvImport {
   )
 
   const catalog = useMemo(
-    () => buildCatalog(seed.categoryRows ?? []),
+    () => buildCatalog(seed.categoryRows ?? defaultCategoryRows()),
     [seed.categoryRows],
   )
-  const fallbackCategory = fallbackCategoryOf(catalog)
+  const fallbackCategories = useMemo(
+    () => fallbackCategoriesOf(catalog),
+    [catalog],
+  )
 
   const [draft, setDraft] = useState<MappingDraft>(() => {
     const seeded = draftForFile({
@@ -71,12 +76,17 @@ export function useStubImport(seed: StubSeed): CsvImport {
       headers: seed.headers,
       matrix: seed.matrix,
       currency: baseCurrency,
-      fallbackCategory,
+      fallbackCategories,
     })
     return seed.amend ? seed.amend(seeded) : seeded
   })
 
   const [suggestedRoles] = useState(() => draft.roles)
+
+  const categoryTypes = useMemo(
+    () => categoryTypesOf(catalog, draft.aliases.categories),
+    [catalog, draft.aliases.categories],
+  )
 
   const context: RowContext = useMemo(
     () => ({
@@ -87,8 +97,9 @@ export function useStubImport(seed: StubSeed): CsvImport {
           group.wallets.map((wallet) => [wallet.id, wallet.name]),
         ),
       ),
+      categoryTypes,
     }),
-    [seed.today, seed.walletCurrencies, walletGroups],
+    [seed.today, seed.walletCurrencies, walletGroups, categoryTypes],
   )
 
   const categories = useMemo(() => categoryOptions(catalog), [catalog])
@@ -173,7 +184,7 @@ export function useStubImport(seed: StubSeed): CsvImport {
         walletGroups,
         catalog,
         categories,
-        fallbackCategory,
+        fallbackCategories,
         merchantIndex,
         baseCurrency,
         templateId: 'one-time',
@@ -201,7 +212,7 @@ export function useStubImport(seed: StubSeed): CsvImport {
       walletGroups,
       catalog,
       categories,
-      fallbackCategory,
+      fallbackCategories,
       merchantIndex,
       baseCurrency,
       updateMapping,

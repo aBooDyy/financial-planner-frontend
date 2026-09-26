@@ -110,6 +110,7 @@ async function rebase(entry: OutboxEntry): Promise<void> {
     await store(entry, template)
   } catch (e) {
     if (isNameTaken(e)) return parkNameConflict(entry)
+    if (statusOf(e) !== 409) throw e
     // Still conflicting — accept server truth rather than loop.
     await db.transaction('rw', db.importTemplates, db.outbox, async () => {
       await db.importTemplates.put(serverTemplateToLocal(fresh))

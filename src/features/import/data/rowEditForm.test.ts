@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { catId } from '#/features/categories/__fixtures__/categories'
 import { testContext, testMapping } from './__fixtures__/mapping'
 import { buildRow } from './csv/rows'
 import { formFor, formValid, patchFor } from './rowEditForm'
@@ -42,6 +43,14 @@ describe('the row editor as data', () => {
       type: 'income',
       counterpartId: 'w2',
     })
+  })
+
+  it('opens on the row’s category and patches the id picked', () => {
+    const initial = formFor(row('Food'), mapping.defaults)
+    expect(initial.categoryId).toBe(catId('other'))
+    expect(
+      patchFor(initial, { ...initial, categoryId: catId('cafes', 'dining') }),
+    ).toEqual({ categoryId: catId('cafes', 'dining') })
   })
 
   it('turns a transfer back into income without touching its category', () => {

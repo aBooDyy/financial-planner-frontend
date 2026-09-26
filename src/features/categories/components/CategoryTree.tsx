@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ChevronRight, Plus } from 'lucide-react'
+import { isRequiredCategory } from '#/features/categories/data/required'
 import { CategoryTreeRow } from './CategoryTreeRow'
 import type {
   CategoryTreeNode,
@@ -66,7 +67,9 @@ export function CategoryTree({
                 </button>
               }
               onEdit={() => onEdit(c.id)}
-              onDelete={() => onDelete(c.id)}
+              onDelete={
+                isRequiredCategory(c) ? undefined : () => onDelete(c.id)
+              }
             />
             {open ? (
               <>

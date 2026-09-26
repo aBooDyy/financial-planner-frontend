@@ -36,8 +36,9 @@ export function MerchantRow({
   const [open, setOpen] = useState(false)
   const [name, setName] = useState(merchant.displayName)
 
-  const learned = merchant.learnedCategory
-    ? catalog.get(merchant.learnedCategory)
+  const learnedId = merchant.learnedCategoryId
+  const learned = learnedId
+    ? { ...catalog.get(learnedId), label: catalog.labelOf(learnedId) }
     : null
 
   const start = () => {
@@ -194,7 +195,7 @@ export function MerchantRow({
                   iconSize={13}
                 />
                 <span className="font-semibold text-fp-text">
-                  {learned.name}
+                  {learned.label}
                 </span>
                 automatically
               </span>

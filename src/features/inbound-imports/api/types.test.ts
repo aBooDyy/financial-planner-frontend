@@ -17,8 +17,7 @@ const importWire = (): InboundImportWire => ({
   amount: 24500,
   currency: 'SAR',
   suggested_merchant: 'Carrefour',
-  suggested_category: null,
-  suggested_subcategory: null,
+  suggested_category_id: null,
   suggested_type: null,
   suggested_wallet_id: null,
   raw_preview: 'Amount: SAR 245.00',
@@ -82,15 +81,14 @@ describe('inbound-import wire mappers', () => {
       merchant: {
         id: 'm1',
         display_name: 'CARREFOUR',
-        learned_category: 'groceries',
-        learned_subcategory: 'supermarket',
+        learned_category_id: 'cat-supermarket',
         times_seen: 3,
         times_confirmed: 2,
       },
     })
     expect(detail.import.id).toBe('i1')
     expect(detail.bodyLines).toHaveLength(2)
-    expect(detail.merchant?.learnedCategory).toBe('groceries')
+    expect(detail.merchant?.learnedCategoryId).toBe('cat-supermarket')
     expect(detail.merchant?.timesConfirmed).toBe(2)
   })
 

@@ -26,6 +26,10 @@ import {
   RATES,
   wallet,
 } from '#/features/planned/testing/fixtures'
+import {
+  catId,
+  defaultCategoryRows,
+} from '#/features/categories/__fixtures__/categories'
 import { QuickAddCard } from './QuickAddCard'
 
 vi.mock('#/db/sync', () => ({ schedulePush: () => undefined }))
@@ -49,6 +53,7 @@ afterEach(cleanup)
 
 beforeEach(async () => {
   await Promise.all(db.tables.map((t) => t.clear()))
+  await db.categories.bulkPut(defaultCategoryRows())
   await db.balanceNodes.bulkPut([SAVINGS, MAIN])
   await db.incomeStreams.put(
     income({ id: 's1', label: 'Salary', amount: m(12000) }),
@@ -170,8 +175,7 @@ describe('QuickAddCard · category', () => {
     typeAmount('18')
     fireEvent.click(screen.getByTitle('Add'))
     const tx = await saved()
-    expect(tx.category).toBe('dining')
-    expect(tx.subcategory).toBe('cafes')
+    expect(tx.categoryId).toBe(catId('cafes', 'dining'))
   })
 
   it('drops a pick that does not fit the new type', async () => {

@@ -22,6 +22,7 @@ import type {
   ResolvedCategory,
   ResolvedSub,
 } from '#/features/categories/data/catalog'
+import { DELETED_CATEGORY_ID } from '#/features/categories/data/catalog'
 import { startOfToday, ymd } from '#/features/transactions/data/planning'
 import type { CurrencyCode } from '#/lib/currency'
 import { minorToInputValue, parseAmountToMinor } from '#/lib/currency'
@@ -32,36 +33,28 @@ type ReviewDraft = {
   amount: string
   currency: CurrencyCode
   date: string
-  category: string
-  subcategory: string | null
+  /** The leaf filed under: a subcategory's id, else its root's. */
+  categoryId: string
   walletId: string
   merchant: string
   note: string
 }
 
 /**
- * The draft's category and subcategory as the catalog can honour them. Derived rather than
- * stored, so a suggestion naming a category this device has not pulled yet is still the
- * one applied once the rows arrive.
+ * The draft's category as the catalog can honour it: the chosen one while the catalog holds
+ * it under the draft's type, else the type's fallback. Derived rather than stored, so a
+ * suggestion naming a category this device has not pulled yet is still the one applied once
+ * the rows arrive.
  */
-const FALLBACK_SLUG = 'other'
-
-const resolveDraft = (
+const resolveCategory = (
   draft: ReviewDraft,
   catalog: CategoryCatalog,
-): ReviewDraft => {
-  const ofType = catalog.byType(draft.type)
-  const found = ofType.find((c) => c.slug === draft.category)
-  const category = found ?? (ofType.length > 0 ? ofType[0] : null)
-  const keepsSub =
-    category !== null &&
-    draft.subcategory !== null &&
-    category.subs.some((s) => s.slug === draft.subcategory)
-  return {
-    ...draft,
-    category: category === null ? FALLBACK_SLUG : category.slug,
-    subcategory: keepsSub ? draft.subcategory : null,
+): string => {
+  const entry = catalog.get(draft.categoryId)
+  if (entry.id !== DELETED_CATEGORY_ID && entry.type === draft.type) {
+    return entry.id
   }
+  return catalog.fallbackFor(draft.type)?.id ?? ''
 }
 
 /**
@@ -85,19 +78,31 @@ const resolveWallet = (
     ? walletId
     : (pickWallet(wallets, suggested)?.id ?? '')
 
+/** What the source said, else what its suggested category is filed as, else a spend. */
+const initialType = (
+  item: LocalInboundImport,
+  catalog: CategoryCatalog,
+): TxType => {
+  if (item.suggestedType) return item.suggestedType
+  const suggested = item.suggestedCategoryId
+  return suggested && catalog.has(suggested)
+    ? catalog.get(suggested).type
+    : 'spend'
+}
+
 function initialDraft(
   item: LocalInboundImport,
   wallets: LocalBalanceNode[],
+  catalog: CategoryCatalog,
 ): ReviewDraft {
   const wallet = pickWallet(wallets, item.suggestedWalletId)
   const currency = item.currency ?? wallet?.currency ?? 'SAR'
   return {
-    type: item.suggestedType ?? 'spend',
+    type: initialType(item, catalog),
     amount: item.amount != null ? minorToInputValue(item.amount, currency) : '',
     currency,
     date: item.occurredOn ?? ymd(startOfToday()),
-    category: item.suggestedCategory ?? '',
-    subcategory: item.suggestedSubcategory,
+    categoryId: item.suggestedCategoryId ?? '',
     walletId: wallet?.id ?? '',
     merchant: item.suggestedMerchant ?? '',
     note: '',
@@ -115,7 +120,7 @@ export function useImportReview(
   catalog: CategoryCatalog,
 ) {
   const [raw, setDraft] = useState<ReviewDraft>(() =>
-    initialDraft(item, wallets),
+    initialDraft(item, wallets, catalog),
   )
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -126,13 +131,18 @@ export function useImportReview(
 
   const draft = useMemo(
     () => ({
-      ...resolveDraft(raw, catalog),
+      ...raw,
+      categoryId: resolveCategory(raw, catalog),
       walletId: resolveWallet(raw.walletId, wallets, item.suggestedWalletId),
     }),
     [raw, catalog, wallets, item.suggestedWalletId],
   )
   const categories: ResolvedCategory[] = catalog.byType(draft.type)
-  const subs: ResolvedSub[] = catalog.subsOf(draft.category)
+  const rootId = draft.categoryId ? catalog.rootOf(draft.categoryId).id : ''
+  const subs: ResolvedSub[] = catalog.subsOf(rootId)
+  const subcategoryId = catalog.parentOf(draft.categoryId)
+    ? draft.categoryId
+    : null
 
   const needsDetails = item.amount == null || item.currency == null
   const draftMinor = parseAmountToMinor(draft.amount, draft.currency)
@@ -150,8 +160,11 @@ export function useImportReview(
 
   const setType = (type: TxType) => setDraft((d) => ({ ...d, type }))
 
-  const setCategory = (category: string) =>
-    setDraft((d) => ({ ...d, category }))
+  const setCategory = (categoryId: string) =>
+    setDraft((d) => ({ ...d, categoryId }))
+
+  /** A child of the chosen root, or null to file under the root itself. */
+  const setSubcategory = (subId: string | null) => setCategory(subId ?? rootId)
 
   /** Fill amount (and currency) from a line the user tapped in the body preview. */
   const useLine = (line: string) =>
@@ -187,6 +200,10 @@ export function useImportReview(
       setAttempted(true)
       return false
     }
+    if (!draft.categoryId) {
+      setError('Choose a category for this entry.')
+      return false
+    }
     const amount = draftMinor
     setBusy(true)
     setError(null)
@@ -195,8 +212,7 @@ export function useImportReview(
       const note = draft.note.trim()
       await confirmImport(item, {
         walletId: draft.walletId,
-        category: draft.category,
-        subcategory: draft.subcategory,
+        categoryId: draft.categoryId,
         type: draft.type,
         amount,
         currency: draft.currency,
@@ -233,7 +249,11 @@ export function useImportReview(
   return {
     draft,
     categories,
+    /** The chosen root, for the category select; the draft may hold one of its children. */
+    rootId,
     subs,
+    /** The chosen child, or null when the entry is filed under the root. */
+    subcategoryId,
     busy,
     error:
       error ??
@@ -248,6 +268,7 @@ export function useImportReview(
     setField,
     setType,
     setCategory,
+    setSubcategory,
     useLine,
     target,
     setTarget,

@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { stubDialect } from '#/features/import/__fixtures__/useStubImport'
 import { draftForFile } from '#/features/import/data/mapping'
-import { buildCatalog } from '#/features/categories/data/catalog'
+import { defaultCatalog } from '#/features/categories/__fixtures__/categories'
 import { categoryOptions } from '#/features/import/data/matching'
 import { SKIP } from '#/features/import/data/values'
 import type { MappingDraft } from '#/features/import/data/mapping'
@@ -71,7 +71,7 @@ type Updater = (current: MappingDraft, matrix: string[][]) => MappingDraft
  * Only what the hook reads. A fuller stand-in would run the whole spine over the same matrix
  * and drown the two counts this test is about.
  */
-const CATALOG = buildCatalog([])
+const CATALOG = defaultCatalog()
 
 function useValueStep() {
   const [draft, setDraft] = useState<MappingDraft>(() =>
@@ -80,7 +80,7 @@ function useValueStep() {
       headers: HEADERS,
       matrix: MATRIX,
       currency: 'SAR',
-      fallbackCategory: 'other',
+      fallbackCategories: { spend: 'cat-other', income: 'cat-other_income' },
     }),
   )
 
@@ -101,6 +101,7 @@ function useValueStep() {
           today: '2026-09-01',
           walletCurrencies: { w1: 'SAR' },
           walletNames: { w1: 'Main' },
+          categoryTypes: {},
         },
         actions: { updateMapping },
       }) as unknown as CsvImport,

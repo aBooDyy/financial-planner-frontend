@@ -60,10 +60,11 @@ export function PackPicker({
         {ordered(suggestedId, !isDesktop).map((pack) => {
           const slugs = packSelection(pack.id).filter((s) => known.has(s))
           const dots = slugs
-            .map((s) => catalog.get(s))
-            .filter((c) => c.type === 'spend')
+            .flatMap((s) => {
+              const c = catalog.bySlug(s)
+              return c?.type === 'spend' ? [c.color] : []
+            })
             .slice(0, DOT_COUNT)
-            .map((c) => c.color)
           return (
             <PackCard
               key={pack.id}

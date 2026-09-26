@@ -5,8 +5,8 @@ export const RATE_LIMIT_MIN = 1
 export const RATE_LIMIT_MAX = 600
 
 /**
- * Apply one edit and keep the draft coherent: a default category belongs to one type, a
- * subcategory to one category, and posting without review needs somewhere to post.
+ * Apply one edit and keep the draft coherent: a default category belongs to one type, and
+ * posting without review needs somewhere to post.
  */
 export function applyEdit<TField extends keyof KeySettings>(
   draft: KeySettings,
@@ -15,11 +15,7 @@ export function applyEdit<TField extends keyof KeySettings>(
 ): KeySettings {
   const next = { ...draft, [field]: value }
   if (field === 'defaultType' && value !== draft.defaultType) {
-    next.defaultCategory = null
-    next.defaultSubcategory = null
-  }
-  if (field === 'defaultCategory' && value !== draft.defaultCategory) {
-    next.defaultSubcategory = null
+    next.defaultCategoryId = null
   }
   if (field === 'defaultWalletId' && value === null) next.autoConfirm = false
   return next

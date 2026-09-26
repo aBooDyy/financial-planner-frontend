@@ -115,9 +115,11 @@ export type Transaction = {
   type: TransactionType
   amount: number // minor units, always positive
   currency: CurrencyCode
-  /** Null on transfer legs and balance adjustments. */
-  category: string | null
-  subcategory: string | null
+  /**
+   * The leaf category: a subcategory's id when one was picked, else the root's. Null on
+   * transfer legs and balance adjustments.
+   */
+  categoryId: string | null
   walletId: string
   goalId: string | null
   merchantId: string | null
@@ -135,7 +137,10 @@ export type Transaction = {
 export type Budget = {
   id: string
   scopeType: BudgetScope
-  target: string | null // category slug or wallet id; null for overall
+  /** A root category's id; set exactly when `scopeType` is 'category'. */
+  categoryId: string | null
+  /** Set exactly when `scopeType` is 'wallet'. */
+  walletId: string | null
   period: BudgetPeriod
   customDays: number | null
   limit: number // minor units
@@ -151,8 +156,8 @@ export type Recurring = {
   type: TxType
   amount: number
   currency: CurrencyCode
-  category: string
-  subcategory: string | null
+  /** The leaf category: a subcategory's id when one was picked, else the root's. */
+  categoryId: string
   walletId: string
   goalId: string | null
   frequency: GoalFrequency
@@ -170,8 +175,7 @@ export type TransactionWire = {
   type: TransactionTypeWire
   amount: number
   currency: string
-  category: string | null
-  subcategory: string | null
+  category_id: string | null
   wallet_id: string
   goal_id: string | null
   merchant_id: string | null
@@ -188,7 +192,8 @@ export type TransactionWire = {
 export type BudgetWire = {
   id: string
   scope_type: BudgetScopeWire
-  target: string | null
+  category_id: string | null
+  wallet_id: string | null
   period: BudgetPeriodWire
   custom_days: number | null
   limit_amount: number
@@ -204,8 +209,7 @@ export type RecurringWire = {
   type: TxTypeWire
   amount: number
   currency: string
-  category: string
-  subcategory: string | null
+  category_id: string
   wallet_id: string
   goal_id: string | null
   frequency: GoalFrequencyWire
@@ -218,15 +222,14 @@ export type RecurringWire = {
 
 /**
  * The server refuses transfer legs here (`spending.transaction.transfer_via_transfers`).
- * `category` is null exactly for an adjustment.
+ * `category_id` is null exactly for an adjustment.
  */
 export type CreateTransactionWire = {
   id: string
   type: TransactionTypeWire
   amount: number
   currency: string
-  category: string | null
-  subcategory: string | null
+  category_id: string | null
   wallet_id: string
   goal_id: string | null
   merchant_id: string | null
@@ -306,6 +309,7 @@ export type BulkTransactionResult = {
   /** The row as the server holds it. Absent when the taken id is not the caller's own. */
   transaction: Transaction | null
   errorCode: string | null
+  errorField: string | null
 }
 
 /** What became of one transfer of `POST /transfers/bulk`. The order mirrors what was sent. */
@@ -330,6 +334,7 @@ export type BulkTransferResult = {
   /** Both legs as the server holds them. Absent when the taken id is not the caller's own. */
   transfer: Transfer | null
   errorCode: string | null
+  errorField: string | null
 }
 
 /** What became of one id of a bulk delete. The order mirrors what was sent. */
@@ -350,17 +355,19 @@ export type BulkDeleteResult = {
   id: string
   /**
    * `deleted` — the row is gone. `missing` — nothing of ours stood behind that id, so it
-   * was already gone. `invalid` — not a usable id, and resending it cannot change that.
-   * All three are terminal: there is never anything left to retry.
+   * was already gone. `invalid` — the server refused to delete it (a transfer leg, a
+   * malformed id).
    */
   status: 'deleted' | 'missing' | 'invalid'
   errorCode: string | null
+  errorField: string | null
 }
 
 export type CreateBudgetWire = {
   id: string
   scope_type: BudgetScopeWire
-  target: string | null
+  category_id: string | null
+  wallet_id: string | null
   period: BudgetPeriodWire
   custom_days: number | null
   limit_amount: number
@@ -376,8 +383,7 @@ export type CreateRecurringWire = {
   type: TxTypeWire
   amount: number
   currency: string
-  category: string
-  subcategory: string | null
+  category_id: string
   wallet_id: string
   goal_id: string | null
   frequency: GoalFrequencyWire
@@ -395,8 +401,7 @@ export const toTransaction = (w: TransactionWire): Transaction => ({
   type: fromWireTransactionType(w.type),
   amount: w.amount,
   currency: fromWireCurrency(w.currency),
-  category: w.category,
-  subcategory: w.subcategory,
+  categoryId: w.category_id,
   walletId: w.wallet_id,
   goalId: w.goal_id,
   merchantId: w.merchant_id ?? null,
@@ -428,6 +433,7 @@ export const toBulkResult = (
   status: BULK_STATUS[w.status],
   transaction: w.transaction ? toTransaction(w.transaction) : null,
   errorCode: w.error_code,
+  errorField: w.error_field,
 })
 
 export const toBulkTransferResult = (
@@ -437,6 +443,7 @@ export const toBulkTransferResult = (
   status: BULK_STATUS[w.status],
   transfer: w.transfer ? toTransfer(w.transfer) : null,
   errorCode: w.error_code,
+  errorField: w.error_field,
 })
 
 const BULK_DELETE_STATUS = {
@@ -451,12 +458,14 @@ export const toBulkDeleteResult = (
   id: w.id,
   status: BULK_DELETE_STATUS[w.status],
   errorCode: w.error_code,
+  errorField: w.error_field,
 })
 
 export const toBudget = (w: BudgetWire): Budget => ({
   id: w.id,
   scopeType: fromWireScope(w.scope_type),
-  target: w.target,
+  categoryId: w.category_id,
+  walletId: w.wallet_id,
   period: fromWirePeriod(w.period),
   customDays: w.custom_days,
   limit: w.limit_amount,
@@ -472,8 +481,7 @@ export const toRecurring = (w: RecurringWire): Recurring => ({
   type: fromWireTxType(w.type),
   amount: w.amount,
   currency: fromWireCurrency(w.currency),
-  category: w.category,
-  subcategory: w.subcategory,
+  categoryId: w.category_id,
   walletId: w.wallet_id,
   goalId: w.goal_id,
   frequency: fromWireFreq(w.frequency),

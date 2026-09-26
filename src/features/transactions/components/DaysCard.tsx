@@ -12,6 +12,8 @@ import { MonthGrid } from './MonthGrid'
 
 type Props = {
   calendar: CalendarView
+  /** The period's figures are still loading: the grid draws its days, not their values. */
+  loading: boolean
   mode: RangeMode
   periodLabel: string
   calOpen: boolean
@@ -40,6 +42,7 @@ const STEP =
 
 export function DaysCard({
   calendar,
+  loading,
   mode,
   periodLabel,
   calOpen,
@@ -107,9 +110,19 @@ export function DaysCard({
         </div>
 
         {calendar.grid === 'months' ? (
-          <MonthGrid grid={calendar} open={calOpen} onPick={onPickMonth} />
+          <MonthGrid
+            grid={calendar}
+            open={calOpen}
+            loading={loading}
+            onPick={onPickMonth}
+          />
         ) : (
-          <DayGrid grid={calendar} open={calOpen} onPick={onPickDay} />
+          <DayGrid
+            grid={calendar}
+            open={calOpen}
+            loading={loading}
+            onPick={onPickDay}
+          />
         )}
       </div>
     </div>

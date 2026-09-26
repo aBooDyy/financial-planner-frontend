@@ -4,3 +4,7 @@
  */
 export const FIELD_WELL =
   'rounded-[14px] border-[1.5px] border-fp-border bg-fp-surface-2 px-[14px] py-3 text-[14px] font-semibold text-fp-text transition outline-none placeholder:font-medium placeholder:text-fp-text-3 focus-visible:border-fp-accent focus-visible:ring-[3px] focus-visible:ring-fp-accent/15 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-fp-danger aria-invalid:bg-fp-danger/[0.07] aria-invalid:ring-fp-danger/20'
+
+/** The same well for a wrapper holding an icon and a bare input, lit while the input has focus. */
+export const FIELD_WELL_GROUP =
+  'flex items-center gap-[10px] rounded-[14px] border-[1.5px] border-fp-border bg-fp-surface-2 px-[14px] transition focus-within:border-fp-accent focus-within:ring-[3px] focus-within:ring-fp-accent/15'

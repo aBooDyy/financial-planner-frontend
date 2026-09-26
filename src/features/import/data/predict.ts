@@ -8,6 +8,7 @@ import { normalizeKey } from './matching'
 import { ROW_ISSUES, lookup, roleColumn } from './types'
 import type { MerchantIndex } from '#/features/merchants/data/matching'
 import type { LocalMerchant } from '#/db/types'
+import type { TxType } from '#/features/transactions/api/types'
 import type { Mapping, ParsedRow } from './types'
 
 /**
@@ -60,6 +61,7 @@ export const predictRow = (
   row: ParsedRow,
   mapping: Mapping,
   merchants: MerchantLookup,
+  categoryTypes: Readonly<Record<string, TxType>>,
 ): ParsedRow => {
   if (row.draft === null || row.intent !== 'cashflow') return row
   const column = roleColumn(mapping.roles, 'merchant')
@@ -85,10 +87,10 @@ export const predictRow = (
     (issue) => issue.code === ROW_ISSUES.categoryDefaulted,
   )
   // A learned category only applies to the direction the row is being filed as — a
-  // merchant seen as a refund does not make this spend a refund.
+  // merchant seen as a refund does not make this spend a refund — and only while it exists.
   const fits =
     prediction !== null &&
-    (prediction.type === null || prediction.type === row.draft.type)
+    lookup(categoryTypes, prediction.categoryId) === row.draft.type
   const applies =
     prediction !== null && prediction.apply && fits && guessed
       ? prediction
@@ -98,9 +100,7 @@ export const predictRow = (
   const draft = {
     ...row.draft,
     merchantId: merchant.id,
-    ...(applies === null
-      ? {}
-      : { category: applies.category, subcategory: applies.subcategory }),
+    ...(applies === null ? {} : { categoryId: applies.categoryId }),
   }
 
   return {
@@ -118,8 +118,7 @@ export const predictRow = (
         : {
             merchantId: merchant.id,
             merchantName: merchant.displayName,
-            category: prediction.category,
-            subcategory: prediction.subcategory,
+            categoryId: prediction.categoryId,
             applied,
           },
   }

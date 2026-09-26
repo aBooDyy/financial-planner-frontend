@@ -7,10 +7,6 @@ export type PickerSection = {
   subs: ResolvedSub[]
 }
 
-/** cmdk's item value for a pick; unique across the whole list. */
-export const pickerValue = (slug: string, subSlug: string | null): string =>
-  subSlug ? `${slug}/${subSlug}` : slug
-
 const scored = (
   parent: ResolvedCategory,
   search: string,

@@ -28,7 +28,7 @@ const anExtraction = (over: Partial<Extraction> = {}): Extraction => ({
     wallet: null,
   },
   missing: ['amount'],
-  resolved: { walletId: null, category: null, subcategory: null },
+  resolved: { walletId: null, categoryId: null },
   ...over,
 })
 
@@ -104,7 +104,7 @@ export const aDeliveryWire = (
         wallet: null,
       },
       missing: ['amount', 'currency'],
-      resolved: { wallet_id: null, category: null, subcategory: null },
+      resolved: { wallet_id: null, category_id: null },
     },
   },
   ...over,

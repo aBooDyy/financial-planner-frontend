@@ -107,6 +107,13 @@ export const inWindow = (iso: string, win: DateWindow): boolean => {
   return x >= midnight(win.start) && x <= midnight(win.end)
 }
 
+/** Where today sits against a period: inside it (`null`), after it, or before it. */
+export const todayRelativeTo = (
+  win: DateWindow,
+  today: Date,
+): 'ahead' | 'behind' | null =>
+  inWindow(ymd(today), win) ? null : today > win.end ? 'ahead' : 'behind'
+
 /** A budget's measurement window, always ending today (weekly / monthly / custom-N-days). */
 export const budgetWindow = (
   period: 'weekly' | 'monthly' | 'custom',

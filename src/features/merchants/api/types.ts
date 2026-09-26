@@ -41,8 +41,7 @@ export type MerchantAlias = {
 export type Merchant = {
   id: string
   displayName: string
-  learnedCategory: string | null
-  learnedSubcategory: string | null
+  learnedCategoryId: string | null
   learnedType: TxType | null
   timesSeen: number
   timesConfirmed: number
@@ -69,8 +68,7 @@ export type MerchantAliasWire = {
 export type MerchantWire = {
   id: string
   display_name: string
-  learned_category: string | null
-  learned_subcategory: string | null
+  learned_category_id: string | null
   learned_type: TxTypeWire | null
   times_seen: number
   times_confirmed: number
@@ -93,8 +91,7 @@ export type CreateMerchantWire = {
   id: string
   display_name: string
   aliases: AliasDraftWire[]
-  learned_category: string | null
-  learned_subcategory: string | null
+  learned_category_id: string | null
   learned_type: TxTypeWire | null
   auto_categorize: boolean
 }
@@ -102,8 +99,7 @@ export type CreateMerchantWire = {
 export type UpdateMerchantWire = {
   version: string
   display_name: string
-  learned_category: string | null
-  learned_subcategory: string | null
+  learned_category_id: string | null
   learned_type: TxTypeWire | null
   auto_categorize: boolean
 }
@@ -132,8 +128,7 @@ export const toMerchantAlias = (w: MerchantAliasWire): MerchantAlias => ({
 export const toMerchant = (w: MerchantWire): Merchant => ({
   id: w.id,
   displayName: w.display_name,
-  learnedCategory: w.learned_category,
-  learnedSubcategory: w.learned_subcategory,
+  learnedCategoryId: w.learned_category_id,
   learnedType: w.learned_type ? fromWireTxType(w.learned_type) : null,
   timesSeen: w.times_seen,
   timesConfirmed: w.times_confirmed,

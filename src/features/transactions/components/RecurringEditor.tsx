@@ -45,7 +45,7 @@ type Props = {
     v: TxEditorDraft[TKey],
   ) => void
   onType: (t: EditorTxType) => void
-  onCategory: (category: string, subcategory: string | null) => void
+  onCategory: (categoryId: string) => void
   onGoal: (id: string | null) => void
   onSave: () => void
   onDelete: () => void
@@ -128,10 +128,9 @@ export function RecurringEditor({
       {picking ? (
         <CategoryOptions
           categories={categories}
-          category={draft.category}
-          subcategory={draft.subcategory}
-          onPick={(category, subcategory) => {
-            onCategory(category, subcategory)
+          value={draft.categoryId}
+          onPick={(categoryId) => {
+            onCategory(categoryId)
             back()
           }}
           listClassName={PANE_LIST}
@@ -198,8 +197,7 @@ export function RecurringEditor({
           <TxSection label="Category">
             <TxCategoryChips
               chips={chips}
-              category={draft.category}
-              subcategory={draft.subcategory}
+              categoryId={draft.categoryId}
               onChange={onCategory}
               onAll={() => setPicking(true)}
             />

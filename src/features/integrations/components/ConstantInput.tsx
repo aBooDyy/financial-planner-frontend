@@ -10,7 +10,11 @@ import {
   SelectValue,
 } from '#/components/ui/select'
 import type { WalletGroupOption } from '#/features/wallets/data/selectors'
-import type { CategoryCatalog } from '#/features/categories/data/catalog'
+import type {
+  CategoryCatalog,
+  ResolvedCategory,
+  ResolvedSub,
+} from '#/features/categories/data/catalog'
 import type { LocatorField } from '#/features/integrations/api/ruleTypes'
 import type { CurrencyCode } from '#/lib/currency'
 
@@ -34,6 +38,7 @@ type Props = {
 /**
  * A fixed value, picked rather than typed wherever the app knows the choices — the server
  * matches an account by name and a category by slug, so those are what the pickers produce.
+ * A rule is external text like a payload, so it names a category by slug, never by id.
  */
 export function ConstantInput({
   id,
@@ -107,6 +112,24 @@ export function ConstantInput({
           </SelectContent>
         </Select>
       )
+    case 'subcategory':
+      return (
+        <Select value={value || undefined} onValueChange={onChange}>
+          {trigger}
+          <SelectContent>
+            {subcategoryGroups(choices.catalog).map(({ root, subs }) => (
+              <SelectGroup key={root.id}>
+                <SelectLabel>{root.name}</SelectLabel>
+                {subs.map((s) => (
+                  <SelectItem key={s.id} value={s.slug}>
+                    {s.name}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            ))}
+          </SelectContent>
+        </Select>
+      )
     default:
       return (
         <Input
@@ -121,4 +144,24 @@ export function ConstantInput({
         />
       )
   }
+}
+
+/**
+ * Every child slug, once, under the first parent holding it: the server looks a subcategory
+ * slug up among the chosen category's children, so a slug two parents share is one choice.
+ */
+function subcategoryGroups(
+  catalog: CategoryCatalog,
+): { root: ResolvedCategory; subs: ResolvedSub[] }[] {
+  const seen = new Set<string>()
+  return catalog.all
+    .map((root) => ({
+      root,
+      subs: root.subs.filter((s) => {
+        if (seen.has(s.slug)) return false
+        seen.add(s.slug)
+        return true
+      }),
+    }))
+    .filter((group) => group.subs.length > 0)
 }

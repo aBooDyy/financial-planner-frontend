@@ -42,8 +42,7 @@ const tx = (over: Partial<LocalTransaction>): LocalTransaction => ({
   type: 'spend',
   amount: 0,
   currency: 'SAR',
-  category: 'groceries',
-  subcategory: null,
+  categoryId: 'cat-groceries',
   walletId: 'w1',
   goalId: null,
   merchantId: null,
@@ -86,7 +85,7 @@ const cat = (
 ): LocalCategory => {
   catSeq += 1
   return {
-    id: over.slug,
+    id: `cat-${over.slug}`,
     parentId: null,
     name: over.slug,
     type: 'spend',
@@ -108,9 +107,9 @@ const CATALOG = buildCatalog([
   cat({ slug: 'dining', name: 'Dining', color: '#F59E0B' }),
   cat({
     slug: 'cafes',
-    id: 'cafes-id',
+    id: 'dining-cafes',
     name: 'Cafés',
-    parentId: 'dining',
+    parentId: 'cat-dining',
     icon: 'coffee',
   }),
   cat({ slug: 'housing', name: 'Housing', color: '#8B5CF6' }),
@@ -161,8 +160,8 @@ describe('buildCashflow', () => {
   // the period's wallet reservations and every spend is Spent.
   it('splits income, spend and set-asides; net subtracts both outflows', () => {
     const txns = [
-      tx({ type: 'income', amount: 1_200_000, category: 'salary' }),
-      tx({ type: 'spend', amount: 240_000, category: 'groceries' }),
+      tx({ type: 'income', amount: 1_200_000, categoryId: 'cat-salary' }),
+      tx({ type: 'spend', amount: 240_000, categoryId: 'cat-groceries' }),
     ]
     const allocations = [
       allocationRow({ amount: 60_000, date: '2026-06-05' }),
@@ -200,7 +199,7 @@ describe('buildCashflow', () => {
       tx({
         type: 'spend',
         amount: 350_000,
-        category: 'groceries',
+        categoryId: 'cat-groceries',
         goalId: 'rent',
       }),
     ]
@@ -237,7 +236,8 @@ describe('buildBudgetsView', () => {
   const budget = (over: Partial<LocalBudget>): LocalBudget => ({
     id: 'b1',
     scopeType: 'category',
-    target: 'groceries',
+    categoryId: 'cat-groceries',
+    walletId: null,
     period: 'monthly',
     customDays: null,
     limit: 150_000,
@@ -252,9 +252,9 @@ describe('buildBudgetsView', () => {
 
   it('measures burn against the cap and flags over-limit', () => {
     const txns = [
-      tx({ category: 'groceries', amount: 90_000, date: '2026-06-05' }),
-      tx({ category: 'groceries', amount: 30_000, date: '2026-06-10' }),
-      tx({ category: 'dining', amount: 50_000, date: '2026-06-10' }), // different category
+      tx({ categoryId: 'cat-groceries', amount: 90_000, date: '2026-06-05' }),
+      tx({ categoryId: 'cat-groceries', amount: 30_000, date: '2026-06-10' }),
+      tx({ categoryId: 'cat-dining', amount: 50_000, date: '2026-06-10' }), // different category
     ]
     const view = buildBudgetsView(
       data({ txns, budgets: [budget({})] }),
@@ -273,8 +273,8 @@ describe('buildBudgetsView', () => {
   // money put aside is a reservation and never reaches a budget.
   it('counts goal-linked payments against the budget, not set-asides', () => {
     const txns = [
-      tx({ category: 'groceries', amount: 90_000 }),
-      tx({ category: 'groceries', amount: 80_000, goalId: 'g1' }),
+      tx({ categoryId: 'cat-groceries', amount: 90_000 }),
+      tx({ categoryId: 'cat-groceries', amount: 80_000, goalId: 'g1' }),
     ]
     const view = buildBudgetsView(
       data({
@@ -297,8 +297,7 @@ describe('buildRecurringView', () => {
     type: 'spend',
     amount: 350_000,
     currency: 'SAR',
-    category: 'housing',
-    subcategory: null,
+    categoryId: 'cat-housing',
     walletId: 'w1',
     goalId: null,
     frequency: 'monthly',
@@ -481,8 +480,8 @@ describe('resolving through the catalog', () => {
 
   it('rolls a subcategory into its parent’s donut segment and its parent’s budget', () => {
     const txns = [
-      tx({ category: 'dining', subcategory: 'cafes', amount: 40_000 }),
-      tx({ category: 'dining', amount: 60_000 }),
+      tx({ categoryId: 'dining-cafes', amount: 40_000 }),
+      tx({ categoryId: 'cat-dining', amount: 60_000 }),
     ]
 
     const donut = buildBreakdown(data({ txns }), CATALOG, ALL, ANCHOR, 'month')
@@ -497,7 +496,8 @@ describe('resolving through the catalog', () => {
           {
             id: 'b1',
             scopeType: 'category',
-            target: 'dining',
+            categoryId: 'cat-dining',
+            walletId: null,
             period: 'monthly',
             customDays: null,
             limit: 200_000,
@@ -519,18 +519,54 @@ describe('resolving through the catalog', () => {
 
   it('names the pair on the row a subcategory was filed under', () => {
     const rows = txRows(
-      list([tx({ category: 'dining', subcategory: 'cafes' })]).groups[0].rows,
+      list([tx({ categoryId: 'dining-cafes' })]).groups[0].rows,
     )
     expect(rows[0].catLabel).toBe('Dining · Cafés')
-    expect(rows[0].subcategoryId).toBe('cafes')
+    expect(rows[0].categoryId).toBe('dining-cafes')
   })
 
   it('falls back to a generic name and icon when the category was deleted', () => {
     const rows = txRows(
-      list([tx({ category: 'hobbies', amount: 10_000 })]).groups[0].rows,
+      list([tx({ categoryId: 'cat-hobbies', amount: 10_000 })]).groups[0].rows,
     )
-    expect(rows[0].catLabel).toBe('Other')
-    expect(CATALOG.get('hobbies').icon).toBe(SPEND_CATEGORY_ICON)
+    expect(rows[0].catLabel).toBe('Deleted category')
+    expect(CATALOG.get('cat-hobbies').icon).toBe(SPEND_CATEGORY_ICON)
+  })
+
+  it('keeps a row filed under another root out of the budget', () => {
+    const budget: LocalBudget = {
+      id: 'b1',
+      scopeType: 'category',
+      categoryId: 'cat-dining',
+      walletId: null,
+      period: 'monthly',
+      customDays: null,
+      limit: 200_000,
+      currency: 'SAR',
+      createdAt: '',
+      updatedAt: '',
+      version: '',
+      dirty: 0,
+      deleted: 0,
+    }
+    const view = buildBudgetsView(
+      data({
+        txns: [
+          tx({ categoryId: 'dining-cafes', amount: 10_000 }),
+          tx({ categoryId: 'cat-groceries', amount: 50_000 }),
+          tx({ categoryId: 'cat-hobbies', amount: 70_000 }),
+        ],
+        budgets: [budget],
+      }),
+      CATALOG,
+      ALL,
+      TODAY,
+    )
+    expect(view.rows[0]).toMatchObject({
+      name: 'Dining',
+      categoryId: 'cat-dining',
+      spentStr: 'SR 100',
+    })
   })
 })
 
@@ -557,7 +593,7 @@ describe('transfers', () => {
   const legs = (transferId: string, note: string | null = null) => [
     tx({
       type: 'transfer_out',
-      category: null,
+      categoryId: null,
       walletId: 'w1',
       amount: 50_000,
       transferId,
@@ -565,14 +601,18 @@ describe('transfers', () => {
     }),
     tx({
       type: 'transfer_in',
-      category: null,
+      categoryId: null,
       walletId: 'w2',
       amount: 50_000,
       transferId,
       note,
     }),
   ]
-  const spend = tx({ type: 'spend', amount: 10_000, category: 'groceries' })
+  const spend = tx({
+    type: 'spend',
+    amount: 10_000,
+    categoryId: 'cat-groceries',
+  })
   const withTransfer = (scopeTxns = [spend, ...legs('tr1')]) =>
     data({ nodes, txns: scopeTxns })
 
@@ -588,7 +628,7 @@ describe('transfers', () => {
     expect(view.spentStr).toBe('SR 100')
     expect(view.incomeStr).toBe('SR 0')
     expect(view.txCount).toBe(1)
-    expect(view.segments.map((s) => s.key)).toEqual(['groceries'])
+    expect(view.segments.map((s) => s.key)).toEqual(['cat-groceries'])
   })
 
   it('keeps transfers out of the breakdown donut', () => {
@@ -606,7 +646,8 @@ describe('transfers', () => {
     const budget: LocalBudget = {
       id: 'b1',
       scopeType: 'wallet',
-      target: 'w1',
+      categoryId: null,
+      walletId: 'w1',
       period: 'monthly',
       customDays: null,
       limit: 100_000,
@@ -734,16 +775,20 @@ describe('balance adjustments', () => {
   }
   const up = tx({
     type: 'adjustment_in',
-    category: null,
+    categoryId: null,
     amount: 30_000,
   })
   const down = tx({
     type: 'adjustment_out',
-    category: null,
+    categoryId: null,
     amount: 5_000,
     note: 'Matched statement',
   })
-  const spend = tx({ type: 'spend', amount: 10_000, category: 'groceries' })
+  const spend = tx({
+    type: 'spend',
+    amount: 10_000,
+    categoryId: 'cat-groceries',
+  })
   const withAdjustments = (txns = [spend, up, down]) =>
     data({ nodes: [wallet, other], txns })
 
@@ -776,7 +821,8 @@ describe('balance adjustments', () => {
     const budget: LocalBudget = {
       id: 'b1',
       scopeType: 'wallet',
-      target: 'w1',
+      categoryId: null,
+      walletId: 'w1',
       period: 'monthly',
       customDays: null,
       limit: 100_000,
@@ -946,7 +992,7 @@ describe('confirmed planned items in Activity', () => {
       txns: [
         tx({
           type: 'income',
-          category: 'salary',
+          categoryId: 'cat-salary',
           plannedId: 'p1',
           amount: 100,
         }),

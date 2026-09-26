@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { catId } from '#/features/categories/__fixtures__/categories'
 import { testContext, testMapping } from './__fixtures__/mapping'
 import { buildRow } from './csv/rows'
 import { settleTransfer, transferLookupOf } from './pairing'
@@ -30,16 +31,51 @@ describe('applyRowPatch', () => {
 
     const fixed = applyRowPatch(
       guessed,
-      { category: 'dining', subcategory: 'cafes' },
+      { categoryId: catId('cafes', 'dining') },
       mapping,
       context,
     )
 
-    expect(fixed.draft?.category).toBe('dining')
-    expect(fixed.draft?.subcategory).toBe('cafes')
+    expect(fixed.draft?.categoryId).toBe(catId('cafes', 'dining'))
     expect(fixed.issues.map((issue) => issue.code)).not.toContain(
       'import.row.category_defaulted',
     )
+  })
+
+  it('moves a row still on the default category to the other direction’s default', () => {
+    const guessed = row(['2026-06-16', 'Bakery', '-12.40'])
+    expect(guessed.draft?.categoryId).toBe(catId('other'))
+
+    const flipped = applyRowPatch(guessed, { type: 'income' }, mapping, context)
+
+    expect(flipped.draft?.categoryId).toBe(catId('other_income'))
+  })
+
+  it('moves a skipped category to the other direction’s default too', () => {
+    const skipping = testMapping({
+      roles: ['date', 'merchant', 'amount', 'category'],
+      aliases: {
+        ...emptyAliases(),
+        categories: { misc: { kind: 'skip' } },
+      },
+    })
+    const skipped = buildRow(
+      ['2026-06-16', 'Bakery', '-12.40', 'Misc'],
+      0,
+      skipping,
+      context,
+    )
+    expect(skipped.draft?.categoryId).toBe(catId('other'))
+
+    const flipped = applyRowPatch(
+      skipped,
+      { type: 'income' },
+      skipping,
+      context,
+    )
+
+    expect(flipped.draft?.categoryId).toBe(catId('other_income'))
+    expect(hasErrors(flipped.issues)).toBe(false)
   })
 
   it('carries the duplicate marks across, and an empty patch changes nothing', () => {

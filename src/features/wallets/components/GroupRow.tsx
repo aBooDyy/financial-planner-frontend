@@ -1,11 +1,14 @@
 import { ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react'
 import type { MouseEvent } from 'react'
 import { IconChip } from '#/components/icons/IconChip'
+import { ValueOrSkeleton } from '#/components/ValueOrSkeleton'
 import { Button } from '#/components/ui/button'
 import type { BalanceRow } from '#/features/wallets/data/selectors'
 
 type Props = {
   row: BalanceRow
+  /** The subtotal is still loading. */
+  loading: boolean
   onToggle: (id: string) => void
   onEdit: (id: string) => void
   onDelete: (id: string) => void
@@ -23,6 +26,7 @@ const stop = (fn: (id: string) => void, id: string) => (e: MouseEvent) => {
 
 export function GroupRow({
   row,
+  loading,
   onToggle,
   onEdit,
   onDelete,
@@ -52,7 +56,10 @@ export function GroupRow({
         {row.childCountStr}
       </span>
       <span className="fp-sensitive text-[13px] font-bold tabular-nums whitespace-nowrap sm:text-[14px]">
-        {row.subtotalStr}
+        <ValueOrSkeleton
+          value={loading ? null : row.subtotalStr}
+          className="h-3.5 w-20"
+        />
       </span>
       <div className="ms-[2px] flex gap-px">
         <Button

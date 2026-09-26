@@ -1,4 +1,5 @@
 import { db } from '#/db/db'
+import { requeued } from '#/db/syncFailure'
 import { schedulePush } from '#/db/sync'
 import type {
   LocalBudget,
@@ -43,14 +44,14 @@ async function enqueueUpsert(
   const create = entries.find((e) => e.op === 'create')
   if (create) {
     create.payload = createPayload
-    await db.outbox.put(create)
+    await db.outbox.put(requeued(create))
     return
   }
   const update = entries.find((e) => e.op === 'update')
   if (update) {
     update.payload = updatePayload
     update.baseVersion = version
-    await db.outbox.put(update)
+    await db.outbox.put(requeued(update))
     return
   }
   await db.outbox.add({
@@ -69,8 +70,8 @@ export type TransactionDraft = {
   type: TxType
   amount: number
   currency: CurrencyCode
-  category: string
-  subcategory: string | null
+  /** The leaf category: a subcategory's id when one was picked, else the root's. */
+  categoryId: string
   walletId: string
   goalId: string | null
   /** Undefined on update means "leave it alone"; null clears the link. */
@@ -104,12 +105,11 @@ const isAdjustmentDraft = (d: LedgerDraft): d is AdjustmentDraft =>
 
 type Links = Pick<
   LocalTransaction,
-  'category' | 'subcategory' | 'goalId' | 'merchantId' | 'plannedId'
+  'categoryId' | 'goalId' | 'merchantId' | 'plannedId'
 >
 
 const NO_LINKS: Links = {
-  category: null,
-  subcategory: null,
+  categoryId: null,
   goalId: null,
   merchantId: null,
   plannedId: null,
@@ -119,8 +119,7 @@ const linksOf = (draft: LedgerDraft): Links =>
   isAdjustmentDraft(draft)
     ? NO_LINKS
     : {
-        category: draft.category,
-        subcategory: draft.subcategory,
+        categoryId: draft.categoryId,
         goalId: draft.goalId,
         merchantId: draft.merchantId ?? null,
         plannedId: draft.plannedId ?? null,
@@ -190,8 +189,7 @@ export async function updateTransaction(
     type: draft.type,
     amount: draft.amount,
     currency: draft.currency,
-    category: draft.category,
-    subcategory: draft.subcategory,
+    categoryId: draft.categoryId,
     walletId: draft.walletId,
     goalId: draft.goalId,
     merchantId:
@@ -354,7 +352,10 @@ export async function bulkDeleteTransactions(
 
 export type BudgetDraft = {
   scopeType: BudgetScope
-  target: string | null
+  /** A root category's id; read only for a 'category' budget. */
+  categoryId: string | null
+  /** Read only for a 'wallet' budget. */
+  walletId: string | null
   period: BudgetPeriod
   customDays: number | null
   limit: number
@@ -364,7 +365,8 @@ export type BudgetDraft = {
 const buildBudget = (id: string, d: BudgetDraft, ts: string): LocalBudget => ({
   id,
   scopeType: d.scopeType,
-  target: d.scopeType === 'overall' ? null : d.target,
+  categoryId: d.scopeType === 'category' ? d.categoryId : null,
+  walletId: d.scopeType === 'wallet' ? d.walletId : null,
   period: d.period,
   customDays: d.period === 'custom' ? d.customDays : null,
   limit: d.limit,
@@ -431,8 +433,8 @@ export type RecurringDraft = {
   type: TxType
   amount: number
   currency: CurrencyCode
-  category: string
-  subcategory: string | null
+  /** The leaf category: a subcategory's id when one was picked, else the root's. */
+  categoryId: string
   walletId: string
   goalId: string | null
   frequency: GoalFrequency

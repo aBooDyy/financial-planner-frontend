@@ -55,7 +55,14 @@ export function walletLiveBalances(
   txns: LocalTransaction[],
   rates: RatesMap,
 ): Record<string, number> {
-  const deltas = walletDeltas(nodes, txns, rates)
+  return liveBalancesFrom(nodes, walletDeltas(nodes, txns, rates))
+}
+
+/** Live balance per wallet from deltas already summed by `walletDeltas`. */
+export function liveBalancesFrom(
+  nodes: LocalBalanceNode[],
+  deltas: Record<string, number>,
+): Record<string, number> {
   const out: Record<string, number> = {}
   for (const n of nodes) {
     if (n.kind === 'wallet') out[n.id] = (n.amount ?? 0) + (deltas[n.id] ?? 0)

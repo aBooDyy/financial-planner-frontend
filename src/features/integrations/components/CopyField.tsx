@@ -22,7 +22,7 @@ export function CopyField({ value, label, onCopied }: Props) {
 
   return (
     <div className="flex flex-col gap-[7px]">
-      <div className="flex min-w-0 items-center gap-[10px] rounded-[14px] border-[1.5px] border-fp-border bg-fp-surface py-2 ps-[14px] pe-2">
+      <div className="flex min-w-0 items-center gap-[10px] rounded-[14px] border-[1.5px] border-fp-border bg-fp-surface-2 py-2 ps-[14px] pe-2">
         <input
           readOnly
           value={value}

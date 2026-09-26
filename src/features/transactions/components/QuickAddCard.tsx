@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import type { LocalBalanceNode } from '#/db/types'
+import { DELETED_CATEGORY_ID } from '#/features/categories/data/catalog'
 import { useCategoryCatalog } from '#/features/categories/hooks/useCategoryCatalog'
 import type { TxType } from '#/features/transactions/api/types'
 import type { EditorTxType } from '#/features/transactions/hooks/useTxEditor'
@@ -13,6 +14,7 @@ import { startOfToday, ymd } from '#/features/transactions/data/planning'
 import type { RatesMap } from '#/lib/config/rates'
 import { amountInputProps, parseAmountToMinor } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
+import { ValueOrSkeleton } from '#/components/ValueOrSkeleton'
 import { Button } from '#/components/ui/button'
 import { QuickAddMatchHint } from './QuickAddMatchHint'
 import { QuickCategoryChips } from './QuickCategoryChips'
@@ -21,7 +23,8 @@ import { QuickTransferForm } from './QuickTransferForm'
 type Props = {
   walletId: string | null
   currency: CurrencyCode
-  symbol: string
+  /** `null` while the wallet it comes from is still loading. */
+  symbol: string | null
   wallets: LocalBalanceNode[]
   base: CurrencyCode
   rates: RatesMap
@@ -55,12 +58,14 @@ export function QuickAddCard({
   const [note, setNote] = useState('')
   // Until the user picks, the entry files under their most-used category for this type.
   const [picked, setPicked] = useState<QuickChip | null>(null)
-  const chips = useQuickChips(type)
-  const { category, subcategory } = picked ??
-    chips.at(0) ?? {
-      category: catalog.byType(type)[0]?.slug ?? 'other',
-      subcategory: null,
-    }
+  const chips = useQuickChips(type, undefined, {
+    minor: parseAmountToMinor(amount, currency),
+    currency,
+  })
+  const categoryId =
+    (picked ?? chips.at(0))?.categoryId ??
+    catalog.fallbackFor(type)?.id ??
+    DELETED_CATEGORY_ID
   const match = useQuickAddMatch({ type, amount, currency })
 
   const switchTab = (next: EditorTxType) => {
@@ -73,8 +78,7 @@ export function QuickAddCard({
     setType(next)
   }
 
-  const chooseCategory = (next: string, nextSub: string | null) =>
-    setPicked({ category: next, subcategory: nextSub })
+  const chooseCategory = (next: string) => setPicked({ categoryId: next })
 
   const add = async () => {
     const minor = parseAmountToMinor(amount, currency)
@@ -91,8 +95,7 @@ export function QuickAddCard({
     await createTransaction({
       type,
       ...target,
-      category,
-      subcategory,
+      categoryId,
       goalId: link?.goalId ?? null,
       plannedId: link?.plannedId ?? null,
       date: ymd(startOfToday()),
@@ -129,7 +132,7 @@ export function QuickAddCard({
           <div className="mb-[11px] flex items-stretch gap-2">
             <div className="flex flex-none items-center gap-[6px] rounded-[11px] border border-fp-border-strong bg-fp-surface-2 px-[11px] focus-within:border-fp-accent">
               <span className="text-[14px] font-bold text-fp-text-3">
-                {symbol}
+                <ValueOrSkeleton value={symbol} className="h-3.5 w-5" />
               </span>
               <input
                 value={amount}
@@ -166,8 +169,7 @@ export function QuickAddCard({
           <QuickCategoryChips
             type={type}
             chips={chips}
-            category={category}
-            subcategory={subcategory}
+            categoryId={categoryId}
             onChange={chooseCategory}
           />
         </>

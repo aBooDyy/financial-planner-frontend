@@ -10,6 +10,7 @@ import type {
   LocalRecurring,
   LocalTransaction,
 } from '#/db/types'
+import { catId } from '#/features/categories/__fixtures__/categories'
 
 let seq = 0
 const next = (prefix: string) => `${prefix}${++seq}`
@@ -77,8 +78,7 @@ export const recurring = (
   type: 'spend',
   amount: m(200),
   currency: 'SAR',
-  category: 'health',
-  subcategory: null,
+  categoryId: catId('health'),
   walletId: 'w1',
   goalId: null,
   frequency: 'monthly',
@@ -126,8 +126,7 @@ export const planned = (over: Partial<LocalPlanned> = {}): LocalPlanned => ({
   name: 'Goal set-aside',
   amount: m(1500),
   currency: 'SAR',
-  category: null,
-  subcategory: null,
+  categoryId: null,
   occurrence: '2026-10-01',
   date: over.occurrence ?? '2026-10-01',
   status: 'open',
@@ -146,8 +145,7 @@ export const tx = (over: Partial<LocalTransaction> = {}): LocalTransaction => ({
   type: 'spend',
   amount: m(100),
   currency: 'SAR',
-  category: 'other',
-  subcategory: null,
+  categoryId: catId('other'),
   walletId: 'w1',
   goalId: null,
   merchantId: null,

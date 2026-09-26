@@ -133,7 +133,13 @@ describe('pushing a run of creates in bulk', () => {
         planned: asServer(taken, { version: 'theirs' }),
       },
       { id: 'taken-no-row', status: 'taken', planned: null },
-      { id: 'invalid', status: 'invalid', planned: null },
+      {
+        id: 'invalid',
+        status: 'invalid',
+        planned: null,
+        errorCode: 'planned.goal_invalid',
+        errorField: 'goal_id',
+      },
     ])
     api.list.mockResolvedValue([asServer(takenNoRow, { version: 'listed' })])
 
@@ -146,7 +152,15 @@ describe('pushing a run of creates in bulk', () => {
       'listed',
     )
     expect(api.list).toHaveBeenCalledTimes(1)
-    expect((await db.outbox.toArray()).map((e) => e.id)).toEqual(['unanswered'])
+    // The refused one is kept and flagged; the unanswered one is simply still queued.
+    const left = await db.outbox.toArray()
+    expect(left.map((e) => e.id)).toEqual(['invalid', 'unanswered'])
+    expect(left[0].failure).toMatchObject({
+      kind: 'rejected',
+      code: 'planned.goal_invalid',
+      field: 'goal_id',
+    })
+    expect(left[1].failure).toBeUndefined()
   })
 })
 

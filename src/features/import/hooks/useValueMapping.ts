@@ -266,20 +266,22 @@ export function useValueMapping(csv: CsvImport, draft: MappingDraft) {
     })
   }, [distinct, proposals, updateMapping])
 
+  const categoryDefaults = draft.defaults.categoryIds
   const defaults = useMemo(
     () => ({
       wallet:
         catalogue.wallets.find(
           (wallet) => wallet.id === draft.defaults.walletId,
         )?.name ?? null,
-      category:
-        catalogue.categories.find(
-          (option) =>
-            option.category === draft.defaults.category &&
-            option.subcategory === null,
-        )?.name ?? draft.defaults.category,
+      // Money out and money in each fall to their own; both are named, spending first.
+      category: [
+        ...new Set([
+          categoryCatalog.labelOf(categoryDefaults.spend),
+          categoryCatalog.labelOf(categoryDefaults.income),
+        ]),
+      ].join(' or '),
     }),
-    [catalogue, draft.defaults.walletId, draft.defaults.category],
+    [catalogue, categoryCatalog, draft.defaults.walletId, categoryDefaults],
   )
 
   const notices: ValueNotice[] = useMemo(
@@ -332,8 +334,8 @@ export function useValueMapping(csv: CsvImport, draft: MappingDraft) {
       const spellings = (aliasesByMerchant.get(merchant.id) ?? []).filter(
         (raw) => raw !== merchant.displayName,
       )
-      const learned = merchant.learnedCategory
-        ? categoryCatalog.get(merchant.learnedCategory).name
+      const learned = merchant.learnedCategoryId
+        ? categoryCatalog.labelOf(merchant.learnedCategoryId)
         : null
       const parts = [
         spellings.length > 0
@@ -535,11 +537,11 @@ const newTargetNote = (
   if (kind === 'category') {
     const target = lookup(aliases.categories, key)
     if (target?.kind !== 'create') return NO_NOTES
-    return target.subcategory === null
+    return target.parentId === null
       ? { hint: null, newLabel: `New category · ${target.name}` }
       : {
           hint: null,
-          newLabel: `New subcategory · ${categoryCatalog.get(target.category).name}${SUBCATEGORY_JOIN}${target.name}`,
+          newLabel: `New subcategory · ${categoryCatalog.get(target.parentId).name}${SUBCATEGORY_JOIN}${target.name}`,
         }
   }
   const target = lookup(aliases.merchants, key)

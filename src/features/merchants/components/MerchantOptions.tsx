@@ -50,8 +50,8 @@ export function MerchantOptions({ value, onPick, listClassName }: Props) {
 
   const learned = (merchant: LocalMerchant): string => {
     const p = predictionFor(merchant)
-    if (!p) return ''
-    const label = catalog.labelOf(p.category, p.subcategory)
+    if (!p || !catalog.has(p.categoryId)) return ''
+    const label = catalog.labelOf(p.categoryId)
     return p.apply ? `Auto-categorised as ${label}` : `Usually ${label}`
   }
 
@@ -63,7 +63,13 @@ export function MerchantOptions({ value, onPick, listClassName }: Props) {
         placeholder="Search or add a merchant…"
       />
       <CommandList className={listClassName}>
-        <CommandEmpty>No merchant matches.</CommandEmpty>
+        <CommandEmpty>
+          {merchants.length === 0 ? (
+            <FirstMerchantHint />
+          ) : (
+            'No merchant matches.'
+          )}
+        </CommandEmpty>
         {trimmed && !exists ? (
           <>
             <CommandGroup>
@@ -142,5 +148,19 @@ export function MerchantOptions({ value, onPick, listClassName }: Props) {
         ) : null}
       </CommandList>
     </Command>
+  )
+}
+
+function FirstMerchantHint() {
+  return (
+    <span className="flex flex-col items-center gap-2 px-4">
+      <span className={TILE}>
+        <Store size={14} strokeWidth={2} />
+      </span>
+      <span className="font-bold text-fp-text">No merchants yet</span>
+      <span>
+        Type the shop or payee above to add it — we’ll remember it next time.
+      </span>
+    </span>
   )
 }

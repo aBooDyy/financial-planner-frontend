@@ -1,14 +1,18 @@
-import { TEMPLATE_CONFIG_VERSION } from './types'
+import { TEMPLATE_CONFIG_VERSION, isConfigV1, pendingCategoryId } from './types'
 import { normalizeKey } from './matching'
 import { formatRelativeTime } from '#/lib/date'
+import type { CategoryCatalog } from '#/features/categories/data/catalog'
 import type { LocalImportTemplate } from '#/db/types'
+import type { TxType } from '#/features/transactions/api/types'
 import type { MappingDraft } from './mapping'
 import type {
   Aliases,
-  CategoryTarget,
+  CategoryPairV1,
   ColumnRole,
   ImportTemplateConfig,
+  ImportTemplateConfigV1,
   MerchantTarget,
+  StoredTemplateConfig,
   WalletTarget,
 } from './types'
 
@@ -67,15 +71,10 @@ export const signatureOf = (
 /** What the app currently holds, for checking a stored mapping still points at real things. */
 export type TemplateCatalogue = {
   walletIds: ReadonlySet<string>
-  /** `category|subcategory` pairs, exactly as a `CategoryTarget` names them. */
-  categoryKeys: ReadonlySet<string>
+  /** The user's own categories — ids to check, and slugs to upgrade a version-1 config by. */
+  categories: CategoryCatalog
   merchantIds: ReadonlySet<string>
 }
-
-export const categoryKeyOf = (
-  category: string,
-  subcategory: string | null,
-): string => `${category}|${subcategory ?? ''}`
 
 /**
  * A target the user asked us to *create* has, by the time an import commits, been created —
@@ -87,15 +86,6 @@ const settledWallet = (target: WalletTarget): WalletTarget =>
     ? { kind: 'wallet', walletId: target.walletId }
     : target
 
-const settledCategory = (target: CategoryTarget): CategoryTarget =>
-  target.kind === 'create'
-    ? {
-        kind: 'category',
-        category: target.category,
-        subcategory: target.subcategory,
-      }
-    : target
-
 const settledMerchant = (target: MerchantTarget): MerchantTarget =>
   target.kind === 'create'
     ? { kind: 'merchant', merchantId: target.merchantId }
@@ -105,12 +95,7 @@ const settledAliases = (aliases: Aliases): Aliases => ({
   wallets: Object.fromEntries(
     Object.entries(aliases.wallets).map(([key, t]) => [key, settledWallet(t)]),
   ),
-  categories: Object.fromEntries(
-    Object.entries(aliases.categories).map(([key, t]) => [
-      key,
-      settledCategory(t),
-    ]),
-  ),
+  categories: { ...aliases.categories },
   merchants: Object.fromEntries(
     Object.entries(aliases.merchants).map(([key, t]) => [
       key,
@@ -121,7 +106,10 @@ const settledAliases = (aliases: Aliases): Aliases => ({
   currencies: { ...aliases.currencies },
 })
 
-/** The session's mapping as the blob a template stores. */
+/**
+ * The session's mapping as the blob a template stores. A category to create keeps its
+ * `create` target until the commit has made it — `withCreatedCategories` settles it then.
+ */
 export const configFromDraft = (draft: MappingDraft): ImportTemplateConfig => ({
   version: TEMPLATE_CONFIG_VERSION,
   dialect: { ...draft.dialect },
@@ -130,15 +118,140 @@ export const configFromDraft = (draft: MappingDraft): ImportTemplateConfig => ({
   amountKind: draft.amountKind,
   negativeMeans: draft.negativeMeans,
   amountUnit: draft.amountUnit,
-  defaults: { ...draft.defaults },
+  defaults: {
+    ...draft.defaults,
+    categoryIds: { ...draft.defaults.categoryIds },
+  },
   aliases: settledAliases(draft.aliases),
   dedupe: { ...draft.dedupe },
 })
 
+/**
+ * A created category only has its id once the commit has made it, so it is settled into a
+ * plain binding afterwards, from the ids the commit hands back by pending id. One the commit
+ * did not make is left out rather than stored as a promise.
+ */
+export const withCreatedCategories = (
+  config: ImportTemplateConfig,
+  created: ReadonlyMap<string, string>,
+): ImportTemplateConfig => {
+  const categories: Aliases['categories'] = {}
+  for (const [key, target] of Object.entries(config.aliases.categories)) {
+    if (target.kind !== 'create') {
+      categories[key] = target
+      continue
+    }
+    const id = created.get(pendingCategoryId(target))
+    if (id !== undefined) categories[key] = { kind: 'category', categoryId: id }
+  }
+  return { ...config, aliases: { ...config.aliases, categories } }
+}
+
+/**
+ * The config with every reference to category `fromId` pointing at `toId` instead, or the
+ * same object when it names `fromId` nowhere. A version-1 config names no ids.
+ */
+export const remapTemplateCategoryIds = (
+  config: StoredTemplateConfig,
+  fromId: string,
+  toId: string,
+): StoredTemplateConfig => {
+  if (isConfigV1(config)) return config
+  const swap = (id: string): string => (id === fromId ? toId : id)
+  const { spend, income } = config.defaults.categoryIds
+  const bound = Object.values(config.aliases.categories).some(
+    (target) => target.kind === 'category' && target.categoryId === fromId,
+  )
+  if (!bound && spend !== fromId && income !== fromId) return config
+  const categories: Aliases['categories'] = {}
+  for (const [key, target] of Object.entries(config.aliases.categories)) {
+    categories[key] =
+      target.kind === 'category'
+        ? { kind: 'category', categoryId: swap(target.categoryId) }
+        : target
+  }
+  return {
+    ...config,
+    defaults: {
+      ...config.defaults,
+      categoryIds: { spend: swap(spend), income: swap(income) },
+    },
+    aliases: { ...config.aliases, categories },
+  }
+}
+
+// --- Version 1 -> 2 ------------------------------------------------------------------
+
+const entryOfPair = (
+  catalog: CategoryCatalog,
+  pair: CategoryPairV1,
+): { id: string; type: TxType } | null =>
+  pair.subcategory
+    ? catalog.bySlug(pair.subcategory, pair.category)
+    : catalog.bySlug(pair.category)
+
+export type UpgradedConfig = {
+  config: ImportTemplateConfig
+  /** Values a version-1 config answered with a slug pair this catalog has no category for. */
+  dropped: string[]
+}
+
+/**
+ * A version-1 config named categories by slug pair. Each pair is looked up in the user's
+ * catalog and kept by id; a pair that matches nothing is dropped and reported, so step ③
+ * asks again. The default becomes one per direction: the old one for its own type, the
+ * catalog's fallback for the other.
+ */
+export const upgradeTemplateConfig = (
+  stored: StoredTemplateConfig,
+  catalog: CategoryCatalog,
+): UpgradedConfig =>
+  isConfigV1(stored)
+    ? upgradeV1(stored, catalog)
+    : { config: stored, dropped: [] }
+
+const upgradeV1 = (
+  v1: ImportTemplateConfigV1,
+  catalog: CategoryCatalog,
+): UpgradedConfig => {
+  const categories: Aliases['categories'] = {}
+  const dropped: string[] = []
+  for (const [key, target] of Object.entries(v1.aliases.categories)) {
+    if (target.kind !== 'category' && target.kind !== 'create') {
+      categories[key] = target
+      continue
+    }
+    const entry = entryOfPair(catalog, target)
+    if (entry === null) dropped.push(key)
+    else categories[key] = { kind: 'category', categoryId: entry.id }
+  }
+
+  const { category, subcategory, ...defaults } = v1.defaults
+  const chosen = entryOfPair(catalog, { category, subcategory })
+  const fallback = (type: TxType): string =>
+    chosen?.type === type ? chosen.id : (catalog.fallbackFor(type)?.id ?? '')
+
+  return {
+    config: {
+      ...v1,
+      version: TEMPLATE_CONFIG_VERSION,
+      defaults: {
+        ...defaults,
+        categoryIds: { spend: fallback('spend'), income: fallback('income') },
+      },
+      aliases: { ...v1.aliases, categories },
+    },
+    dropped,
+  }
+}
+
 /** A value the template answers for, whose answer no longer exists here. */
 export type UnknownAlias = {
   kind: 'wallet' | 'category' | 'merchant' | 'default'
-  /** The normalised spelling from the file, which is what the key is. */
+  /**
+   * The normalised spelling from the file, which is what the key is; for a `default`, which
+   * one (`spend` / `income` / `wallet`).
+   */
   key: string
   message: string
 }
@@ -169,6 +282,11 @@ const keep = <T>(
 
 const quoted = (key: string): string => `“${key}”`
 
+const FLOW_WORDS: Readonly<Record<TxType, string>> = {
+  spend: 'money out',
+  income: 'money in',
+}
+
 export type AppliedTemplate = {
   draft: MappingDraft
   /** Never swallowed: an answer we had to drop is re-asked, and the user is told why. */
@@ -181,10 +299,12 @@ export type AppliedTemplate = {
  * so step ③ asks again rather than a row resolving to a dangling id.
  */
 export const applyTemplateConfig = (
-  config: ImportTemplateConfig,
+  stored: StoredTemplateConfig,
   columnCount: number,
   catalogue: TemplateCatalogue,
 ): AppliedTemplate => {
+  const catalog = catalogue.categories
+  const { config, dropped } = upgradeTemplateConfig(stored, catalog)
   const wallets = keep(
     config.aliases.wallets,
     (target) =>
@@ -195,18 +315,18 @@ export const applyTemplateConfig = (
       message: `${quoted(key)} pointed at an account that no longer exists.`,
     }),
   )
+  const categoryGone = (key: string): UnknownAlias => ({
+    kind: 'category',
+    key,
+    message: `${quoted(key)} pointed at a category that no longer exists.`,
+  })
   const categories = keep(
     config.aliases.categories,
     (target) =>
-      target.kind !== 'category' ||
-      catalogue.categoryKeys.has(
-        categoryKeyOf(target.category, target.subcategory),
-      ),
-    (key) => ({
-      kind: 'category',
-      key,
-      message: `${quoted(key)} pointed at a category that no longer exists.`,
-    }),
+      target.kind === 'category'
+        ? catalog.has(target.categoryId)
+        : target.kind !== 'create',
+    categoryGone,
   )
   const merchants = keep(
     config.aliases.merchants,
@@ -226,13 +346,28 @@ export const applyTemplateConfig = (
 
   const unknown = [
     ...wallets.unknown,
+    ...dropped.map(categoryGone),
     ...categories.unknown,
     ...merchants.unknown,
   ]
+
+  // A default that is gone, or no longer of its direction, falls to that type's fallback.
+  const categoryIds = { ...config.defaults.categoryIds }
+  for (const type of ['spend', 'income'] as const) {
+    const id = categoryIds[type]
+    if (catalog.has(id) && catalog.get(id).type === type) continue
+    categoryIds[type] = catalog.fallbackFor(type)?.id ?? ''
+    unknown.push({
+      kind: 'default',
+      key: type,
+      message: `The category this template filed ${FLOW_WORDS[type]} under no longer exists.`,
+    })
+  }
+
   if (defaultGone) {
     unknown.push({
       kind: 'default',
-      key: '',
+      key: 'wallet',
       message:
         'The account this template filed unmatched rows into no longer exists.',
     })
@@ -252,6 +387,7 @@ export const applyTemplateConfig = (
       defaults: {
         ...config.defaults,
         walletId: defaultGone ? null : defaultWalletId,
+        categoryIds,
       },
       aliases: {
         wallets: wallets.kept,

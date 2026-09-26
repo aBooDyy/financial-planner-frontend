@@ -16,27 +16,30 @@ export type DeleteTarget = {
   subCount: number
   txCount: number
   recurringCount: number
+  plannedCount: number
 }
-
-export type DeleteMode = 'move' | 'keep'
 
 export type DeleteChoice = {
-  /** Whether anything is filed under the category — only then is there a choice to make. */
+  /** Whether anything is filed under the category — only then must it move somewhere. */
   hasFiled: boolean
   targets: MoveTarget[]
-  mode: DeleteMode
-  setMode: (mode: DeleteMode) => void
   moveTo: string | null
   setMoveTo: (id: string) => void
-  /** The id to move into, or `null` to keep the rows' labels as they are. */
+  /** The id to move into, or `null` when nothing is filed. */
   resolvedMoveTo: string | null
+  /** Filed rows with nowhere chosen to go: the delete can't proceed. */
+  blocked: boolean
 }
 
-type State = { forId: string | null; mode: DeleteMode; moveTo: string | null }
+type State = { forId: string | null; moveTo: string | null }
+
+export const filedCount = (t: DeleteTarget): number =>
+  t.txCount + t.recurringCount + t.plannedCount
 
 /**
- * The delete dialog's decision: move what the category files, and where to, or keep it
- * as it is. It resets to the suggested target whenever the dialog opens on another row.
+ * The delete dialog's decision: where what the category files moves to. A category in use
+ * can't be deleted without a target. It resets to the suggested target whenever the dialog
+ * opens on another row.
  */
 export function useDeleteChoice(
   target: DeleteTarget | null,
@@ -46,26 +49,22 @@ export function useDeleteChoice(
     () => (target ? moveTargetsFor(catalog, target) : []),
     [catalog, target],
   )
-  const [state, setState] = useState<State>({
-    forId: null,
-    mode: 'move',
-    moveTo: null,
-  })
+  const [state, setState] = useState<State>({ forId: null, moveTo: null })
 
   if (target && state.forId !== target.id) {
     const moveTo = defaultMoveTarget(catalog, targets, target.parentId)
-    setState({ forId: target.id, mode: moveTo ? 'move' : 'keep', moveTo })
+    setState({ forId: target.id, moveTo })
   }
 
-  const hasFiled = target !== null && target.txCount + target.recurringCount > 0
+  const hasFiled = target !== null && filedCount(target) > 0
+  const resolvedMoveTo = hasFiled ? state.moveTo : null
 
   return {
     hasFiled,
     targets,
-    mode: state.mode,
-    setMode: (mode) => setState((s) => ({ ...s, mode })),
     moveTo: state.moveTo,
     setMoveTo: (moveTo) => setState((s) => ({ ...s, moveTo })),
-    resolvedMoveTo: hasFiled && state.mode === 'move' ? state.moveTo : null,
+    resolvedMoveTo,
+    blocked: hasFiled && resolvedMoveTo === null,
   }
 }

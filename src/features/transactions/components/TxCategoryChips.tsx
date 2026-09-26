@@ -6,44 +6,37 @@ import { TxChip } from './TxChip'
 
 type Props = {
   chips: ReadonlyArray<QuickChip>
-  category: string
-  subcategory: string | null
-  onChange: (category: string, subcategory: string | null) => void
+  /** The picked leaf's id. */
+  categoryId: string
+  onChange: (categoryId: string) => void
   onAll: () => void
 }
 
-const same = (a: QuickChip, b: QuickChip) =>
-  a.category === b.category && a.subcategory === b.subcategory
-
 /** The categories the user reaches for most, the chosen one always among them, then the full list. */
-export function TxCategoryChips({
-  chips,
-  category,
-  subcategory,
-  onChange,
-  onAll,
-}: Props) {
+export function TxCategoryChips({ chips, categoryId, onChange, onAll }: Props) {
   const catalog = useCategoryCatalog()
-  const chosen: QuickChip = { category, subcategory }
-  const shown = chips.some((c) => same(c, chosen)) ? chips : [chosen, ...chips]
+  const shown: ReadonlyArray<QuickChip> = chips.some(
+    (c) => c.categoryId === categoryId,
+  )
+    ? chips
+    : [{ categoryId }, ...chips]
 
   return (
     <div className="flex flex-wrap gap-2">
       {shown.map((chip) => {
-        const parent = catalog.get(chip.category)
-        const sub = catalog.sub(chip.category, chip.subcategory)
+        const entry = catalog.get(chip.categoryId)
         return (
           <TxChip
-            key={`${chip.category}/${chip.subcategory ?? ''}`}
-            active={same(chip, chosen)}
-            color={parent.color}
-            title={catalog.labelOf(chip.category, sub?.slug ?? null)}
-            onClick={() => onChange(chip.category, chip.subcategory)}
+            key={chip.categoryId}
+            active={chip.categoryId === categoryId}
+            color={catalog.rootOf(chip.categoryId).color}
+            title={catalog.labelOf(chip.categoryId)}
+            onClick={() => onChange(chip.categoryId)}
           >
-            <span style={{ color: sub?.color ?? parent.color }}>
-              <Icon id={sub?.icon ?? parent.icon} size={15} />
+            <span style={{ color: entry.color }}>
+              <Icon id={entry.icon} size={15} />
             </span>
-            <span className="truncate">{sub?.name ?? parent.name}</span>
+            <span className="truncate">{entry.name}</span>
           </TxChip>
         )
       })}

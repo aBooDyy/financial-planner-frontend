@@ -29,6 +29,7 @@ const {
   createImportTemplate,
   deleteImportTemplate,
   recordTemplateUse,
+  remapTemplateCategories,
   renameImportTemplate,
   saveTemplateForImport,
 } = await import('./mutations')
@@ -46,8 +47,7 @@ const draft: MappingDraft = {
     walletId: 'w1',
     currency: 'SAR',
     type: 'spend',
-    category: 'other',
-    subcategory: null,
+    categoryIds: { spend: 'cat-other', income: 'cat-other_income' },
   },
   aliases: emptyAliases(),
   dedupe: DEFAULT_DEDUPE,
@@ -154,6 +154,35 @@ describe('createImportTemplate', () => {
       }),
     ).rejects.toMatchObject({ code: 'import.template.name_taken' })
     expect(await db.importTemplates.count()).toBe(1)
+  })
+})
+
+describe('remapTemplateCategories', () => {
+  it('points a queued template at the id the server gave its category', async () => {
+    const created = await createImportTemplate({
+      name: 'Al Rajhi',
+      signature: SIGNATURE,
+      config: {
+        ...config,
+        aliases: {
+          ...config.aliases,
+          categories: { fuel: { kind: 'category', categoryId: 'local-fuel' } },
+        },
+      },
+    })
+
+    await remapTemplateCategories('local-fuel', 'server-fuel')
+
+    const row = await db.importTemplates.get(created.id)
+    expect(row?.config?.aliases.categories.fuel).toEqual({
+      kind: 'category',
+      categoryId: 'server-fuel',
+    })
+    const [queued] = await outbox()
+    expect(
+      JSON.parse((queued.payload as { config: string }).config).aliases
+        .categories.fuel.categoryId,
+    ).toBe('server-fuel')
   })
 })
 

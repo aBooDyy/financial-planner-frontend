@@ -3,6 +3,7 @@ import { Coins, Plus, Search } from 'lucide-react'
 import { EmptyState } from '#/components/EmptyState'
 import { CurrencyPicker } from '#/components/CurrencyPicker'
 import { Button } from '#/components/ui/button'
+import { FIELD_WELL_GROUP } from '#/components/ui/field-well'
 import { Input } from '#/components/ui/input'
 import { setBaseCurrency } from '#/features/wallets/data/mutations'
 import {
@@ -171,22 +172,24 @@ export function CurrenciesSection() {
       </div>
 
       <div className={CARD}>
-        <div className="flex items-center gap-2 border-b border-fp-border px-[18px] py-[11px]">
-          <Search
-            size={15}
-            strokeWidth={2}
-            className="shrink-0 text-fp-text-3"
-          />
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search currency or code…"
-            aria-label="Search currencies"
-            className="h-auto border-0 bg-transparent px-0 py-1 text-[14px] shadow-none focus-visible:border-0 focus-visible:ring-0"
-          />
-          <span className="shrink-0 text-[12px] text-fp-text-3 tabular-nums">
-            {listed.length}
-          </span>
+        <div className="border-b border-fp-border px-[18px] py-3">
+          <div className={FIELD_WELL_GROUP}>
+            <Search
+              size={15}
+              strokeWidth={2}
+              className="shrink-0 text-fp-text-3"
+            />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search currency or code…"
+              aria-label="Search currencies"
+              className="h-auto border-0 bg-transparent px-0 py-[10px] font-medium shadow-none focus-visible:border-0 focus-visible:ring-0"
+            />
+            <span className="shrink-0 text-[12px] text-fp-text-3 tabular-nums">
+              {listed.length}
+            </span>
+          </div>
         </div>
         <RateList rows={listed} base={base} onCommit={commit} onReset={reset} />
       </div>

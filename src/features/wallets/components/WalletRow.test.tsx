@@ -55,7 +55,7 @@ const withPots = (over: Partial<BalanceRow> = {}) =>
     ...over,
   })
 
-const renderRow = (row: BalanceRow) => {
+const renderRow = (row: BalanceRow, loading = false) => {
   const handlers = {
     onEdit: vi.fn(),
     onAdjust: vi.fn(),
@@ -63,11 +63,19 @@ const renderRow = (row: BalanceRow) => {
     onDelete: vi.fn(),
     onOpenGoal: vi.fn(),
   }
-  render(<WalletRow row={row} {...handlers} />)
+  render(<WalletRow row={row} loading={loading} {...handlers} />)
   return handlers
 }
 
 describe('WalletRow', () => {
+  it('names a wallet at once and holds its balance back until it has loaded', () => {
+    renderRow(wallet({ isForeign: true, baseStr: 'SR 3.75' }), true)
+    expect(screen.getByText('Main Checking')).toBeDefined()
+    expect(screen.queryByText('SR 10,000.00')).toBeNull()
+    expect(screen.queryByText('SR 3.75')).toBeNull()
+    expect(document.querySelector('[data-slot="skeleton"]')).not.toBeNull()
+  })
+
   it('leaves a wallet without reservations as it was', () => {
     renderRow(wallet())
     expect(screen.getByText('SR 10,000.00')).toBeDefined()

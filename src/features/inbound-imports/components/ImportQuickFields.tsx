@@ -23,18 +23,18 @@ type Props = {
 
 /** The fast path: the two picks most imports need before Confirm. */
 export function ImportQuickFields({ id, review, wallets }: Props) {
-  const { draft, categories } = review
+  const { draft, rootId, categories } = review
   return (
     <div className="grid grid-cols-2 items-start gap-3">
       <div className="min-w-0">
         <FieldLabel htmlFor={`${id}-category`}>Category</FieldLabel>
-        <Select value={draft.category} onValueChange={review.setCategory}>
+        <Select value={rootId} onValueChange={review.setCategory}>
           <SelectTrigger id={`${id}-category`} className={QUICK_TRIGGER}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             {categories.map((c) => (
-              <SelectItem key={c.slug} value={c.slug}>
+              <SelectItem key={c.id} value={c.id}>
                 <IconChip
                   id={c.icon}
                   color={c.color}

@@ -61,8 +61,7 @@ export type InboundImport = {
   amount: number | null
   currency: CurrencyCode | null
   suggestedMerchant: string | null
-  suggestedCategory: string | null
-  suggestedSubcategory: string | null
+  suggestedCategoryId: string | null
   suggestedType: TxType | null
   suggestedWalletId: string | null
   rawPreview: string | null
@@ -79,8 +78,7 @@ export type InboundImport = {
 export type ImportMerchant = {
   id: string
   displayName: string
-  learnedCategory: string | null
-  learnedSubcategory: string | null
+  learnedCategoryId: string | null
   timesSeen: number
   timesConfirmed: number
 }
@@ -112,8 +110,7 @@ export type InboundImportWire = {
   amount: number | null
   currency: string | null
   suggested_merchant: string | null
-  suggested_category: string | null
-  suggested_subcategory: string | null
+  suggested_category_id: string | null
   suggested_type: TxTypeWire | null
   suggested_wallet_id: string | null
   raw_preview: string | null
@@ -127,8 +124,7 @@ export type InboundImportWire = {
 type ImportMerchantWire = {
   id: string
   display_name: string
-  learned_category: string | null
-  learned_subcategory: string | null
+  learned_category_id: string | null
   times_seen: number
   times_confirmed: number
 }
@@ -146,8 +142,8 @@ export type ImportDetailWire = {
  */
 export type ConfirmImportWire = {
   wallet_id: string
-  category: string
-  subcategory: string | null
+  /** The leaf category the transaction is filed under. */
+  category_id: string
   type: 'SPEND' | 'INCOME'
   amount?: number
   currency?: string
@@ -177,8 +173,7 @@ export const toInboundImport = (w: InboundImportWire): InboundImport => ({
   amount: w.amount,
   currency: fromWireCurrencyOrNull(w.currency),
   suggestedMerchant: w.suggested_merchant,
-  suggestedCategory: w.suggested_category,
-  suggestedSubcategory: w.suggested_subcategory,
+  suggestedCategoryId: w.suggested_category_id,
   suggestedType: w.suggested_type ? fromWireTxType(w.suggested_type) : null,
   suggestedWalletId: w.suggested_wallet_id,
   rawPreview: w.raw_preview,
@@ -193,8 +188,7 @@ export const toInboundImport = (w: InboundImportWire): InboundImport => ({
 const toImportMerchant = (w: ImportMerchantWire): ImportMerchant => ({
   id: w.id,
   displayName: w.display_name,
-  learnedCategory: w.learned_category,
-  learnedSubcategory: w.learned_subcategory,
+  learnedCategoryId: w.learned_category_id,
   timesSeen: w.times_seen,
   timesConfirmed: w.times_confirmed,
 })

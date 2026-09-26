@@ -175,8 +175,7 @@ export type EmailRule = {
   template: ExtractionTemplate
   walletId: string | null
   type: TxType
-  category: string | null
-  subcategory: string | null
+  categoryId: string | null
   autoConfirm: boolean
   createdAt: string
   updatedAt: string
@@ -194,8 +193,7 @@ export type EmailRuleDraft = {
   template: ExtractionTemplate
   walletId: string | null
   type: TxType
-  category: string | null
-  subcategory: string | null
+  categoryId: string | null
   autoConfirm: boolean
 }
 
@@ -366,8 +364,7 @@ export type EmailRuleWire = {
   template: TemplateWire
   wallet_id: string | null
   type: TxTypeWire
-  category: string | null
-  subcategory: string | null
+  category_id: string | null
   auto_confirm: boolean
   created_at: string
   updated_at: string
@@ -384,8 +381,7 @@ export type EmailRuleDraftWire = {
   template: TemplateWire
   wallet_id: string | null
   type: TxTypeWire
-  category: string | null
-  subcategory: string | null
+  category_id: string | null
   auto_confirm: boolean
 }
 
@@ -584,8 +580,7 @@ export const toEmailRule = (w: EmailRuleWire): EmailRule => ({
   template: toTemplate(w.template),
   walletId: w.wallet_id,
   type: fromWireTxType(w.type),
-  category: w.category,
-  subcategory: w.subcategory,
+  categoryId: w.category_id,
   autoConfirm: w.auto_confirm,
   createdAt: w.created_at,
   updatedAt: w.updated_at,
@@ -605,8 +600,7 @@ export const toRuleDraftWire = (d: EmailRuleDraft): EmailRuleDraftWire => ({
   template: toTemplateWire(d.template),
   wallet_id: d.walletId,
   type: toWireTxType(d.type),
-  category: d.category,
-  subcategory: d.subcategory,
+  category_id: d.categoryId,
   auto_confirm: d.autoConfirm,
 })
 

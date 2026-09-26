@@ -31,8 +31,7 @@ const NO_ACCOUNT_MATRIX = [
 const merchant = (over: Partial<LocalMerchant> = {}): LocalMerchant => ({
   id: 'm1',
   displayName: 'Carrefour',
-  learnedCategory: 'groceries',
-  learnedSubcategory: 'supermarket',
+  learnedCategoryId: 'cat-groceries-supermarket',
   learnedType: 'spend',
   timesSeen: 12,
   timesConfirmed: 4,
@@ -73,7 +72,7 @@ function Harness(seed: StubSeed) {
           const row = csv.rowAt(index)
           return row === null ? null : (
             <li key={index}>
-              {`row${index} category=${row.draft?.category ?? '-'} merchant=${
+              {`row${index} category=${row.draft?.categoryId ?? '-'} merchant=${
                 row.draft?.merchantId ?? '-'
               } note=${row.draft?.note ?? '-'}`}
             </li>
@@ -162,9 +161,9 @@ describe('ValueMappingStep', () => {
     })
 
     expect(screen.getByText(/also known as/)).toBeDefined()
-    expect(screen.getByText(/usually Groceries/)).toBeDefined()
+    expect(screen.getByText(/usually Groceries · Supermarket/)).toBeDefined()
     expect(
-      screen.getByText(/row0 category=groceries merchant=m1/),
+      screen.getByText(/row0 category=cat-groceries merchant=m1/),
     ).toBeDefined()
   })
 
@@ -278,12 +277,16 @@ describe('ValueMappingStep', () => {
     })
 
     fireEvent.click(
-      screen.getByRole('button', { name: 'Use Other for the rest' }),
+      screen.getByRole('button', {
+        name: 'Use Other or Other income for the rest',
+      }),
     )
 
-    expect(screen.getByText(/row2 category=other/)).toBeDefined()
+    expect(screen.getByText(/row2 category=cat-other /)).toBeDefined()
     expect(
-      screen.queryByRole('button', { name: 'Use Other for the rest' }),
+      screen.queryByRole('button', {
+        name: 'Use Other or Other income for the rest',
+      }),
     ).toBeNull()
   })
 

@@ -12,6 +12,7 @@ type Props = {
   /** Tailwind grid-cols class for one row. */
   cols: string
   open: boolean
+  loading: boolean
   showBreakdown: (cell: PeriodCell) => boolean
   onPick: (key: string) => void
 }
@@ -24,6 +25,7 @@ export function FoldingGrid({
   rows,
   cols,
   open,
+  loading,
   showBreakdown,
   onPick,
 }: Props) {
@@ -34,6 +36,7 @@ export function FoldingGrid({
           key={c.key}
           cell={c}
           showBreakdown={showBreakdown(c)}
+          loading={loading}
           height={CELL_HEIGHT}
           onPick={onPick}
         />

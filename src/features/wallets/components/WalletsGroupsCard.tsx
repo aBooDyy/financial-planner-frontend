@@ -9,6 +9,8 @@ import { WalletRow } from './WalletRow'
 
 type Props = {
   rows: BalanceRow[]
+  /** The balances are still loading: the tree draws, its figures do not. */
+  loading: boolean
   onAddWallet: () => void
   onAddGroup: () => void
   /** Absent when there aren't two wallets to move money between. */
@@ -24,6 +26,7 @@ type Props = {
 
 export function WalletsGroupsCard({
   rows,
+  loading,
   onAddWallet,
   onAddGroup,
   onTransfer,
@@ -88,6 +91,7 @@ export function WalletsGroupsCard({
               <GroupRow
                 key={row.id}
                 row={row}
+                loading={loading}
                 onToggle={onToggle}
                 onEdit={onEdit}
                 onDelete={onDelete}
@@ -97,6 +101,7 @@ export function WalletsGroupsCard({
               <WalletRow
                 key={row.id}
                 row={row}
+                loading={loading}
                 onEdit={onEdit}
                 onAdjust={onAdjust}
                 onDelete={onDelete}

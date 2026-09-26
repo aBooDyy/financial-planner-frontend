@@ -29,8 +29,7 @@ export const localPlannedToCreateWire = (
   name: l.name,
   amount: l.amount,
   currency: l.currency,
-  category: l.category,
-  subcategory: l.subcategory,
+  category_id: l.categoryId,
   occurrence: l.occurrence,
   date: l.date,
   status: toWirePlannedStatus(l.status),
@@ -49,6 +48,5 @@ export const localPlannedToUpdateWire = (
   pinned: l.pinned,
   note: l.note,
   name: l.name,
-  category: l.category,
-  subcategory: l.subcategory,
+  category_id: l.categoryId,
 })

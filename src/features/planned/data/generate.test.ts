@@ -10,6 +10,7 @@ import {
 } from '#/features/planned/testing/fixtures'
 import { desiredPlanned, paydaysOf } from './generate'
 import type { DesiredPlanned } from './generate'
+import { catId } from '#/features/categories/__fixtures__/categories'
 
 const SEP_24 = new Date(2026, 8, 24)
 const JUN_12 = new Date(2026, 5, 12)
@@ -347,7 +348,7 @@ describe('desiredPlanned — Spending schedules', () => {
     const rentIn = recurring({
       id: 'rent-in',
       type: 'income',
-      category: 'salary',
+      categoryId: catId('salary'),
       nextDue: '2026-10-01',
     })
     const out = generate({ recurrings: [gym, rentIn] })
@@ -356,7 +357,7 @@ describe('desiredPlanned — Spending schedules', () => {
     ).toEqual(['payment', 'payment', 'payment'])
     expect(out.find((r) => r.recurringId === 'rent-in')).toMatchObject({
       role: 'income',
-      category: 'salary',
+      categoryId: catId('salary'),
       walletId: 'w1',
     })
   })

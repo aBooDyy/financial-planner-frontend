@@ -1,19 +1,29 @@
 import { describe, expect, it } from 'vitest'
+import {
+  catId,
+  defaultCatalog,
+} from '#/features/categories/__fixtures__/categories'
 import { testDialect } from './__fixtures__/mapping'
 import {
   applyTemplateConfig,
-  categoryKeyOf,
   configFromDraft,
   needsReread,
   rankTemplates,
   signatureOf,
   suggestTemplateName,
   templateHint,
+  withCreatedCategories,
 } from './templates'
-import { DEFAULT_DEDUPE, TEMPLATE_CONFIG_VERSION, emptyAliases } from './types'
+import {
+  DEFAULT_DEDUPE,
+  TEMPLATE_CONFIG_VERSION,
+  emptyAliases,
+  pendingCategoryId,
+} from './types'
 import type { LocalImportTemplate } from '#/db/types'
 import type { MappingDraft } from './mapping'
 import type { TemplateCatalogue } from './templates'
+import type { ImportTemplateConfigV1 } from './types'
 
 const HEADERS = ['Date', 'Description', 'Debit', 'Credit', 'Currency']
 
@@ -21,7 +31,7 @@ const catalogue = (
   overrides: Partial<TemplateCatalogue> = {},
 ): TemplateCatalogue => ({
   walletIds: new Set(['w1']),
-  categoryKeys: new Set([categoryKeyOf('groceries', null)]),
+  categories: defaultCatalog(),
   merchantIds: new Set(['m1']),
   ...overrides,
 })
@@ -38,8 +48,7 @@ const draft = (overrides: Partial<MappingDraft> = {}): MappingDraft => ({
     walletId: 'w1',
     currency: 'SAR',
     type: 'spend',
-    category: 'other',
-    subcategory: null,
+    categoryIds: { spend: catId('other'), income: catId('other_income') },
   },
   aliases: emptyAliases(),
   dedupe: DEFAULT_DEDUPE,
@@ -100,8 +109,7 @@ describe('configFromDraft / applyTemplateConfig', () => {
         categories: {
           supermarket: {
             kind: 'category',
-            category: 'groceries',
-            subcategory: null,
+            categoryId: catId('supermarket', 'groceries'),
           },
         },
         merchants: { carrefour: { kind: 'merchant', merchantId: 'm1' } },
@@ -162,7 +170,7 @@ describe('configFromDraft / applyTemplateConfig', () => {
             closed: { kind: 'wallet', walletId: 'deleted-wallet' },
           },
           categories: {
-            fuel: { kind: 'category', category: 'gone', subcategory: null },
+            fuel: { kind: 'category', categoryId: 'deleted-long-ago' },
           },
           merchants: {
             carrefour: { kind: 'merchant', merchantId: 'm1' },
@@ -182,6 +190,51 @@ describe('configFromDraft / applyTemplateConfig', () => {
       ['merchant', 'merged'],
     ])
     expect(applied.unknown[0].message).toContain('closed')
+  })
+
+  it('settles a created category into the id the commit gave it', () => {
+    const create = {
+      kind: 'create' as const,
+      parentId: catId('groceries'),
+      name: 'Farmers market',
+      type: 'spend' as const,
+      slug: 'farmers_market',
+    }
+    const config = configFromDraft(
+      draft({
+        aliases: {
+          ...emptyAliases(),
+          categories: { market: create, never: { ...create, slug: 'never' } },
+        },
+      }),
+    )
+    const settled = withCreatedCategories(
+      config,
+      new Map([[pendingCategoryId(create), 'cat-new']]),
+    )
+    // One the commit never made is left out rather than stored as a promise.
+    expect(settled.aliases.categories).toEqual({
+      market: { kind: 'category', categoryId: 'cat-new' },
+    })
+  })
+
+  it('falls a default category that is gone back to the type’s own', () => {
+    const config = configFromDraft(
+      draft({
+        defaults: {
+          walletId: 'w1',
+          currency: 'SAR',
+          type: 'spend',
+          categoryIds: { spend: 'deleted', income: catId('salary') },
+        },
+      }),
+    )
+    const applied = applyTemplateConfig(config, 5, catalogue())
+    expect(applied.draft.defaults.categoryIds).toEqual({
+      spend: catId('other'),
+      income: catId('salary'),
+    })
+    expect(applied.unknown.map((u) => u.kind)).toEqual(['default'])
   })
 
   it('keeps a "skip" answer, which targets nothing that can disappear', () => {
@@ -229,6 +282,61 @@ describe('configFromDraft / applyTemplateConfig', () => {
     const applied = applyTemplateConfig(config, 5, catalogue())
     expect(applied.draft.dateFormat).toBe('DD/MM/YYYY')
     expect(applied.draft.dateAmbiguous).toBe(false)
+  })
+})
+
+describe('a version-1 template', () => {
+  const v1 = (): ImportTemplateConfigV1 => {
+    const { defaults, aliases, ...rest } = configFromDraft(draft())
+    return {
+      ...rest,
+      version: 1,
+      defaults: {
+        walletId: defaults.walletId,
+        currency: defaults.currency,
+        type: defaults.type,
+        category: 'salary',
+        subcategory: null,
+      },
+      aliases: {
+        ...aliases,
+        categories: {
+          dining: { kind: 'category', category: 'dining', subcategory: null },
+          cafe: { kind: 'category', category: 'dining', subcategory: 'cafes' },
+          made: { kind: 'category', category: 'hobbies', subcategory: null },
+          transfer: { kind: 'transfer' },
+        },
+      },
+    }
+  }
+
+  it('is upgraded on read, each slug pair looked up in the catalog', () => {
+    const applied = applyTemplateConfig(v1(), 5, catalogue())
+    expect(applied.draft.aliases.categories).toEqual({
+      dining: { kind: 'category', categoryId: catId('dining') },
+      cafe: { kind: 'category', categoryId: catId('cafes', 'dining') },
+      transfer: { kind: 'transfer' },
+    })
+  })
+
+  it('drops a pair the catalog has nothing for, and asks again', () => {
+    const applied = applyTemplateConfig(v1(), 5, catalogue())
+    expect(applied.unknown).toEqual([
+      expect.objectContaining({ kind: 'category', key: 'made' }),
+    ])
+  })
+
+  it('keeps its default for its own direction and falls the other to its fallback', () => {
+    const applied = applyTemplateConfig(v1(), 5, catalogue())
+    expect(applied.draft.defaults.categoryIds).toEqual({
+      spend: catId('other'),
+      income: catId('salary'),
+    })
+  })
+
+  it('is saved back as version 2', () => {
+    const applied = applyTemplateConfig(v1(), 5, catalogue())
+    expect(configFromDraft(applied.draft).version).toBe(2)
   })
 })
 

@@ -68,8 +68,7 @@ type RowSeed = {
   currency: CurrencyCode
   name: string
   walletId?: string | null
-  category?: string | null
-  subcategory?: string | null
+  categoryId?: string | null
   done?: boolean
 }
 
@@ -90,8 +89,7 @@ const rowFor = (userId: string, seed: RowSeed): DesiredPlanned => ({
   name: seed.name,
   amount: Math.max(0, Math.round(seed.amount)),
   currency: seed.currency,
-  category: seed.category ?? null,
-  subcategory: seed.subcategory ?? null,
+  categoryId: seed.categoryId ?? null,
   occurrence: seed.occurrence,
   date: seed.occurrence,
   status: seed.done ? 'done' : 'open',
@@ -257,8 +255,7 @@ function recurringRows(
     currency: r.currency,
     name: r.name,
     walletId: r.walletId,
-    category: r.category,
-    subcategory: r.subcategory,
+    categoryId: r.categoryId,
     done: legacy.has(legacyMarkerOf(r.id, date)),
   }))
 }

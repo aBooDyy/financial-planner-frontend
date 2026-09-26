@@ -5,6 +5,7 @@ import {
   DEFAULT_DEDUPE,
   emptyAliases,
   isExclusiveRole,
+  pendingCategoryId,
   roleColumn,
 } from './types'
 import type { CategoryCatalog } from '#/features/categories/data/catalog'
@@ -106,21 +107,36 @@ export type DraftSeed = {
   matrix: ReadonlyArray<ReadonlyArray<string>>
   currency: CurrencyCode
   walletId?: string | null
-  /** Where a row that names no category of its own lands — `fallbackCategoryOf`. */
-  fallbackCategory: string
+  /** Where a row that names no category of its own lands, by direction — `fallbackCategoriesOf`. */
+  fallbackCategories: Record<TxType, string>
 }
 
-const FALLBACK_SLUG = 'other'
-
 /**
- * The category rows fall back to: the user's own "Other" when they kept one, and otherwise
- * their first spending category — never a built-in slug they have renamed away from.
+ * The categories rows fall back to, one per direction: the catalog's required "Other" /
+ * "Other income", and otherwise the type's first category. Empty only before the categories
+ * have been pulled.
  */
-export const fallbackCategoryOf = (catalog: CategoryCatalog): string => {
-  const spend = catalog.byType('spend')
-  const own = spend.find((category) => category.slug === FALLBACK_SLUG)
-  if (own !== undefined) return own.slug
-  return spend.length > 0 ? spend[0].slug : FALLBACK_SLUG
+export const fallbackCategoriesOf = (
+  catalog: CategoryCatalog,
+): Record<TxType, string> => ({
+  spend: catalog.fallbackFor('spend')?.id ?? '',
+  income: catalog.fallbackFor('income')?.id ?? '',
+})
+
+/** Each category's direction by id — the catalog's, and the ones this import will create. */
+export const categoryTypesOf = (
+  catalog: CategoryCatalog,
+  categories: Aliases['categories'],
+): Record<string, TxType> => {
+  const types: Record<string, TxType> = {}
+  for (const root of catalog.all) {
+    types[root.id] = root.type
+    for (const sub of root.subs) types[sub.id] = sub.type
+  }
+  for (const target of Object.values(categories)) {
+    if (target.kind === 'create') types[pendingCategoryId(target)] = target.type
+  }
+  return types
 }
 
 /** Everything detection proposes about a freshly read file, as one draft. */
@@ -139,8 +155,7 @@ export const draftForFile = (seed: DraftSeed): MappingDraft => {
         walletId: seed.walletId ?? null,
         currency: seed.currency,
         type: 'spend',
-        category: seed.fallbackCategory,
-        subcategory: null,
+        categoryIds: { ...seed.fallbackCategories },
       },
       aliases: emptyAliases(),
       dedupe: DEFAULT_DEDUPE,

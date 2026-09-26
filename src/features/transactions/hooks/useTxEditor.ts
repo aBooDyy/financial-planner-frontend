@@ -15,6 +15,7 @@ import type {
   TxType,
 } from '#/features/transactions/api/types'
 import { isCashflow } from '#/features/transactions/api/types'
+import { DELETED_CATEGORY_ID } from '#/features/categories/data/catalog'
 import type { CategoryCatalog } from '#/features/categories/data/catalog'
 import { useCategoryCatalog } from '#/features/categories/hooks/useCategoryCatalog'
 import {
@@ -54,8 +55,12 @@ export type EditorTxType = TxType | 'transfer'
 export type TxEditorDraft = {
   type: EditorTxType
   amount: string
-  category: string
-  subcategory: string | null
+  /**
+   * The leaf category: a subcategory's id when one was picked, else the root's. A budget
+   * reads it as the root it caps.
+   */
+  categoryId: string
+  /** The entry's wallet (a transfer's source); a budget reads it as the account it caps. */
   walletId: string
   goalId: string | null
   /** The planned item this entry settles (1e's match), or null for an unlinked entry. */
@@ -76,7 +81,6 @@ export type TxEditorDraft = {
   autopost: boolean
   // budget
   scopeType: BudgetScope
-  target: string
   period: BudgetPeriod
   customDays: string
   limit: string
@@ -99,13 +103,19 @@ export type TxEditorState = {
 }
 
 const firstCategoryOf = (catalog: CategoryCatalog, type: TxType): string =>
-  catalog.byType(type)[0]?.slug ?? 'other'
+  catalog.byType(type).at(0)?.id ?? DELETED_CATEGORY_ID
 
 /** A new schedule is most often a bill; start on Housing when the user kept it. */
-const recurringCategoryOf = (catalog: CategoryCatalog): string =>
-  catalog.byType('spend').some((c) => c.slug === 'housing')
-    ? 'housing'
+const recurringCategoryOf = (catalog: CategoryCatalog): string => {
+  const housing = catalog.bySlug('housing')
+  return housing?.type === 'spend'
+    ? housing.id
     : firstCategoryOf(catalog, 'spend')
+}
+
+/** Whether `id` is a live category filed as `type`. */
+const isOfType = (catalog: CategoryCatalog, id: string, type: TxType) =>
+  catalog.has(id) && catalog.rootOf(id).type === type
 
 /** A learned category is only usable when it belongs to the type the row is being filed as. */
 const appliesTo = (
@@ -113,8 +123,15 @@ const appliesTo = (
   prediction: CategoryPrediction | null,
   type: TxType,
 ): prediction is CategoryPrediction =>
-  prediction !== null &&
-  catalog.byType(type).some((c) => c.slug === prediction.category)
+  prediction !== null && isOfType(catalog, prediction.categoryId, type)
+
+/** The spend root a category budget caps: the draft's own when it is one, else the first. */
+const budgetRootOf = (catalog: CategoryCatalog, id: string): string => {
+  const root = catalog.rootOf(id)
+  return isOfType(catalog, root.id, 'spend')
+    ? root.id
+    : firstCategoryOf(catalog, 'spend')
+}
 
 export function useTxEditor(
   wallets: LocalBalanceNode[],
@@ -147,8 +164,7 @@ export function useTxEditor(
   const blank = (): TxEditorDraft => ({
     type: 'spend',
     amount: '',
-    category: firstCategoryOf(catalog, 'spend'),
-    subcategory: null,
+    categoryId: firstCategoryOf(catalog, 'spend'),
     walletId: defaultWalletId,
     goalId: null,
     plannedId: null,
@@ -163,7 +179,6 @@ export function useTxEditor(
     frequency: 'monthly',
     autopost: false,
     scopeType: 'category',
-    target: firstCategoryOf(catalog, 'spend'),
     period: 'monthly',
     customDays: '30',
     limit: '',
@@ -182,8 +197,7 @@ export function useTxEditor(
         ...blank(),
         type: t.type,
         amount: minorToInputValue(t.amount, t.currency),
-        category: t.category ?? firstCategoryOf(catalog, t.type),
-        subcategory: t.subcategory,
+        categoryId: t.categoryId ?? firstCategoryOf(catalog, t.type),
         walletId: t.walletId,
         goalId: t.goalId,
         plannedId: t.plannedId,
@@ -233,11 +247,8 @@ export function useTxEditor(
       draft: {
         ...blank(),
         scopeType: b.scopeType,
-        target:
-          b.target ??
-          (b.scopeType === 'wallet'
-            ? defaultWalletId
-            : firstCategoryOf(catalog, 'spend')),
+        categoryId: b.categoryId ?? firstCategoryOf(catalog, 'spend'),
+        walletId: b.walletId ?? defaultWalletId,
         period: b.period,
         customDays: String(b.customDays ?? 30),
         limit: minorToInputValue(b.limit, b.currency),
@@ -252,7 +263,7 @@ export function useTxEditor(
       id: null,
       draft: {
         ...blank(),
-        category: recurringCategoryOf(catalog),
+        categoryId: recurringCategoryOf(catalog),
         date: ymd(addMonths(startOfToday(), 1)),
       },
     })
@@ -265,8 +276,7 @@ export function useTxEditor(
         name: r.name,
         type: r.type,
         amount: minorToInputValue(r.amount, r.currency),
-        category: r.category,
-        subcategory: r.subcategory,
+        categoryId: r.categoryId,
         walletId: r.walletId,
         goalId: r.goalId,
         frequency: r.frequency,
@@ -339,23 +349,20 @@ export function useTxEditor(
           }),
         }
       }
-      const valid = catalog.byType(type).map((c) => c.slug)
-      const category = valid.includes(prev.draft.category)
-        ? prev.draft.category
-        : valid[0]
+      const categoryId = isOfType(catalog, prev.draft.categoryId, type)
+        ? prev.draft.categoryId
+        : firstCategoryOf(catalog, type)
       // A payday and a payment are different planned items; a new type drops the link.
       const plannedId = type === prev.draft.type ? prev.draft.plannedId : null
       return {
         ...prev,
-        draft: { ...prev.draft, type, category, subcategory: null, plannedId },
+        draft: { ...prev.draft, type, categoryId, plannedId },
       }
     })
 
-  const setCategory = (category: string, subcategory: string | null = null) =>
+  const setCategory = (categoryId: string) =>
     setEditing((prev) =>
-      prev
-        ? { ...prev, draft: { ...prev.draft, category, subcategory } }
-        : prev,
+      prev ? { ...prev, draft: { ...prev.draft, categoryId } } : prev,
     )
 
   // Paying toward a goal keeps the user's own category (rent paid is Housing, not
@@ -394,11 +401,7 @@ export function useTxEditor(
         return {
           ...prev,
           suggestion: null,
-          draft: {
-            ...draft,
-            category: prediction.category,
-            subcategory: prediction.subcategory,
-          },
+          draft: { ...draft, categoryId: prediction.categoryId },
         }
       }
       return {
@@ -416,24 +419,23 @@ export function useTxEditor(
       return {
         ...prev,
         suggestion: null,
-        draft: {
-          ...prev.draft,
-          category: prev.suggestion.category,
-          subcategory: prev.suggestion.subcategory,
-        },
+        draft: { ...prev.draft, categoryId: prev.suggestion.categoryId },
       }
     })
 
   const setScopeType = (scopeType: BudgetScope) =>
     setEditing((prev) => {
       if (!prev) return prev
-      const target =
-        scopeType === 'category'
-          ? firstCategoryOf(catalog, 'spend')
-          : scopeType === 'wallet'
-            ? defaultWalletId
-            : ''
-      return { ...prev, draft: { ...prev.draft, scopeType, target } }
+      const { categoryId, walletId } = prev.draft
+      return {
+        ...prev,
+        draft: {
+          ...prev.draft,
+          scopeType,
+          categoryId: budgetRootOf(catalog, categoryId),
+          walletId: walletId || defaultWalletId,
+        },
+      }
     })
 
   /** `link` overrides the draft's planned link and goal — the "Counts toward" field resolves them. */
@@ -472,8 +474,7 @@ export function useTxEditor(
         type: draft.type,
         amount,
         currency,
-        category: draft.category,
-        subcategory: draft.subcategory,
+        categoryId: draft.categoryId,
         walletId: draft.walletId,
         goalId: draft.type === 'spend' ? (link?.goalId ?? draft.goalId) : null,
         plannedId: link ? link.plannedId : draft.plannedId,
@@ -492,7 +493,11 @@ export function useTxEditor(
       if (limit <= 0) return
       const payload = {
         scopeType: draft.scopeType,
-        target: draft.scopeType === 'overall' ? null : draft.target,
+        categoryId:
+          draft.scopeType === 'category'
+            ? budgetRootOf(catalog, draft.categoryId)
+            : null,
+        walletId: draft.scopeType === 'wallet' ? draft.walletId : null,
         period: draft.period,
         customDays:
           draft.period === 'custom'
@@ -516,8 +521,7 @@ export function useTxEditor(
       type: draft.type,
       amount,
       currency,
-      category: draft.category,
-      subcategory: draft.subcategory,
+      categoryId: draft.categoryId,
       walletId: draft.walletId,
       goalId: draft.type === 'spend' ? draft.goalId : null,
       frequency: draft.frequency,

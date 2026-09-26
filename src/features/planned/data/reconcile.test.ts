@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { LocalGoal, LocalPlanned } from '#/db/types'
+import { catId } from '#/features/categories/__fixtures__/categories'
 import { goal, m, planned } from '#/features/planned/testing/fixtures'
 import type { DesiredPlanned } from './generate'
 import { orphanedPlanned, reconcilePlanned } from './reconcile'
@@ -104,6 +105,31 @@ describe('reconcilePlanned — fill', () => {
     )
     expect(plan.update).toEqual([
       { id: 'salary:2026-10-27', patch: { amount: m(21000) } },
+    ])
+  })
+
+  it('follows a schedule’s new category on its future rows', () => {
+    const gym = (categoryId: string) =>
+      planned({
+        id: 'gym:2026-10-05',
+        origin: 'recurring',
+        role: 'payment',
+        goalId: null,
+        recurringId: 'gym',
+        name: 'Gym',
+        occurrence: '2026-10-05',
+        categoryId,
+      })
+    const plan = reconcilePlanned(
+      [want(gym(catId('fitness', 'health')))],
+      [gym(catId('health'))],
+      ctx(),
+    )
+    expect(plan.update).toEqual([
+      {
+        id: 'gym:2026-10-05',
+        patch: { categoryId: catId('fitness', 'health') },
+      },
     ])
   })
 

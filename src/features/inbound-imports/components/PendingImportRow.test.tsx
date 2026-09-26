@@ -18,7 +18,10 @@ import {
   vi,
 } from 'vitest'
 import type { LocalBalanceNode, LocalInboundImport } from '#/db/types'
-import { buildCatalog } from '#/features/categories/data/catalog'
+import {
+  catId,
+  defaultCatalog,
+} from '#/features/categories/__fixtures__/categories'
 import type { ImportDetail } from '#/features/inbound-imports/api/types'
 import { ReviewPayloadTree } from '#/features/integrations/components/ReviewPayloadTree'
 import { DISMISS_UNDO_MS } from '#/features/inbound-imports/hooks/useUndoableDismiss'
@@ -98,8 +101,7 @@ const webhookRow = (
   amount: null,
   currency: null,
   suggestedMerchant: null,
-  suggestedCategory: null,
-  suggestedSubcategory: null,
+  suggestedCategoryId: null,
   suggestedType: 'spend',
   suggestedWalletId: 'w2',
   rawPreview: JSON.stringify(PAYLOAD),
@@ -126,7 +128,7 @@ const renderRow = (item: LocalInboundImport) => {
       <PendingImportRow
         item={item}
         wallets={WALLETS}
-        catalog={buildCatalog([])}
+        catalog={defaultCatalog()}
       />
     </PayloadViewContext.Provider>,
   )
@@ -185,6 +187,7 @@ describe('PendingImportRow — a webhook row', () => {
       currency: 'SAR',
       date: '2026-09-23',
       merchant: 'CARREFOUR HYPER 4471',
+      categoryId: catId('other'),
     })
   })
 })

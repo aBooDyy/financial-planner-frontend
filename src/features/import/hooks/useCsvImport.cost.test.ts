@@ -122,8 +122,7 @@ const PICKS: Array<(draft: MappingDraft) => MappingDraft> = [
         ...draft.aliases.categories,
         [normalizeKey(`CAT ${at}`)]: {
           kind: 'category' as const,
-          category: 'other',
-          subcategory: null,
+          categoryId: 'cat-other',
         },
       },
     },

@@ -32,7 +32,7 @@ const controlOf = (path: string | undefined): RuleControl => {
   if (path.startsWith('filter')) return 'terms'
   if (path.startsWith('template')) return 'template'
   if (path === 'wallet_id') return 'walletId'
-  if (path === 'category' || path === 'subcategory') return 'category'
+  if (path === 'category_id') return 'category'
   if (path === 'auto_confirm') return 'autoConfirm'
   return 'other'
 }

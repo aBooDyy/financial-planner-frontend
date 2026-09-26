@@ -1,9 +1,8 @@
 import { useNavigate } from '@tanstack/react-router'
 import type { LocalBalanceNode, LocalGoal } from '#/db/types'
 import { transferWallets } from '#/features/wallets/data/transferDialog'
-import { walletDeltas } from '#/features/transactions/data/ledger'
 import { scopeSections } from '#/features/transactions/data/selectors'
-import type { SpendingData } from '#/features/transactions/data/selectors'
+import type { SpendingInputs } from '#/features/transactions/data/selectors'
 import type { TxEditorApi } from '#/features/transactions/hooks/useTxEditor'
 import type { CurrencyCode } from '#/lib/currency'
 import { BudgetEditor } from './BudgetEditor'
@@ -16,7 +15,9 @@ type Props = {
   archivedWalletIds: ReadonlySet<string>
   goals: LocalGoal[]
   base: CurrencyCode
-  data: SpendingData
+  data: SpendingInputs
+  /** Each wallet's `walletDeltas` over the whole ledger. */
+  deltas: Record<string, number>
 }
 
 /**
@@ -30,9 +31,10 @@ export function ConnectedTxEditor({
   goals,
   base,
   data,
+  deltas,
 }: Props) {
   const navigate = useNavigate()
-  const { nodes, txns, rates } = data
+  const { rates } = data
 
   const { editing } = editor
   if (!editing) return null
@@ -51,12 +53,8 @@ export function ConnectedTxEditor({
     )
   }
 
-  const accounts = transferWallets(
-    wallets,
-    walletDeltas(nodes, txns, rates),
-    base,
-  )
-  const accountSections = scopeSections(data)
+  const accounts = transferWallets(wallets, deltas, base)
+  const accountSections = scopeSections(data, deltas)
   if (editing.kind === 'recurring') {
     return (
       <RecurringEditor

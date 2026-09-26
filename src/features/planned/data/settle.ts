@@ -31,12 +31,15 @@ export type SettlementIndex = ReadonlyMap<string, ReadonlyArray<Settlement>>
 
 const LEGACY_PREFIX = 'legacy:'
 
+/** How a legacy auto-post's `source` starts. */
+export const LEGACY_SOURCE_PREFIX = 'recurring:'
+
 /**
  * Before recurrings moved onto planned rows, an auto-posted occurrence was marked only by its
  * `source`. Such a transaction settles the occurrence it names, so nothing posts twice.
  */
 export const legacyMarkerOf = (recurringId: string, occurrence: string) =>
-  `recurring:${recurringId}:${occurrence}`
+  `${LEGACY_SOURCE_PREFIX}${recurringId}:${occurrence}`
 
 const legacyKeyOf = (item: LocalPlanned): string | null =>
   item.origin === 'recurring' && item.recurringId
@@ -80,7 +83,7 @@ export function indexSettlements(
   for (const t of txns) {
     if (t.deleted !== 0) continue
     if (t.plannedId) add(t.plannedId, txSettlement(t))
-    else if (t.source?.startsWith('recurring:'))
+    else if (t.source?.startsWith(LEGACY_SOURCE_PREFIX))
       add(`${LEGACY_PREFIX}${t.source}`, txSettlement(t))
   }
   for (const a of allocations) {

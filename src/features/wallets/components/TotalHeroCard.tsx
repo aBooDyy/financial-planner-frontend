@@ -1,4 +1,6 @@
 import { SegmentedBar } from '#/components/SegmentedBar'
+import { ValueOrSkeleton } from '#/components/ValueOrSkeleton'
+import { Skeleton } from '#/components/ui/skeleton'
 import { TransferGlyph } from '#/components/icons/TransferGlyph'
 import { Button } from '#/components/ui/button'
 import type { CurrencyCode } from '#/lib/currency'
@@ -6,12 +8,15 @@ import type { WalletsView } from '#/features/wallets/data/selectors'
 
 type Props = {
   view: WalletsView
+  /** The balances are still loading: the tree's counts show, its figures do not. */
+  loading: boolean
   base: CurrencyCode
   /** Mobile-only entry; absent when there aren't two wallets. */
   onTransfer?: () => void
 }
 
-export function TotalHeroCard({ view, base, onTransfer }: Props) {
+export function TotalHeroCard({ view, loading, base, onTransfer }: Props) {
+  const figure = (value: string) => (loading ? null : value)
   return (
     <div className="rounded-[18px] border border-fp-border bg-fp-surface p-5 shadow-fp md:p-7">
       <div className="mb-[10px] flex items-center gap-2">
@@ -22,7 +27,10 @@ export function TotalHeroCard({ view, base, onTransfer }: Props) {
 
       <div className="flex flex-wrap items-end gap-[10px]">
         <span className="fp-sensitive text-[38px] leading-[1.05] font-extrabold tracking-[-0.02em] tabular-nums whitespace-nowrap">
-          {view.grandTotalStr}
+          <ValueOrSkeleton
+            value={figure(view.grandTotalStr)}
+            className="h-[38px] w-48"
+          />
         </span>
         <span className="mb-[5px] rounded-full border border-fp-border px-[9px] py-1 text-[12px] font-bold text-fp-text-3">
           {base}
@@ -60,11 +68,15 @@ export function TotalHeroCard({ view, base, onTransfer }: Props) {
         </Button>
       ) : null}
 
-      <SegmentedBar
-        segments={view.groupBars.map((bar) => ({ ...bar, key: bar.id }))}
-        className="mt-[18px] h-3 rounded-[7px]"
-        minWidth="1%"
-      />
+      {loading ? (
+        <Skeleton aria-hidden className="mt-[18px] h-3 rounded-[7px]" />
+      ) : (
+        <SegmentedBar
+          segments={view.groupBars.map((bar) => ({ ...bar, key: bar.id }))}
+          className="mt-[18px] h-3 rounded-[7px]"
+          minWidth="1%"
+        />
+      )}
 
       <div className="mt-[13px] flex flex-wrap gap-x-4 gap-y-[6px]">
         {view.groupBars.map((bar) => (
@@ -75,7 +87,10 @@ export function TotalHeroCard({ view, base, onTransfer }: Props) {
             />
             <span className="text-[12.5px] font-semibold">{bar.label}</span>
             <span className="fp-sensitive text-[12px] text-fp-text-3 tabular-nums">
-              {bar.valueStr}
+              <ValueOrSkeleton
+                value={figure(bar.valueStr)}
+                className="h-3 w-14"
+              />
             </span>
           </div>
         ))}

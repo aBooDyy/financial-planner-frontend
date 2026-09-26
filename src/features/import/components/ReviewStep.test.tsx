@@ -40,8 +40,7 @@ const ANSWERED = () => ({
   categories: {
     groceries: {
       kind: 'category' as const,
-      category: 'groceries',
-      subcategory: null,
+      categoryId: 'cat-groceries',
     },
   },
 })

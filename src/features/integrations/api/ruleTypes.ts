@@ -89,8 +89,14 @@ export type Extraction = {
   missing: LocatorField[]
   resolved: {
     walletId: string | null
-    category: string | null
-    subcategory: string | null
+    /** The leaf category the raw text resolved to. */
+    categoryId: string | null
+    /**
+     * The server's snapshot of the category it resolved to, in words: the root's and the
+     * child's names (a slug on a delivery logged before categories were referenced by id).
+     */
+    categoryText?: string | null
+    subcategoryText?: string | null
   }
 }
 
@@ -150,8 +156,10 @@ export type ExtractionWire = {
   missing: LocatorField[]
   resolved: {
     wallet_id: string | null
-    category: string | null
-    subcategory: string | null
+    category_id: string | null
+    /** Name snapshots of the resolved root and child (slugs on an old delivery). */
+    category?: string | null
+    subcategory?: string | null
   }
 }
 
@@ -228,8 +236,13 @@ export const toExtraction = (w: ExtractionWire): Extraction => {
     missing: w.missing,
     resolved: {
       walletId: w.resolved.wallet_id,
-      category: w.resolved.category,
-      subcategory: w.resolved.subcategory,
+      categoryId: w.resolved.category_id,
+      ...(w.resolved.category !== undefined
+        ? {
+            categoryText: w.resolved.category,
+            subcategoryText: w.resolved.subcategory ?? null,
+          }
+        : {}),
     },
   }
 }

@@ -3,8 +3,7 @@ import { fromWireTxType, toWireTxType } from '#/features/transactions/api/types'
 
 /**
  * Wire/domain types for the user-editable category tree. A row with `parentId === null` is
- * a category; one with a parent is a subcategory. Two levels, no deeper — the ledger stores
- * exactly one `(category, subcategory)` slug pair.
+ * a category; one with a parent is a subcategory. Two levels, no deeper.
  */
 
 export type Category = {
@@ -55,7 +54,7 @@ export type UpdateCategoryWire = {
   position: number
 }
 
-/** Present only when the deleted category's rows move somewhere rather than keep its slugs. */
+/** Present when the deleted category's rows (and budgets, merchants, rules) move to another one. */
 export type DeleteCategoryWire = { move_to: string }
 
 export const toCategory = (w: CategoryWire): Category => ({

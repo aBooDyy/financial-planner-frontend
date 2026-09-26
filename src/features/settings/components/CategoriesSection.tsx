@@ -34,6 +34,7 @@ export function CategoriesSection() {
           subCount: c.subs.length,
           txCount: c.txCount,
           recurringCount: c.recurringCount,
+          plannedCount: c.plannedCount,
         })
         return
       }
@@ -47,6 +48,7 @@ export function CategoriesSection() {
           subCount: 0,
           txCount: child.txCount,
           recurringCount: child.recurringCount,
+          plannedCount: child.plannedCount,
         })
         return
       }
@@ -54,7 +56,8 @@ export function CategoriesSection() {
   }
 
   const confirmDelete = (moveToId: string | null) => {
-    if (deleting) void deleteCategory(deleting.id, moveToId)
+    // The dialog only offers a delete the rules allow, so a refusal here changes nothing.
+    if (deleting) void deleteCategory(deleting.id, moveToId).catch(() => {})
     setDeleting(null)
     addRef.current?.focus()
   }

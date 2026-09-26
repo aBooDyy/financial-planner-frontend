@@ -47,7 +47,7 @@ const EMPTY_RUN: DryRun = {
       wallet: null,
     },
     missing: [],
-    resolved: { walletId: null, category: null, subcategory: null },
+    resolved: { walletId: null, categoryId: null },
   },
   focus: null,
   would: 'STAGE',

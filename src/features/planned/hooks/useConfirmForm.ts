@@ -45,13 +45,14 @@ export const plannedErrorMessage = (e: unknown): string =>
  * dialog's actions. `onDone` runs after any action that settles or moves the item.
  */
 export function useConfirmForm(plannedId: string | null, onDone: () => void) {
-  const c = useConfirmPlanned(plannedId)
   const nodeRows = useLiveQuery(() => db.balanceNodes.toArray())
   const wallets = useMemo<LocalBalanceNode[]>(
     () => activeNodes(nodeRows ?? []).filter((n) => n.kind === 'wallet'),
     [nodeRows],
   )
   const [form, setForm] = useState<Form | null>(null)
+  const chosen = wallets.find((w) => w.id === form?.source) ?? null
+  const c = useConfirmPlanned(plannedId, chosen?.id ?? null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -80,12 +81,8 @@ export function useConfirmForm(plannedId: string | null, onDone: () => void) {
     ? Math.max(0, parseAmountToMinor(form.amount, currency) ?? 0)
     : 0
   const isExternal = ready && form.source === EXTERNAL
-  const wallet = ready
-    ? (wallets.find((w) => w.id === form.source) ?? null)
-    : null
-  const preview = ready
-    ? c.preview(amount, isExternal ? null : (wallet?.id ?? null), form.date)
-    : null
+  const wallet = ready ? chosen : null
+  const preview = ready ? c.preview(amount, form.date) : null
 
   const goalCurrency = useLiveQuery(
     async () =>

@@ -51,7 +51,7 @@ export function TermsInput({
   return (
     <div
       className={cn(
-        'flex min-w-0 flex-wrap items-center gap-1.5 rounded-[14px] border-[1.5px] bg-fp-surface px-[10px] py-2 transition focus-within:border-fp-accent focus-within:ring-[3px] focus-within:ring-fp-accent/15',
+        'flex min-w-0 flex-wrap items-center gap-1.5 rounded-[14px] border-[1.5px] bg-fp-surface-2 px-[10px] py-2 transition focus-within:border-fp-accent focus-within:ring-[3px] focus-within:ring-fp-accent/15',
         invalid ? 'border-fp-danger bg-fp-danger/[0.07]' : 'border-fp-border',
       )}
     >

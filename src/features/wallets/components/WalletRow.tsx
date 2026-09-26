@@ -1,6 +1,7 @@
 import { Pencil, Scale, Trash2 } from 'lucide-react'
 import type { MouseEvent } from 'react'
 import { IconChip } from '#/components/icons/IconChip'
+import { ValueOrSkeleton } from '#/components/ValueOrSkeleton'
 import { Button } from '#/components/ui/button'
 import type { BalanceRow } from '#/features/wallets/data/selectors'
 import { PotRow } from './PotRow'
@@ -8,6 +9,8 @@ import { ReservedWalletLines } from './ReservedWalletLines'
 
 type Props = {
   row: BalanceRow
+  /** The balance is still loading. */
+  loading: boolean
   onEdit: (id: string) => void
   onAdjust: (id: string) => void
   onDelete: (id: string) => void
@@ -29,6 +32,7 @@ const stop = (fn: (id: string) => void, id: string) => (e: MouseEvent) => {
  */
 export function WalletRow({
   row,
+  loading,
   onEdit,
   onAdjust,
   onDelete,
@@ -68,9 +72,12 @@ export function WalletRow({
             </div>
             <div className="fp-sensitive flex shrink-0 flex-col items-end">
               <span className="text-[14px] font-bold tabular-nums whitespace-nowrap">
-                {row.amountStr}
+                <ValueOrSkeleton
+                  value={loading ? null : row.amountStr}
+                  className="h-3.5 w-20"
+                />
               </span>
-              {row.isForeign ? (
+              {row.isForeign && !loading ? (
                 <span className="text-[11.5px] whitespace-nowrap text-fp-text-3 tabular-nums">
                   {row.baseStr}
                 </span>

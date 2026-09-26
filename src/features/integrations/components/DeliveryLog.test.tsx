@@ -7,7 +7,7 @@ import {
   waitFor,
 } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { buildCatalog } from '#/features/categories/data/catalog'
+import { defaultCatalog } from '#/features/categories/__fixtures__/categories'
 import {
   PURCHASE_PAYLOAD,
   aDelivery,
@@ -40,7 +40,7 @@ const renderLog = (
       apiKey={aKey()}
       online={online}
       walletNames={new Map()}
-      catalog={buildCatalog([])}
+      catalog={defaultCatalog()}
       onBuild={onBuild}
     />,
   )

@@ -68,9 +68,9 @@ describe('buildWalletsView', () => {
   })
 
   it('flattens the visible tree and respects collapse', () => {
-    expect(
-      buildWalletsView(sampleTree(false), 'SAR', rates).rows,
-    ).toHaveLength(4)
+    expect(buildWalletsView(sampleTree(false), 'SAR', rates).rows).toHaveLength(
+      4,
+    )
     // Collapsing the group hides its two children.
     const collapsed = buildWalletsView(sampleTree(true), 'SAR', rates)
     expect(collapsed.rows).toHaveLength(2)

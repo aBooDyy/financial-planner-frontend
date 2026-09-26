@@ -11,8 +11,7 @@ const merchant = (
 ): LocalMerchant => ({
   id,
   displayName,
-  learnedCategory: null,
-  learnedSubcategory: null,
+  learnedCategoryId: null,
   learnedType: null,
   timesSeen,
   timesConfirmed: 0,

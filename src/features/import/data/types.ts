@@ -86,18 +86,18 @@ export type WalletTarget =
   | { kind: 'skip' }
 
 export type CategoryTarget =
-  | { kind: 'category'; category: string; subcategory: string | null }
-  // The slugs the rows will carry: `category` alone for a new top-level category, and the
-  // chosen parent's slug plus the new child's when `parentId` is set. A child slug is
-  // meaningless without its parent, so the pair travels together.
+  /** A root's id, or a child's when the value names a subcategory. */
+  | { kind: 'category'; categoryId: string }
+  // Rows bound to a category still to be made carry `pendingCategoryId(target)` until the
+  // commit creates it and swaps in the id it got.
   | {
       kind: 'create'
-      category: string
-      subcategory: string | null
       /** The category row the new one is created under; null for a new top-level one. */
       parentId: string | null
       name: string
       type: TxType
+      /** Unique among the new category's siblings, minted when the user chose Create. */
+      slug: string
     }
   | { kind: 'skip' }
   // Not a category at all: the rows are money moving between the user's own wallets, or a
@@ -110,6 +110,17 @@ export type CategoryTarget =
  * row is one side of money moving between two wallets, an `adjustment` a balance correction.
  */
 export type RowIntent = 'cashflow' | 'transfer' | 'adjustment'
+
+/**
+ * What rows filed under a category the import will create carry until the commit makes it.
+ * Sibling slugs are unique, so the parent and the slug name the create exactly.
+ */
+export const pendingCategoryId = (
+  target: Pick<
+    Extract<CategoryTarget, { kind: 'create' }>,
+    'parentId' | 'slug'
+  >,
+): string => `new-category:${target.parentId ?? ''}:${target.slug}`
 
 /**
  * A merchant binding also files the file's spelling as a new alias on that merchant, which
@@ -156,8 +167,11 @@ export type MappingDefaults = {
   walletId: string | null
   currency: CurrencyCode
   type: TxType
-  category: string
-  subcategory: string | null
+  /**
+   * Where a row the file files under nothing lands, by its direction: a category belongs to
+   * one type, so money in and money out each need their own.
+   */
+  categoryIds: Record<TxType, string>
 }
 
 export type Mapping = {
@@ -174,11 +188,11 @@ export type Mapping = {
 }
 
 /**
- * Stamped into every saved `config` so a future format change can tell the shapes apart.
- * Nothing reads it back yet — bump it when a field's meaning changes, and teach
- * `parseTemplateConfig` what the older number means at the same time.
+ * Stamped into every saved `config` so a format change can tell the shapes apart — bump it
+ * when a field's meaning changes, and teach `upgradeTemplateConfig` what the older number
+ * means at the same time. 2: categories are named by id, not by slug pair.
  */
-export const TEMPLATE_CONFIG_VERSION = 1
+export const TEMPLATE_CONFIG_VERSION = 2
 
 /**
  * The mapping a template remembers — everything the wizard would otherwise ask for, and
@@ -200,6 +214,36 @@ export type ImportTemplateConfig = {
   dedupe: DedupeSettings
 }
 
+/** How a version-1 template named a category: its root's slug, plus a child's slug. */
+export type CategoryPairV1 = { category: string; subcategory: string | null }
+
+/**
+ * A config saved before categories were referenced by id. Read, never written: applying
+ * one upgrades it through the catalog (`upgradeTemplateConfig`).
+ */
+export type ImportTemplateConfigV1 = Omit<
+  ImportTemplateConfig,
+  'defaults' | 'aliases'
+> & {
+  defaults: Omit<MappingDefaults, 'categoryIds'> & CategoryPairV1
+  aliases: Omit<Aliases, 'categories'> & {
+    categories: Record<
+      string,
+      | ({ kind: 'category' } & CategoryPairV1)
+      | ({ kind: 'create' } & CategoryPairV1)
+      | Extract<CategoryTarget, { kind: 'skip' | 'transfer' | 'adjustment' }>
+    >
+  }
+}
+
+/** A config as the server hands it back: either shape, told apart by `version`. */
+export type StoredTemplateConfig = ImportTemplateConfig | ImportTemplateConfigV1
+
+export const isConfigV1 = (
+  config: StoredTemplateConfig,
+): config is ImportTemplateConfigV1 =>
+  !(config.version >= TEMPLATE_CONFIG_VERSION)
+
 // --- Row issues ----------------------------------------------------------------------
 
 /**
@@ -219,6 +263,8 @@ export const ROW_ISSUES = {
   currencyMismatch: 'import.row.currency_mismatch',
   walletUnresolved: 'import.row.wallet_unresolved',
   categoryDefaulted: 'import.row.category_defaulted',
+  categoryTypeMismatch: 'import.row.category_type_mismatch',
+  categoryMissing: 'import.row.category_missing',
   typeDefaulted: 'import.row.type_defaulted',
   ragged: 'import.row.ragged',
   transferUnpaired: 'import.row.transfer_unpaired',
@@ -277,8 +323,8 @@ export type RowFacts = {
   walletId: string | null
   /** The wallet alias said "skip these rows" — the row leaves silently, as asked. */
   walletSkipped: boolean
-  category: string
-  subcategory: string | null
+  /** The leaf filed under — possibly a `pendingCategoryId` the commit resolves. */
+  categoryId: string
   categoryDefaulted: boolean
   intent: RowIntent
   /** The other wallet of a transfer, when the user named it. */
@@ -304,8 +350,7 @@ export type RowTransfer = {
 export type RowPrediction = {
   merchantId: string
   merchantName: string
-  category: string
-  subcategory: string | null
+  categoryId: string
   /** True ⇒ written into the draft (`auto_categorize` on). False ⇒ offered in review. */
   applied: boolean
 }
@@ -344,6 +389,11 @@ export type RowContext = {
   walletCurrencies: Readonly<Record<string, CurrencyCode>>
   /** Wallet name by wallet id — what a transfer's note is read against. */
   walletNames: Readonly<Record<string, string>>
+  /**
+   * Each category's direction by id, the import's pending creates included — a row filed
+   * under a category of the other type would be refused by the server.
+   */
+  categoryTypes: Readonly<Record<string, TxType>>
 }
 
 export const hasErrors = (issues: ReadonlyArray<RowIssue>): boolean =>

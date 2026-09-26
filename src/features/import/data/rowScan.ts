@@ -171,6 +171,7 @@ const scanInto = (
       buildRow(matrix[index], index, mapping, context),
       mapping,
       pass.merchants,
+      context.categoryTypes,
     )
     const mark = markRow(row, ledger, pass.seen, mapping.dedupe)
     const candidate = candidateOf(row)
@@ -312,6 +313,7 @@ export const rowReader = (input: RowReaderInput): RowReader => {
             ),
             input.mapping,
             merchants,
+            input.context.categoryTypes,
           ),
           duplicates.get(index),
         ),

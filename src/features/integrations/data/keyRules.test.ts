@@ -68,20 +68,17 @@ describe('describeKey', () => {
 describe('the key draft', () => {
   const base = settingsOf({ ...aKey(), defaultWalletId: 'w1' })
 
-  it('drops the subcategory when the category changes, and both when the type does', () => {
-    const withSub = {
-      ...base,
-      defaultCategory: 'food',
-      defaultSubcategory: 'cafe',
-    }
-    expect(applyEdit(withSub, 'defaultCategory', 'transport')).toMatchObject({
-      defaultCategory: 'transport',
-      defaultSubcategory: null,
+  it('drops the default category when the type changes', () => {
+    const withCategory = { ...base, defaultCategoryId: 'cat-dining-cafes' }
+    expect(
+      applyEdit(withCategory, 'defaultCategoryId', 'cat-transport'),
+    ).toMatchObject({ defaultCategoryId: 'cat-transport' })
+    expect(applyEdit(withCategory, 'defaultType', 'income')).toMatchObject({
+      defaultCategoryId: null,
     })
-    expect(applyEdit(withSub, 'defaultType', 'income')).toMatchObject({
-      defaultCategory: null,
-      defaultSubcategory: null,
-    })
+    expect(
+      applyEdit(withCategory, 'defaultType', 'spend').defaultCategoryId,
+    ).toBe('cat-dining-cafes')
   })
 
   it('turns posting without review off when the account is cleared', () => {

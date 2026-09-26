@@ -55,26 +55,27 @@ export function BudgetEditor({
   const [attempted, setAttempted] = useState(false)
   const catalog = useCategoryCatalog()
 
+  const target =
+    draft.scopeType === 'wallet' ? draft.walletId : draft.categoryId
   const choices = wallets.filter(
-    (w) => !archivedWalletIds.has(w.id) || w.id === draft.target,
+    (w) => !archivedWalletIds.has(w.id) || w.id === draft.walletId,
   )
   const walletLabel = (w: LocalBalanceNode) =>
     archivedWalletIds.has(w.id) ? `${w.name} (archived)` : w.name
 
   const limitMinor = parseAmountToMinor(draft.limit, draft.currency)
-  const hint = budgetBlock({ ...draft, limitMinor })
+  const hint = budgetBlock({ ...draft, targetId: target, limitMinor })
   const limitMissing = attempted && (limitMinor ?? 0) <= 0
   const daysInvalid =
     attempted && draft.period === 'custom' && !customDaysValid(draft.customDays)
-  const targetMissing =
-    attempted && draft.scopeType !== 'overall' && !draft.target
+  const targetMissing = attempted && draft.scopeType !== 'overall' && !target
 
   const label =
     draft.scopeType === 'overall'
       ? 'Overall'
       : draft.scopeType === 'wallet'
-        ? (wallets.find((w) => w.id === draft.target)?.name ?? 'Account')
-        : catalog.get(draft.target).name
+        ? (wallets.find((w) => w.id === draft.walletId)?.name ?? 'Account')
+        : catalog.get(draft.categoryId).name
 
   return (
     <EditorDialog
@@ -128,8 +129,12 @@ export function BudgetEditor({
           <BudgetTargetSelect
             id="budget-target"
             scope={draft.scopeType}
-            value={draft.target}
-            onChange={(v) => onField('target', v)}
+            value={target}
+            onChange={(v) =>
+              draft.scopeType === 'wallet'
+                ? onField('walletId', v)
+                : onField('categoryId', v)
+            }
             wallets={choices}
             walletLabel={walletLabel}
           />

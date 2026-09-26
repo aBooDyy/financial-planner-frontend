@@ -4,6 +4,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '#/db/db'
 import type { LocalBalanceNode } from '#/db/types'
+import { defaultCategoryRows } from '#/features/categories/__fixtures__/categories'
 import type { CsvReadResult } from '#/features/import/data/csv/read'
 import { useCsvImport } from './useCsvImport'
 
@@ -55,6 +56,10 @@ const aFile = () => new File(['date,description'], 'alrajhi.csv')
 
 const openedWizard = async () => {
   const wizard = renderHook(() => useCsvImport())
+  // The wizard is opened over a device that has pulled its categories.
+  await waitFor(() =>
+    expect(wizard.result.current.catalog.all.length).toBeGreaterThan(0),
+  )
   await act(async () => {
     wizard.result.current.actions.openFile(aFile())
   })
@@ -69,6 +74,7 @@ describe('useCsvImport', () => {
     await db.balanceNodes.clear()
     await db.transactions.clear()
     await db.balanceNodes.put(wallet)
+    await db.categories.bulkPut(defaultCategoryRows())
   })
 
   it('reads a file and proposes a mapping for it', async () => {

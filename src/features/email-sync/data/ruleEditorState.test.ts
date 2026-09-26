@@ -37,8 +37,7 @@ const rule = (id: string, over: Partial<EmailRule> = {}): EmailRule => ({
   template: TEMPLATE,
   walletId: null,
   type: 'spend',
-  category: null,
-  subcategory: null,
+  categoryId: null,
   autoConfirm: false,
   createdAt: '',
   updatedAt: '',
@@ -245,14 +244,18 @@ describe('ruleEditorReducer — the set', () => {
   it('clears auto-confirm with the account, and the category with the type', () => {
     const state = run(
       loaded(
-        rule('r1', { walletId: 'w1', autoConfirm: true, category: 'food' }),
+        rule('r1', {
+          walletId: 'w1',
+          autoConfirm: true,
+          categoryId: 'cat-food',
+        }),
       ),
       { type: 'open', index: 0 },
       { type: 'edit', patch: { walletId: null } },
       { type: 'edit', patch: { type: 'income' } },
     )
     expect(state.open?.draft.autoConfirm).toBe(false)
-    expect(state.open?.draft.category).toBeNull()
+    expect(state.open?.draft.categoryId).toBeNull()
   })
 
   it('opens the rule that staged a sample, else a new one', () => {

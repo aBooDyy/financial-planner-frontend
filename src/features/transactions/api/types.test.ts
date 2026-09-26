@@ -14,8 +14,7 @@ const aTxWire = (currency: string): TransactionWire => ({
   type: 'SPEND',
   amount: 4500,
   currency,
-  category: 'food',
-  subcategory: null,
+  category_id: 'cat-food',
   wallet_id: 'w1',
   goal_id: null,
   merchant_id: null,
@@ -31,7 +30,8 @@ const aTxWire = (currency: string): TransactionWire => ({
 const aBudgetWire = (currency: string): BudgetWire => ({
   id: 'b1',
   scope_type: 'CATEGORY',
-  target: 'food',
+  category_id: 'cat-food',
+  wallet_id: null,
   period: 'MONTHLY',
   custom_days: null,
   limit_amount: 100000,
@@ -42,6 +42,22 @@ const aBudgetWire = (currency: string): BudgetWire => ({
 })
 
 describe('spending mappers', () => {
+  it('maps the category and wallet refs a budget scope carries', () => {
+    expect(toBudget(aBudgetWire('SAR'))).toMatchObject({
+      scopeType: 'category',
+      categoryId: 'cat-food',
+      walletId: null,
+    })
+    expect(
+      toBudget({
+        ...aBudgetWire('SAR'),
+        scope_type: 'WALLET',
+        category_id: null,
+        wallet_id: 'w1',
+      }),
+    ).toMatchObject({ scopeType: 'wallet', categoryId: null, walletId: 'w1' })
+  })
+
   it('accepts any ISO code the config lists', () => {
     expect(toTransaction(aTxWire('JPY')).currency).toBe('JPY')
     expect(toBudget(aBudgetWire('KWD')).currency).toBe('KWD')
@@ -51,12 +67,12 @@ describe('spending mappers', () => {
     const leg = toTransaction({
       ...aTxWire('SAR'),
       type: 'TRANSFER_IN',
-      category: null,
+      category_id: null,
       transfer_id: 'tr1',
     })
     expect(leg).toMatchObject({
       type: 'transfer_in',
-      category: null,
+      categoryId: null,
       transferId: 'tr1',
     })
   })
@@ -65,9 +81,12 @@ describe('spending mappers', () => {
     const row = toTransaction({
       ...aTxWire('SAR'),
       type: 'ADJUSTMENT_OUT',
-      category: null,
+      category_id: null,
     })
-    expect(row).toMatchObject({ type: 'adjustment_out', category: null })
+    expect(row).toMatchObject({
+      type: 'adjustment_out',
+      categoryId: null,
+    })
     expect(toWireTransactionType('adjustment_in')).toBe('ADJUSTMENT_IN')
     expect(toWireTransactionType('adjustment_out')).toBe('ADJUSTMENT_OUT')
   })

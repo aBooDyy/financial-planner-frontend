@@ -10,6 +10,7 @@ export type MoveTarget = {
   label: string
   /** The parent's name for a subcategory, `null` for a category. */
   parentName: string | null
+  type: TxType
   color: string
   icon: IconId
 }
@@ -33,6 +34,7 @@ export function moveTargetsFor(
       name: c.name,
       label: c.name,
       parentName: null,
+      type: c.type,
       color: c.color,
       icon: c.icon,
     })
@@ -43,6 +45,7 @@ export function moveTargetsFor(
         name: s.name,
         label: `${c.name} › ${s.name}`,
         parentName: c.name,
+        type: s.type,
         color: s.color,
         icon: s.icon,
       })
@@ -51,11 +54,9 @@ export function moveTargetsFor(
   return out
 }
 
-const FALLBACK_SLUG = 'other'
-
 /**
  * The target a delete suggests before the user picks: a subcategory's rows go back to its
- * parent, a category's to the catch-all "Other", else to the first category left.
+ * parent, a category's to its type's fallback ("Other"), else to the first category left.
  */
 export function defaultMoveTarget(
   catalog: CategoryCatalog,
@@ -64,10 +65,9 @@ export function defaultMoveTarget(
 ): string | null {
   const ids = new Set(targets.map((t) => t.id))
   if (parentId && ids.has(parentId)) return parentId
-  const other = catalog.all.find(
-    (c) => c.slug === FALLBACK_SLUG && ids.has(c.id),
-  )
-  if (other) return other.id
+  const type = targets.at(0)?.type
+  const fallback = type ? catalog.fallbackFor(type) : null
+  if (fallback && ids.has(fallback.id)) return fallback.id
   return (
     targets.find((t) => t.parentName === null)?.id ?? targets.at(0)?.id ?? null
   )

@@ -1,19 +1,25 @@
 import { ChevronRight } from 'lucide-react'
 import type { CountsFace } from '#/features/transactions/hooks/useCountsToward'
+import { cn } from '#/lib/utils'
 
 type Props = {
   face: CountsFace
   onOpen: () => void
+  invalid?: boolean
 }
 
 /** One line for what the entry counts toward; the list opens from it. */
-export function CountsTowardRow({ face, onOpen }: Props) {
+export function CountsTowardRow({ face, onOpen, invalid = false }: Props) {
   return (
     <button
       type="button"
       onClick={onOpen}
       aria-label={`Counts toward: ${face.name}`}
-      className="flex w-full items-center gap-[10px] rounded-[14px] border-[1.5px] border-fp-border px-[14px] py-[13px] text-start transition hover:bg-fp-surface-2"
+      aria-invalid={invalid || undefined}
+      className={cn(
+        'flex w-full items-center gap-[10px] rounded-[14px] border-[1.5px] px-[14px] py-[13px] text-start transition hover:bg-fp-surface-2',
+        invalid ? 'border-fp-danger' : 'border-fp-border',
+      )}
     >
       <span className="text-[13px] font-bold whitespace-nowrap text-fp-text-2">
         Counts toward

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { LocalBalanceNode } from '#/db/types'
+import { walletDeltas } from './ledger'
 import type { SpendingData } from './selectors'
-import { offeredScope, scopeSections } from './selectors'
+import { offeredScope, scopeSections as sectionsOf } from './selectors'
 
 function node(over: Partial<LocalBalanceNode> & { id: string }) {
   return {
@@ -38,6 +39,9 @@ const spending = (nodes: LocalBalanceNode[]): SpendingData => ({
   allocations: [],
   goals: [],
 })
+
+const scopeSections = (data: SpendingData) =>
+  sectionsOf(data, walletDeltas(data.nodes, data.txns, data.rates))
 
 const summary = (data: SpendingData) =>
   scopeSections(data).map((s) => ({

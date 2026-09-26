@@ -6,7 +6,7 @@ import { FieldMessage } from '#/components/FormRow'
 import { Input } from '#/components/ui/input'
 import { ResponsiveDialog } from '#/components/ui/responsive-dialog'
 import { ParentCategorySelect } from '#/features/categories/components/ParentCategorySelect'
-import { slugify } from '#/features/categories/data/slug'
+import { uniqueSlug } from '#/features/categories/data/slug'
 import type { ResolvedCategory } from '#/features/categories/data/catalog'
 import type { TxType } from '#/features/transactions/api/types'
 import type { CategoryTarget } from '#/features/import/data/types'
@@ -27,18 +27,8 @@ const FLOW_OPTIONS = [
   { value: 'income', label: 'Money in' },
 ] as const
 
-const uniqueSlug = (name: string, taken: ReadonlyArray<string>): string => {
-  const base = slugify(name)
-  if (!taken.includes(base)) return base
-  for (let suffix = 2; suffix < 1000; suffix += 1) {
-    const candidate = `${base}_${suffix}`
-    if (!taken.includes(candidate)) return candidate
-  }
-  return `${base}_${crypto.randomUUID().slice(0, 6)}`
-}
-
 /**
- * Records a category to create at import time, under the slugs its rows will carry. Picking
+ * Records a category to create at import time, under a slug unique among its siblings. Picking
  * a parent makes it a subcategory of that one, which is also where its type comes from.
  */
 export function CreateCategoryDialog({
@@ -73,11 +63,10 @@ export function CreateCategoryDialog({
     const slug = uniqueSlug(trimmed, takenSlugs(parent?.id ?? null))
     onCreate({
       kind: 'create',
-      category: parent ? parent.slug : slug,
-      subcategory: parent ? slug : null,
       parentId: parent?.id ?? null,
       name: trimmed,
       type: parent ? parent.type : type,
+      slug,
     })
     onOpenChange(false)
   }

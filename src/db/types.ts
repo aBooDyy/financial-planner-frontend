@@ -9,7 +9,7 @@ import type {
 } from '#/features/goals/api/types'
 import type {
   ImportSource,
-  ImportTemplateConfig,
+  StoredTemplateConfig,
 } from '#/features/import/data/types'
 import type { AliasOrigin } from '#/features/merchants/api/types'
 import type {
@@ -201,8 +201,11 @@ export type LocalTransaction = {
   type: TransactionType
   amount: number
   currency: CurrencyCode
-  category: string | null
-  subcategory: string | null
+  /**
+   * The leaf category (a subcategory's id when one was picked, else the root's); null on
+   * transfer legs and adjustments.
+   */
+  categoryId: string | null
   walletId: string
   goalId: string | null
   merchantId: string | null
@@ -222,7 +225,10 @@ export type LocalTransaction = {
 export type LocalBudget = {
   id: string
   scopeType: BudgetScope
-  target: string | null
+  /** A root category's id; set exactly when `scopeType` is 'category'. */
+  categoryId: string | null
+  /** Set exactly when `scopeType` is 'wallet'. */
+  walletId: string | null
   period: BudgetPeriod
   customDays: number | null
   limit: number
@@ -240,8 +246,8 @@ export type LocalRecurring = {
   type: TxType
   amount: number
   currency: CurrencyCode
-  category: string
-  subcategory: string | null
+  /** The leaf category: a subcategory's id when one was picked, else the root's. */
+  categoryId: string
   walletId: string
   goalId: string | null
   frequency: GoalFrequency
@@ -271,8 +277,8 @@ export type LocalPlanned = {
   name: string
   amount: number
   currency: CurrencyCode
-  category: string | null
-  subcategory: string | null
+  /** The leaf category; null on a set-aside. */
+  categoryId: string | null
   /** The date the generator assigned. Immutable — it is part of the row's identity. */
   occurrence: string
   /** When it is due now; moving it leaves `occurrence` alone. */
@@ -296,8 +302,8 @@ export type LocalPlanned = {
 export type LocalMerchant = {
   id: string
   displayName: string
-  learnedCategory: string | null
-  learnedSubcategory: string | null
+  /** The leaf category this merchant was last filed under. */
+  learnedCategoryId: string | null
   learnedType: TxType | null
   timesSeen: number
   timesConfirmed: number
@@ -376,8 +382,7 @@ export type LocalIntegrationKey = {
   /** When a key over its quota accepts requests again; null while it is not throttled. */
   throttledUntil: string | null
   defaultWalletId: string | null
-  defaultCategory: string | null
-  defaultSubcategory: string | null
+  defaultCategoryId: string | null
   defaultType: TxType
   defaultCurrency: CurrencyCode | null
   autoConfirm: boolean
@@ -418,8 +423,7 @@ export type LocalInboundImport = {
   amount: number | null
   currency: CurrencyCode | null
   suggestedMerchant: string | null
-  suggestedCategory: string | null
-  suggestedSubcategory: string | null
+  suggestedCategoryId: string | null
   /** What the source resolved for the entry; null when it said nothing. */
   suggestedType: TxType | null
   suggestedWalletId: string | null
@@ -462,7 +466,7 @@ export type LocalImportTemplate = {
   name: string
   sourceKind: 'csv'
   signature: string
-  config: ImportTemplateConfig | null
+  config: StoredTemplateConfig | null
   lastUsedAt: string | null
   useCount: number
   /**
@@ -510,6 +514,24 @@ export type OutboxEntity =
   | 'importTemplate'
   | 'planned'
 
+/**
+ * Why the last push of an outbox entry failed. `unavailable`: the server could not be reached
+ * or could not take it right now. `rejected`: the server refused this payload.
+ */
+export type SyncFailure = {
+  kind: 'unavailable' | 'rejected'
+  /** `0` for a network failure. */
+  status: number
+  /** The server's stable error code, e.g. `spending.transaction.wallet_invalid`. */
+  code: string
+  /** The field the server named, when it named one. */
+  field: string | null
+  /** The server's own wording, kept as the fallback for a code the app does not know. */
+  message: string
+  /** ISO time of the failed attempt. */
+  at: string
+}
+
 export type OutboxEntry = {
   seq?: number
   op: OutboxOp
@@ -518,4 +540,10 @@ export type OutboxEntry = {
   payload: unknown
   baseVersion: string | null
   createdAt: string
+  /** Set while the last push of this payload failed; not indexed. */
+  failure?: SyncFailure
+  /** How many times the server has rejected it so far. */
+  attempts?: number
+  /** No automatic retry before this time; a manual retry ignores it. */
+  nextAttemptAt?: string | null
 }

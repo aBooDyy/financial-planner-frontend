@@ -16,23 +16,21 @@ import {
   CommandList,
 } from '#/components/ui/command'
 import type { ResolvedCategory } from '#/features/categories/data/catalog'
-import {
-  pickerSections,
-  pickerValue,
-} from '#/features/categories/data/pickerSections'
+import { pickerSections } from '#/features/categories/data/pickerSections'
 import type { PickerSection } from '#/features/categories/data/pickerSections'
 import type { IconId } from '#/lib/icons/catalog.gen'
 import { cn } from '#/lib/utils'
 
 type Props = {
   categories: ReadonlyArray<ResolvedCategory>
-  category: string
-  subcategory: string | null
-  onPick: (category: string, subcategory: string | null) => void
+  /** The picked leaf's id. */
+  value: string
+  onPick: (categoryId: string) => void
   listClassName?: string
 }
 
 type RowProps = {
+  /** The category id — unique across the whole list, so it doubles as cmdk's value. */
   value: string
   name: string
   icon: IconId
@@ -91,42 +89,39 @@ function OptionRow({
 
 type SectionProps = {
   section: PickerSection
-  category: string
-  subcategory: string | null
-  onPick: (category: string, subcategory: string | null) => void
+  value: string
+  onPick: (categoryId: string) => void
 }
 
 function OptionSection({
   section: { parent, subs },
-  category,
-  subcategory,
+  value,
   onPick,
 }: SectionProps) {
-  const inThis = category === parent.slug
   return (
     <CommandGroup className="py-0.5">
       <OptionRow
-        value={pickerValue(parent.slug, null)}
+        value={parent.id}
         name={parent.name}
         icon={parent.icon}
         color={parent.color}
-        checked={inThis && subcategory === null}
+        checked={value === parent.id}
         child={false}
-        onSelect={() => onPick(parent.slug, null)}
+        onSelect={() => onPick(parent.id)}
       />
       {subs.length > 0 ? (
         // The rail sits under the parent's chip, so the children read as inside it.
         <div className="ms-[21px] border-s border-fp-border ps-[6px]">
           {subs.map((sub) => (
             <OptionRow
-              key={sub.slug}
-              value={pickerValue(parent.slug, sub.slug)}
+              key={sub.id}
+              value={sub.id}
               name={sub.name}
               icon={sub.icon}
               color={sub.color}
-              checked={inThis && subcategory === sub.slug}
+              checked={value === sub.id}
               child
-              onSelect={() => onPick(parent.slug, sub.slug)}
+              onSelect={() => onPick(sub.id)}
             />
           ))}
         </div>
@@ -141,8 +136,7 @@ function OptionSection({
  */
 export function CategoryOptions({
   categories,
-  category,
-  subcategory,
+  value,
   onPick,
   listClassName,
 }: Props) {
@@ -153,8 +147,8 @@ export function CategoryOptions({
     [categories, deferredQuery],
   )
 
-  const first = sections[0] ? pickerValue(sections[0].parent.slug, null) : ''
-  const [active, setActive] = useState(() => pickerValue(category, subcategory))
+  const first = sections[0]?.parent.id ?? ''
+  const [active, setActive] = useState(value)
   const [shown, setShown] = useState(sections)
   if (shown !== sections) {
     setShown(sections)
@@ -182,10 +176,9 @@ export function CategoryOptions({
         <CommandEmpty>No category matches.</CommandEmpty>
         {sections.map((section) => (
           <OptionSection
-            key={section.parent.slug}
+            key={section.parent.id}
             section={section}
-            category={category}
-            subcategory={subcategory}
+            value={value}
             onPick={onPick}
           />
         ))}

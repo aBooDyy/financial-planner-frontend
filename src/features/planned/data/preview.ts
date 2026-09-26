@@ -49,6 +49,8 @@ export function previewConfirm(args: {
   /** In the item's currency. */
   amount: number
   walletId: string | null
+  /** Every transaction on `walletId`; the wallet line waits while it is undefined. */
+  walletTxns: ReadonlyArray<LocalTransaction> | undefined
   date: string
 }): ConfirmPreview {
   const { inputs, state, item, amount, walletId, date } = args
@@ -100,8 +102,7 @@ export function previewConfirm(args: {
       type: item.role === 'income' ? 'income' : 'spend',
       amount: inWallet,
       currency: walletCurrency,
-      category: item.category ?? 'other',
-      subcategory: null,
+      categoryId: item.categoryId,
       walletId: wallet.id,
       goalId: item.goalId,
       merchantId: null,
@@ -153,13 +154,13 @@ export function previewConfirm(args: {
   }
 
   const walletPreview =
-    wallet && extraTxns.length > 0
+    wallet && extraTxns.length > 0 && args.walletTxns
       ? {
           id: wallet.id,
           balanceAfter:
             walletLiveBalances(
               [wallet],
-              [...inputs.txns, ...extraTxns],
+              [...args.walletTxns, ...extraTxns],
               inputs.rates,
             )[wallet.id] ?? 0,
         }

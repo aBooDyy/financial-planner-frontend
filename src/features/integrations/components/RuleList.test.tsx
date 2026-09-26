@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { defaultCatalog } from '#/features/categories/__fixtures__/categories'
 import type { RuleDraft } from '#/features/integrations/data/ruleDraft'
 import { FieldRow } from './FieldRow'
 import { RuleList } from './RuleList'
@@ -89,16 +90,7 @@ describe('FieldRow', () => {
         problem={null}
         choices={{
           walletGroups: [],
-          catalog: {
-            all: [],
-            byType: () => [],
-            get: () => {
-              throw new Error('unused')
-            },
-            subsOf: () => [],
-            sub: () => null,
-            labelOf: () => '',
-          },
+          catalog: defaultCatalog(),
           baseCurrency: 'SAR',
         }}
         onChange={vi.fn()}

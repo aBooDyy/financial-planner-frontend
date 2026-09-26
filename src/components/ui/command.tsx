@@ -3,6 +3,7 @@ import { Command as CommandPrimitive } from 'cmdk'
 import { SearchIcon } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import { FIELD_WELL_GROUP } from './field-well'
 
 function Command({
   className,
@@ -27,13 +28,13 @@ function CommandInput({
   return (
     <div
       data-slot="command-input-wrapper"
-      className="flex items-center gap-2 border-b border-fp-border px-3"
+      className={cn(FIELD_WELL_GROUP, 'm-2 mb-1')}
     >
       <SearchIcon size={15} className="shrink-0 text-fp-text-3" />
       <CommandPrimitive.Input
         data-slot="command-input"
         className={cn(
-          'flex h-10 w-full bg-transparent py-3 text-[14px] outline-hidden placeholder:text-fp-text-3 disabled:cursor-not-allowed disabled:opacity-50',
+          'flex h-10 w-full bg-transparent py-2.5 text-[14px] font-medium text-fp-text outline-hidden placeholder:text-fp-text-3 disabled:cursor-not-allowed disabled:opacity-50',
           className,
         )}
         {...props}

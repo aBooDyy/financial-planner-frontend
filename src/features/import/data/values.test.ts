@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { buildCatalog } from '#/features/categories/data/catalog'
+import {
+  catId,
+  defaultCatalog,
+} from '#/features/categories/__fixtures__/categories'
 import { categoryOptions } from './matching'
 import { emptyAliases } from './types'
 import {
@@ -28,7 +31,7 @@ const catalogue: ValueCatalogue = {
     { id: 'w1', name: 'Main', currency: 'SAR', group: null },
     { id: 'w2', name: 'Rainy day', currency: 'SAR', group: 'Savings' },
   ],
-  categories: categoryOptions(buildCatalog([])),
+  categories: categoryOptions(defaultCatalog()),
   merchants: { merchants: [], aliases: [] },
 }
 
@@ -294,7 +297,15 @@ describe('movement answers — transfers and balance adjustments', () => {
 })
 
 describe('categoryTargetGroups', () => {
-  const groups = categoryTargetGroups(categoryOptions(buildCatalog([])))
+  const groups = categoryTargetGroups(categoryOptions(defaultCatalog()))
+
+  it('offers each category by its id, children under their parent', () => {
+    const groceries = groups.find((group) => group.label === 'Groceries')
+    expect(groceries?.options.map((option) => option.value)).toContain(
+      catId('supermarket', 'groceries'),
+    )
+    expect(groceries?.options[0].value).toBe(catId('groceries'))
+  })
 
   it('puts every money-out parent before every money-in one', () => {
     const sections = groups.map((group) => group.section)

@@ -65,8 +65,9 @@ export function ValueMappingStep({ csv, draft, save, onBack, onNext }: Props) {
   /**
    * Slugs are unique among siblings only (a child named "Other" may sit under two parents),
    * so what is taken depends on where the new category is going — including the creates
-   * this import has already recorded but not yet written.
+   * this import has already recorded but not yet written, except the one being redone.
    */
+  const creatingKey = creating?.key ?? null
   const takenSlugs = useCallback(
     (parentId: string | null): ReadonlyArray<string> => {
       const parent = parentId
@@ -75,13 +76,15 @@ export function ValueMappingStep({ csv, draft, save, onBack, onNext }: Props) {
       const existing = parent
         ? parent.subs.map((sub) => sub.slug)
         : csv.catalog.all.map((category) => category.slug)
-      const pending = Object.values(draft.aliases.categories)
+      const pending = Object.entries(draft.aliases.categories)
+        .filter(([key]) => key !== creatingKey)
+        .map(([, target]) => target)
         .filter((target) => target.kind === 'create')
-        .filter((target) => (target.parentId ?? null) === parentId)
-        .map((target) => target.subcategory ?? target.category)
+        .filter((target) => target.parentId === parentId)
+        .map((target) => target.slug)
       return [...new Set([...existing, ...pending])]
     },
-    [csv.catalog, draft.aliases.categories],
+    [csv.catalog, draft.aliases.categories, creatingKey],
   )
 
   // Stable, so the memo on every row of every group keeps biting when one answer changes.

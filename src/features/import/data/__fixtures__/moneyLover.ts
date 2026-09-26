@@ -4,6 +4,7 @@ import { draftForFile, toMapping } from '../mapping'
 import { distinctValues } from '../matching'
 import { proposalsFor, seedFor, withAliases } from '../values'
 import { roleColumn } from '../types'
+import { catId } from '#/features/categories/__fixtures__/categories'
 import { testContext } from './mapping'
 import type { Mapping, RowContext } from '../types'
 
@@ -33,7 +34,10 @@ export const moneyLover = (): {
     headers: read.headers,
     matrix: read.rows,
     currency: 'SAR',
-    fallbackCategory: 'other',
+    fallbackCategories: {
+      spend: catId('other'),
+      income: catId('other_income'),
+    },
   })
   const categories = distinctValues(
     read.rows,

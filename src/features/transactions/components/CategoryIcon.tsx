@@ -2,20 +2,13 @@ import { Icon } from '#/components/icons/Icon'
 import { useCategoryCatalog } from '#/features/categories/hooks/useCategoryCatalog'
 
 type Props = {
+  /** A root's or a child's id — a child draws its own icon. */
   categoryId: string
-  /** When the row names a child, the child's own icon is the more specific thing to draw. */
-  subcategoryId?: string | null
   size?: number
 }
 
 /** A category's icon, resolved live from the user's catalog. */
-export function CategoryIcon({
-  categoryId,
-  subcategoryId = null,
-  size = 19,
-}: Props) {
+export function CategoryIcon({ categoryId, size = 19 }: Props) {
   const catalog = useCategoryCatalog()
-  const sub = catalog.sub(categoryId, subcategoryId)
-
-  return <Icon id={sub?.icon ?? catalog.get(categoryId).icon} size={size} />
+  return <Icon id={catalog.get(categoryId).icon} size={size} />
 }

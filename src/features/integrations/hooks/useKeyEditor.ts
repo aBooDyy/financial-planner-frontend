@@ -29,6 +29,7 @@ const EDITOR_FIELDS: ReadonlyArray<KeyField> = [
   'name',
   'expiresAt',
   'defaultWalletId',
+  'defaultCategoryId',
   'defaultCurrency',
   'autoConfirm',
   'rateLimitPerMinute',

@@ -1,6 +1,7 @@
 import 'fake-indexeddb/auto'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '#/db/db'
+import { catId } from '#/features/categories/__fixtures__/categories'
 
 vi.mock('#/db/sync', () => ({ schedulePush: vi.fn() }))
 
@@ -28,8 +29,7 @@ describe('balance adjustment mutations', () => {
     expect(await db.transactions.get(id)).toMatchObject({
       type: 'adjustment_out',
       amount: 12_000,
-      category: null,
-      subcategory: null,
+      categoryId: null,
       goalId: null,
       merchantId: null,
       plannedId: null,
@@ -40,7 +40,7 @@ describe('balance adjustment mutations', () => {
     expect(entry).toMatchObject({ op: 'create', entity: 'transaction', id })
     expect(entry.payload).toMatchObject({
       type: 'ADJUSTMENT_OUT',
-      category: null,
+      category_id: null,
     })
   })
 
@@ -69,8 +69,7 @@ describe('balance adjustment mutations', () => {
           type: 'spend',
           amount: 1_000,
           currency: 'SAR',
-          category: 'groceries',
-          subcategory: null,
+          categoryId: catId('groceries'),
           walletId: 'w1',
           goalId: null,
           date: '2026-09-24',
@@ -83,7 +82,7 @@ describe('balance adjustment mutations', () => {
 
     expect(await db.transactions.get('spend-1')).toMatchObject({
       type: 'spend',
-      category: 'groceries',
+      categoryId: catId('groceries'),
     })
   })
 
@@ -92,7 +91,7 @@ describe('balance adjustment mutations', () => {
 
     expect(await db.transactions.get('adj-1')).toMatchObject({
       type: 'adjustment_out',
-      category: null,
+      categoryId: null,
     })
   })
 })

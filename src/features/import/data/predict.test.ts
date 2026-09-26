@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { catId } from '#/features/categories/__fixtures__/categories'
 import { identityKey } from '#/features/merchants/data/matching'
 import { testContext, testMapping } from './__fixtures__/mapping'
 import { buildRows } from './csv/rows'
@@ -12,8 +13,7 @@ import type { Mapping, ParsedRow } from './types'
 const merchant = (overrides: Partial<LocalMerchant> = {}): LocalMerchant => ({
   id: 'm1',
   displayName: 'Carrefour',
-  learnedCategory: 'groceries',
-  learnedSubcategory: 'supermarket',
+  learnedCategoryId: catId('supermarket', 'groceries'),
   learnedType: 'spend',
   timesSeen: 12,
   timesConfirmed: 4,
@@ -56,7 +56,8 @@ const predictAll = (
   merchants: MerchantIndex,
 ): ParsedRow[] => {
   const lookup = merchantLookup(merchants)
-  return rows.map((row) => predictRow(row, mapping, lookup))
+  const { categoryTypes } = testContext()
+  return rows.map((row) => predictRow(row, mapping, lookup, categoryTypes))
 }
 
 describe('predictRow', () => {
@@ -64,14 +65,12 @@ describe('predictRow', () => {
     const [row] = predictAll(rowsFor('CARREFOUR HYPER 4471'), MAPPING, index())
     expect(row.draft).toMatchObject({
       merchantId: 'm1',
-      category: 'groceries',
-      subcategory: 'supermarket',
+      categoryId: catId('supermarket', 'groceries'),
     })
     expect(row.prediction).toEqual({
       merchantId: 'm1',
       merchantName: 'Carrefour',
-      category: 'groceries',
-      subcategory: 'supermarket',
+      categoryId: catId('supermarket', 'groceries'),
       applied: true,
     })
   })
@@ -92,7 +91,7 @@ describe('predictRow', () => {
       index({ merchants: [merchant({ autoCategorize: false })] }),
     )
     expect(row.draft?.merchantId).toBe('m1')
-    expect(row.draft?.category).toBe('other')
+    expect(row.draft?.categoryId).toBe(catId('other'))
     expect(row.prediction).toMatchObject({ applied: false })
     expect(row.issues.map((i) => i.code)).toEqual([
       ROW_ISSUES.categoryDefaulted,
@@ -106,13 +105,28 @@ describe('predictRow', () => {
       MAPPING,
       index({
         merchants: [
-          merchant({ learnedType: refund, learnedCategory: 'refund' }),
+          merchant({ learnedType: refund, learnedCategoryId: catId('refund') }),
         ],
       }),
     )
     expect(row.draft?.type).toBe('spend')
-    expect(row.draft?.category).toBe('other')
+    expect(row.draft?.categoryId).toBe(catId('other'))
     expect(row.prediction).toBeNull()
+  })
+
+  it('judges the direction by the learned category itself, and skips one that is gone', () => {
+    for (const learned of [
+      merchant({ learnedType: null, learnedCategoryId: catId('salary') }),
+      merchant({ learnedCategoryId: 'deleted-elsewhere' }),
+    ]) {
+      const [row] = predictAll(
+        rowsFor('CARREFOUR HYPER 4471'),
+        MAPPING,
+        index({ merchants: [learned] }),
+      )
+      expect(row.draft?.categoryId).toBe(catId('other'))
+      expect(row.prediction).toBeNull()
+    }
   })
 
   it('never overwrites a category the file itself stated', () => {
@@ -121,7 +135,7 @@ describe('predictRow', () => {
       aliases: {
         ...testMapping().aliases,
         categories: {
-          dining: { kind: 'category', category: 'dining', subcategory: null },
+          dining: { kind: 'category', categoryId: catId('dining') },
         },
       },
     })
@@ -131,7 +145,7 @@ describe('predictRow', () => {
       testContext(),
     )
     const [row] = predictAll(rows, mapping, index())
-    expect(row.draft?.category).toBe('dining')
+    expect(row.draft?.categoryId).toBe(catId('dining'))
     expect(row.prediction).toMatchObject({ applied: false })
   })
 
@@ -170,7 +184,7 @@ describe('predictRow', () => {
       testContext(),
     )
     const [row] = predictAll(rows, mapping, index())
-    expect(row.draft?.category).toBe('groceries')
+    expect(row.draft?.categoryId).toBe(catId('supermarket', 'groceries'))
     expect(row.prediction).toMatchObject({ applied: true })
   })
 

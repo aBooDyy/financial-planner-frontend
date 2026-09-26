@@ -8,8 +8,12 @@ import type {
 } from '#/features/categories/data/catalog'
 import { useCategoryCatalog } from './useCategoryCatalog'
 
-/** How many ledger entries and recurring schedules are filed under a row. */
-type FiledCounts = { txCount: number; recurringCount: number }
+/** How many ledger entries, recurring schedules and planned items are filed under a row. */
+type FiledCounts = {
+  txCount: number
+  recurringCount: number
+  plannedCount: number
+}
 
 export type CategoryTreeSub = ResolvedSub & FiledCounts
 
@@ -25,34 +29,25 @@ export type CategoryTree = {
   categories: CategoryTreeNode[]
 }
 
-const pairKey = (slug: string, subSlug: string) => `${slug}\u0000${subSlug}`
+type Filed = { categoryId: string | null; deleted: number }
 
-type Filed = {
-  category: string | null
-  subcategory: string | null
-  deleted: number
-}
-
-type Tally = { byParent: Map<string, number>; byPair: Map<string, number> }
-
-const bump = (counts: Map<string, number>, key: string) =>
-  counts.set(key, (counts.get(key) ?? 0) + 1)
-
-function tally(rows: ReadonlyArray<Filed>): Tally {
-  const byParent = new Map<string, number>()
-  const byPair = new Map<string, number>()
-  for (const r of rows) {
-    if (r.deleted === 1 || r.category === null) continue
-    bump(byParent, r.category)
-    if (r.subcategory) bump(byPair, pairKey(r.category, r.subcategory))
+/** Live rows per category id — the leaf each row names. */
+function tally(rows: ReadonlyArray<Filed> | undefined): Map<string, number> {
+  const counts = new Map<string, number>()
+  for (const r of rows ?? []) {
+    if (r.deleted === 1 || r.categoryId === null) continue
+    counts.set(r.categoryId, (counts.get(r.categoryId) ?? 0) + 1)
   }
-  return { byParent, byPair }
+  return counts
 }
+
+const sumOf = (counts: Map<string, number>, ids: ReadonlyArray<string>) =>
+  ids.reduce((sum, id) => sum + (counts.get(id) ?? 0), 0)
 
 /**
- * The Settings list's view model: the catalog of one type, with live transaction and
- * recurring counts per row. A parent counts every row filed under it — including rows that also name a child —
- * because that is the number a user deleting the parent needs to see.
+ * The Settings list's view model: the catalog of one type, with live counts per row. A parent
+ * counts every row filed under it or any of its children — the number a user deleting the
+ * parent needs to see, since its delete takes the children too.
  */
 export function useCategoryTree(initialType: TxType = 'spend'): CategoryTree {
   const [type, setType] = useState<TxType>(initialType)
@@ -60,24 +55,23 @@ export function useCategoryTree(initialType: TxType = 'spend'): CategoryTree {
   const rows = useLiveQuery(() => db.categories.toArray())
   const txns = useLiveQuery(() => db.transactions.toArray())
   const recurrings = useLiveQuery(() => db.recurrings.toArray())
+  const planned = useLiveQuery(() => db.plannedTransactions.toArray())
 
   const categories = useMemo(() => {
-    const tx = tally(txns ?? [])
-    const rec = tally(recurrings ?? [])
+    const tx = tally(txns)
+    const rec = tally(recurrings)
+    const plan = tally(planned)
+    const countsOf = (ids: ReadonlyArray<string>): FiledCounts => ({
+      txCount: sumOf(tx, ids),
+      recurringCount: sumOf(rec, ids),
+      plannedCount: sumOf(plan, ids),
+    })
     return catalog.byType(type).map((c) => ({
       ...c,
-      txCount: tx.byParent.get(c.slug) ?? 0,
-      recurringCount: rec.byParent.get(c.slug) ?? 0,
-      subs: c.subs.map((s) => {
-        const key = pairKey(c.slug, s.slug)
-        return {
-          ...s,
-          txCount: tx.byPair.get(key) ?? 0,
-          recurringCount: rec.byPair.get(key) ?? 0,
-        }
-      }),
+      ...countsOf([c.id, ...c.subs.map((s) => s.id)]),
+      subs: c.subs.map((s) => ({ ...s, ...countsOf([s.id]) })),
     }))
-  }, [catalog, type, txns, recurrings])
+  }, [catalog, type, txns, recurrings, planned])
 
   return { loading: rows === undefined, type, setType, categories }
 }

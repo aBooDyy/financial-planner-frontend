@@ -17,9 +17,16 @@ export function QuickAddSheet() {
  */
 function QuickAddEditor() {
   const hide = useQuickAddStore((s) => s.hide)
-  const { loading, base, data, editorWallets, archivedWalletIds, goals } =
-    useTransactions()
-  const editor = useTxEditor(editorWallets, base, data.rates)
+  const {
+    loading,
+    base,
+    inputs,
+    deltas,
+    editorWallets,
+    archivedWalletIds,
+    goals,
+  } = useTransactions()
+  const editor = useTxEditor(editorWallets, base, inputs.rates)
   const started = useRef(false)
 
   useEffect(() => {
@@ -32,6 +39,7 @@ function QuickAddEditor() {
     }
   })
 
+  if (!deltas) return null
   return (
     <ConnectedTxEditor
       editor={editor}
@@ -39,7 +47,8 @@ function QuickAddEditor() {
       archivedWalletIds={archivedWalletIds}
       goals={goals}
       base={base}
-      data={data}
+      data={inputs}
+      deltas={deltas}
     />
   )
 }

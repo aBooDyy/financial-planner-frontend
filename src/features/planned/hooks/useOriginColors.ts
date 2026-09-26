@@ -25,7 +25,7 @@ export function useOriginColors(): (item: LocalPlanned) => string {
     (item: LocalPlanned) =>
       (item.goalId ? byId.get(item.goalId) : undefined) ??
       (item.incomeStreamId ? byId.get(item.incomeStreamId) : undefined) ??
-      (item.category ? catalog.get(item.category).color : undefined) ??
+      (item.categoryId ? catalog.rootOf(item.categoryId).color : undefined) ??
       FALLBACK,
     [byId, catalog],
   )

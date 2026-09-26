@@ -39,10 +39,7 @@ export type ReconcileContext = {
 }
 
 export type PlannedPatch = Partial<
-  Pick<
-    LocalPlanned,
-    'amount' | 'walletId' | 'name' | 'category' | 'subcategory' | 'date'
-  >
+  Pick<LocalPlanned, 'amount' | 'walletId' | 'name' | 'categoryId' | 'date'>
 >
 
 export type ReconcilePlan = {
@@ -55,8 +52,7 @@ const PATCHABLE = [
   'amount',
   'walletId',
   'name',
-  'category',
-  'subcategory',
+  'categoryId',
 ] as const satisfies ReadonlyArray<keyof PlannedPatch>
 
 const diff = (row: LocalPlanned, want: DesiredPlanned): PlannedPatch | null => {

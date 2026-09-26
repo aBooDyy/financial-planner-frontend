@@ -11,7 +11,8 @@ import {
   vi,
 } from 'vitest'
 import { db } from '#/db/db'
-import { buildCatalog } from '#/features/categories/data/catalog'
+import { defaultCatalog } from '#/features/categories/__fixtures__/categories'
+import { categoryOptions } from '#/features/import/data/matching'
 import { draftForFile } from '#/features/import/data/mapping'
 import { configFromDraft, signatureOf } from '#/features/import/data/templates'
 import { CsvImportWizard } from './CsvImportWizard'
@@ -54,7 +55,7 @@ const aDraft = (): MappingDraft =>
     headers: HEADERS,
     matrix: MATRIX,
     currency: 'SAR',
-    fallbackCategory: 'other',
+    fallbackCategories: { spend: 'cat-other', income: 'cat-other_income' },
   })
 
 const aWizard = (step: ImportStep, draft: MappingDraft | null): CsvImport =>
@@ -70,11 +71,16 @@ const aWizard = (step: ImportStep, draft: MappingDraft | null): CsvImport =>
     suggestedRoles: draft?.roles ?? [],
     matrix: MATRIX,
     rowAt: () => null,
-    context: { today: '2026-09-01', walletCurrencies: {}, walletNames: {} },
+    context: {
+      today: '2026-09-01',
+      walletCurrencies: {},
+      walletNames: {},
+      categoryTypes: {},
+    },
     walletGroups: [],
-    catalog: buildCatalog([]),
-    categories: [],
-    fallbackCategory: 'other',
+    catalog: defaultCatalog(),
+    categories: categoryOptions(defaultCatalog()),
+    fallbackCategories: { spend: 'cat-other', income: 'cat-other_income' },
     merchantIndex: { merchants: [], aliases: [] },
     baseCurrency: 'SAR',
     templateId: 'one-time',

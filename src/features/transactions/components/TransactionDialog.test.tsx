@@ -31,6 +31,7 @@ import type {
   TxEditorDraft,
   TxEditorState,
 } from '#/features/transactions/hooks/useTxEditor'
+import { catId } from '#/features/categories/__fixtures__/categories'
 import { TransactionDialog } from './TransactionDialog'
 
 vi.mock('#/db/sync', () => ({ schedulePush: () => undefined }))
@@ -70,8 +71,7 @@ const GOALS: LocalGoal[] = [RENT, UMRAH]
 const draft = (over: Partial<TxEditorDraft>): TxEditorDraft => ({
   type: 'spend',
   amount: '3500',
-  category: 'housing',
-  subcategory: null,
+  categoryId: catId('housing'),
   walletId: 'w1',
   goalId: null,
   plannedId: null,
@@ -86,7 +86,6 @@ const draft = (over: Partial<TxEditorDraft>): TxEditorDraft => ({
   frequency: 'monthly',
   autopost: false,
   scopeType: 'category',
-  target: '',
   period: 'monthly',
   customDays: '30',
   limit: '',
@@ -252,7 +251,7 @@ describe('TransactionDialog · planned links', () => {
   it('finds an income entry’s payday and hides the stream row', async () => {
     const { onSave } = renderDialog({
       type: 'income',
-      category: 'salary',
+      categoryId: catId('salary'),
       amount: '12000',
       date: '2026-09-27',
     })
@@ -320,5 +319,56 @@ describe('TransactionDialog · readiness', () => {
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Save' })).toBeTruthy(),
     )
+  })
+})
+
+describe('TransactionDialog · a row that did not sync', () => {
+  const flag = (field: string | null) =>
+    db.outbox.add({
+      op: 'update',
+      entity: 'transaction',
+      id: 't1',
+      payload: {},
+      baseVersion: 'v1',
+      createdAt: '2026-09-26T10:00:00.000Z',
+      failure: {
+        kind: 'rejected',
+        status: 422,
+        code: 'spending.transaction.category_invalid',
+        field,
+        message: 'Category not found.',
+        at: '2026-09-26T10:00:00.000Z',
+      },
+      attempts: 1,
+      nextAttemptAt: '2026-09-26T10:01:00.000Z',
+    })
+
+  it('leads with why, what to do, and Retry now', async () => {
+    await flag('category_id')
+    renderDialog({ amount: '120' }, { id: 't1' })
+    const banner = await screen.findByRole('alert')
+    expect(banner.textContent).toContain('Category no longer available')
+    expect(banner.textContent).toContain('Pick another category and save.')
+    expect(screen.getByRole('button', { name: 'Retry now' })).toBeTruthy()
+  })
+
+  it('marks the field the server named', async () => {
+    await flag('category_id')
+    renderDialog({ amount: '120' }, { id: 't1' })
+    await screen.findByRole('alert')
+    expect(
+      screen
+        .getByRole('group', { name: 'What for?' })
+        .getAttribute('data-invalid'),
+    ).toBe('true')
+    expect(
+      screen.getByRole('group', { name: 'When?' }).hasAttribute('data-invalid'),
+    ).toBe(false)
+  })
+
+  it('shows nothing for a row that synced', async () => {
+    renderDialog({ amount: '120' }, { id: 't1' })
+    await screen.findByRole('heading', { name: 'Edit spend' })
+    expect(screen.queryByRole('button', { name: 'Retry now' })).toBeNull()
   })
 })

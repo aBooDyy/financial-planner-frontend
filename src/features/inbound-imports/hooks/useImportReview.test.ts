@@ -7,6 +7,11 @@ import type {
   LocalInboundImport,
 } from '#/db/types'
 import { buildCatalog } from '#/features/categories/data/catalog'
+import {
+  catId,
+  categoryRow,
+  defaultCatalog,
+} from '#/features/categories/__fixtures__/categories'
 import { useImportReview } from './useImportReview'
 
 const confirmImport = vi.fn()
@@ -39,8 +44,7 @@ const anImport = (
   amount: 24500,
   currency: 'SAR',
   suggestedMerchant: 'CARREFOUR HYPERMARKET',
-  suggestedCategory: 'groceries',
-  suggestedSubcategory: null,
+  suggestedCategoryId: catId('groceries'),
   suggestedType: null,
   suggestedWalletId: null,
   rawPreview: 'Amount: SAR 245.00',
@@ -53,24 +57,7 @@ const anImport = (
   ...over,
 })
 
-const categoryRow = (
-  over: Partial<LocalCategory> & { slug: string; name: string },
-): LocalCategory => ({
-  id: over.slug,
-  parentId: null,
-  type: 'spend',
-  color: '#1F9D6B',
-  icon: null,
-  position: 0,
-  createdAt: '2026-01-01T00:00:00.000Z',
-  updatedAt: '2026-01-01T00:00:00.000Z',
-  version: 'v1',
-  dirty: 0,
-  deleted: 0,
-  ...over,
-})
-
-const BUILT_INS = buildCatalog([])
+const BUILT_INS = defaultCatalog()
 
 const review = (item: LocalInboundImport, rows?: LocalCategory[]) =>
   renderHook(() =>
@@ -93,7 +80,7 @@ describe('useImportReview', () => {
       amount: '245',
       currency: 'SAR',
       date: '2026-06-12',
-      category: 'groceries',
+      categoryId: catId('groceries'),
       walletId: 'w1',
       merchant: 'CARREFOUR HYPERMARKET',
     })
@@ -108,7 +95,7 @@ describe('useImportReview', () => {
 
   it('fills amount and currency from a line tapped in the email', () => {
     const { result } = review(
-      anImport({ amount: null, currency: null, suggestedCategory: null }),
+      anImport({ amount: null, currency: null, suggestedCategoryId: null }),
     )
     act(() => result.current.useLine('Amount: USD 89.00'))
     expect(result.current.draft.amount).toBe('89')
@@ -140,7 +127,24 @@ describe('useImportReview', () => {
       currency: 'SAR',
       date: '2026-06-12',
       type: 'spend',
+      categoryId: catId('groceries'),
     })
+  })
+
+  it('confirms the chosen subcategory by its own id', async () => {
+    const { result } = review(anImport())
+    act(() => result.current.setSubcategory(catId('supermarket', 'groceries')))
+    expect(result.current.rootId).toBe(catId('groceries'))
+    expect(result.current.subcategoryId).toBe(catId('supermarket', 'groceries'))
+    await act(async () => {
+      await result.current.confirm()
+    })
+    expect(confirmImport.mock.calls[0][1].categoryId).toBe(
+      catId('supermarket', 'groceries'),
+    )
+
+    act(() => result.current.setSubcategory(null))
+    expect(result.current.draft.categoryId).toBe(catId('groceries'))
   })
 
   it('sends the merchant only when the user edited it', async () => {
@@ -160,36 +164,39 @@ describe('useImportReview', () => {
 
   it('files under a category the user created, with its own children', () => {
     const rows = [
-      categoryRow({ slug: 'groceries', name: 'Food shopping' }),
+      categoryRow({ id: 'mine', slug: 'groceries', name: 'Food shopping' }),
       categoryRow({
         id: 'sub-1',
         slug: 'farmers_market',
         name: 'Farmers market',
-        parentId: 'groceries',
+        parentId: 'mine',
       }),
     ]
-    const { result } = review(
-      anImport({ suggestedSubcategory: 'farmers_market' }),
-      rows,
-    )
-    expect(result.current.draft).toMatchObject({
-      category: 'groceries',
-      subcategory: 'farmers_market',
-    })
+    const { result } = review(anImport({ suggestedCategoryId: 'sub-1' }), rows)
+    expect(result.current.draft.categoryId).toBe('sub-1')
+    expect(result.current.rootId).toBe('mine')
+    expect(result.current.subcategoryId).toBe('sub-1')
     expect(result.current.categories.map((c) => c.name)).toEqual([
       'Food shopping',
     ])
     expect(result.current.subs.map((s) => s.slug)).toEqual(['farmers_market'])
   })
 
-  it('drops a suggested child the chosen category does not own', () => {
-    const { result } = review(
-      anImport({
-        suggestedCategory: 'groceries',
-        suggestedSubcategory: 'cafes',
-      }),
+  it('falls back to the type’s fallback when the suggestion is not in the catalog', () => {
+    const { result } = review(anImport({ suggestedCategoryId: 'gone' }))
+    expect(result.current.draft.categoryId).toBe(catId('other'))
+    expect(result.current.subcategoryId).toBeNull()
+  })
+
+  it('upgrades to the suggestion once the categories arrive', () => {
+    const item = anImport()
+    const { result, rerender } = renderHook(
+      ({ catalog }) => useImportReview(item, [WALLET], catalog),
+      { initialProps: { catalog: buildCatalog([]) } },
     )
-    expect(result.current.draft.subcategory).toBeNull()
+    expect(result.current.draft.categoryId).toBe('')
+    rerender({ catalog: BUILT_INS })
+    expect(result.current.draft.categoryId).toBe(catId('groceries'))
   })
 
   it('starts from the type and account the source suggested', () => {
@@ -212,6 +219,14 @@ describe('useImportReview', () => {
     expect(result.current.draft.type).toBe('income')
     expect(result.current.draft.walletId).toBe('w2')
     expect(result.current.draft.currency).toBe('USD')
+  })
+
+  it('takes the direction from the suggested category when the source named none', () => {
+    const { result } = review(
+      anImport({ suggestedType: null, suggestedCategoryId: catId('salary') }),
+    )
+    expect(result.current.draft.type).toBe('income')
+    expect(result.current.draft.categoryId).toBe(catId('salary'))
   })
 
   it('lands on the suggested account when the accounts load after the row', () => {
@@ -277,6 +292,6 @@ describe('useImportReview', () => {
     const { result } = review(anImport())
     act(() => result.current.setType('income'))
     expect(result.current.draft.type).toBe('income')
-    expect(result.current.draft.category).not.toBe('groceries')
+    expect(result.current.draft.categoryId).toBe(catId('other_income'))
   })
 })

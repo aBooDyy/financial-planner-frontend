@@ -13,7 +13,7 @@ import type { ParsedRow, RowIssue, RowIssueField } from './types'
 
 export type RowLabels = {
   wallet: (id: string | null) => string
-  category: (category: string, subcategory: string | null) => string
+  category: (id: string) => string
   merchant: (id: string | null) => string | null
   date: (iso: string) => string
   /** Names the ledger row a duplicate repeats, when it can be found. */
@@ -80,7 +80,7 @@ const categoryText = (row: ParsedRow, labels: RowLabels): string => {
     if (other === null) return 'Transfer'
     return `Transfer ${draft.type === 'spend' ? '→' : '←'} ${labels.wallet(other)}`
   }
-  return labels.category(draft.category, draft.subcategory)
+  return labels.category(draft.categoryId)
 }
 
 const toneOf = (row: ParsedRow): AmountTone => {

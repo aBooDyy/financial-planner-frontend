@@ -1,14 +1,19 @@
 import { Coins } from 'lucide-react'
 import { EmptyState } from '#/components/EmptyState'
+import { ValueOrSkeleton } from '#/components/ValueOrSkeleton'
+import { Skeleton } from '#/components/ui/skeleton'
 import type { CurrencyCode } from '#/lib/currency'
 import type { CurrencyBreakdown } from '#/features/wallets/data/selectors'
 
 type Props = {
   breakdown: CurrencyBreakdown[]
+  /** The balances are still loading: each currency is listed, its share and sum are not. */
+  loading: boolean
   base: CurrencyCode
 }
 
-export function CurrencyBreakdownCard({ breakdown, base }: Props) {
+export function CurrencyBreakdownCard({ breakdown, loading, base }: Props) {
+  const figure = (value: string) => (loading ? null : value)
   return (
     <div className="rounded-[18px] border border-fp-border bg-fp-surface p-[18px] shadow-fp">
       <div className="mb-[3px] text-[14px] font-bold">By currency</div>
@@ -25,20 +30,30 @@ export function CurrencyBreakdownCard({ breakdown, base }: Props) {
               />
               <span className="text-[13px] font-semibold">{b.currency}</span>
               <span className="text-[11.5px] text-fp-text-3 tabular-nums">
-                {b.pctStr}
+                <ValueOrSkeleton value={figure(b.pctStr)} className="h-3 w-8" />
               </span>
               <div className="flex-1" />
               <span className="fp-sensitive text-[13px] font-bold tabular-nums">
-                {b.amountStr}
+                <ValueOrSkeleton
+                  value={figure(b.amountStr)}
+                  className="h-3.5 w-20"
+                />
               </span>
             </div>
-            <div className="h-[6px] overflow-hidden rounded-[4px] bg-fp-surface-2">
-              <div
-                className="h-full rounded-[4px]"
-                style={{ width: `${Math.max(2, b.pct)}%`, background: b.color }}
-              />
-            </div>
-            {b.showBase ? (
+            {loading ? (
+              <Skeleton aria-hidden className="h-[6px] rounded-[4px]" />
+            ) : (
+              <div className="h-[6px] overflow-hidden rounded-[4px] bg-fp-surface-2">
+                <div
+                  className="h-full rounded-[4px]"
+                  style={{
+                    width: `${Math.max(2, b.pct)}%`,
+                    background: b.color,
+                  }}
+                />
+              </div>
+            )}
+            {b.showBase && !loading ? (
               <div className="fp-sensitive mt-1 text-end text-[11px] text-fp-text-3 tabular-nums">
                 {b.baseStr}
               </div>

@@ -35,7 +35,15 @@ export function ImportDetailsFields({
   id: string
   review: ImportReview
 }) {
-  const { draft, subs, setField, setType, amountError } = review
+  const {
+    draft,
+    subs,
+    subcategoryId,
+    setField,
+    setSubcategory,
+    setType,
+    amountError,
+  } = review
   const dateFormat = usePreferencesStore((s) => s.dateFormat)
 
   return (
@@ -105,10 +113,8 @@ export function ImportDetailsFields({
               Subcategory
             </FieldLabel>
             <Select
-              value={draft.subcategory ?? NONE}
-              onValueChange={(v) =>
-                setField('subcategory', v === NONE ? null : v)
-              }
+              value={subcategoryId ?? NONE}
+              onValueChange={(v) => setSubcategory(v === NONE ? null : v)}
             >
               <SelectTrigger id={`${id}-subcategory`}>
                 <SelectValue />
@@ -116,7 +122,7 @@ export function ImportDetailsFields({
               <SelectContent>
                 <SelectItem value={NONE}>—</SelectItem>
                 {subs.map((s) => (
-                  <SelectItem key={s.slug} value={s.slug}>
+                  <SelectItem key={s.id} value={s.id}>
                     {s.name}
                   </SelectItem>
                 ))}

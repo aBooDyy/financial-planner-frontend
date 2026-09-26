@@ -18,11 +18,13 @@ type Props = {
   suggestion: string | null
   counts: CountsToward
   dateFormat: DateFormat
+  /** The field a refused sync named, while it is still as it was. */
+  flaggedField?: string | null
   onField: <TKey extends keyof TxEditorDraft>(
     f: TKey,
     v: TxEditorDraft[TKey],
   ) => void
-  onCategory: (category: string, subcategory: string | null) => void
+  onCategory: (categoryId: string) => void
   onApplySuggestion: () => void
   onOpen: (pane: 'category' | 'merchant' | 'counts') => void
 }
@@ -38,6 +40,7 @@ export function TxCashflowFields({
   suggestion,
   counts,
   dateFormat,
+  flaggedField = null,
   onField,
   onCategory,
   onApplySuggestion,
@@ -46,17 +49,16 @@ export function TxCashflowFields({
   const { face, banner, infoHint } = counts
   return (
     <>
-      <TxSection label="What for?">
+      <TxSection label="What for?" invalid={flaggedField === 'category_id'}>
         <TxCategoryChips
           chips={chips}
-          category={draft.category}
-          subcategory={draft.subcategory}
+          categoryId={draft.categoryId}
           onChange={onCategory}
           onAll={() => onOpen('category')}
         />
       </TxSection>
 
-      <TxSection label="Where?">
+      <TxSection label="Where?" invalid={flaggedField === 'merchant_id'}>
         <TxMerchantField
           name={merchantName}
           onOpen={() => onOpen('merchant')}
@@ -65,7 +67,7 @@ export function TxCashflowFields({
         />
       </TxSection>
 
-      <TxSection label="When?">
+      <TxSection label="When?" invalid={flaggedField === 'date'}>
         <TxDateChips
           value={draft.date}
           onChange={(iso) => onField('date', iso)}
@@ -74,7 +76,11 @@ export function TxCashflowFields({
       </TxSection>
 
       {face ? (
-        <CountsTowardRow face={face} onOpen={() => onOpen('counts')} />
+        <CountsTowardRow
+          face={face}
+          onOpen={() => onOpen('counts')}
+          invalid={flaggedField === 'goal_id' || flaggedField === 'planned_id'}
+        />
       ) : null}
 
       {banner ? (

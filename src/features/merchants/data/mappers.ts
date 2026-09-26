@@ -11,8 +11,7 @@ import { toWireOrigin, toWireTxType } from '#/features/merchants/api/types'
 export const serverMerchantToLocal = (m: Merchant): LocalMerchant => ({
   id: m.id,
   displayName: m.displayName,
-  learnedCategory: m.learnedCategory,
-  learnedSubcategory: m.learnedSubcategory,
+  learnedCategoryId: m.learnedCategoryId,
   learnedType: m.learnedType,
   timesSeen: m.timesSeen,
   timesConfirmed: m.timesConfirmed,
@@ -52,8 +51,7 @@ export const localMerchantToCreateWire = (
   id: m.id,
   display_name: m.displayName,
   aliases: aliases.map(localAliasToDraftWire),
-  learned_category: m.learnedCategory,
-  learned_subcategory: m.learnedSubcategory,
+  learned_category_id: m.learnedCategoryId,
   learned_type: m.learnedType ? toWireTxType(m.learnedType) : null,
   auto_categorize: m.autoCategorize,
 })
@@ -65,8 +63,7 @@ export const localMerchantToUpdateWire = (
 ): UpdateMerchantWire => ({
   version: m.version,
   display_name: m.displayName,
-  learned_category: m.learnedCategory,
-  learned_subcategory: m.learnedSubcategory,
+  learned_category_id: m.learnedCategoryId,
   learned_type: m.learnedType ? toWireTxType(m.learnedType) : null,
   auto_categorize: m.autoCategorize,
 })

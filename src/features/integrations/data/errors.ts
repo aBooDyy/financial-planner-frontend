@@ -6,6 +6,7 @@ export type KeyField =
   | 'name'
   | 'expiresAt'
   | 'defaultWalletId'
+  | 'defaultCategoryId'
   | 'defaultCurrency'
   | 'autoConfirm'
   | 'rateLimitPerMinute'
@@ -21,6 +22,7 @@ const FIELD_OF_WIRE: Partial<Record<string, KeyField>> = {
   name: 'name',
   expires_at: 'expiresAt',
   default_wallet_id: 'defaultWalletId',
+  default_category_id: 'defaultCategoryId',
   default_currency: 'defaultCurrency',
   auto_confirm: 'autoConfirm',
   rate_limit_per_minute: 'rateLimitPerMinute',
@@ -31,6 +33,7 @@ const FIELD_OF_CODE: Partial<Record<string, KeyField>> = {
   'integrations.key.name_taken': 'name',
   'integrations.key.expiry_invalid': 'expiresAt',
   'integrations.key.wallet_invalid': 'defaultWalletId',
+  'integrations.key.category_invalid': 'defaultCategoryId',
   'integrations.key.currency_invalid': 'defaultCurrency',
   'integrations.key.rate_limit_invalid': 'rateLimitPerMinute',
   'integrations.key.auto_confirm_needs_wallet': 'autoConfirm',

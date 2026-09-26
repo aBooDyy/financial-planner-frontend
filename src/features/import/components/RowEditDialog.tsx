@@ -174,11 +174,11 @@ function RowEditForm({
           <FieldLabel htmlFor="row-category">Category</FieldLabel>
           <TargetPicker
             id="row-category"
-            value={form.category}
+            value={form.categoryId}
             placeholder="Pick a category"
             searchPlaceholder="Search categories…"
             groups={categories}
-            onChange={(value) => set('category', value)}
+            onChange={(value) => set('categoryId', value)}
           />
         </div>
       )}

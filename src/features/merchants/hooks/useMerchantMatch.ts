@@ -8,7 +8,6 @@ import {
   CHECK_MATCH_SCORE,
   matchMerchant,
 } from '#/features/merchants/data/matching'
-import type { TxType } from '#/features/transactions/api/types'
 import { useMerchantIndex } from './useMerchants'
 
 /**
@@ -17,9 +16,8 @@ import { useMerchantIndex } from './useMerchants'
  * cache synced and matched client-side, on means apply it silently, off means offer it.
  */
 export type CategoryPrediction = {
-  category: string
-  subcategory: string | null
-  type: TxType | null
+  /** The leaf the merchant was last filed under; its type is the category's. */
+  categoryId: string
   /** True ⇒ apply without asking. False ⇒ show it as a suggestion. */
   apply: boolean
 }
@@ -33,11 +31,9 @@ export type MerchantSuggestion = MerchantMatch & {
 export function predictionFor(
   merchant: LocalMerchant,
 ): CategoryPrediction | null {
-  if (!merchant.learnedCategory) return null
+  if (!merchant.learnedCategoryId) return null
   return {
-    category: merchant.learnedCategory,
-    subcategory: merchant.learnedSubcategory,
-    type: merchant.learnedType,
+    categoryId: merchant.learnedCategoryId,
     apply: merchant.autoCategorize,
   }
 }

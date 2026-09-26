@@ -70,6 +70,10 @@ describe('ruleProblems', () => {
           code: 'email_sync.rule.currency_invalid',
         },
         { field: 'rules[0].wallet_id', code: 'email_sync.rule.wallet_invalid' },
+        {
+          field: 'rules[0].category_id',
+          code: 'email_sync.rule.category_invalid',
+        },
       ],
     })
     const problems = ruleProblems(error)
@@ -79,6 +83,7 @@ describe('ruleProblems', () => {
       'Choose one of your accounts.',
     )
     expect(problems.byRule.get(0)?.template).toBeTruthy()
+    expect(problems.byRule.get(0)?.category).toBeTruthy()
   })
 
   it('is one general line for anything not about a rule', () => {

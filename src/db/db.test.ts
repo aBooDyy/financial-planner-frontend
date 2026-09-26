@@ -1,18 +1,19 @@
 import 'fake-indexeddb/auto'
+import Dexie from 'dexie'
 import { describe, expect, it } from 'vitest'
 
 /**
- * The schema is declared once, at `version(1)`, because no installed client exists to walk
- * forward. What is worth pinning is the shape that declaration produces — every table the
- * app reads, and the indexes the features actually query by.
+ * The schema is declared once, at its current version. What is worth pinning is the shape
+ * that declaration produces — every table the app reads, the indexes the features actually
+ * query by — and the one-off wipe the version-2 upgrade performs.
  */
 
 describe('the local database', () => {
-  it('opens at a single version with every table the app reads', async () => {
+  it('opens at version 2 with every table the app reads', async () => {
     const { db } = await import('./db')
     await db.open()
 
-    expect(db.verno).toBe(1)
+    expect(db.verno).toBe(2)
     expect(db.tables.map((t) => t.name).sort()).toEqual([
       'appConfig',
       'balanceNodes',
@@ -46,8 +47,7 @@ describe('the local database', () => {
       type: 'spend',
       amount: 1240,
       currency: 'SAR',
-      category: 'groceries',
-      subcategory: null,
+      categoryId: 'cat-groceries',
       walletId: 'w1',
       goalId: null,
       merchantId: null,
@@ -93,8 +93,7 @@ describe('the local database', () => {
       type: 'spend',
       amount: 100,
       currency: 'SAR',
-      category: 'housing',
-      subcategory: null,
+      categoryId: 'cat-housing',
       walletId: 'w1',
       goalId: null,
       merchantId: null,
@@ -133,5 +132,56 @@ describe('the local database', () => {
     expect(found.txns.map((t) => t.id)).toEqual(['tx-p'])
     expect(found.allocations.map((a) => a.id)).toEqual(['a-p'])
     await Promise.all([db.transactions.clear(), db.goalAllocations.clear()])
+  })
+
+  it('indexes `categoryId` on the three ledger tables a category re-file walks', async () => {
+    const { db } = await import('./db')
+    await db.open()
+
+    const indexed = (table: string) =>
+      db.table(table).schema.indexes.map((i) => i.name)
+
+    expect(indexed('transactions')).toContain('categoryId')
+    expect(indexed('recurrings')).toContain('categoryId')
+    expect(indexed('plannedTransactions')).toContain('categoryId')
+  })
+
+  it('wipes synced rows, the outbox and the watermarks when upgrading from version 1', async () => {
+    const name = 'upgrade-from-v1'
+    const v1 = new Dexie(name)
+    v1.version(1).stores({
+      appConfig: 'id',
+      categories: 'id, slug, parentId, dirty, deleted',
+      transactions:
+        'id, walletId, goalId, merchantId, transferId, date, source, plannedId, dirty, deleted',
+      importBatches: 'id, createdAt',
+      syncState: 'id',
+      outbox: '++seq, [entity+id]',
+    })
+    await v1.open()
+    await v1.table('appConfig').put({ id: 'me', config: {}, fetchedAt: '' })
+    await v1
+      .table('categories')
+      .put({ id: 'c1', slug: 'dining', parentId: null })
+    await v1.table('transactions').put({ id: 't1', category: 'dining' })
+    await v1.table('importBatches').put({ id: 'b1', createdAt: '' })
+    await v1.table('syncState').put({ id: 'u:transaction', since: 'x' })
+    await v1
+      .table('outbox')
+      .add({ entity: 'transaction', id: 't1', op: 'create' })
+    v1.close()
+
+    const { AppDatabase } = await import('./db')
+    const upgraded = new AppDatabase(name)
+    await upgraded.open()
+
+    expect(upgraded.verno).toBe(2)
+    expect(await upgraded.categories.count()).toBe(0)
+    expect(await upgraded.transactions.count()).toBe(0)
+    expect(await upgraded.syncState.count()).toBe(0)
+    expect(await upgraded.outbox.count()).toBe(0)
+    expect(await upgraded.appConfig.count()).toBe(1)
+    expect(await upgraded.importBatches.count()).toBe(1)
+    upgraded.close()
   })
 })

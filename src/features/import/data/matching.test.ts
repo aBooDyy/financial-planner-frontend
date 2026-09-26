@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { buildCatalog } from '#/features/categories/data/catalog'
+import {
+  catId,
+  defaultCatalog,
+} from '#/features/categories/__fixtures__/categories'
 import { normalizeKey as merchantKey } from '#/features/merchants/data/matching'
 import {
   categoryOptions,
@@ -187,31 +191,29 @@ describe('resolveWallet — the group a file names', () => {
 })
 
 describe('matchCategory', () => {
-  const options = categoryOptions(buildCatalog([]))
+  const options = categoryOptions(defaultCatalog())
 
   it('matches a catalog parent', () => {
     const match = matchCategory('Groceries', options)
-    expect(match?.target.category).toBe('groceries')
-    expect(match?.target.subcategory).toBeNull()
+    expect(match?.target.id).toBe(catId('groceries'))
+    expect(match?.target.parentId).toBeNull()
   })
 
   it('matches a subcategory, alone or with its parent', () => {
     expect(matchCategory('Supermarket', options)?.target).toMatchObject({
-      category: 'groceries',
-      subcategory: 'supermarket',
+      id: catId('supermarket', 'groceries'),
+      parentId: catId('groceries'),
     })
-    expect(
-      matchCategory('Groceries: Supermarket', options)?.target,
-    ).toMatchObject({ category: 'groceries', subcategory: 'supermarket' })
+    expect(matchCategory('Groceries: Supermarket', options)?.target.id).toBe(
+      catId('supermarket', 'groceries'),
+    )
   })
 
   it('reads the user’s own names, not the built-in ones', () => {
     const mine = categoryOptions(
       buildCatalog([categoryRow({ slug: 'groceries', name: 'Food shopping' })]),
     )
-    expect(matchCategory('Food shopping', mine)?.target.category).toBe(
-      'groceries',
-    )
+    expect(matchCategory('Food shopping', mine)?.target.id).toBe('groceries')
     expect(matchCategory('Groceries', mine)).toBeNull()
   })
 
@@ -228,8 +230,8 @@ describe('matchCategory', () => {
       ]),
     )
     expect(matchCategory('Farmers market', mine)?.target).toMatchObject({
-      category: 'groceries',
-      subcategory: 'farmers_market',
+      id: 'sub-1',
+      parentId: 'groceries',
     })
   })
 

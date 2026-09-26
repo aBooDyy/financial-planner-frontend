@@ -19,6 +19,8 @@ export type StatusLine = {
   tail?: string
 }
 
+export type CategoryWords = { root: string; sub: string | null }
+
 export type StatusContext = {
   /** Whether a usable sample payload is loaded. */
   hasSample: boolean
@@ -31,7 +33,8 @@ export type StatusContext = {
     type: MappedType
   }
   walletName: (id: string) => string | null
-  categoryName: (slug: string) => string | null
+  /** A category id in words: its root's name, and its own when it is a child. */
+  category: (id: string) => CategoryWords | null
   formatAmount: (minor: number, currency: string) => string
   formatDate: (iso: string) => string
 }
@@ -195,9 +198,9 @@ function okLine(
       }
     }
     case 'category': {
-      const slug = extraction?.resolved.category
-      return slug
-        ? ok(ctx.categoryName(slug) ?? slug)
+      const named = resolvedCategory(extraction, ctx)
+      return named
+        ? ok(named.root)
         : {
             tone: 'idle',
             lead: '',
@@ -206,9 +209,9 @@ function okLine(
           }
     }
     case 'subcategory': {
-      const slug = extraction?.resolved.subcategory
-      return slug
-        ? ok(ctx.categoryName(slug) ?? slug)
+      const sub = resolvedCategory(extraction, ctx)?.sub
+      return sub
+        ? ok(sub)
         : {
             tone: 'idle',
             lead: '',
@@ -219,6 +222,25 @@ function okLine(
     default:
       return ok(text)
   }
+}
+
+/**
+ * The server's words for what it resolved, as they were when it ran (so a delivery reads the
+ * same after a rename or delete); without them, the id named as the catalog has it now.
+ */
+function resolvedCategory(
+  extraction: Extraction | null,
+  ctx: StatusContext,
+): CategoryWords | null {
+  const resolved = extraction?.resolved
+  if (!resolved) return null
+  if (resolved.categoryText) {
+    return {
+      root: resolved.categoryText,
+      sub: resolved.subcategoryText ?? null,
+    }
+  }
+  return resolved.categoryId ? ctx.category(resolved.categoryId) : null
 }
 
 function unresolvedLine(

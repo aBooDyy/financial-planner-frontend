@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
+  catId,
+  categoryRow,
+  defaultCatalog,
+} from '#/features/categories/__fixtures__/categories'
+import { buildCatalog } from '#/features/categories/data/catalog'
+import {
   amountModeFor,
   assignRole,
   draftForFile,
+  fallbackCategoriesOf,
   mappingReadiness,
   roleOptionsFor,
   toMapping,
@@ -30,8 +37,31 @@ const aDraft = (): MappingDraft =>
     headers: HEADERS,
     matrix: MATRIX,
     currency: 'SAR',
-    fallbackCategory: 'other',
+    fallbackCategories: {
+      spend: catId('other'),
+      income: catId('other_income'),
+    },
   })
+
+describe('fallbackCategoriesOf', () => {
+  it('falls each direction to its own required root', () => {
+    expect(fallbackCategoriesOf(defaultCatalog())).toEqual({
+      spend: catId('other'),
+      income: catId('other_income'),
+    })
+  })
+
+  it('takes the type’s first category when the required one is missing', () => {
+    const catalog = buildCatalog([
+      categoryRow({ slug: 'food' }),
+      categoryRow({ slug: 'pay', type: 'income' }),
+    ])
+    expect(fallbackCategoriesOf(catalog)).toEqual({
+      spend: catId('food'),
+      income: catId('pay'),
+    })
+  })
+})
 
 describe('draftForFile', () => {
   it('proposes roles, the amount shape and the date format', () => {
@@ -50,8 +80,7 @@ describe('draftForFile', () => {
       walletId: null,
       currency: 'SAR',
       type: 'spend',
-      category: 'other',
-      subcategory: null,
+      categoryIds: { spend: catId('other'), income: catId('other_income') },
     })
   })
 

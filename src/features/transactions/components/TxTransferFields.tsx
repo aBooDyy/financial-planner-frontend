@@ -23,6 +23,8 @@ type Props = {
   missingSide?: 'from' | 'to'
   rates: RatesMap
   dateFormat: DateFormat
+  /** The field a refused sync named, while it is still as it was. */
+  flaggedField?: string | null
   onField: <TKey extends keyof TxEditorDraft>(
     f: TKey,
     v: TxEditorDraft[TKey],
@@ -39,6 +41,7 @@ export function TxTransferFields({
   missingSide,
   rates,
   dateFormat,
+  flaggedField = null,
   onField,
   onSwap,
   onResetReceived,
@@ -77,7 +80,11 @@ export function TxTransferFields({
             locked={missingSide === 'from'}
             options={accounts}
             onPick={(id) => onField('walletId', id)}
-            invalid={sameAccount}
+            invalid={
+              sameAccount ||
+              flaggedField === 'from_wallet_id' ||
+              flaggedField === 'wallet_id'
+            }
           />
           {missingSide ? null : (
             <button
@@ -96,7 +103,7 @@ export function TxTransferFields({
             locked={missingSide === 'to'}
             options={accounts}
             onPick={(id) => onField('toWalletId', id)}
-            invalid={sameAccount}
+            invalid={sameAccount || flaggedField === 'to_wallet_id'}
           />
         </div>
         {sameAccount ? (
@@ -106,7 +113,7 @@ export function TxTransferFields({
         ) : null}
       </div>
 
-      <TxSection label="When?">
+      <TxSection label="When?" invalid={flaggedField === 'date'}>
         <TxDateChips
           value={draft.date}
           onChange={(iso) => onField('date', iso)}

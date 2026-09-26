@@ -4,11 +4,14 @@ import type {
   RecurringView,
 } from '#/features/transactions/data/selectors'
 import { EmptyState } from '#/components/EmptyState'
+import { ValueOrSkeleton } from '#/components/ValueOrSkeleton'
 import { Button } from '#/components/ui/button'
 import { CategoryIcon } from './CategoryIcon'
+import { SkeletonRows } from './SkeletonRows'
 
 type Props = {
-  view: RecurringView
+  /** `null` while the schedules load; the header and actions render regardless. */
+  view: RecurringView | null
   onAdd: () => void
   onEdit: (id: string) => void
 }
@@ -24,7 +27,7 @@ function Row({ r, onEdit }: { r: RecurringRow; onEdit: (id: string) => void }) {
           className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[11px]"
           style={{ background: `${r.color}22`, color: r.color }}
         >
-          <CategoryIcon categoryId={r.categoryIcon} size={19} />
+          <CategoryIcon categoryId={r.categoryId} size={19} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-[7px]">
@@ -73,7 +76,8 @@ export function RecurringCard({ view, onAdd, onEdit }: Props) {
         <div className="flex flex-col">
           <span className="text-[15px] font-bold">Recurring</span>
           <span className="text-[12px] text-fp-text-3">
-            {view.countStr} · bills &amp; regular income on a schedule
+            <ValueOrSkeleton value={view?.countStr} className="h-3 w-14" /> ·
+            bills &amp; regular income on a schedule
           </span>
         </div>
         <Button
@@ -86,10 +90,16 @@ export function RecurringCard({ view, onAdd, onEdit }: Props) {
         </Button>
       </div>
       <div className="p-[10px]">
-        {view.rows.map((r) => (
+        {view ? null : (
+          <SkeletonRows
+            count={3}
+            rowClassName="mb-[9px] rounded-[14px] border border-fp-border p-[13px]"
+          />
+        )}
+        {view?.rows.map((r) => (
           <Row key={r.id} r={r} onEdit={onEdit} />
         ))}
-        {view.empty ? (
+        {view?.empty ? (
           <EmptyState
             icon={Repeat}
             title="No recurring items yet"
@@ -106,18 +116,21 @@ export function UpcomingCard({
   view,
   onAdd,
 }: {
-  view: RecurringView
+  view: RecurringView | null
   onAdd: () => void
 }) {
   return (
     <div className="rounded-[18px] border border-fp-border bg-fp-surface p-[18px] shadow-fp">
       <div className="mb-[3px] text-[14px] font-bold">Upcoming this month</div>
       <div className="mb-[15px] text-[12px] text-fp-text-3">
-        {view.upcomingEmpty ? '' : 'Bills & income still scheduled this month'}
+        {view?.upcomingEmpty === false
+          ? 'Bills & income still scheduled this month'
+          : ''}
       </div>
+      {view ? null : <SkeletonRows count={2} rowClassName="mb-[15px]" />}
       <div className="relative ps-[6px]">
-        {view.upcoming.map((u, i) => {
-          const last = i === view.upcoming.length - 1
+        {view?.upcoming.map((u, i, all) => {
+          const last = i === all.length - 1
           return (
             <div key={i} className="relative flex gap-[13px] pb-[15px]">
               {!last ? (
@@ -156,7 +169,7 @@ export function UpcomingCard({
           )
         })}
       </div>
-      {view.upcomingEmpty ? (
+      {view?.upcomingEmpty ? (
         <EmptyState
           icon={CalendarCheck}
           size="sm"

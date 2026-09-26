@@ -17,8 +17,9 @@ import { isAdjustment, isCashflow } from '#/features/transactions/api/types'
 import { AMBER, AT_RISK_RATIO, RED } from '#/features/transactions/constants'
 import type { RangeMode } from '#/features/transactions/constants'
 import type { DateWindow } from './planning'
+import { DELETED_CATEGORY_ID } from '#/features/categories/data/catalog'
 import type { CategoryCatalog } from '#/features/categories/data/catalog'
-import { walletLiveBalances } from './ledger'
+import { liveBalancesFrom } from './ledger'
 import { activeNodes } from '#/features/wallets/data/archive'
 import { GROUP_ICON, WALLET_ICON, iconIdOr } from '#/lib/icons/fallbacks'
 import type { IconId } from '#/lib/icons/catalog.gen'
@@ -55,6 +56,13 @@ function rangeLabel(
   return fmtMonth(anchor)
 }
 
+/** The caption for the period on screen, as the hero and the donut head it. */
+export const periodCaption = (
+  anchor: Date,
+  mode: RangeMode,
+  dateFormat: DateFormat = DEFAULT_DATE_FORMAT,
+): string => rangeLabel(anchor, mode, windowOf(anchor, mode), dateFormat)
+
 type RatesMap = Partial<Record<string, number>>
 
 export type Scope =
@@ -74,6 +82,9 @@ export type SpendingData = {
   /** Names the goal a set-aside row belongs to. */
   goals?: ReadonlyArray<LocalGoal>
 }
+
+/** Everything the selectors read except the ledger rows. */
+export type SpendingInputs = Omit<SpendingData, 'txns'>
 
 // --- Scope helpers -------------------------------------------------------------------
 
@@ -126,11 +137,15 @@ export type ScopeSection = {
 /**
  * The account filter, shaped like the Wallets tree: everything, then one section per
  * top-level group with its wallets and subgroups nested beneath, then the wallets in no
- * group. Archived accounts are left out.
+ * group. Archived accounts are left out. `deltas` are `walletDeltas` over the whole ledger,
+ * since a balance is never a window's sum.
  */
-export function scopeSections(data: SpendingData): ScopeSection[] {
-  const { nodes, txns, base, rates } = data
-  const balances = walletLiveBalances(nodes, txns, rates)
+export function scopeSections(
+  data: Pick<SpendingData, 'nodes' | 'base' | 'rates'>,
+  deltas: Record<string, number>,
+): ScopeSection[] {
+  const { nodes, base, rates } = data
+  const balances = liveBalancesFrom(nodes, deltas)
   const active = activeNodes(nodes)
   const children = new Map<string | null, LocalBalanceNode[]>()
   for (const n of active) {
@@ -239,10 +254,10 @@ const toBase = (t: LocalTransaction, data: SpendingData): number =>
  * A spend or income row — the only kind any total counts. Transfer legs and balance
  * adjustments move money, never earn or spend it.
  */
-type FlowTxn = LocalTransaction & { type: TxType; category: string }
+type FlowTxn = LocalTransaction & { type: TxType; categoryId: string }
 
 const isFlow = (t: LocalTransaction): t is FlowTxn =>
-  isCashflow(t.type) && t.category !== null
+  isCashflow(t.type) && t.categoryId !== null
 
 type AdjustmentTxn = LocalTransaction & { type: AdjustmentType }
 
@@ -330,7 +345,8 @@ export function buildCashflow(
       continue
     }
     spent += v
-    byCat.set(t.category, (byCat.get(t.category) ?? 0) + v)
+    const root = catalog.rootOf(t.categoryId).id
+    byCat.set(root, (byCat.get(root) ?? 0) + v)
   }
   const saved = savedInWindow(data, scope, win)
   const net = income - spent - saved
@@ -411,13 +427,14 @@ export function buildBreakdown(
   const txns = flowTxns(data, scope).filter(
     (t) => inWindow(t.date, win) && t.type === 'spend',
   )
-  // Keyed on the parent slug alone, so a row filed under a child lands in its parent's segment.
+  // Keyed on the root, so a row filed under a child lands in its parent's segment.
   const byCat = new Map<string, number>()
   let outflow = 0
   for (const t of txns) {
     const v = toBase(t, data)
     outflow += v
-    byCat.set(t.category, (byCat.get(t.category) ?? 0) + v)
+    const root = catalog.rootOf(t.categoryId).id
+    byCat.set(root, (byCat.get(root) ?? 0) + v)
   }
   const sorted = [...byCat.entries()].sort((a, b) => b[1] - a[1])
   const denom = Math.max(outflow, 1)
@@ -452,8 +469,8 @@ export function buildBreakdown(
 export type TxRow = {
   kind: 'tx'
   id: string
+  /** The leaf the row is filed under — its icon is the most specific one to draw. */
   categoryId: string
-  subcategoryId: string | null
   name: string
   /** "Dining", or "Dining · Cafés" once the row names a child. */
   catLabel: string
@@ -546,7 +563,7 @@ export type ActivityListView = {
   countStr: string
 }
 
-const DELETED_ACCOUNT = 'Deleted account'
+export const DELETED_ACCOUNT = 'Deleted account'
 // A day holding only transfers or adjustments has nothing to total.
 const NO_DAY_TOTAL = '—'
 const NO_WALLET_COLOR = 'var(--fp-border-strong)'
@@ -559,16 +576,15 @@ type ActivityContext = {
 }
 
 function txRowOf(t: FlowTxn, ctx: ActivityContext): TxRow {
-  const cat = ctx.catalog.get(t.category)
+  const cat = ctx.catalog.rootOf(t.categoryId)
   const wallet = ctx.nodeById.get(t.walletId)
   const isInc = t.type === 'income'
   return {
     kind: 'tx',
     id: t.id,
-    categoryId: t.category,
-    subcategoryId: t.subcategory,
+    categoryId: t.categoryId,
     name: t.note || cat.name,
-    catLabel: ctx.catalog.labelOf(t.category, t.subcategory),
+    catLabel: ctx.catalog.labelOf(t.categoryId),
     color: cat.color,
     walletName: wallet?.name ?? '',
     walletColor: wallet?.color ?? NO_WALLET_COLOR,
@@ -944,6 +960,26 @@ function perDayTotals(txns: FlowTxn[], data: SpendingData) {
   return { spend, inc }
 }
 
+/** The anchor month's grid of whole weeks: the first week's start and the last week's. */
+function monthWeeks(anchor: Date): { first: Date; last: Date } {
+  const y = anchor.getFullYear()
+  const m = anchor.getMonth()
+  return {
+    first: startOfWeek(new Date(y, m, 1)),
+    last: startOfWeek(new Date(y, m + 1, 0)),
+  }
+}
+
+/**
+ * Every day the calendar can show for this anchor: the year, or the whole weeks of the
+ * anchor's month — which hold any week the day grid pins open, as it lies in that month.
+ */
+export function calendarSpan(anchor: Date, mode: RangeMode): DateWindow {
+  if (mode === 'year') return windowOf(anchor, 'year')
+  const { first, last } = monthWeeks(anchor)
+  return { start: first, end: addDays(last, 6) }
+}
+
 function buildDayGrid(
   data: SpendingData,
   txns: FlowTxn[],
@@ -991,8 +1027,7 @@ function buildDayGrid(
   const weekOf = (start: Date) =>
     [0, 1, 2, 3, 4, 5, 6].map((i) => cellFor(addDays(start, i)))
 
-  const gridStart = startOfWeek(new Date(calY, calM, 1))
-  const lastWeekStart = startOfWeek(new Date(calY, calM + 1, 0))
+  const { first: gridStart, last: lastWeekStart } = monthWeeks(anchor)
   const weekIndex = (start: Date) =>
     Math.round((midnight(start) - midnight(gridStart)) / (7 * 86_400_000))
   const weekCount = weekIndex(lastWeekStart) + 1
@@ -1102,7 +1137,8 @@ export type BudgetRow = {
   id: string
   name: string
   color: string
-  categoryIcon: string | null
+  /** The capped category's id, drawn as its icon; null for a wallet or overall cap. */
+  categoryId: string | null
   scopeSub: string
   periodLabel: string
   spentStr: string
@@ -1135,6 +1171,7 @@ const burnColor = (pct: number): string =>
 function budgetSpentMinor(
   budget: LocalBudget,
   data: SpendingData,
+  catalog: CategoryCatalog,
   scope: Scope,
   today: Date,
 ): number {
@@ -1145,10 +1182,16 @@ function budgetSpentMinor(
     if (t.deleted || t.type !== 'spend') continue // transfers aren't budget spend
     if (!matcher(t.walletId)) continue
     if (!inWindow(t.date, win)) continue
-    // Caps are parent-scoped: the child a row may also name never narrows the match.
-    if (budget.scopeType === 'category' && t.category !== budget.target)
+    // Caps are root-scoped: a row filed under a child counts against its parent's cap.
+    if (
+      budget.scopeType === 'category' &&
+      (t.categoryId === null ||
+        (t.categoryId !== budget.categoryId &&
+          catalog.rootOf(t.categoryId).id !== budget.categoryId))
+    )
       continue
-    if (budget.scopeType === 'wallet' && t.walletId !== budget.target) continue
+    if (budget.scopeType === 'wallet' && t.walletId !== budget.walletId)
+      continue
     sum += convertMinor(t.amount, t.currency, budget.currency, data.rates)
   }
   return sum
@@ -1164,22 +1207,22 @@ export function buildBudgetsView(
   const nodeById = new Map(data.nodes.map((n) => [n.id, n]))
 
   const rows: BudgetRow[] = budgets.map((b) => {
-    const spent = budgetSpentMinor(b, data, scope, today)
+    const spent = budgetSpentMinor(b, data, catalog, scope, today)
     const pct = b.limit > 0 ? spent / b.limit : 0
     const over = pct >= 1
     const remain = b.limit - spent
     let name = 'Total spendable'
     let color = '#64748B'
-    let categoryIcon: string | null = null
+    let categoryId: string | null = null
     let scopeSub = 'Everything combined'
     if (b.scopeType === 'category') {
-      const cat = catalog.get(b.target ?? 'other')
+      const cat = catalog.get(b.categoryId ?? DELETED_CATEGORY_ID)
       name = cat.name
       color = cat.color
-      categoryIcon = cat.slug
+      categoryId = cat.id
       scopeSub = 'Category cap'
     } else if (b.scopeType === 'wallet') {
-      const w = nodeById.get(b.target ?? '')
+      const w = nodeById.get(b.walletId ?? '')
       name = w?.name ?? 'Account'
       color = w?.color ?? '#64748B'
       scopeSub = 'Account cap'
@@ -1194,7 +1237,7 @@ export function buildBudgetsView(
       id: b.id,
       name,
       color,
-      categoryIcon,
+      categoryId,
       scopeSub,
       periodLabel,
       spentStr: formatMoneyRounded(spent, b.currency),
@@ -1215,7 +1258,7 @@ export function buildBudgetsView(
   let onTrack = 0
   let over = 0
   for (const b of budgets) {
-    const spent = budgetSpentMinor(b, data, scope, today)
+    const spent = budgetSpentMinor(b, data, catalog, scope, today)
     const pct = b.limit > 0 ? spent / b.limit : 0
     if (pct >= 1) over += 1
     else onTrack += 1
@@ -1227,8 +1270,11 @@ export function buildBudgetsView(
         0,
       )
   const capSpent = overall
-    ? budgetSpentMinor(overall, data, scope, today)
-    : others.reduce((s, b) => s + budgetSpentMinor(b, data, scope, today), 0)
+    ? budgetSpentMinor(overall, data, catalog, scope, today)
+    : others.reduce(
+        (s, b) => s + budgetSpentMinor(b, data, catalog, scope, today),
+        0,
+      )
   const capPct = capLimit > 0 ? capSpent / capLimit : 0
   const left = capLimit - capSpent
 
@@ -1257,7 +1303,8 @@ export type RecurringRow = {
   id: string
   name: string
   color: string
-  categoryIcon: string
+  /** The leaf the schedule files under — its icon is the most specific one to draw. */
+  categoryId: string
   catName: string
   walletName: string
   walletColor: string
@@ -1333,13 +1380,13 @@ export function buildRecurringView(
   const denom = Math.max(monthly, 1)
 
   const rows: RecurringRow[] = sorted.map((r) => {
-    const cat = catalog.get(r.category)
+    const cat = catalog.rootOf(r.categoryId)
     const wallet = nodeById.get(r.walletId)
     return {
       id: r.id,
       name: r.name,
       color: cat.color,
-      categoryIcon: cat.slug,
+      categoryId: r.categoryId,
       catName: cat.name,
       walletName: wallet?.name ?? '',
       walletColor: wallet?.color ?? 'var(--fp-border-strong)',
@@ -1357,7 +1404,7 @@ export function buildRecurringView(
   const upcoming = sorted
     .filter((r) => inThisMonth(r.nextDue))
     .map((r): UpcomingItem => {
-      const cat = catalog.get(r.category)
+      const cat = catalog.rootOf(r.categoryId)
       return {
         dateStr: fmtShort(parseISO(r.nextDue)),
         relStr: relFuture(r.nextDue, today),
@@ -1382,7 +1429,7 @@ export function buildRecurringView(
       ? `Next: ${next.name} · ${fmtShort(parseISO(next.nextDue))}`
       : 'Nothing scheduled',
     nextColor: next
-      ? catalog.get(next.category).color
+      ? catalog.rootOf(next.categoryId).color
       : 'var(--fp-border-strong)',
     segments: spend.map((r) => {
       const perMonth =
@@ -1392,7 +1439,7 @@ export function buildRecurringView(
       return {
         key: r.id,
         label: r.name,
-        color: catalog.get(r.category).color,
+        color: catalog.rootOf(r.categoryId).color,
         pct,
         valueStr: `${formatMoneyRounded(perMonth, data.base)}/mo`,
         pctStr: `${formatShare(pct)} of monthly`,

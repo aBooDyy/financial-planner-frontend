@@ -85,6 +85,14 @@ export const validateRow = (
   if (facts.categoryDefaulted && !movement) {
     add('warning', 'category', ROW_ISSUES.categoryDefaulted)
   }
+  // The server refuses a category it does not hold (deleted, or a create this import no longer
+  // makes), and spending filed under an income category, and the reverse.
+  const categoryType = lookup(context.categoryTypes, facts.categoryId)
+  if (!movement && categoryType === undefined) {
+    add('error', 'category', ROW_ISSUES.categoryMissing)
+  } else if (!movement && categoryType !== facts.type) {
+    add('error', 'category', ROW_ISSUES.categoryTypeMismatch)
+  }
   if (facts.typeDefaulted) {
     add('warning', 'type', ROW_ISSUES.typeDefaulted)
   }

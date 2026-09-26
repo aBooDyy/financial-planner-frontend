@@ -4,11 +4,15 @@ import type {
   BudgetsView,
 } from '#/features/transactions/data/selectors'
 import { EmptyState } from '#/components/EmptyState'
+import { ValueOrSkeleton } from '#/components/ValueOrSkeleton'
 import { Button } from '#/components/ui/button'
+import { Skeleton } from '#/components/ui/skeleton'
 import { CategoryIcon } from './CategoryIcon'
+import { SkeletonRows } from './SkeletonRows'
 
 type Props = {
-  view: BudgetsView
+  /** `null` while the budgets' rows load; the header and actions render regardless. */
+  view: BudgetsView | null
   onAdd: () => void
   onEdit: (id: string) => void
 }
@@ -27,8 +31,8 @@ function Row({ b, onEdit }: { b: BudgetRow; onEdit: (id: string) => void }) {
           className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[11px]"
           style={{ background: `${b.color}22`, color: b.color }}
         >
-          {b.categoryIcon ? (
-            <CategoryIcon categoryId={b.categoryIcon} size={19} />
+          {b.categoryId ? (
+            <CategoryIcon categoryId={b.categoryId} size={19} />
           ) : (
             <Wallet size={19} strokeWidth={1.8} />
           )}
@@ -85,7 +89,8 @@ export function BudgetsCard({ view, onAdd, onEdit }: Props) {
         <div className="flex flex-col">
           <span className="text-[15px] font-bold">Budgets</span>
           <span className="text-[12px] text-fp-text-3">
-            {view.countStr} · spending caps by category, account &amp; period
+            <ValueOrSkeleton value={view?.countStr} className="h-3 w-16" /> ·
+            spending caps by category, account &amp; period
           </span>
         </div>
         <Button
@@ -98,10 +103,16 @@ export function BudgetsCard({ view, onAdd, onEdit }: Props) {
         </Button>
       </div>
       <div className="p-[10px]">
-        {view.rows.map((b) => (
+        {view ? null : (
+          <SkeletonRows
+            count={3}
+            rowClassName="mb-[9px] rounded-[14px] border border-fp-border p-[13px]"
+          />
+        )}
+        {view?.rows.map((b) => (
           <Row key={b.id} b={b} onEdit={onEdit} />
         ))}
-        {view.empty ? (
+        {view?.empty ? (
           <EmptyState
             icon={Gauge}
             title="No budgets yet"
@@ -118,17 +129,17 @@ export function BudgetHealthCard({
   view,
   onAdd,
 }: {
-  view: BudgetsView
+  view: BudgetsView | null
   onAdd: () => void
 }) {
-  const h = view.health
+  const h = view?.health
   return (
     <div className="rounded-[18px] border border-fp-border bg-fp-surface p-[18px] shadow-fp">
       <div className="mb-[14px] text-[14px] font-bold">Budget health</div>
       <div className="mb-[15px] flex gap-2">
         <div className="flex-1 rounded-[12px] border border-fp-border bg-fp-surface-2 p-[11px]">
           <div className="text-[20px] font-extrabold tabular-nums text-fp-accent">
-            {h.onTrack}
+            <ValueOrSkeleton value={h?.onTrack} className="h-6 w-8" />
           </div>
           <div className="mt-[2px] text-[11.5px] text-fp-text-3">on track</div>
         </div>
@@ -137,7 +148,7 @@ export function BudgetHealthCard({
             className="text-[20px] font-extrabold tabular-nums"
             style={{ color: '#E5484D' }}
           >
-            {h.over}
+            <ValueOrSkeleton value={h?.over} className="h-6 w-8" />
           </div>
           <div className="mt-[2px] text-[11.5px] text-fp-text-3">
             over limit
@@ -147,17 +158,24 @@ export function BudgetHealthCard({
       <div className="mb-[7px] flex justify-between text-[12.5px]">
         <span className="font-semibold text-fp-text-2">Spent this month</span>
         <span className="fp-sensitive font-bold tabular-nums">
-          {h.spentStr} / {h.totalStr}
+          <ValueOrSkeleton
+            value={h ? `${h.spentStr} / ${h.totalStr}` : null}
+            className="h-3.5 w-28"
+          />
         </span>
       </div>
-      <div className="h-[10px] overflow-hidden rounded-[6px] bg-fp-surface-2">
-        <div
-          className="h-full rounded-[6px]"
-          style={{ width: `${h.pct}%`, background: h.barColor }}
-        />
-      </div>
+      {h ? (
+        <div className="h-[10px] overflow-hidden rounded-[6px] bg-fp-surface-2">
+          <div
+            className="h-full rounded-[6px]"
+            style={{ width: `${h.pct}%`, background: h.barColor }}
+          />
+        </div>
+      ) : (
+        <Skeleton aria-hidden className="h-[10px] rounded-[6px]" />
+      )}
       <div className="fp-sensitive mt-[9px] text-[12px] text-fp-text-3">
-        {h.leftStr}
+        <ValueOrSkeleton value={h?.leftStr} className="h-3 w-44" />
       </div>
       <Button
         type="button"

@@ -1,11 +1,19 @@
 import { db } from '#/db/db'
+import { requeued } from '#/db/syncFailure'
 import { schedulePush } from '#/db/sync'
 import type { LocalCategory } from '#/db/types'
 import type { DeleteCategoryWire } from '#/features/categories/api/types'
 import type { TxType } from '#/features/transactions/api/types'
 import { localCategoryToCreateWire, localCategoryToUpdateWire } from './mappers'
-import { filingOf, refileLocally, refileTables } from './refile'
-import { slugify } from './slug'
+import {
+  isInUse,
+  refileLocally,
+  refileTables,
+  subtreeIds,
+  unlinkLocally,
+} from './refile'
+import { isRequiredCategory } from './required'
+import { uniqueSlug } from './slug'
 
 const now = () => new Date().toISOString()
 const newId = () => crypto.randomUUID()
@@ -33,21 +41,6 @@ const liveCategories = async (): Promise<LocalCategory[]> =>
 const siblingsOf = async (parentId: string | null): Promise<LocalCategory[]> =>
   (await liveCategories()).filter((c) => c.parentId === parentId)
 
-/** Slugs are unique among siblings only: two parents may each own an `other`. */
-async function uniqueSlug(
-  name: string,
-  parentId: string | null,
-): Promise<string> {
-  const base = slugify(name)
-  const taken = new Set((await siblingsOf(parentId)).map((c) => c.slug))
-  if (!taken.has(base)) return base
-  for (let i = 2; i < 1000; i += 1) {
-    const candidate = `${base}_${i}`
-    if (!taken.has(candidate)) return candidate
-  }
-  return `${base}_${newId().slice(0, 6)}`
-}
-
 async function nextPosition(parentId: string | null): Promise<number> {
   const siblings = await siblingsOf(parentId)
   return siblings.reduce((max, c) => Math.max(max, c.position), -1) + 1
@@ -63,7 +56,7 @@ async function enqueueCategoryUpsert(category: LocalCategory): Promise<void> {
   const create = entries.find((e) => e.op === 'create')
   if (create) {
     create.payload = localCategoryToCreateWire(category)
-    await db.outbox.put(create)
+    await db.outbox.put(requeued(create))
     return
   }
   const update = entries.find((e) => e.op === 'update')
@@ -71,7 +64,7 @@ async function enqueueCategoryUpsert(category: LocalCategory): Promise<void> {
   if (update) {
     update.payload = payload
     update.baseVersion = category.version
-    await db.outbox.put(update)
+    await db.outbox.put(requeued(update))
     return
   }
   await db.outbox.add({
@@ -88,25 +81,37 @@ async function enqueueCategoryUpsert(category: LocalCategory): Promise<void> {
 
 export async function createCategory(draft: CategoryDraft): Promise<string> {
   const parentId = draft.parentId ?? null
-  return createCategoryWithSlug(await uniqueSlug(draft.name, parentId), draft)
+  const taken = (await siblingsOf(parentId)).map((c) => c.slug)
+  return createCategoryWithSlug(uniqueSlug(draft.name, taken), draft)
 }
 
 /**
- * Create a category under a caller-supplied slug. The importer files rows by slug and picks
- * one while mapping, so the rows are final before anything is written. A slug already used
- * by a sibling is left alone — those rows then file under the category that already owns it.
+ * Create a category under a caller-supplied slug (the importer picks one while mapping). When a
+ * sibling of the same type already owns the slug nothing is created and the sibling's id comes
+ * back instead; one of the other type keeps it, and the new category takes the next free slug.
  */
 export async function createCategoryWithSlug(
-  slug: string,
+  requested: string,
   draft: CategoryDraft,
 ): Promise<string> {
   const parentId = draft.parentId ?? null
-  const owner = (await siblingsOf(parentId)).find((c) => c.slug === slug)
-  if (owner) return owner.id
-
   // A child's type is its parent's, and a blank colour means "the parent's" — both are what
   // the server decides on create, so the local row has to agree or the next pull flips it.
   const parent = parentId ? await db.categories.get(parentId) : undefined
+  if (parentId && (!parent || parent.deleted !== 0)) {
+    throw new Error(`category parent ${parentId} is gone`)
+  }
+  const type = parent?.type ?? draft.type
+  const siblings = await siblingsOf(parentId)
+  const owner = siblings.find((c) => c.slug === requested)
+  if (owner && owner.type === type) return owner.id
+  const slug = owner
+    ? uniqueSlug(
+        requested,
+        siblings.map((c) => c.slug),
+      )
+    : requested
+
   const id = newId()
   const ts = now()
   const category: LocalCategory = {
@@ -114,7 +119,7 @@ export async function createCategoryWithSlug(
     parentId,
     slug,
     name: draft.name.trim(),
-    type: parent?.type ?? draft.type,
+    type,
     color: draft.color.trim() || (parent?.color ?? draft.color),
     icon: draft.icon ?? null,
     position: await nextPosition(parentId),
@@ -161,38 +166,58 @@ export async function updateCategory(
   schedulePush()
 }
 
+/** The local mirror of the server's delete refusals; `code` is the server's. */
+export class CategoryDeleteRefused extends Error {
+  readonly code: string
+  constructor(reason: 'required' | 'in_use') {
+    super(`Category delete refused: ${reason}`)
+    this.code = `settings.category.${reason}`
+  }
+}
+
 /**
  * Delete a category and, when it is a parent, its children with it. The server cascades, so
  * one delete op covers the subtree — but the children's own queued ops have to go in the
  * same transaction, or a create for a child would be pushed after its parent is gone.
  *
- * `moveToId` names a category that stays: everything filed under the deleted one moves
- * there, here at once and server-side when the delete is pushed.
+ * When anything is filed under the subtree, `moveToId` must name a surviving category of the
+ * same type: everything filed there moves to it, here at once and server-side when the delete
+ * is pushed. The required roots are never deleted.
  */
 export async function deleteCategory(
   id: string,
   moveToId: string | null = null,
 ): Promise<void> {
-  await db.transaction('rw', [db.categories, ...refileTables()], async () => {
+  await db.transaction('rw', refileTables(), async () => {
     const category = await db.categories.get(id)
-    const target = moveToId ? await db.categories.get(moveToId) : undefined
-    const source = category ? await filingOf(category) : null
-    const destination = target ? await filingOf(target) : null
-    if (source && destination) await refileLocally(source, destination)
+    if (!category) return
+    if (isRequiredCategory(category))
+      throw new CategoryDeleteRefused('required')
+
+    const subtree = await subtreeIds(id)
+    const target = await moveTargetOf(subtree, category, moveToId)
+    if (target) {
+      await refileLocally(subtree, target.id, target.parentId ?? target.id)
+    } else if (await isInUse(subtree)) {
+      throw new CategoryDeleteRefused('in_use')
+    } else {
+      await unlinkLocally(subtree)
+    }
 
     const neverSynced = (await pending(id).toArray()).some(
       (e) => e.op === 'create',
     )
-    const children = await db.categories.where('parentId').equals(id).toArray()
-    for (const child of children) {
-      await pending(child.id).delete()
-      await db.categories.delete(child.id)
+    for (const childId of subtree) {
+      if (childId === id) continue
+      await pending(childId).delete()
+      await db.categories.delete(childId)
     }
     await pending(id).delete()
     await db.categories.delete(id)
     if (!neverSynced) {
-      const payload: DeleteCategoryWire | null =
-        destination && moveToId ? { move_to: moveToId } : null
+      const payload: DeleteCategoryWire | null = target
+        ? { move_to: target.id }
+        : null
       await db.outbox.add({
         op: 'delete',
         entity: 'category',
@@ -204,4 +229,16 @@ export async function deleteCategory(
     }
   })
   schedulePush()
+}
+
+async function moveTargetOf(
+  subtree: ReadonlySet<string>,
+  deleting: LocalCategory,
+  moveToId: string | null,
+): Promise<LocalCategory | null> {
+  if (!moveToId || subtree.has(moveToId)) return null
+  const target = await db.categories.get(moveToId)
+  if (!target || target.deleted === 1 || target.type !== deleting.type)
+    return null
+  return target
 }

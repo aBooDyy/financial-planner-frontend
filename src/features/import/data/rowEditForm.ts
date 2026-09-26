@@ -1,5 +1,4 @@
 import { stripReference } from './dedupe'
-import { categoryValue, splitCategoryValue } from './values'
 import { minorToInputValue, parseAmountToMinor } from '#/lib/currency'
 import type { RowPatch } from './rowEdits'
 import type { MappingDefaults, ParsedRow, RowIntent } from './types'
@@ -32,7 +31,7 @@ export type RowForm = {
   walletId: string
   /** A transfer's other account; '' while none is chosen. */
   counterpartId: string
-  category: string
+  categoryId: string
   note: string
 }
 
@@ -57,10 +56,7 @@ export const formFor = (row: ParsedRow, defaults: MappingDefaults): RowForm => {
     flow: type,
     walletId: draft?.walletId ?? defaults.walletId ?? '',
     counterpartId: row.transfer?.counterpartId ?? '',
-    category: categoryValue(
-      draft?.category ?? defaults.category,
-      draft?.subcategory ?? null,
-    ),
+    categoryId: draft?.categoryId ?? defaults.categoryIds[type],
     note: stripReference(draft?.note ?? null) ?? '',
   }
 }
@@ -91,10 +87,8 @@ export const patchFor = (initial: RowForm, form: RowForm): RowPatch => {
   ) {
     patch.counterpartId = form.counterpartId
   }
-  if (!hasFlow(form.kind) && form.category !== initial.category) {
-    const { category, subcategory } = splitCategoryValue(form.category)
-    patch.category = category
-    patch.subcategory = subcategory
+  if (!hasFlow(form.kind) && form.categoryId !== initial.categoryId) {
+    patch.categoryId = form.categoryId
   }
   if (form.note !== initial.note) patch.note = form.note.trim() || null
   return patch

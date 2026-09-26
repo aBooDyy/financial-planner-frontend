@@ -73,8 +73,8 @@ export type Planned = {
   name: string
   amount: number
   currency: CurrencyCode
-  category: string | null
-  subcategory: string | null
+  /** The leaf category; null on a set-aside. */
+  categoryId: string | null
   occurrence: string
   date: string
   status: PlannedStatus
@@ -98,8 +98,7 @@ export type PlannedWire = {
   name: string
   amount: number
   currency: string
-  category: string | null
-  subcategory: string | null
+  category_id: string | null
   occurrence: string
   date: string
   status: PlannedStatusWire
@@ -125,8 +124,7 @@ export type UpdatePlannedWire = {
   pinned: boolean
   note: string | null
   name: string
-  category: string | null
-  subcategory: string | null
+  category_id: string | null
 }
 
 /** One entry of `POST /planned-transactions/bulk`, answered in the order it was sent. */
@@ -150,6 +148,8 @@ export type BulkPlannedResult = {
   status: 'created' | 'taken' | 'invalid'
   /** The row as the server holds it; absent when the server did not send it back. */
   planned: Planned | null
+  errorCode: string | null
+  errorField: string | null
 }
 
 // --- Mappers (wire → domain) ---------------------------------------------------------
@@ -165,8 +165,7 @@ export const toPlanned = (w: PlannedWire): Planned => ({
   name: w.name,
   amount: w.amount,
   currency: fromWireCurrency(w.currency),
-  category: w.category,
-  subcategory: w.subcategory,
+  categoryId: w.category_id,
   occurrence: w.occurrence,
   date: w.date,
   status: fromWirePlannedStatus(w.status),
@@ -189,4 +188,6 @@ export const toBulkPlannedResult = (
   id: w.id,
   status: BULK_STATUS[w.status],
   planned: w.planned_transaction ? toPlanned(w.planned_transaction) : null,
+  errorCode: w.error_code,
+  errorField: w.error_field,
 })

@@ -20,8 +20,8 @@ export type RuleDraft = {
   template: ExtractionTemplate | null
   walletId: string | null
   type: TxType
-  category: string | null
-  subcategory: string | null
+  /** A root's or a child's id; null leaves it to the review. */
+  categoryId: string | null
   autoConfirm: boolean
 }
 
@@ -43,8 +43,7 @@ export const newRule = (): RuleDraft => ({
   template: null,
   walletId: null,
   type: 'spend',
-  category: null,
-  subcategory: null,
+  categoryId: null,
   autoConfirm: false,
 })
 
@@ -57,8 +56,7 @@ export const toDraft = (rule: EmailRule): RuleDraft => ({
   template: rule.template,
   walletId: rule.walletId,
   type: rule.type,
-  category: rule.category,
-  subcategory: rule.subcategory,
+  categoryId: rule.categoryId,
   autoConfirm: rule.autoConfirm,
 })
 
@@ -76,8 +74,7 @@ export function sendable(draft: RuleDraft): EmailRuleDraft | null {
     template: draft.template,
     walletId: draft.walletId,
     type: draft.type,
-    category: draft.category,
-    subcategory: draft.subcategory,
+    categoryId: draft.categoryId,
     autoConfirm: draft.autoConfirm && draft.walletId !== null,
   }
 }

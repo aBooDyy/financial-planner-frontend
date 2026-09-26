@@ -10,6 +10,7 @@
 import { db } from '#/db/db'
 import { schedulePush } from '#/db/sync'
 import type { LocalGoal, LocalPlanned } from '#/db/types'
+import { buildCatalog } from '#/features/categories/data/catalog'
 import { createAllocation } from '#/features/goals/data/mutations'
 import type { PlannedRole } from '#/features/planned/api/types'
 import {
@@ -39,6 +40,7 @@ export type PlannedActionCode =
   | 'has_settlements'
   | 'not_manual'
   | 'origin_gone'
+  | 'category_invalid'
 
 /** A planned action the item's state does not allow. `code` is stable; show your own copy. */
 export class PlannedActionError extends Error {
@@ -82,14 +84,18 @@ async function categoryFor(
   type: TxType,
   wanted: string | null | undefined,
 ): Promise<string> {
-  const roots = (await db.categories.toArray()).filter(
-    (c) => c.deleted === 0 && c.parentId === null && c.type === type,
-  )
-  const has = (slug: string) => roots.some((c) => c.slug === slug)
-  const fallback = type === 'income' ? 'salary' : 'other'
-  if (wanted && (roots.length === 0 || has(wanted))) return wanted
-  if (roots.length === 0 || has(fallback)) return fallback
-  return roots[0].slug
+  const catalog = buildCatalog(await db.categories.toArray())
+  if (wanted && catalog.has(wanted)) {
+    if (catalog.rootOf(wanted).type === type) return wanted
+  }
+  // A confirmed payday belongs under Salary, not the catch-all income root.
+  const salary = type === 'income' ? catalog.bySlug('salary') : null
+  if (salary?.type === 'income') return salary.id
+  const fallback = catalog.fallbackFor(type)
+  if (fallback) return fallback.id
+  // Nothing pulled yet to check against: trust what the row already names.
+  if (wanted && catalog.all.length === 0) return wanted
+  throw new PlannedActionError('category_invalid')
 }
 
 async function walletCurrency(walletId: string): Promise<CurrencyCode | null> {
@@ -108,9 +114,8 @@ export type ConfirmInput = {
   externalLabel?: string | null
   /** When it happened. Defaults to today, not the planned date. */
   date?: string
-  /** Income and payments: the category the transaction is filed under. */
-  category?: string | null
-  subcategory?: string | null
+  /** Income and payments: the leaf category the transaction is filed under. */
+  categoryId?: string | null
   note?: string | null
   /** Provenance marker for the transaction (the auto-poster marks its rows). */
   source?: string | null
@@ -180,20 +185,12 @@ export async function confirmPlanned(
     } else {
       const type: TxType = item.role === 'income' ? 'income' : 'spend'
       const wanted =
-        input.category !== undefined ? input.category : item.category
-      const category = await categoryFor(type, wanted)
+        input.categoryId !== undefined ? input.categoryId : item.categoryId
       const settlementId = await createTransaction({
         type,
         amount: inWallet,
         currency,
-        category,
-        // A child of a category we could not use would name nothing under the one we did.
-        subcategory:
-          category !== wanted
-            ? null
-            : input.category !== undefined
-              ? (input.subcategory ?? null)
-              : item.subcategory,
+        categoryId: await categoryFor(type, wanted),
         walletId,
         goalId: type === 'spend' ? await goalIdOf(item) : null,
         date,
@@ -331,8 +328,7 @@ export async function addContribution(
         name: role === 'payment' ? goal.name : `${goal.name} set-aside`,
         amount: Math.round(input.amount),
         currency: goal.currency,
-        category: null,
-        subcategory: null,
+        categoryId: null,
         occurrence: input.date,
         date: input.date,
         status: 'open',
@@ -418,8 +414,7 @@ export async function addContribution(
         await currentRates(),
       ),
       currency,
-      category: await categoryFor('spend', null),
-      subcategory: null,
+      categoryId: await categoryFor('spend', null),
       walletId,
       goalId,
       date: input.date,

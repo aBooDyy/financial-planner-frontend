@@ -1,174 +1,188 @@
 import type { LocalCategory } from '#/db/types'
 import type { TxType } from '#/features/transactions/api/types'
 import type { IconId } from '#/lib/icons/catalog.gen'
-import { CATEGORIES, defaultCategory, defaultSubcategory } from './defaults'
-import type { DefaultCategory } from './defaults'
+import { defaultCategory, defaultSubcategory } from './defaults'
 import { CATEGORY_ICON_FALLBACK, iconIdOr } from '#/lib/icons/fallbacks'
 
-export type ResolvedSub = {
-  /** The local row's id, absent when the sub comes from the built-in defaults. */
+type Entry = {
   id: string
   slug: string
   name: string
-  color: string
-  icon: IconId
-  position: number
-}
-
-export type ResolvedCategory = {
-  id: string
-  slug: string
-  name: string
+  /** A child's is its parent's. */
   type: TxType
   color: string
   icon: IconId
   position: number
-  subs: ResolvedSub[]
 }
+
+export type ResolvedSub = Entry & { parentId: string }
+
+export type ResolvedCategory = Entry & { parentId: null; subs: ResolvedSub[] }
+
+/** Anything a row can be filed under: a root or one of its children. */
+export type CatalogEntry = ResolvedCategory | ResolvedSub
 
 export type CategoryCatalog = {
+  /** The roots, in display order. Empty means the categories have not been pulled yet. */
   all: ResolvedCategory[]
   byType: (type: TxType) => ResolvedCategory[]
-  get: (slug: string) => ResolvedCategory
-  subsOf: (slug: string) => ResolvedSub[]
-  sub: (slug: string, subSlug: string | null) => ResolvedSub | null
-  /** The slug pair a row carries, rendered for display. */
-  labelOf: (slug: string, subSlug: string | null) => string
+  /** Whether the catalog holds `id` — a live root or child. */
+  has: (id: string) => boolean
+  /** Never throws: an id the catalog does not hold resolves to `DELETED_CATEGORY`. */
+  get: (id: string) => CatalogEntry
+  /** The root itself, or a child's parent. */
+  rootOf: (id: string) => ResolvedCategory
+  /** A child's parent; null for a root or an unknown id. */
+  parentOf: (id: string) => ResolvedCategory | null
+  subsOf: (rootId: string) => ResolvedSub[]
+  /** "Dining · Cafés" for a child, "Dining" for a root. */
+  labelOf: (id: string) => string
+  /** Lookup by slug — a root's alone, a child's under its parent's slug. */
+  bySlug: (slug: string, parentSlug?: string) => CatalogEntry | null
+  /**
+   * Where a row of `type` goes when nothing chose a category: the required `other` /
+   * `other_income` root, else the type's first root. Null only while nothing is loaded.
+   */
+  fallbackFor: (type: TxType) => ResolvedCategory | null
 }
 
+export const DELETED_CATEGORY_ID = 'deleted-category'
+
 const GENERIC_COLOR = '#64748B'
+
+/**
+ * What an id resolves to when the catalog does not hold it. Rows reference categories by
+ * foreign key, so this marks a transient state (a delete not yet pulled), never lost data.
+ */
+export const DELETED_CATEGORY: ResolvedCategory = {
+  id: DELETED_CATEGORY_ID,
+  parentId: null,
+  slug: '',
+  name: 'Deleted category',
+  type: 'spend',
+  color: GENERIC_COLOR,
+  icon: CATEGORY_ICON_FALLBACK.spend,
+  position: Number.MAX_SAFE_INTEGER,
+  subs: [],
+}
+
+const FALLBACK_SLUG: Record<TxType, string> = {
+  spend: 'other',
+  income: 'other_income',
+}
 
 const byPosition = (a: LocalCategory, b: LocalCategory): number =>
   a.position - b.position || a.createdAt.localeCompare(b.createdAt)
 
-const resolveSub = (
+const resolveRoot = (
   row: LocalCategory,
-  parent: LocalCategory,
-  parentIcon: IconId,
-): ResolvedSub => ({
-  id: row.id,
-  slug: row.slug,
-  name: row.name,
-  color: row.color.trim() || parent.color,
-  icon: iconIdOr(
+  children: LocalCategory[],
+): ResolvedCategory => {
+  const icon = iconIdOr(
     row.icon,
-    defaultSubcategory(parent.slug, row.slug)?.icon ?? parentIcon,
-  ),
-  position: row.position,
-})
+    defaultCategory(row.slug)?.icon ?? CATEGORY_ICON_FALLBACK[row.type],
+  )
+  const color = row.color.trim() || GENERIC_COLOR
+  return {
+    id: row.id,
+    parentId: null,
+    slug: row.slug,
+    name: row.name,
+    type: row.type,
+    color,
+    icon,
+    position: row.position,
+    subs: children.sort(byPosition).map((child) => ({
+      id: child.id,
+      parentId: row.id,
+      slug: child.slug,
+      name: child.name,
+      type: row.type,
+      color: child.color.trim() || color,
+      icon: iconIdOr(
+        child.icon,
+        defaultSubcategory(row.slug, child.slug)?.icon ?? icon,
+      ),
+      position: child.position,
+    })),
+  }
+}
 
-const fromDefault = (d: DefaultCategory): ResolvedCategory => ({
-  id: d.id,
-  slug: d.id,
-  name: d.name,
-  type: d.type,
-  color: d.color,
-  icon: d.icon,
-  position: CATEGORIES.indexOf(d),
-  subs: d.subs.map((s, i) => ({
-    id: s.id,
-    slug: s.id,
-    name: s.name,
-    color: d.color,
-    icon: s.icon,
-    position: i,
-  })),
-})
-
-const BUILT_INS: ResolvedCategory[] = CATEGORIES.map(fromDefault)
-
-/**
- * Nest the local category rows into the two-level catalog every screen reads names, colours,
- * icons and child lists from. Pure: no React, no IO — the selectors take the result as a
- * parameter so they stay pure too.
- */
-export function buildCatalog(rows: LocalCategory[]): CategoryCatalog {
+const nest = (rows: LocalCategory[]): ResolvedCategory[] => {
   const live = rows.filter((r) => r.deleted === 0)
   const roots = live.filter((r) => r.parentId === null).sort(byPosition)
-  const rootsById = new Map(roots.map((r) => [r.id, r]))
+  const rootIds = new Set(roots.map((r) => r.id))
 
   const childrenOf = new Map<string, LocalCategory[]>()
   for (const row of live) {
-    // A child of a child would be a third level the ledger cannot represent, and a child of
-    // a missing parent has nowhere to render — both are dropped rather than promoted.
-    if (row.parentId === null || !rootsById.has(row.parentId)) continue
+    // A child of a child would be a third level, and a child of a missing parent has nowhere
+    // to render — both are dropped rather than promoted.
+    if (row.parentId === null || !rootIds.has(row.parentId)) continue
     const siblings = childrenOf.get(row.parentId)
     if (siblings) siblings.push(row)
     else childrenOf.set(row.parentId, [row])
   }
 
-  const all: ResolvedCategory[] =
-    roots.length === 0
-      ? BUILT_INS
-      : roots.map((row) => {
-          const icon = iconIdOr(
-            row.icon,
-            defaultCategory(row.slug)?.icon ?? CATEGORY_ICON_FALLBACK[row.type],
-          )
-          return {
-            id: row.id,
-            slug: row.slug,
-            name: row.name,
-            type: row.type,
-            color: row.color.trim() || GENERIC_COLOR,
-            icon,
-            position: row.position,
-            subs: (childrenOf.get(row.id) ?? [])
-              .sort(byPosition)
-              .map((child) => resolveSub(child, row, icon)),
-          }
-        })
+  return roots.map((row) => resolveRoot(row, childrenOf.get(row.id) ?? []))
+}
 
-  const bySlug = new Map(all.map((c) => [c.slug, c]))
+/**
+ * Nest the local category rows into the two-level catalog every screen reads names, colours,
+ * icons and child lists from, keyed by id. Pure: no React, no IO — the selectors take the
+ * result as a parameter so they stay pure too.
+ */
+export function buildCatalog(rows: LocalCategory[]): CategoryCatalog {
+  const all = nest(rows)
 
-  const unknown = (slug: string): ResolvedCategory => {
-    const built = defaultCategory(slug)
-    if (built) return fromDefault(built)
-    return (
-      bySlug.get('other') ?? {
-        id: slug,
-        slug,
-        name: 'Other',
-        type: 'spend',
-        color: GENERIC_COLOR,
-        icon: CATEGORY_ICON_FALLBACK.spend,
-        position: all.length,
-        subs: [],
-      }
-    )
+  const byId = new Map<string, CatalogEntry>()
+  const rootBySlug = new Map<string, ResolvedCategory>()
+  for (const root of all) {
+    byId.set(root.id, root)
+    rootBySlug.set(root.slug, root)
+    for (const sub of root.subs) byId.set(sub.id, sub)
   }
 
-  const get = (slug: string): ResolvedCategory =>
-    bySlug.get(slug) ?? unknown(slug)
+  const get = (id: string): CatalogEntry => byId.get(id) ?? DELETED_CATEGORY
 
-  const sub = (slug: string, subSlug: string | null): ResolvedSub | null => {
-    if (!subSlug) return null
-    const found = get(slug).subs.find((s) => s.slug === subSlug)
-    if (found) return found
-    // A deleted or never-seeded built-in child still labels the transactions that name it.
-    const built = defaultSubcategory(slug, subSlug)
-    if (!built) return null
-    const parent = get(slug)
-    return {
-      id: '',
-      slug: built.id,
-      name: built.name,
-      color: parent.color,
-      icon: built.icon,
-      position: 0,
-    }
+  const parentOf = (id: string): ResolvedCategory | null => {
+    const entry = byId.get(id)
+    if (!entry?.parentId) return null
+    return byId.get(entry.parentId) as ResolvedCategory
   }
+
+  const rootOf = (id: string): ResolvedCategory => {
+    const entry = get(id)
+    return entry.parentId === null ? entry : (parentOf(id) ?? DELETED_CATEGORY)
+  }
+
+  const byType = (type: TxType): ResolvedCategory[] =>
+    all.filter((c) => c.type === type)
 
   return {
     all,
-    byType: (type) => all.filter((c) => c.type === type),
+    byType,
+    has: (id) => byId.has(id),
     get,
-    subsOf: (slug) => get(slug).subs,
-    sub,
-    labelOf: (slug, subSlug) => {
-      const parent = get(slug)
-      const child = sub(slug, subSlug)
-      return child ? `${parent.name} · ${child.name}` : parent.name
+    rootOf,
+    parentOf,
+    subsOf: (rootId) => {
+      const entry = byId.get(rootId)
+      return entry?.parentId === null ? entry.subs : []
+    },
+    labelOf: (id) => {
+      const entry = get(id)
+      const parent = parentOf(id)
+      return parent ? `${parent.name} · ${entry.name}` : entry.name
+    },
+    bySlug: (slug, parentSlug) => {
+      if (parentSlug === undefined) return rootBySlug.get(slug) ?? null
+      const parent = rootBySlug.get(parentSlug)
+      return parent?.subs.find((s) => s.slug === slug) ?? null
+    },
+    fallbackFor: (type) => {
+      const required = rootBySlug.get(FALLBACK_SLUG[type])
+      if (required?.type === type) return required
+      return byType(type)[0] ?? null
     },
   }
 }

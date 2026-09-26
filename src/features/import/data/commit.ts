@@ -13,7 +13,7 @@ import { bulkAddTransfers } from '#/features/transactions/data/transfers'
 import { batchSource, saveBatch } from './batches'
 import { normalizeKey } from './matching'
 import { isCommittable } from './review'
-import { roleColumn } from './types'
+import { pendingCategoryId, roleColumn } from './types'
 import type { LocalImportBatch } from '#/db/types'
 import type {
   LedgerDraft,
@@ -76,9 +76,38 @@ export type CommitResult = {
   batch: LocalImportBatch
   /** New spellings filed onto existing merchants — what the Done screen reports. */
   learnedSpellings: number
+  /** Each category the import created: the pending id its rows carried → the id it got. */
+  createdCategories: ReadonlyMap<string, string>
 }
 
 const yieldToUi = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
+
+/**
+ * `created` as it stands now. Once a create pushes, the server may answer that its slug is
+ * taken and the local row is remapped onto the server's twin (same parent and slug), so an id
+ * handed back at commit can be gone by the time a template is saved from the Done screen.
+ */
+export async function liveCreatedCategories(
+  categories: Aliases['categories'],
+  created: ReadonlyMap<string, string>,
+): Promise<Map<string, string>> {
+  const live = (await db.categories.toArray()).filter((c) => c.deleted === 0)
+  const ids = new Set(live.map((c) => c.id))
+  const current = new Map<string, string>()
+  for (const target of Object.values(categories)) {
+    if (target.kind !== 'create') continue
+    const pending = pendingCategoryId(target)
+    const id = created.get(pending)
+    if (id === undefined) continue
+    const twin = ids.has(id)
+      ? id
+      : live.find(
+          (c) => c.parentId === target.parentId && c.slug === target.slug,
+        )?.id
+    if (twin !== undefined) current.set(pending, twin)
+  }
+  return current
+}
 
 /**
  * The file's own spelling for each merchant key, recovered from the rows. Aliases are keyed
@@ -101,17 +130,26 @@ const merchantSpellings = (
   return spellings
 }
 
+type Created = {
+  /** Merchant ids that could not be created — their rows lose the link. */
+  unresolved: Set<string>
+  /** Pending category id → the id the category was created under. */
+  categories: Map<string, string>
+}
+
 /**
- * Materialise everything the mapping promised to create, under the exact id or slug the
- * rows already carry. It runs before any row is written, so a failure here leaves nothing
- * imported. Returns the merchant ids it could not create — their rows lose the link rather
- * than pointing at an account that does not exist.
+ * Materialise everything the mapping promised to create: wallets and merchants under the
+ * exact ids the rows already carry, categories under the slug their pending id names. It
+ * runs before any row is written — and queues each category ahead of the rows filed under
+ * it — so a failure here leaves nothing imported. A merchant it cannot create leaves its
+ * rows without the link rather than pointing at a merchant that does not exist.
  */
 async function createPendingTargets(
   aliases: Aliases,
   spellings: ReadonlyMap<string, string>,
-): Promise<Set<string>> {
+): Promise<Created> {
   const unresolved = new Set<string>()
+  const categories = new Map<string, string>()
 
   for (const target of Object.values(aliases.wallets)) {
     if (target.kind !== 'create') continue
@@ -128,14 +166,16 @@ async function createPendingTargets(
 
   for (const target of Object.values(aliases.categories)) {
     if (target.kind !== 'create') continue
-    // A child carries the pair: its parent's slug in `category`, its own in `subcategory`.
-    // A blank colour there means "inherit the parent's", which is what the server stores.
-    await createCategoryWithSlug(target.subcategory ?? target.category, {
+    const pending = pendingCategoryId(target)
+    if (categories.has(pending)) continue
+    // A blank colour on a child means "inherit the parent's", which is what the server stores.
+    const id = await createCategoryWithSlug(target.slug, {
       name: target.name,
       type: target.type,
       color: target.parentId === null ? NEW_ENTITY_COLOR : '',
       parentId: target.parentId,
     })
+    categories.set(pending, id)
   }
 
   for (const [key, target] of Object.entries(aliases.merchants)) {
@@ -157,7 +197,7 @@ async function createPendingTargets(
     })
   }
 
-  return unresolved
+  return { unresolved, categories }
 }
 
 /**
@@ -183,7 +223,7 @@ async function learnSpellings(
 const ledgerDraftOf = (
   row: ParsedRow,
   source: string,
-  unresolved: ReadonlySet<string>,
+  created: Created,
 ): LedgerDraft => {
   const draft = row.draft as TransactionDraft
   if (row.intent === 'adjustment') {
@@ -199,8 +239,9 @@ const ledgerDraftOf = (
   }
   return {
     ...draft,
+    categoryId: created.categories.get(draft.categoryId) ?? draft.categoryId,
     merchantId:
-      draft.merchantId != null && unresolved.has(draft.merchantId)
+      draft.merchantId != null && created.unresolved.has(draft.merchantId)
         ? null
         : draft.merchantId,
     source,
@@ -282,7 +323,7 @@ export async function commitImport(
   const source = batchSource(batchId)
   const spellings = merchantSpellings(rows, mapping)
 
-  const unresolved = await createPendingTargets(mapping.aliases, spellings)
+  const created = await createPendingTargets(mapping.aliases, spellings)
   const learnedSpellings = await learnSpellings(mapping.aliases, spellings)
 
   const total = rows.total
@@ -299,7 +340,7 @@ export async function commitImport(
         transfers.add(row)
         continue
       }
-      const draft = ledgerDraftOf(row, source, unresolved)
+      const draft = ledgerDraftOf(row, source, created)
       walletIds.add(draft.walletId)
       entries.push({ id: crypto.randomUUID(), draft })
     }
@@ -344,5 +385,5 @@ export async function commitImport(
   await saveBatch(batch)
 
   schedulePush()
-  return { batch, learnedSpellings }
+  return { batch, learnedSpellings, createdCategories: created.categories }
 }

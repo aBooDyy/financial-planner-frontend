@@ -12,8 +12,9 @@ import { useCategoryCatalog } from '#/features/categories/hooks/useCategoryCatal
 type Props = {
   id: string
   scope: 'category' | 'wallet'
+  /** A wallet id, or a spend root's id. */
   value: string
-  onChange: (target: string) => void
+  onChange: (id: string) => void
   wallets: ReadonlyArray<LocalBalanceNode>
   walletLabel: (w: LocalBalanceNode) => string
 }
@@ -48,7 +49,7 @@ export function BudgetTargetSelect({
               </SelectItem>
             ))
           : catalog.byType('spend').map((c) => (
-              <SelectItem key={c.slug} value={c.slug}>
+              <SelectItem key={c.id} value={c.id}>
                 <IconChip
                   id={c.icon}
                   color={c.color}

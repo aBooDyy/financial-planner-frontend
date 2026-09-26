@@ -51,8 +51,7 @@ export type IntegrationKey = {
   rateLimitPerMinute: number
   throttledUntil: string | null
   defaultWalletId: string | null
-  defaultCategory: string | null
-  defaultSubcategory: string | null
+  defaultCategoryId: string | null
   defaultType: TxType
   defaultCurrency: CurrencyCode | null
   autoConfirm: boolean
@@ -72,8 +71,7 @@ export type KeySettings = {
   status: IntegrationKeyStatus
   expiresAt: string | null
   defaultWalletId: string | null
-  defaultCategory: string | null
-  defaultSubcategory: string | null
+  defaultCategoryId: string | null
   defaultType: TxType
   defaultCurrency: CurrencyCode | null
   autoConfirm: boolean
@@ -101,8 +99,7 @@ export type IntegrationKeyWire = {
   rate_limit_per_minute: number
   throttled_until: string | null
   default_wallet_id: string | null
-  default_category: string | null
-  default_subcategory: string | null
+  default_category_id: string | null
   default_type: TxTypeWire
   default_currency: string | null
   auto_confirm: boolean
@@ -127,8 +124,7 @@ type UpdateKeyWire = {
   status: IntegrationKeyStatusWire
   expires_at: string | null
   default_wallet_id: string | null
-  default_category: string | null
-  default_subcategory: string | null
+  default_category_id: string | null
   default_type: TxTypeWire
   default_currency: string | null
   auto_confirm: boolean
@@ -150,8 +146,7 @@ export const toIntegrationKey = (w: IntegrationKeyWire): IntegrationKey => ({
   rateLimitPerMinute: w.rate_limit_per_minute,
   throttledUntil: w.throttled_until,
   defaultWalletId: w.default_wallet_id,
-  defaultCategory: w.default_category,
-  defaultSubcategory: w.default_subcategory,
+  defaultCategoryId: w.default_category_id,
   defaultType: fromWireTxType(w.default_type),
   defaultCurrency: fromWireCurrencyOrNull(w.default_currency),
   autoConfirm: w.auto_confirm,
@@ -182,8 +177,7 @@ export const toUpdateKeyWire = (
   status: toWireKeyStatus(s.status),
   expires_at: s.expiresAt,
   default_wallet_id: s.defaultWalletId,
-  default_category: s.defaultCategory,
-  default_subcategory: s.defaultSubcategory,
+  default_category_id: s.defaultCategoryId,
   default_type: toWireTxType(s.defaultType),
   default_currency: s.defaultCurrency,
   auto_confirm: s.autoConfirm,
@@ -197,8 +191,7 @@ export const settingsOf = (k: IntegrationKey): KeySettings => ({
   status: k.status,
   expiresAt: k.expiresAt,
   defaultWalletId: k.defaultWalletId,
-  defaultCategory: k.defaultCategory,
-  defaultSubcategory: k.defaultSubcategory,
+  defaultCategoryId: k.defaultCategoryId,
   defaultType: k.defaultType,
   defaultCurrency: k.defaultCurrency,
   autoConfirm: k.autoConfirm,

@@ -115,20 +115,6 @@ export type ValueCatalogue = {
   merchants: MerchantIndex
 }
 
-export const categoryValue = (
-  category: string,
-  subcategory: string | null,
-): string => `${category}|${subcategory ?? ''}`
-
-export const splitCategoryValue = (
-  value: string,
-): { category: string; subcategory: string | null } => {
-  const at = value.indexOf('|')
-  const category = at < 0 ? value : value.slice(0, at)
-  const subcategory = at < 0 ? '' : value.slice(at + 1)
-  return { category, subcategory: subcategory === '' ? null : subcategory }
-}
-
 /**
  * The distinct members of a list of already-projected values. `distinctValues` covers a
  * plain column; a category that spells itself across two columns needs the pair.
@@ -229,12 +215,7 @@ const proposeCategory = (raw: string, catalogue: ValueCatalogue): Proposal => {
   const movement = proposeMovement(raw)
   if (movement !== null) return movement
   const match = matchCategory(raw, catalogue.categories)
-  return match === null
-    ? NONE
-    : bound(
-        categoryValue(match.target.category, match.target.subcategory),
-        match.tier,
-      )
+  return match === null ? NONE : bound(match.target.id, match.tier)
 }
 
 const proposeMerchant = (raw: string, catalogue: ValueCatalogue): Proposal => {
@@ -315,7 +296,7 @@ const categoryTargetValue = (target: CategoryTarget | undefined): string => {
     case 'create':
       return NEW
     default:
-      return categoryValue(target.category, target.subcategory)
+      return target.categoryId
   }
 }
 
@@ -323,7 +304,7 @@ const categoryTargetOf = (value: string): CategoryTarget => {
   if (value === SKIP) return { kind: 'skip' }
   if (value === TRANSFER) return { kind: 'transfer' }
   if (value === ADJUSTMENT) return { kind: 'adjustment' }
-  return { kind: 'category', ...splitCategoryValue(value) }
+  return { kind: 'category', categoryId: value }
 }
 
 const merchantValue = (target: MerchantTarget | undefined): string => {
@@ -517,8 +498,8 @@ export const withAlias = (
 }
 
 /**
- * Record a target the user asked us to invent. It already carries the id or slug it will be
- * created under, so every row bound to it is final before anything is written.
+ * Record a target the user asked us to invent. A wallet or merchant already carries the id it
+ * will be created under; a category carries the slug its pending id is made from.
  */
 export const withNewWallet = (
   aliases: Aliases,
@@ -585,27 +566,23 @@ export const categoryTargetGroups = (
   categories: ReadonlyArray<CategoryOption>,
 ): TargetGroup[] =>
   categories
-    .filter((option) => option.subcategory === null)
+    .filter((option) => option.parentId === null)
     .sort((a, b) => TYPE_ORDER[a.type] - TYPE_ORDER[b.type])
     .map((parent) => ({
       label: parent.name,
       section: CATEGORY_SECTION[parent.type],
       options: [
         {
-          value: categoryValue(parent.category, null),
+          value: parent.id,
           label: parent.name,
           icon: parent.icon,
           color: parent.color,
           tag: CATEGORY_SECTION[parent.type],
         },
         ...categories
-          .filter(
-            (option) =>
-              option.category === parent.category &&
-              option.subcategory !== null,
-          )
+          .filter((option) => option.parentId === parent.id)
           .map((option) => ({
-            value: categoryValue(option.category, option.subcategory),
+            value: option.id,
             label: `${parent.name} › ${option.name}`,
             name: option.name,
             icon: option.icon,

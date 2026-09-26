@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { buildCatalog } from './catalog'
-import { pickerSections, pickerValue } from './pickerSections'
+import { defaultCatalog } from '#/features/categories/__fixtures__/categories'
+import { pickerSections } from './pickerSections'
 
-const spend = buildCatalog([]).byType('spend')
+const spend = defaultCatalog().byType('spend')
 
 const outline = (query: string) =>
   pickerSections(spend, query).map(
@@ -28,12 +28,5 @@ describe('pickerSections', () => {
 
   it('leaves out parents with no match at all', () => {
     expect(outline('zzzz')).toEqual([])
-  })
-})
-
-describe('pickerValue', () => {
-  it('is the slug for a parent and slug/sub for a child', () => {
-    expect(pickerValue('dining', null)).toBe('dining')
-    expect(pickerValue('dining', 'cafes')).toBe('dining/cafes')
   })
 })

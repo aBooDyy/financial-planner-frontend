@@ -1,4 +1,5 @@
 import { db } from '#/db/db'
+import { requeued } from '#/db/syncFailure'
 import { schedulePush } from '#/db/sync'
 import type { LocalTransaction, OutboxEntry } from '#/db/types'
 import type { CurrencyCode } from '#/lib/currency'
@@ -54,8 +55,7 @@ const buildLeg = (
   type,
   amount,
   currency,
-  category: null,
-  subcategory: null,
+  categoryId: null,
   walletId,
   goalId: null,
   merchantId: null,
@@ -204,13 +204,13 @@ export async function updateTransfer(
     const create = entries.find((e) => e.op === 'create')
     if (create && bothLegs(legs)) {
       create.payload = transferToCreateWire(transferId, legs)
-      await db.outbox.put(create)
+      await db.outbox.put(requeued(create))
       return
     }
     const update = entries.find((e) => e.op === 'update')
     if (update) {
       update.payload = transferToUpdateWire(legs)
-      await db.outbox.put(update)
+      await db.outbox.put(requeued(update))
       return
     }
     await db.outbox.add({

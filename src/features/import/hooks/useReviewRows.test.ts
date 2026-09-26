@@ -41,8 +41,7 @@ const ANSWERED = () => ({
   categories: {
     groceries: {
       kind: 'category' as const,
-      category: 'groceries',
-      subcategory: null,
+      categoryId: 'cat-groceries',
     },
   },
 })
@@ -187,8 +186,7 @@ describe('useReviewRows — transfers', () => {
           transfer: { kind: 'transfer' },
           groceries: {
             kind: 'category',
-            category: 'groceries',
-            subcategory: null,
+            categoryId: 'cat-groceries',
           },
         },
       },

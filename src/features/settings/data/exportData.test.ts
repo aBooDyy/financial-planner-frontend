@@ -3,6 +3,10 @@ import 'fake-indexeddb/auto'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '#/db/db'
 import type { LocalTransaction } from '#/db/types'
+import {
+  catId,
+  defaultCategoryRows,
+} from '#/features/categories/__fixtures__/categories'
 import type * as CurrencyModule from '#/lib/currency'
 
 vi.mock('#/lib/currency', async (importOriginal) => {
@@ -18,8 +22,7 @@ const tx = (over: Partial<LocalTransaction> = {}): LocalTransaction => ({
   type: 'spend',
   amount: 1234,
   currency: 'SAR',
-  category: 'groceries',
-  subcategory: null,
+  categoryId: catId('groceries'),
   walletId: 'w-1',
   goalId: null,
   merchantId: null,
@@ -87,8 +90,8 @@ describe('exportCsv', () => {
 
   it('names an adjustment plainly and signs it by direction', async () => {
     await db.transactions.bulkAdd([
-      tx({ id: 'a', type: 'adjustment_in', category: null, amount: 1000 }),
-      tx({ id: 'b', type: 'adjustment_out', category: null, amount: 250 }),
+      tx({ id: 'a', type: 'adjustment_in', categoryId: null, amount: 1000 }),
+      tx({ id: 'b', type: 'adjustment_out', categoryId: null, amount: 250 }),
     ])
 
     const rows = (await exported()).slice(1).map((line) => line.split(','))
@@ -97,6 +100,23 @@ describe('exportCsv', () => {
       expect.arrayContaining([
         ['balance adjustment', '10'],
         ['balance adjustment', '-2.5'],
+      ]),
+    )
+  })
+
+  it('names the category and subcategory in their own columns', async () => {
+    await db.categories.bulkAdd(defaultCategoryRows())
+    await db.transactions.bulkAdd([
+      tx({ id: 'a', date: '2026-01-01', categoryId: catId('cafes', 'dining') }),
+      tx({ id: 'b', date: '2026-01-02', categoryId: catId('groceries') }),
+    ])
+
+    const rows = (await exported()).slice(1).map((line) => line.split(','))
+
+    expect(rows.map((cells) => [cells[4], cells[5]])).toEqual(
+      expect.arrayContaining([
+        ['Dining', 'Cafés'],
+        ['Groceries', ''],
       ]),
     )
   })

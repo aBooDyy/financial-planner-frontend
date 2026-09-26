@@ -20,7 +20,7 @@ import type { CurrencyCode } from '#/lib/currency'
 import type { RatesMap } from '#/lib/config/rates'
 import { desiredPlanned } from './generate'
 import type { DesiredPlanned } from './generate'
-import { indexSettlements } from './settle'
+import { indexSettlements, LEGACY_SOURCE_PREFIX } from './settle'
 import type { SettlementIndex } from './settle'
 
 export type PlannerInputs = {
@@ -28,6 +28,7 @@ export type PlannerInputs = {
   income: LocalIncomeStream[]
   recurrings: LocalRecurring[]
   planned: LocalPlanned[]
+  /** Only transactions linked to a goal, a planned row or a legacy auto-post. */
   txns: LocalTransaction[]
   allocations: LocalGoalAllocation[]
   base: CurrencyCode
@@ -74,7 +75,7 @@ export function derivePlannerState(
   const legacyMarkers = new Set(
     txns
       .map((t) => t.source)
-      .filter((s): s is string => !!s && s.startsWith('recurring:')),
+      .filter((s): s is string => !!s && s.startsWith(LEGACY_SOURCE_PREFIX)),
   )
   const desired = desiredPlanned({
     userId,

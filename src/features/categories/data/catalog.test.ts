@@ -1,30 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import type { LocalCategory } from '#/db/types'
+import {
+  catId,
+  categoryRow as row,
+  defaultCatalog,
+} from '#/features/categories/__fixtures__/categories'
 import { CATEGORIES } from './defaults'
-import { buildCatalog } from './catalog'
-
-let seq = 0
-
-const row = (
-  over: Partial<LocalCategory> & { slug: string },
-): LocalCategory => {
-  seq += 1
-  return {
-    id: over.slug,
-    parentId: null,
-    name: over.slug,
-    type: 'spend',
-    color: '#1F9D6B',
-    icon: null,
-    position: 0,
-    createdAt: `2026-01-01T00:00:0${seq % 10}.000Z`,
-    updatedAt: '2026-01-01T00:00:00.000Z',
-    version: 'v1',
-    dirty: 0,
-    deleted: 0,
-    ...over,
-  }
-}
+import { DELETED_CATEGORY, DELETED_CATEGORY_ID, buildCatalog } from './catalog'
 
 const dining = row({
   slug: 'dining',
@@ -45,17 +26,12 @@ const cafes = row({
 })
 
 describe('buildCatalog', () => {
-  it('yields the built-in defaults when there are no rows', () => {
+  it('is empty — not loaded — when there are no rows', () => {
     const catalog = buildCatalog([])
 
-    expect(catalog.all).toHaveLength(CATEGORIES.length)
-    expect(catalog.get('dining').name).toBe('Dining')
-    expect(catalog.subsOf('dining').map((s) => s.slug)).toEqual([
-      'restaurants',
-      'cafes',
-      'takeaway',
-      'snacks',
-    ])
+    expect(catalog.all).toEqual([])
+    expect(catalog.fallbackFor('spend')).toBeNull()
+    expect(catalog.get('anything')).toBe(DELETED_CATEGORY)
   })
 
   it('nests children under roots, each level ordered by position', () => {
@@ -77,7 +53,7 @@ describe('buildCatalog', () => {
       'dining',
       'travel',
     ])
-    expect(catalog.subsOf('dining').map((s) => s.slug)).toEqual([
+    expect(catalog.subsOf(dining.id).map((s) => s.slug)).toEqual([
       'cafes',
       'takeaway',
     ])
@@ -97,7 +73,7 @@ describe('buildCatalog', () => {
     ])
 
     expect(catalog.all.map((c) => c.slug)).toEqual(['dining'])
-    expect(catalog.subsOf('dining').map((s) => s.slug)).toEqual(['cafes'])
+    expect(catalog.subsOf(dining.id).map((s) => s.slug)).toEqual(['cafes'])
   })
 
   it('drops a child whose parent is missing', () => {
@@ -107,7 +83,7 @@ describe('buildCatalog', () => {
     ])
 
     expect(catalog.all.map((c) => c.slug)).toEqual(['dining'])
-    expect(catalog.subsOf('dining')).toEqual([])
+    expect(catalog.get('orphan-id')).toBe(DELETED_CATEGORY)
   })
 
   it('drops a child pointing at another child — never a third level', () => {
@@ -117,59 +93,96 @@ describe('buildCatalog', () => {
       row({ id: 'deep-id', slug: 'deep', parentId: cafes.id }),
     ])
 
-    expect(catalog.all.map((c) => c.slug)).toEqual(['dining'])
-    expect(catalog.subsOf('dining').map((s) => s.slug)).toEqual(['cafes'])
+    expect(catalog.subsOf(dining.id).map((s) => s.slug)).toEqual(['cafes'])
+    expect(catalog.get('deep-id')).toBe(DELETED_CATEGORY)
   })
 
-  it('resolves an unknown slug against the built-ins first', () => {
+  it('resolves a root and a child by id, each knowing its parent', () => {
     const catalog = buildCatalog([dining, cafes])
 
-    expect(catalog.get('travel')).toMatchObject({
-      slug: 'travel',
-      name: 'Travel',
-      icon: 'suitcase-rolling',
+    expect(catalog.get(dining.id)).toMatchObject({
+      name: 'Dining',
+      parentId: null,
     })
+    expect(catalog.get(cafes.id)).toMatchObject({
+      name: 'Cafés',
+      parentId: dining.id,
+      type: 'spend',
+    })
+    expect(catalog.parentOf(cafes.id)?.id).toBe(dining.id)
+    expect(catalog.parentOf(dining.id)).toBeNull()
+    expect(catalog.rootOf(cafes.id).id).toBe(dining.id)
+    expect(catalog.rootOf(dining.id).id).toBe(dining.id)
   })
 
-  it('falls back to a generic Other for a slug nothing knows', () => {
+  it('resolves an unknown id to one stable deleted entry', () => {
     const catalog = buildCatalog([dining, cafes])
 
-    expect(catalog.get('gone_for_good').name).toBe('Other')
+    expect(catalog.get('gone')).toBe(catalog.get('also-gone'))
+    expect(catalog.get('gone')).toMatchObject({
+      id: DELETED_CATEGORY_ID,
+      name: 'Deleted category',
+      color: '#64748B',
+      icon: 'tag',
+    })
+    expect(catalog.rootOf('gone')).toBe(DELETED_CATEGORY)
+    expect(catalog.parentOf('gone')).toBeNull()
+    expect(catalog.labelOf('gone')).toBe('Deleted category')
+    expect(catalog.subsOf('gone')).toEqual([])
   })
 
-  it('prefers the user’s own Other row over the built-in one', () => {
+  it('labels a root and a child', () => {
+    const catalog = buildCatalog([dining, cafes])
+
+    expect(catalog.labelOf(dining.id)).toBe('Dining')
+    expect(catalog.labelOf(cafes.id)).toBe('Dining · Cafés')
+  })
+
+  it('lists no children for a child id', () => {
+    expect(buildCatalog([dining, cafes]).subsOf(cafes.id)).toEqual([])
+  })
+
+  it('finds a root by slug, and a child only under its parent’s slug', () => {
     const catalog = buildCatalog([
       dining,
-      row({ slug: 'other', name: 'Miscellaneous' }),
+      cafes,
+      row({ slug: 'cafes', name: 'Cafés (root)' }),
     ])
 
-    expect(catalog.get('gone_for_good').name).toBe('Miscellaneous')
+    expect(catalog.bySlug('dining')?.id).toBe(dining.id)
+    expect(catalog.bySlug('cafes', 'dining')?.id).toBe(cafes.id)
+    expect(catalog.bySlug('cafes')?.name).toBe('Cafés (root)')
+    expect(catalog.bySlug('cafes', 'travel')).toBeNull()
+    expect(catalog.bySlug('nope')).toBeNull()
   })
 
-  it('returns null for a null subcategory rather than throwing', () => {
-    expect(buildCatalog([dining, cafes]).sub('dining', null)).toBeNull()
-  })
+  it('falls back by type to the required roots, else the first root of the type', () => {
+    const catalog = defaultCatalog()
 
-  it('labels a row with and without a subcategory', () => {
-    const catalog = buildCatalog([dining, cafes])
+    expect(catalog.fallbackFor('spend')?.id).toBe(catId('other'))
+    expect(catalog.fallbackFor('income')?.id).toBe(catId('other_income'))
 
-    expect(catalog.labelOf('dining', null)).toBe('Dining')
-    expect(catalog.labelOf('dining', 'cafes')).toBe('Dining · Cafés')
+    const partial = buildCatalog([
+      dining,
+      row({ slug: 'salary', name: 'Salary', type: 'income' }),
+    ])
+    expect(partial.fallbackFor('spend')?.id).toBe(dining.id)
+    expect(partial.fallbackFor('income')?.slug).toBe('salary')
   })
 
   it('inherits the parent’s colour for a child that has none', () => {
     const catalog = buildCatalog([dining, cafes])
 
-    expect(catalog.sub('dining', 'cafes')?.color).toBe('#F59E0B')
+    expect(catalog.get(cafes.id).color).toBe('#F59E0B')
   })
 
-  it('gives a child with no icon the built-in one for its slug', () => {
+  it('gives a child with no icon the built-in one for its slug pair', () => {
     const catalog = buildCatalog([
       dining,
       row({ id: 'cafes-id', slug: 'cafes', parentId: dining.id, icon: null }),
     ])
 
-    expect(catalog.sub('dining', 'cafes')?.icon).toBe('coffee')
+    expect(catalog.get('cafes-id').icon).toBe('coffee')
   })
 
   it('falls back to the parent’s icon for a child the built-ins never named', () => {
@@ -178,7 +191,7 @@ describe('buildCatalog', () => {
       row({ id: 'brunch-id', slug: 'brunch', parentId: dining.id, icon: null }),
     ])
 
-    expect(catalog.sub('dining', 'brunch')?.icon).toBe('fork-knife')
+    expect(catalog.get('brunch-id').icon).toBe('fork-knife')
   })
 
   it('gives a root with no icon the built-in one, then its type’s fallback', () => {
@@ -188,16 +201,9 @@ describe('buildCatalog', () => {
       row({ slug: 'tips', name: 'Tips', type: 'income', icon: null }),
     ])
 
-    expect(catalog.get('dining').icon).toBe('fork-knife')
-    expect(catalog.get('yachts').icon).toBe('tag')
-    expect(catalog.get('tips').icon).toBe('hand-deposit')
-  })
-
-  it('still labels a deleted built-in child from the defaults', () => {
-    const catalog = buildCatalog([dining])
-
-    expect(catalog.labelOf('dining', 'cafes')).toBe('Dining · Cafés')
-    expect(catalog.sub('dining', 'unheard_of')).toBeNull()
+    expect(catalog.get(catId('dining')).icon).toBe('fork-knife')
+    expect(catalog.get(catId('yachts')).icon).toBe('tag')
+    expect(catalog.get(catId('tips')).icon).toBe('hand-deposit')
   })
 
   it('partitions by type', () => {
@@ -208,5 +214,12 @@ describe('buildCatalog', () => {
 
     expect(catalog.byType('spend').map((c) => c.slug)).toEqual(['dining'])
     expect(catalog.byType('income').map((c) => c.slug)).toEqual(['salary'])
+  })
+
+  it('resolves the seeded default rows to the whole built-in set', () => {
+    const catalog = defaultCatalog()
+
+    expect(catalog.all.map((c) => c.slug)).toEqual(CATEGORIES.map((c) => c.id))
+    expect(catalog.labelOf(catId('cafes', 'dining'))).toBe('Dining · Cafés')
   })
 })
