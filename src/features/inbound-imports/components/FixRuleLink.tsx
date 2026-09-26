@@ -1,20 +1,43 @@
 import { Link } from '@tanstack/react-router'
-import { Wrench } from 'lucide-react'
+import { Pencil } from 'lucide-react'
+import type { LocalInboundImport } from '#/db/types'
 
-type Props = { keyId: string; importId: string }
+type Props = { item: LocalInboundImport }
+
+const CLASS =
+  'inline-flex items-center gap-[6px] self-start text-[12.5px] font-bold text-fp-accent-ink hover:underline'
 
 /**
- * From a webhook row the rules could not read, into that key's rule editor with this very
- * payload as the sample — the moment the user holds the payload that proves the rule wrong.
+ * From a row its source could not read, into the rule editor that should have read it, with
+ * this very body as the sample — the moment the user holds the proof the rule is wrong. The
+ * queue names only the settings route of each source, never the source's code.
  */
-export function FixRuleLink({ keyId, importId }: Props) {
+export function FixRuleLink({ item }: Props) {
+  if (item.source === 'webhook') {
+    if (!item.keyId) return null
+    return (
+      <Link
+        to="/settings/integrations"
+        search={{ key: item.keyId, sample: item.id }}
+        className={CLASS}
+      >
+        <Pencil size={13} strokeWidth={2.2} />
+        Fix the rule
+      </Link>
+    )
+  }
+  if (!item.connectionId || !item.hasBody) return null
   return (
     <Link
-      to="/settings/integrations"
-      search={{ key: keyId, sample: importId }}
-      className="inline-flex items-center gap-[6px] text-[12.5px] font-semibold text-fp-accent-ink hover:underline"
+      to="/settings/email-sync"
+      search={{
+        inbox: item.connectionId,
+        sample: item.id,
+        ...(item.ruleId ? { rule: item.ruleId } : {}),
+      }}
+      className={CLASS}
     >
-      <Wrench size={13} strokeWidth={2.2} />
+      <Pencil size={13} strokeWidth={2.2} />
       Fix the rule
     </Link>
   )

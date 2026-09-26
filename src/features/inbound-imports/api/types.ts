@@ -51,6 +51,8 @@ export type InboundImport = {
   source: InboundSource
   connectionId: string | null
   keyId: string | null
+  /** The source's rule that staged it — an inbox rule or a key's rule; null once it is gone. */
+  ruleId: string | null
   merchantId: string | null
   sourceRef: string | null
   sourceLabel: string | null
@@ -166,6 +168,7 @@ export const toInboundImport = (w: InboundImportWire): InboundImport => ({
   source: fromWireSource(w.source),
   connectionId: w.connection_id,
   keyId: w.integration_key_id,
+  ruleId: w.rule_id,
   merchantId: w.merchant_id,
   sourceRef: w.source_ref,
   sourceLabel: w.source_label,

@@ -29,6 +29,7 @@ const anImport = (
   source: 'inbox',
   connectionId: 'c1',
   keyId: null,
+  ruleId: null,
   merchantId: null,
   sourceRef: 'alerts@bank.example',
   sourceLabel: null,

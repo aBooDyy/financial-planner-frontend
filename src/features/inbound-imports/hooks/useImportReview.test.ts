@@ -30,6 +30,7 @@ const anImport = (
   source: 'inbox',
   connectionId: 'c1',
   keyId: null,
+  ruleId: null,
   merchantId: 'm1',
   sourceRef: 'alerts@riyadbank.com',
   sourceLabel: 'Riyad Bank Alerts',
@@ -120,7 +121,10 @@ describe('useImportReview', () => {
       await result.current.confirm()
     })
     expect(confirmImport).not.toHaveBeenCalled()
-    expect(result.current.error).toMatch(/tap it in the email/i)
+    expect(result.current.amountError).toMatch(/tap it in the email above/i)
+    expect(result.current.error).toBe(
+      'Add the amount and currency from the details above.',
+    )
   })
 
   it('confirms with the typed-in values as overrides', async () => {
@@ -266,7 +270,7 @@ describe('useImportReview', () => {
     await act(async () => {
       await result.current.confirm()
     })
-    expect(result.current.error).toMatch(/tap it in the payload/i)
+    expect(result.current.amountError).toMatch(/tap it in the payload/i)
   })
 
   it('switching to income re-points the category at an income one', () => {

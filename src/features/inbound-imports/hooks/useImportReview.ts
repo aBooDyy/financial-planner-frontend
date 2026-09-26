@@ -119,6 +119,7 @@ export function useImportReview(
   )
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [attempted, setAttempted] = useState(false)
   const [target, setTarget] = useState<PickField>(() =>
     firstTarget(raw.amount, item.currency != null),
   )
@@ -134,6 +135,13 @@ export function useImportReview(
   const subs: ResolvedSub[] = catalog.subsOf(draft.category)
 
   const needsDetails = item.amount == null || item.currency == null
+  const draftMinor = parseAmountToMinor(draft.amount, draft.currency)
+  const amountMissing = draftMinor == null || draftMinor <= 0
+  // Derived, so the complaint goes away the moment the amount is typed or tapped in.
+  const amountError =
+    attempted && amountMissing
+      ? `Enter the amount — you can tap it in the ${bodyNoun(item.bodyFormat)} above.`
+      : null
 
   const setField = <TKey extends keyof ReviewDraft>(
     key: TKey,
@@ -171,17 +179,15 @@ export function useImportReview(
   }
 
   const confirm = async (): Promise<boolean> => {
-    const amount = parseAmountToMinor(draft.amount, draft.currency)
     if (!draft.walletId) {
       setError('Choose an account for this entry.')
       return false
     }
-    if (amount == null || amount <= 0) {
-      setError(
-        `Enter the amount — you can tap it in the ${bodyNoun(item.bodyFormat)} below.`,
-      )
+    if (draftMinor == null || amountMissing) {
+      setAttempted(true)
       return false
     }
+    const amount = draftMinor
     setBusy(true)
     setError(null)
     try {
@@ -210,14 +216,17 @@ export function useImportReview(
     }
   }
 
-  const dismiss = async (): Promise<void> => {
+  /** True once the server has it; on failure the row stays with the reason. */
+  const dismiss = async (): Promise<boolean> => {
     setBusy(true)
     setError(null)
     try {
       await dismissImport(item)
+      return true
     } catch (err) {
       setBusy(false)
       setError(messageForApiError(err))
+      return false
     }
   }
 
@@ -226,7 +235,14 @@ export function useImportReview(
     categories,
     subs,
     busy,
-    error,
+    error:
+      error ??
+      (amountError
+        ? 'Add the amount and currency from the details above.'
+        : null),
+    amountError,
+    /** Everything confirm needs is there — the button reads as ready. */
+    ready: !!draft.walletId && !amountMissing,
     needsDetails,
     hasSubject: !!item.subject,
     setField,

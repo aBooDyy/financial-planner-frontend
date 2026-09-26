@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react'
+import { CheckCheck } from 'lucide-react'
+import { EmptyState } from '#/components/EmptyState'
 import type { LocalBalanceNode, LocalInboundImport } from '#/db/types'
 import { useCategoryCatalog } from '#/features/categories/hooks/useCategoryCatalog'
 import { useRefreshQueue } from '#/features/inbound-imports/hooks/useRefreshQueue'
@@ -39,17 +41,21 @@ export function PendingReviewModal({
           : `${imports.length} import${imports.length === 1 ? '' : 's'} to review`
       }
       contentClassName="sm:max-w-[560px]"
-      bodyClassName="px-0"
+      bodyClassName="gap-0 px-0 pt-[14px] pb-0"
     >
       {toolbar ? (
-        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-fp-border px-[18px] pb-3">
+        <div className="flex flex-wrap items-center justify-between gap-x-[10px] gap-y-2 border-y border-fp-border bg-fp-surface-2 px-5 py-[10px]">
           {toolbar}
         </div>
       ) : null}
 
       {imports.length === 0 ? (
-        <div className="px-[18px] py-12 text-center text-[13.5px] text-fp-text-3">
-          All caught up — nothing waiting.
+        <div className="px-5 py-6">
+          <EmptyState
+            icon={CheckCheck}
+            title="All caught up"
+            text="Nothing is waiting for review."
+          />
         </div>
       ) : (
         imports.map((item) => (
