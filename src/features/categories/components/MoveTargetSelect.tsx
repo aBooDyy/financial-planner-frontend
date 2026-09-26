@@ -10,16 +10,24 @@ import type { MoveTarget } from '#/features/categories/data/moveTargets'
 import { cn } from '#/lib/utils'
 
 type Props = {
+  id?: string
+  className?: string
   targets: ReadonlyArray<MoveTarget>
   value: string | null
   onChange: (id: string) => void
 }
 
 /** The category a deleted one's rows move into — categories with their subcategories nested. */
-export function MoveTargetSelect({ targets, value, onChange }: Props) {
+export function MoveTargetSelect({
+  id,
+  className,
+  targets,
+  value,
+  onChange,
+}: Props) {
   return (
     <Select value={value ?? undefined} onValueChange={onChange}>
-      <SelectTrigger aria-label="Move them to" className="w-full">
+      <SelectTrigger id={id} aria-label="Move them to" className={className}>
         <SelectValue placeholder="Choose a category" />
       </SelectTrigger>
       <SelectContent className="max-h-[320px]">
@@ -34,7 +42,8 @@ export function MoveTargetSelect({ targets, value, onChange }: Props) {
               id={t.icon}
               color={t.color}
               size={22}
-              className="rounded-[6px]"
+              iconSize={13}
+              className="rounded-[7px]"
             />
             <span className={cn('truncate', !t.parentName && 'font-semibold')}>
               {t.parentName ? (

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
-import { Button } from '#/components/ui/button'
-import { ResponsiveDialog } from '#/components/ui/responsive-dialog'
+import { ConfirmDialog } from '#/components/dialog/ConfirmDialog'
+import { FieldLabel } from '#/components/FieldLabel'
 import type { CategoryCatalog } from '#/features/categories/data/catalog'
 import { useDeleteChoice } from '#/features/categories/hooks/useDeleteChoice'
 import type {
@@ -58,10 +58,10 @@ function ChoiceCard({
   return (
     <div
       className={cn(
-        'rounded-[12px] border transition-colors',
+        'rounded-[14px] border-[1.5px] transition-colors',
         active
-          ? 'border-fp-accent bg-fp-accent-soft'
-          : 'border-fp-border-strong bg-fp-surface-2 hover:border-fp-text-3',
+          ? 'border-fp-accent bg-[color-mix(in_oklab,var(--fp-accent)_5%,var(--fp-surface))]'
+          : 'border-fp-border bg-fp-surface hover:border-fp-border-strong',
       )}
     >
       <button
@@ -69,35 +69,28 @@ function ChoiceCard({
         role="radio"
         aria-checked={active}
         onClick={() => onSelect(mode)}
-        className="flex w-full items-start gap-[10px] px-[12px] py-[10px] text-start"
+        className="flex w-full items-start gap-[11px] px-[14px] py-3 text-start"
       >
         <span
           aria-hidden
           className={cn(
-            'mt-[3px] flex size-[16px] flex-none items-center justify-center rounded-full border-[1.5px]',
+            'mt-px flex size-[18px] flex-none items-center justify-center rounded-full border-2',
             active ? 'border-fp-accent' : 'border-fp-border-strong',
           )}
         >
           {active ? (
-            <span className="size-[8px] rounded-full bg-fp-accent" />
+            <span className="size-2 rounded-full bg-fp-accent" />
           ) : null}
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-[2px]">
-          <span
-            className={cn(
-              'text-[13.5px] font-semibold',
-              active ? 'text-fp-accent-ink' : 'text-fp-text',
-            )}
-          >
-            {label}
-          </span>
-          <span className="text-[12px] leading-[1.45] text-fp-text-3">
+          <span className="text-[14px] font-bold text-fp-text">{label}</span>
+          <span className="text-[12.5px] leading-[1.45] text-fp-text-2">
             {hint}
           </span>
         </span>
       </button>
       {active && children ? (
-        <div className="px-[12px] pb-[12px] ps-[38px]">{children}</div>
+        <div className="-mt-[2px] pe-[14px] pb-3 ps-[43px]">{children}</div>
       ) : null}
     </div>
   )
@@ -111,11 +104,13 @@ function FiledChoice({
   choice: DeleteChoice
 }) {
   return (
-    <div className="flex flex-col gap-3">
-      <p className="text-[13px] leading-relaxed text-fp-text-2">
-        {filedSummary(target)}
-      </p>
-      <div role="radiogroup" className="flex flex-col gap-[8px]">
+    <div className="flex flex-col gap-[10px]">
+      <p>{filedSummary(target)}</p>
+      <div
+        role="radiogroup"
+        aria-label="What happens to them"
+        className="flex flex-col gap-[10px]"
+      >
         {choice.targets.length > 0 ? (
           <ChoiceCard
             mode="move"
@@ -124,7 +119,10 @@ function FiledChoice({
             hint="Nothing is lost — they’re re-filed under the category you pick."
             onSelect={choice.setMode}
           >
+            <FieldLabel htmlFor="move-target">Move them to</FieldLabel>
             <MoveTargetSelect
+              id="move-target"
+              className="bg-fp-surface"
               targets={choice.targets}
               value={choice.moveTo}
               onChange={choice.setMoveTo}
@@ -160,37 +158,22 @@ export function DeleteCategoryDialog({
   const blocked = choice.hasFiled && choice.mode === 'move' && !choice.moveTo
 
   return (
-    <ResponsiveDialog
+    <ConfirmDialog
       open={target !== null}
       onOpenChange={(open) => {
         if (!open) onClose()
       }}
       title={target ? title(target) : ''}
+      confirmLabel={moving ? 'Delete & move' : 'Delete'}
+      confirmDisabled={blocked}
       contentClassName="sm:max-w-[460px]"
-      footer={
-        <>
-          <div className="flex-1" />
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            variant="destructive"
-            autoFocus
-            disabled={blocked}
-            onClick={() => onConfirm(choice.resolvedMoveTo)}
-          >
-            {moving ? 'Delete & move' : 'Delete'}
-          </Button>
-        </>
-      }
+      onConfirm={() => onConfirm(choice.resolvedMoveTo)}
     >
       {target === null ? null : choice.hasFiled ? (
         <FiledChoice target={target} choice={choice} />
       ) : (
-        <p className="text-[13px] leading-relaxed text-fp-text-2">
-          {emptyBody(target)}
-        </p>
+        <p>{emptyBody(target)}</p>
       )}
-    </ResponsiveDialog>
+    </ConfirmDialog>
   )
 }
