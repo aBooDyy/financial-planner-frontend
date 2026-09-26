@@ -2,8 +2,8 @@ import { useMemo } from 'react'
 import { getRouteApi, useNavigate } from '@tanstack/react-router'
 import { CloudOff, Plus } from 'lucide-react'
 import { Button } from '#/components/ui/button'
-import { walletGroupOptions } from '#/features/balances/data/selectors'
-import { useBalances } from '#/features/balances/hooks/useBalances'
+import { walletGroupOptions } from '#/features/wallets/data/selectors'
+import { useWallets } from '#/features/wallets/hooks/useWallets'
 import { useCategoryCatalog } from '#/features/categories/hooks/useCategoryCatalog'
 import { useIntegrationKeys } from '#/features/integrations/hooks/useIntegrationKeys'
 import { useKeyFlow } from '#/features/integrations/hooks/useKeyFlow'
@@ -32,7 +32,7 @@ export function IntegrationsSection() {
       void navigate({ to: '/settings/integrations', search: {}, replace: true })
     }
   }
-  const { nodes, base } = useBalances()
+  const { nodes, base } = useWallets()
   const catalog = useCategoryCatalog()
 
   const walletGroups = useMemo(() => walletGroupOptions(nodes), [nodes])

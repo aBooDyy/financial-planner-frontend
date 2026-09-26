@@ -9,6 +9,7 @@ import type {
 import { readSample } from '#/features/integrations/data/payloadTree'
 import type { Binding } from '#/features/integrations/data/ruleDraft'
 import type { LastPayloadState } from '#/features/integrations/hooks/useRuleEditor'
+import { SMALL_BUTTON } from './buttonStyles'
 import { PayloadTree } from './PayloadTree'
 
 type Props = {
@@ -71,19 +72,19 @@ export function SamplePayloadPane({
   return (
     <section aria-labelledby="sample-heading" className="flex flex-col gap-2.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h4 id="sample-heading" className="text-[14px] font-bold">
+        <h4 id="sample-heading" className="text-[15px] font-extrabold">
           Sample payload
         </h4>
         <div className="flex gap-2">
           <Button
             type="button"
-            variant="outline"
+            variant="quiet"
             disabled={!online || lastPayload === 'loading'}
             onClick={() => {
               setEditing(false)
               onLoadLast()
             }}
-            className="gap-1.5 bg-fp-surface px-3 py-[7px] text-[12.5px] font-semibold"
+            className={`${SMALL_BUTTON} gap-1.5`}
           >
             <History size={14} strokeWidth={2} />
             {lastPayload === 'loading' ? 'Loading…' : 'Use last payload'}
@@ -91,9 +92,9 @@ export function SamplePayloadPane({
           {showTree ? (
             <Button
               type="button"
-              variant="outline"
+              variant="quiet"
               onClick={() => setEditing(true)}
-              className="gap-1.5 bg-fp-surface px-3 py-[7px] text-[12.5px] font-semibold"
+              className={`${SMALL_BUTTON} gap-1.5`}
             >
               <Pencil size={13} strokeWidth={2} />
               Edit
@@ -147,7 +148,7 @@ export function SamplePayloadPane({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p
               id="sample-problem"
-              className={`text-[12px] ${problem ? 'text-fp-danger' : 'text-fp-text-3'}`}
+              className={`text-[12px] font-medium ${problem ? 'font-semibold text-fp-danger' : 'text-fp-text-3'}`}
             >
               {problem ??
                 'Paste it and the tree appears — then tap values instead of typing paths.'}
@@ -155,9 +156,9 @@ export function SamplePayloadPane({
             {tree ? (
               <Button
                 type="button"
-                variant="outline"
+                variant="quiet"
                 onClick={() => setEditing(false)}
-                className="bg-fp-surface px-3 py-[7px] text-[12.5px] font-semibold"
+                className={SMALL_BUTTON}
               >
                 Show as a tree
               </Button>

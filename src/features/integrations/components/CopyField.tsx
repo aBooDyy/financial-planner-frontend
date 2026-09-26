@@ -1,7 +1,7 @@
-import { Check, Copy } from 'lucide-react'
+import { Check } from 'lucide-react'
 import { Button } from '#/components/ui/button'
-import { Input } from '#/components/ui/input'
 import { useCopy } from '#/features/integrations/hooks/useCopy'
+import { SMALL_BUTTON, SOFT_BUTTON } from './buttonStyles'
 
 type Props = {
   value: string
@@ -21,37 +21,38 @@ export function CopyField({ value, label, onCopied }: Props) {
   }
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-center gap-2">
-        <Input
+    <div className="flex flex-col gap-[7px]">
+      <div className="flex min-w-0 items-center gap-[10px] rounded-[14px] border-[1.5px] border-fp-border bg-fp-surface py-2 ps-[14px] pe-2">
+        <input
           readOnly
           value={value}
           aria-label={label}
           dir="ltr"
           onFocus={(e) => e.currentTarget.select()}
-          className="min-w-0 flex-1 text-start font-mono text-[13px]"
+          className="min-w-0 flex-1 bg-transparent py-1 text-start font-mono text-[12.5px] text-fp-text outline-none"
         />
         <Button
           type="button"
-          variant="outline"
-          size="icon"
+          variant="ghost"
           onClick={() => void onClick()}
           aria-label={`Copy ${label.toLowerCase()}`}
-          className="h-[46px] w-[46px] shrink-0 rounded-xl bg-fp-surface"
+          className={`${SMALL_BUTTON} ${SOFT_BUTTON} shrink-0`}
         >
-          {copied ? (
-            <Check size={17} strokeWidth={2.2} className="text-fp-accent" />
-          ) : (
-            <Copy size={17} strokeWidth={1.9} />
-          )}
+          Copy
         </Button>
       </div>
-      <span aria-live="polite" className="text-[12px] text-fp-text-3">
-        {copied
-          ? 'Copied'
-          : failed
-            ? 'Couldn’t copy — select the text and copy it by hand.'
-            : ''}
+      <span
+        aria-live="polite"
+        className={`flex items-center gap-1 text-[12px] font-semibold ${failed && !copied ? 'text-fp-danger' : 'text-fp-accent-ink'}`}
+      >
+        {copied ? (
+          <>
+            <Check aria-hidden size={13} strokeWidth={2.6} />
+            <span>Copied</span>
+          </>
+        ) : failed ? (
+          'Couldn’t copy — select the text and copy it by hand.'
+        ) : null}
       </span>
     </div>
   )

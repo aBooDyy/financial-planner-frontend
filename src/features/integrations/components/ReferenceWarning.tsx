@@ -1,4 +1,5 @@
 import { TriangleAlert } from 'lucide-react'
+import { NoteBox } from '#/components/dialog/NoteBox'
 
 type Props = {
   onFix: () => void
@@ -9,20 +10,14 @@ type Props = {
 /** A nudge, never a block: without a reference, identical payloads count once. */
 export function ReferenceWarning({ onFix, noCandidates }: Props) {
   return (
-    <div className="flex items-start gap-2 rounded-xl border border-fp-warn/40 bg-fp-surface px-3 py-2.5 text-[12.5px] text-fp-text-2">
-      <TriangleAlert
-        aria-hidden
-        size={15}
-        strokeWidth={2}
-        className="mt-px shrink-0 text-fp-warn"
-      />
+    <NoteBox tone="warn" icon={<TriangleAlert />}>
       <div className="flex flex-col gap-1.5">
         <p>
           No “reference” field. Means will use a fingerprint of the payload to
           spot repeats — two identical transactions would be counted once.
         </p>
         {noCandidates ? (
-          <p className="text-fp-text-3">
+          <p className="font-medium">
             Nothing in this sample looks like an id. Tap the value that is
             different for every transaction.
           </p>
@@ -30,11 +25,11 @@ export function ReferenceWarning({ onFix, noCandidates }: Props) {
         <button
           type="button"
           onClick={onFix}
-          className="self-start font-semibold text-fp-accent-ink hover:underline"
+          className="self-start font-extrabold underline-offset-2 hover:underline"
         >
           Fix this
         </button>
       </div>
-    </div>
+    </NoteBox>
   )
 }

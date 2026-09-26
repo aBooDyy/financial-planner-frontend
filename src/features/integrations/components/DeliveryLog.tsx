@@ -1,4 +1,5 @@
-import { RefreshCw } from 'lucide-react'
+import { History, RefreshCw } from 'lucide-react'
+import { EmptyState } from '#/components/EmptyState'
 import { Button } from '#/components/ui/button'
 import type { CategoryCatalog } from '#/features/categories/data/catalog'
 import type { Delivery } from '#/features/integrations/api/deliveryTypes'
@@ -7,6 +8,7 @@ import { summarizeDelivery } from '#/features/integrations/data/deliveryText'
 import { useBuildFromDelivery } from '#/features/integrations/hooks/useBuildFromDelivery'
 import { useDeliveries } from '#/features/integrations/hooks/useDeliveries'
 import { useConfigLimits } from '#/lib/config/appConfig'
+import { SMALL_BUTTON } from './buttonStyles'
 import { DeliveryRow } from './DeliveryRow'
 
 type Props = {
@@ -41,26 +43,31 @@ export function DeliveryLog({
     <section
       aria-labelledby="delivery-log-heading"
       aria-busy={log.status === 'loading'}
-      className="flex flex-col gap-3 rounded-xl border border-fp-border bg-fp-surface-2 p-4"
+      className="flex min-w-0 flex-col gap-3 rounded-[16px] border-[1.5px] border-fp-border bg-fp-surface p-[14px]"
     >
-      <div className="flex items-center justify-between gap-3">
-        <h3 id="delivery-log-heading" className="text-[14.5px] font-bold">
-          Recent deliveries
-        </h3>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={!online || log.status === 'loading'}
-          onClick={log.reload}
-          className="gap-1.5 bg-fp-surface px-3 py-[7px] text-[12.5px] font-semibold"
-        >
-          <RefreshCw size={13} strokeWidth={2} />
-          Refresh
-        </Button>
+      <div>
+        <div className="flex items-center gap-2">
+          <h3
+            id="delivery-log-heading"
+            className="flex-1 text-[15px] font-extrabold"
+          >
+            Recent deliveries
+          </h3>
+          <Button
+            type="button"
+            variant="quiet"
+            disabled={!online || log.status === 'loading'}
+            onClick={log.reload}
+            className={`${SMALL_BUTTON} gap-1.5`}
+          >
+            <RefreshCw size={13} strokeWidth={2.2} />
+            Refresh
+          </Button>
+        </div>
+        <p className="mt-[3px] text-[12.5px] leading-[1.45] text-fp-text-2">
+          The last 50 requests this key received, including the ones it refused.
+        </p>
       </div>
-      <p className="text-[12.5px] leading-relaxed text-fp-text-2">
-        The last 50 requests this key received, including the ones it refused.
-      </p>
 
       {log.status === 'offline' ? (
         <p className="text-[12.5px] text-fp-text-3">
@@ -70,17 +77,18 @@ export function DeliveryLog({
         <p role="alert" className="text-[12.5px] text-fp-danger">
           Couldn’t load the delivery log.
         </p>
+      ) : log.deliveries.length === 0 && log.status === 'loading' ? (
+        <p className="text-[12.5px] text-fp-text-3">Loading…</p>
       ) : log.deliveries.length === 0 ? (
-        <p className="text-[12.5px] text-fp-text-3">
-          {log.status === 'loading'
-            ? 'Loading…'
-            : 'Nothing yet. Send a request from your app and it will show here, whether or not it was accepted.'}
-        </p>
+        <EmptyState
+          icon={History}
+          size="sm"
+          framed
+          title="No requests yet"
+          text="Send a request from your app and it will show here, whether or not it was accepted."
+        />
       ) : (
-        <ul
-          aria-label="Deliveries, newest first"
-          className="overflow-hidden rounded-xl border border-fp-border bg-fp-surface"
-        >
+        <ul aria-label="Deliveries, newest first" className="-mt-1">
           {log.deliveries.map((delivery) => (
             <DeliveryRow
               key={delivery.id}

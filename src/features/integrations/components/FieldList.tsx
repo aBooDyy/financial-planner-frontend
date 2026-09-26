@@ -45,7 +45,7 @@ export function FieldList({
       aria-labelledby="rule-fields-heading"
       className="flex flex-col gap-3"
     >
-      <h4 id="rule-fields-heading" className="text-[14px] font-bold">
+      <h4 id="rule-fields-heading" className="text-[15px] font-extrabold">
         Fields
       </h4>
       {shown.map((field) => {
@@ -66,7 +66,7 @@ export function FieldList({
       })}
       {addable.length > 0 ? (
         <div className="flex flex-col gap-2">
-          <span className="text-[12px] font-semibold text-fp-text-2">
+          <span className="text-[13px] font-bold text-fp-text-2">
             Also read
           </span>
           <div className="flex flex-wrap gap-2">
@@ -78,12 +78,12 @@ export function FieldList({
                   onChange(field, {})
                   onTarget(field)
                 }}
-                className="inline-flex items-center gap-1 rounded-full border border-fp-border bg-fp-surface px-3 py-1.5 text-[12.5px] font-semibold text-fp-text-2 hover:border-fp-accent hover:text-fp-text"
+                className="inline-flex items-center gap-1 rounded-full border-[1.5px] border-fp-border bg-fp-surface px-[13px] py-2 text-[13px] font-semibold text-fp-text transition hover:border-fp-border-strong"
               >
                 <Plus size={13} strokeWidth={2.2} />
                 {FIELD_META[field].label}
                 {FIELD_META[field].hint ? (
-                  <span className="font-normal text-fp-text-3">
+                  <span className="font-medium text-fp-text-3">
                     ({FIELD_META[field].hint})
                   </span>
                 ) : null}

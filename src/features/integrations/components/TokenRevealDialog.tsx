@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { TriangleAlert } from 'lucide-react'
 import { Button } from '#/components/ui/button'
 import { ResponsiveDialog } from '#/components/ui/responsive-dialog'
+import { NoteBox } from '#/components/dialog/NoteBox'
 import { CopyField } from './CopyField'
 
 /** Long enough to select the text by hand; short enough not to feel like a lock. */
@@ -26,6 +27,7 @@ export function TokenRevealDialog({
   continueLabel,
   onContinue,
 }: Props) {
+  const { unlocked, unlock } = useUnlock(token)
   return (
     <ResponsiveDialog
       open={token !== null}
@@ -33,61 +35,48 @@ export function TokenRevealDialog({
       dismissible={false}
       title={title}
       description="This is the only time Means will show this key."
+      footer={
+        <Button
+          type="button"
+          size="dialog"
+          disabled={!unlocked}
+          onClick={onContinue}
+          className="flex-1"
+        >
+          {continueLabel}
+        </Button>
+      }
     >
       {token !== null ? (
-        <RevealBody
-          key={token}
-          token={token}
-          continueLabel={continueLabel}
-          onContinue={onContinue}
-        />
+        <>
+          <CopyField
+            key={token}
+            value={token}
+            label="Integration key"
+            onCopied={unlock}
+          />
+          <NoteBox tone="warn" icon={<TriangleAlert />}>
+            Copy it into your app now. If you lose it, rotate the key for a new
+            secret.
+          </NoteBox>
+        </>
       ) : null}
     </ResponsiveDialog>
   )
 }
 
-function RevealBody({
-  token,
-  continueLabel,
-  onContinue,
-}: {
-  token: string
-  continueLabel: string
-  onContinue: () => void
-}) {
-  const [unlocked, setUnlocked] = useState(false)
+/** Continue unlocks on a copy, or once the wait has passed — per secret shown. */
+function useUnlock(token: string | null) {
+  const [unlockedFor, setUnlockedFor] = useState<string | null>(null)
 
   useEffect(() => {
-    const timer = setTimeout(() => setUnlocked(true), REVEAL_UNLOCK_MS)
+    if (token === null) return
+    const timer = setTimeout(() => setUnlockedFor(token), REVEAL_UNLOCK_MS)
     return () => clearTimeout(timer)
-  }, [])
+  }, [token])
 
-  return (
-    <div className="flex flex-col gap-4 pt-2">
-      <CopyField
-        value={token}
-        label="Integration key"
-        onCopied={() => setUnlocked(true)}
-      />
-      <div className="flex items-start gap-2.5 rounded-xl bg-fp-surface-2 p-3 text-[12.5px] leading-relaxed text-fp-text-2">
-        <TriangleAlert
-          size={16}
-          strokeWidth={1.9}
-          className="mt-px shrink-0 text-fp-warn"
-        />
-        <span>
-          Copy it into your app now. If you lose it, rotate the key for a new
-          secret.
-        </span>
-      </div>
-      <Button
-        type="button"
-        disabled={!unlocked}
-        onClick={onContinue}
-        className="mb-2 self-end"
-      >
-        {continueLabel}
-      </Button>
-    </div>
-  )
+  return {
+    unlocked: token !== null && unlockedFor === token,
+    unlock: () => setUnlockedFor(token),
+  }
 }

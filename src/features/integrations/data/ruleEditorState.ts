@@ -23,6 +23,8 @@ export type OpenRule = {
   /** Where the rule sits (or will sit, for a new one) in the set. */
   index: number
   draft: RuleDraft
+  /** The rule as it was opened — what `draft` is compared with to tell an edit. */
+  base: RuleDraft
   isNew: boolean
 }
 
@@ -107,7 +109,7 @@ export function ruleEditorReducer(
       const draft = newRule(state.rules.length)
       return {
         ...state,
-        open: { index: state.rules.length, draft, isNew: true },
+        open: { index: state.rules.length, draft, base: draft, isNew: true },
         target: firstTarget(draft.fields),
         highlightReference: false,
       }
@@ -117,7 +119,7 @@ export function ruleEditorReducer(
       const draft = state.rules[action.index]
       return {
         ...state,
-        open: { index: action.index, draft, isNew: false },
+        open: { index: action.index, draft, base: draft, isNew: false },
         target: firstTarget(draft.fields),
         highlightReference: false,
       }

@@ -49,7 +49,7 @@ export function MatchConditionRow({
         aria-labelledby="rule-match-heading"
         className="flex flex-col gap-1.5"
       >
-        <h4 id="rule-match-heading" className="text-[14px] font-bold">
+        <h4 id="rule-match-heading" className="text-[15px] font-extrabold">
           Apply this rule when
         </h4>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -62,7 +62,7 @@ export function MatchConditionRow({
               onChange(EMPTY)
               onPick(true)
             }}
-            className="inline-flex items-center gap-1 text-[12.5px] font-semibold text-fp-accent-ink hover:underline"
+            className="inline-flex items-center gap-1 text-[13px] font-bold text-fp-accent-ink hover:underline"
           >
             <Plus size={13} strokeWidth={2.2} />
             Add a condition
@@ -79,14 +79,14 @@ export function MatchConditionRow({
     <section
       aria-labelledby="rule-match-heading"
       className={cn(
-        'flex flex-col gap-2 rounded-xl border bg-fp-surface p-3',
+        'flex flex-col gap-[10px] rounded-[14px] border-[1.5px] bg-fp-surface p-3',
         picking
           ? 'border-fp-accent ring-[3px] ring-fp-accent/15'
           : 'border-fp-border',
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <h4 id="rule-match-heading" className="text-[14px] font-bold">
+        <h4 id="rule-match-heading" className="text-[14px] font-extrabold">
           Apply this rule when
         </h4>
         <button
@@ -96,7 +96,7 @@ export function MatchConditionRow({
             onChange(null)
             onPick(false)
           }}
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-fp-text-3 hover:bg-fp-surface-2 hover:text-fp-text"
+          className="flex size-8 items-center justify-center rounded-[10px] bg-fp-surface-2 text-fp-text-2 hover:text-fp-text"
         >
           <X size={15} strokeWidth={2} />
         </button>
@@ -113,7 +113,7 @@ export function MatchConditionRow({
             aria-label="Condition path"
             aria-invalid={problem ? true : undefined}
             onChange={(e) => set({ path: e.target.value })}
-            className="py-2 text-start font-mono text-[13px]"
+            className="text-start font-mono text-[13px]"
           />
           <button
             type="button"
@@ -121,10 +121,10 @@ export function MatchConditionRow({
             onClick={() => onPick(!picking)}
             title="Pick from the payload"
             className={cn(
-              'flex h-9 shrink-0 items-center gap-1 rounded-lg border px-2.5 text-[12px] font-semibold',
+              'flex shrink-0 items-center gap-1 self-stretch rounded-[11px] border-[1.5px] px-3 text-[13px] font-bold transition',
               picking
                 ? 'border-fp-accent bg-fp-accent-soft text-fp-accent-ink'
-                : 'border-fp-border text-fp-text-2 hover:text-fp-text',
+                : 'border-fp-border bg-fp-surface text-fp-text-2 hover:border-fp-border-strong hover:text-fp-text',
             )}
           >
             <Crosshair size={14} strokeWidth={2} />
@@ -137,7 +137,7 @@ export function MatchConditionRow({
         >
           <SelectTrigger
             aria-label="Comparison"
-            className="w-full py-2 text-[13px] sm:w-[124px]"
+            className="w-full sm:w-[132px]"
           >
             <SelectValue />
           </SelectTrigger>
@@ -157,7 +157,7 @@ export function MatchConditionRow({
             aria-label="Value to compare with"
             maxLength={200}
             onChange={(e) => set({ value: e.target.value })}
-            className="py-2 text-[13px] sm:w-[34%]"
+            className="sm:w-[34%]"
           />
         ) : null}
       </div>
@@ -171,11 +171,11 @@ export function MatchConditionRow({
         </label>
       ) : null}
       {problem ? (
-        <p role="alert" className="text-[12px] text-fp-danger">
+        <p role="alert" className="text-[12px] font-semibold text-fp-danger">
           {problem}
         </p>
       ) : picking ? (
-        <p className="text-[12px] text-fp-accent-ink">
+        <p className="text-[12px] font-semibold text-fp-accent-ink">
           Tap a value in the payload to compare against it.
         </p>
       ) : null}

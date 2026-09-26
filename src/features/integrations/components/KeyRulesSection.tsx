@@ -1,10 +1,15 @@
-import { Plus } from 'lucide-react'
+import { useState } from 'react'
+import { CheckCircle2, Info, ListFilter, Plus } from 'lucide-react'
+import { ConfirmDialog } from '#/components/dialog/ConfirmDialog'
+import { NoteBox } from '#/components/dialog/NoteBox'
+import { EmptyState } from '#/components/EmptyState'
 import { Button } from '#/components/ui/button'
 import type { RuleEditorModel } from '#/features/integrations/hooks/useRuleEditor'
 import {
   OUTCOME_TEXT,
   ruleVerdicts,
 } from '#/features/integrations/data/verdicts'
+import { SMALL_BUTTON, SOFT_BUTTON } from './buttonStyles'
 import { RuleList } from './RuleList'
 
 type Props = {
@@ -21,51 +26,62 @@ export function KeyRulesSection({ model, locked }: Props) {
     ...model.saveProblems.byRule.keys(),
     ...dryRun.problems.byRule.keys(),
   ])
+  const [removing, setRemoving] = useState<number | null>(null)
 
   return (
     <section
       aria-labelledby="key-rules-heading"
-      className="flex flex-col gap-3 rounded-xl border border-fp-border bg-fp-surface-2 p-4"
+      className="flex flex-col gap-[10px]"
     >
-      <div className="flex items-center justify-between gap-3">
-        <h3 id="key-rules-heading" className="text-[14.5px] font-bold">
-          Rules
-        </h3>
-        {model.status === 'ready' ? (
-          <span className="text-[12px] text-fp-text-3 tabular-nums">
-            <bdi>
-              {rules.length} of {model.rulesMax}
-            </bdi>
-          </span>
-        ) : null}
+      <div>
+        <div className="flex items-center gap-2">
+          <h3
+            id="key-rules-heading"
+            className="flex-1 text-[15px] font-extrabold"
+          >
+            Rules
+          </h3>
+          {model.status === 'ready' ? (
+            <span className="text-[12.5px] font-semibold text-fp-text-3 tabular-nums">
+              <bdi>
+                {rules.length} of {model.rulesMax}
+              </bdi>
+            </span>
+          ) : null}
+        </div>
+        <p className="mt-[3px] text-[12.5px] leading-[1.45] text-fp-text-2">
+          Checked in order; the first that matches wins.
+        </p>
       </div>
-      <p className="text-[12.5px] leading-relaxed text-fp-text-2">
-        Checked in order; the first that matches wins.
-      </p>
 
       {model.status === 'loading' ? (
         <p className="text-[12.5px] text-fp-text-3">Loading rules…</p>
       ) : model.status === 'failed' ? (
-        <div className="flex flex-wrap items-center gap-3">
-          <p role="alert" className="text-[12.5px] text-fp-danger">
-            Couldn’t load this key’s rules.
-          </p>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={model.reload}
-            className="bg-fp-surface px-3 py-[7px] text-[12.5px] font-semibold"
-          >
-            Try again
-          </Button>
-        </div>
+        <NoteBox tone="danger">
+          <div className="flex flex-wrap items-center gap-3">
+            <span role="alert" className="flex-1">
+              Couldn’t load this key’s rules.
+            </span>
+            <Button
+              type="button"
+              variant="quiet"
+              onClick={model.reload}
+              className={SMALL_BUTTON}
+            >
+              Try again
+            </Button>
+          </div>
+        </NoteBox>
       ) : (
         <>
           {rules.length === 0 ? (
-            <p className="text-[12.5px] leading-relaxed text-fp-text-2">
-              No rules yet. Anything this key receives will wait in your review
-              queue until you add one.
-            </p>
+            <EmptyState
+              icon={ListFilter}
+              size="sm"
+              framed
+              title="No rules yet"
+              text="Anything this key receives will wait in your review queue until you add one."
+            />
           ) : (
             <RuleList
               rules={rules}
@@ -73,37 +89,41 @@ export function KeyRulesSection({ model, locked }: Props) {
               flagged={flagged}
               disabled={locked}
               onOpen={model.openRule}
-              onRemove={model.remove}
+              onRemove={setRemoving}
               onMove={model.move}
             />
           )}
           <SampleSummary model={model} />
           {model.conflict ? (
-            <div className="flex flex-wrap items-center gap-3">
-              <p role="alert" className="text-[12.5px] text-fp-danger">
-                These rules were changed somewhere else. Reload them to carry on
-                — your edits here will be lost.
-              </p>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={model.reload}
-                className="bg-fp-surface px-3 py-[7px] text-[12.5px] font-semibold"
-              >
-                Reload rules
-              </Button>
-            </div>
+            <NoteBox tone="danger">
+              <div className="flex flex-col items-start gap-2">
+                <span role="alert">
+                  These rules were changed somewhere else. Reload them to carry
+                  on — your edits here will be lost.
+                </span>
+                <Button
+                  type="button"
+                  variant="quiet"
+                  onClick={model.reload}
+                  className={SMALL_BUTTON}
+                >
+                  Reload rules
+                </Button>
+              </div>
+            </NoteBox>
           ) : null}
-          <Button
-            type="button"
-            variant="outline"
-            disabled={locked || !model.canAddRule}
-            onClick={model.add}
-            className="gap-1.5 self-start bg-fp-surface px-3.5 py-2 text-[13px] font-semibold"
-          >
-            <Plus size={15} strokeWidth={2.2} />
-            Add rule
-          </Button>
+          <div>
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={locked || !model.canAddRule}
+              onClick={model.add}
+              className={`${SMALL_BUTTON} ${SOFT_BUTTON} gap-1`}
+            >
+              <Plus size={15} strokeWidth={2.4} />
+              Add rule
+            </Button>
+          </div>
           {!model.canAddRule ? (
             <p className="text-[12px] text-fp-text-3">
               A key can have up to {model.rulesMax} rules.
@@ -111,6 +131,23 @@ export function KeyRulesSection({ model, locked }: Props) {
           ) : null}
         </>
       )}
+
+      <ConfirmDialog
+        open={removing !== null}
+        onOpenChange={(open) => {
+          if (!open) setRemoving(null)
+        }}
+        title={`Delete “${removing !== null ? (rules[removing]?.name ?? '') : ''}”?`}
+        bullets={[
+          'The rules after it move up one place.',
+          'Nothing changes until you save the key.',
+        ]}
+        confirmLabel="Delete"
+        onConfirm={() => {
+          if (removing !== null) model.remove(removing)
+          setRemoving(null)
+        }}
+      />
     </section>
   )
 }
@@ -124,8 +161,11 @@ function SampleSummary({ model }: { model: RuleEditorModel }) {
       ? `Your sample payload is handled by rule ${fired + 1}. ${OUTCOME_TEXT[result.would]}`
       : `No rule matches your sample payload. ${OUTCOME_TEXT[result.would]}`
   return (
-    <p role="status" className="text-[12.5px] text-fp-text-2">
-      {text}
-    </p>
+    <NoteBox
+      tone={fired !== null ? 'accent' : 'neutral'}
+      icon={fired !== null ? <CheckCircle2 /> : <Info />}
+    >
+      <span role="status">{text}</span>
+    </NoteBox>
   )
 }

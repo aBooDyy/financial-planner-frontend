@@ -7,6 +7,7 @@ import {
   CollapsibleTrigger,
 } from '#/components/ui/collapsible'
 import { sampleCurl } from '#/features/integrations/data/curl'
+import { SMALL_BUTTON } from './buttonStyles'
 import { CopyField } from './CopyField'
 
 type Props = { endpoint: string }
@@ -29,8 +30,8 @@ export function EndpointCard({ endpoint }: Props) {
           <CollapsibleTrigger asChild>
             <Button
               type="button"
-              variant="outline"
-              className="gap-1.5 bg-fp-surface px-3 py-[7px] text-[12.5px] font-semibold"
+              variant="quiet"
+              className={`${SMALL_BUTTON} gap-1.5`}
             >
               {open ? 'Hide curl' : 'Show curl'}
               <ChevronDown

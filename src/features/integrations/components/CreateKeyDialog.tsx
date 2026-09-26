@@ -1,7 +1,11 @@
-import { Button } from '#/components/ui/button'
+import { Chip, ChipRow } from '#/components/dialog/Chip'
+import { DialogActions } from '#/components/dialog/DialogActions'
+import { NoteBox } from '#/components/dialog/NoteBox'
+import { FormRow } from '#/components/FormRow'
 import { Input } from '#/components/ui/input'
 import { ResponsiveDialog } from '#/components/ui/responsive-dialog'
-import type { WalletGroupOption } from '#/features/balances/data/selectors'
+import { WalletSelect } from '#/features/wallets/components/WalletSelect'
+import type { WalletGroupOption } from '#/features/wallets/data/selectors'
 import type { CreatedKey, NewKey } from '#/features/integrations/api/types'
 import {
   KEY_NAME_MAX,
@@ -9,8 +13,9 @@ import {
 } from '#/features/integrations/hooks/useCreateKeyForm'
 import type { KeyOutcome } from '#/features/integrations/hooks/useIntegrationKeys'
 import { ExpiryField } from './ExpiryField'
-import { FormRow } from './FormRow'
-import { WalletSelect } from './WalletSelect'
+
+/** Naming a key is the one field people stall on, so the examples name it for them. */
+const EXAMPLES = ['Tasker', 'n8n', 'Shortcuts']
 
 type Props = {
   open: boolean
@@ -44,30 +49,23 @@ export function CreateKeyDialog({
       }}
       title="New key"
       footer={
-        <>
-          {online ? (
-            <div className="flex-1" />
-          ) : (
-            <span className="flex-1 text-[12px] text-fp-text-3">
-              You’re offline. A key can only be made by the server.
-            </span>
-          )}
-          <Button type="button" variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            form="create-key-form"
-            disabled={!online || !form.valid || form.saving}
-          >
-            {form.saving ? 'Creating…' : 'Create'}
-          </Button>
-        </>
+        <DialogActions
+          hint={
+            online
+              ? null
+              : 'You’re offline. A key can only be made by the server.'
+          }
+          onCancel={onClose}
+          submitLabel={form.saving ? 'Creating…' : 'Create'}
+          submitType="submit"
+          form="create-key-form"
+          disabled={!online || !form.valid || form.saving}
+        />
       }
     >
       <form
         id="create-key-form"
-        className="flex flex-col gap-4"
+        className="flex flex-col gap-[14px]"
         onSubmit={(e) => {
           e.preventDefault()
           void form.submit()
@@ -83,10 +81,26 @@ export function CreateKeyDialog({
             aria-invalid={error('name') ? true : undefined}
             onChange={(e) => form.set('name', e.target.value)}
           />
+          {form.draft.name.trim() === '' ? (
+            <div className="mt-2">
+              <ChipRow label="Example names">
+                {EXAMPLES.map((name) => (
+                  <Chip
+                    key={name}
+                    active={false}
+                    onClick={() => form.set('name', name)}
+                  >
+                    {name}
+                  </Chip>
+                ))}
+              </ChipRow>
+            </div>
+          ) : null}
         </FormRow>
         <FormRow
           id="new-key-wallet"
           label="Default account"
+          optional
           error={error('defaultWalletId')}
           help="Where its transactions land unless a rule says otherwise."
         >
@@ -101,15 +115,16 @@ export function CreateKeyDialog({
         <FormRow id="new-key-expiry" label="Expires" error={error('expiresAt')}>
           <ExpiryField
             id="new-key-expiry"
+            variant="chips"
             value={form.draft.expiresAt}
             onChange={(v) => form.set('expiresAt', v)}
             invalid={Boolean(error('expiresAt'))}
           />
         </FormRow>
         {general ? (
-          <p role="alert" className="text-[12.5px] text-fp-danger">
-            {general}
-          </p>
+          <NoteBox tone="danger">
+            <span role="alert">{general}</span>
+          </NoteBox>
         ) : null}
       </form>
     </ResponsiveDialog>

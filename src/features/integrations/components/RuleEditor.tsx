@@ -10,7 +10,7 @@ import { useFieldStatusContext } from '#/features/integrations/hooks/useFieldSta
 import type { RuleEditorModel } from '#/features/integrations/hooks/useRuleEditor'
 import type { ConstantChoices } from './ConstantInput'
 import { FieldList } from './FieldList'
-import { FormRow } from './FormRow'
+import { FormRow } from '#/components/FormRow'
 import { MatchConditionRow } from './MatchConditionRow'
 import { ReferenceWarning } from './ReferenceWarning'
 import { SamplePayloadPane } from './SamplePayloadPane'
@@ -44,7 +44,9 @@ export function RuleEditor({
   const root = useRef<HTMLDivElement>(null)
   // The dialog body is reused from the key view, so it would keep that view's scroll offset —
   // deep in the delivery log when the rule was opened from there.
-  useEffect(() => root.current?.scrollIntoView({ block: 'start' }), [])
+  useEffect(() => {
+    root.current?.scrollIntoView({ block: 'start' })
+  }, [])
   const problem =
     open !== null
       ? (model.dryRun.problems.byRule.get(open.index) ??
@@ -88,7 +90,7 @@ export function RuleEditor({
   ]
 
   return (
-    <div ref={root} className="flex flex-col gap-4 pb-2">
+    <div ref={root} className="flex scroll-mt-4 flex-col gap-[14px]">
       <FormRow id="rule-name" label="Rule name" error={problem?.name}>
         <Input
           id="rule-name"
@@ -151,7 +153,7 @@ export function RuleEditor({
         />
       </div>
       {problem?.other ? (
-        <p role="alert" className="text-[12px] text-fp-danger">
+        <p role="alert" className="text-[12px] font-semibold text-fp-danger">
           {problem.other}
         </p>
       ) : null}

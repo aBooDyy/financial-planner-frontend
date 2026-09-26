@@ -1,7 +1,15 @@
 import { CheckCircle2, Info, LoaderCircle, TriangleAlert } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { DryRunState } from '#/features/integrations/hooks/useDryRun'
+import { NoteBox } from '#/components/dialog/NoteBox'
+import type { NoteTone } from '#/components/dialog/NoteBox'
 import { OUTCOME_TEXT } from '#/features/integrations/data/verdicts'
+
+const NOTE_TONE: Record<'ok' | 'info' | 'error', NoteTone> = {
+  ok: 'accent',
+  info: 'neutral',
+  error: 'danger',
+}
 
 type Props = {
   dryRun: DryRunState
@@ -61,18 +69,8 @@ export function TraceBanner({ dryRun, index, ruleNames, hasSample }: Props) {
           ? LoaderCircle
           : Info
   return (
-    <p
-      role="status"
-      className={`flex items-start gap-2 rounded-xl border px-3 py-2.5 text-[12.5px] ${
-        tone === 'ok'
-          ? 'border-fp-accent/40 bg-fp-accent-soft text-fp-accent-ink'
-          : tone === 'error'
-            ? 'border-fp-danger/40 text-fp-danger'
-            : 'border-fp-border bg-fp-surface-2 text-fp-text-2'
-      }`}
-    >
-      <Icon aria-hidden size={15} strokeWidth={2} className="mt-px shrink-0" />
-      <span>{body}</span>
-    </p>
+    <NoteBox tone={NOTE_TONE[tone]} icon={<Icon />}>
+      <span role="status">{body}</span>
+    </NoteBox>
   )
 }

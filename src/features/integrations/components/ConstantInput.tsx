@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select'
-import type { WalletGroupOption } from '#/features/balances/data/selectors'
+import type { WalletGroupOption } from '#/features/wallets/data/selectors'
 import type { CategoryCatalog } from '#/features/categories/data/catalog'
 import type { LocatorField } from '#/features/integrations/api/ruleTypes'
 import type { CurrencyCode } from '#/lib/currency'
@@ -48,7 +48,6 @@ export function ConstantInput({
   const trigger = (
     <SelectTrigger
       id={id}
-      className="w-full"
       aria-label={label}
       aria-describedby={describedBy}
       aria-invalid={invalid}
@@ -119,7 +118,6 @@ export function ConstantInput({
           aria-invalid={invalid}
           maxLength={200}
           onChange={(e) => onChange(e.target.value)}
-          className="py-2 text-[13.5px]"
         />
       )
   }

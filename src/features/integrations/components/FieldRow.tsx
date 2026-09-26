@@ -48,7 +48,7 @@ export function FieldRow({
     <section
       aria-labelledby={`${id}-label`}
       className={cn(
-        'flex flex-col gap-2.5 rounded-xl border bg-fp-surface p-3 transition',
+        'flex flex-col gap-[10px] rounded-[14px] border-[1.5px] bg-fp-surface p-3 transition',
         isTarget
           ? 'border-fp-accent ring-[3px] ring-fp-accent/15'
           : 'border-fp-border',
@@ -72,7 +72,7 @@ export function FieldRow({
                   : 'border-fp-border-strong',
             )}
           />
-          <span id={`${id}-label`} className="text-[14px] font-bold">
+          <span id={`${id}-label`} className="text-[14px] font-extrabold">
             {meta.label}
           </span>
           <span className="truncate text-[11.5px] font-semibold text-fp-text-3">
@@ -139,7 +139,7 @@ function IconButton({
       type="button"
       aria-label={label}
       onClick={onClick}
-      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-fp-text-3 hover:bg-fp-surface-2 hover:text-fp-text"
+      className="flex size-[30px] shrink-0 items-center justify-center rounded-[9px] border-[1.5px] border-fp-border text-fp-text-3 transition hover:border-fp-border-strong hover:text-fp-text"
     >
       {children}
     </button>

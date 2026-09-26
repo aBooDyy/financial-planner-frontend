@@ -61,6 +61,8 @@ export type RuleEditorModel = {
   /** The last save lost a race with another edit; only a reload can continue. */
   conflict: boolean
   dirty: boolean
+  /** The open rule has edits that Done has not folded into the set yet. */
+  openDirty: boolean
   saving: boolean
   rulesMax: number
   canAddRule: boolean
@@ -184,6 +186,8 @@ export function useRuleEditor({
   )
 
   const dirty = state.status === 'ready' && !sameRules(state.rules, state.saved)
+  const openDirty =
+    state.open !== null && !sameRules([state.open.draft], [state.open.base])
   const ruleCount = state.rules.length + (state.open?.isNew ? 1 : 0)
 
   const save = useCallback(async (): Promise<boolean> => {
@@ -253,6 +257,7 @@ export function useRuleEditor({
     saveProblems: current?.problems ?? NO_PROBLEMS,
     conflict: current?.conflict ?? false,
     dirty,
+    openDirty,
     saving,
     rulesMax: limits.integrationRulesMax,
     canAddRule,

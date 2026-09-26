@@ -1,8 +1,8 @@
 import { useMemo } from 'react'
-import { ChevronLeft } from 'lucide-react'
-import { Button } from '#/components/ui/button'
+import { DialogActions } from '#/components/dialog/DialogActions'
+import { useDiscardGuard } from '#/components/dialog/useDiscardGuard'
 import { ResponsiveDialog } from '#/components/ui/responsive-dialog'
-import type { WalletGroupOption } from '#/features/balances/data/selectors'
+import type { WalletGroupOption } from '#/features/wallets/data/selectors'
 import type { CategoryCatalog } from '#/features/categories/data/catalog'
 import type {
   IntegrationKey,
@@ -88,65 +88,58 @@ export function KeyEditorDialog({
     if (await rules.save()) onClose()
   }
 
+  const keyGuard = useDiscardGuard({
+    dirty: editor.dirty || rules.dirty,
+    close: onClose,
+    message:
+      'You changed this key’s settings or rules. Closing now loses them.',
+  })
+  const ruleGuard = useDiscardGuard({
+    dirty: rules.openDirty,
+    close: () => rules.closeRule(false),
+    message: 'You changed this rule. Going back now loses the edits.',
+  })
+
   const ruleView = open !== null
   const title = ruleView ? (
-    <span className="flex items-center gap-2">
-      <button
-        type="button"
-        aria-label="Back to the key"
-        onClick={() => rules.closeRule(false)}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-fp-surface-2 text-fp-text-2 hover:text-fp-text"
-      >
-        <ChevronLeft size={17} strokeWidth={2} className="rtl:rotate-180" />
-      </button>
-      <span className="truncate">
-        Rule · {open.draft.name.trim() || 'Untitled rule'}
-      </span>
-    </span>
+    `Rule · ${open.draft.name.trim() || 'Untitled rule'}`
   ) : (
-    <span className="flex flex-wrap items-baseline gap-x-3">
-      <span>{apiKey.name}</span>
+    <>
+      {apiKey.name}{' '}
       <span
         dir="ltr"
-        className="font-mono text-[12.5px] font-normal text-fp-text-3"
+        className="font-mono text-[12.5px] font-medium tracking-normal text-fp-text-3"
       >
         {apiKey.tokenPrefix}…
       </span>
-    </span>
+    </>
   )
 
   const footer = ruleView ? (
-    <>
-      <span className="flex-1 text-[12px] text-fp-text-3">
-        {open.isNew ? 'Done adds it to the list.' : 'Done keeps your edits.'}{' '}
-        Save the key to store them.
-      </span>
-      <Button
-        type="button"
-        variant="outline"
-        onClick={() => rules.closeRule(false)}
-      >
-        Cancel
-      </Button>
-      <Button type="button" onClick={() => rules.closeRule(true)}>
-        Done
-      </Button>
-    </>
+    <DialogActions
+      hint={`${open.isNew ? 'Done adds it to the list.' : 'Done keeps your edits.'} Save the key to store them.`}
+      onCancel={ruleGuard.requestClose}
+      submitLabel="Done"
+      onSubmit={() => rules.closeRule(true)}
+    />
   ) : (
-    <>
-      <span
-        role={general ? 'alert' : undefined}
-        className={`flex-1 text-[12px] ${general ? 'text-fp-danger' : 'text-fp-text-3'}`}
-      >
-        {general ?? note}
-      </span>
-      <Button type="button" variant="outline" onClick={onClose}>
-        Cancel
-      </Button>
-      <Button type="button" disabled={!canSave} onClick={() => void save()}>
-        {saving ? 'Saving…' : 'Save'}
-      </Button>
-    </>
+    <div className="flex w-full flex-col gap-2">
+      {general ? (
+        <p
+          role="alert"
+          className="text-center text-[12px] font-semibold text-fp-danger"
+        >
+          {general}
+        </p>
+      ) : null}
+      <DialogActions
+        hint={general ? null : note}
+        onCancel={keyGuard.requestClose}
+        submitLabel={saving ? 'Saving…' : 'Save'}
+        onSubmit={() => void save()}
+        disabled={!canSave}
+      />
+    </div>
   )
 
   return (
@@ -154,10 +147,11 @@ export function KeyEditorDialog({
       open
       onOpenChange={(next) => {
         if (next) return
-        if (ruleView) rules.closeRule(false)
-        else onClose()
+        if (ruleView) ruleGuard.requestClose()
+        else keyGuard.requestClose()
       }}
       title={title}
+      onBack={ruleView ? ruleGuard.requestClose : undefined}
       contentClassName="sm:max-w-[920px]"
       sheetClassName="h-[96%] max-h-[96%]"
       footer={footer}
@@ -173,8 +167,8 @@ export function KeyEditorDialog({
           maxBytes={limits.integrationPayloadMaxBytes}
         />
       ) : (
-        <div className="flex flex-col gap-5 pb-2">
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="flex flex-col gap-[18px]">
+          <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
             <KeySettingsForm
               editor={editor}
               walletGroups={walletGroups}
@@ -196,6 +190,8 @@ export function KeyEditorDialog({
           />
         </div>
       )}
+      {keyGuard.prompt}
+      {ruleGuard.prompt}
     </ResponsiveDialog>
   )
 }

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { RuleDraft } from '#/features/integrations/data/ruleDraft'
 import type { RuleVerdict } from '#/features/integrations/data/verdicts'
-import { useDragReorder } from '#/features/integrations/hooks/useDragReorder'
+import { useDragReorder } from '#/hooks/useDragReorder'
 import { RuleListItem } from './RuleListItem'
 
 type Props = {

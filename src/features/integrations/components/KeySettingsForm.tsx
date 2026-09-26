@@ -1,6 +1,9 @@
-import type { ReactNode } from 'react'
-import { X } from 'lucide-react'
+import { Plus, X } from 'lucide-react'
 import { CurrencyPicker } from '#/components/CurrencyPicker'
+import { PillSwitch } from '#/components/dialog/PillSwitch'
+import { ToggleCard } from '#/components/dialog/ToggleCard'
+import { FieldLabel } from '#/components/FieldLabel'
+import { FieldMessage, FormRow } from '#/components/FormRow'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import {
@@ -10,8 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select'
-import { Switch } from '#/components/ui/switch'
-import type { WalletGroupOption } from '#/features/balances/data/selectors'
+import { WalletSelect } from '#/features/wallets/components/WalletSelect'
+import type { WalletGroupOption } from '#/features/wallets/data/selectors'
 import type { CategoryCatalog } from '#/features/categories/data/catalog'
 import {
   RATE_LIMIT_MAX,
@@ -19,19 +22,17 @@ import {
 } from '#/features/integrations/data/draft'
 import { KEY_NAME_MAX } from '#/features/integrations/hooks/useCreateKeyForm'
 import type { KeyEditor } from '#/features/integrations/hooks/useKeyEditor'
-import { Segmented } from '#/features/settings/components/Segmented'
 import type { TxType } from '#/features/transactions/api/types'
+import { TYPE_TINT } from '#/features/transactions/data/txDialog'
 import type { CurrencyCode } from '#/lib/currency'
 import { ExpiryField } from './ExpiryField'
-import { FormRow } from './FormRow'
-import { WalletSelect } from './WalletSelect'
 
 const NONE = '__none__'
 
-const TYPES: { value: TxType; label: string }[] = [
+const TYPES = [
   { value: 'spend', label: 'Spend' },
   { value: 'income', label: 'Income' },
-]
+] as const
 
 const NEEDS_WALLET =
   'Choose a default account first — Means needs to know which account to post to.'
@@ -56,29 +57,36 @@ export function KeySettingsForm({
     ? catalog.subsOf(draft.defaultCategory)
     : []
   const noWallet = draft.defaultWalletId === null
-  const autoConfirmError = errorFor('autoConfirm')
   const rateError = errorFor('rateLimitPerMinute')
 
   return (
-    <div className="flex flex-col gap-4">
-      <FormRow id="key-name" label="Name" error={errorFor('name')}>
-        <Input
-          id="key-name"
-          value={draft.name}
-          maxLength={KEY_NAME_MAX}
-          aria-invalid={errorFor('name') ? true : undefined}
-          onChange={(e) => set('name', e.target.value)}
-        />
-      </FormRow>
+    <section
+      aria-labelledby="key-settings-heading"
+      className="flex flex-col gap-[14px]"
+    >
+      <h3 id="key-settings-heading" className="text-[15px] font-extrabold">
+        Settings
+      </h3>
 
-      <FormRow id="key-expiry" label="Expires" error={errorFor('expiresAt')}>
-        <ExpiryField
-          id="key-expiry"
-          value={draft.expiresAt}
-          onChange={(v) => set('expiresAt', v)}
-          invalid={Boolean(errorFor('expiresAt'))}
-        />
-      </FormRow>
+      <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2">
+        <FormRow id="key-name" label="Name" error={errorFor('name')}>
+          <Input
+            id="key-name"
+            value={draft.name}
+            maxLength={KEY_NAME_MAX}
+            aria-invalid={errorFor('name') ? true : undefined}
+            onChange={(e) => set('name', e.target.value)}
+          />
+        </FormRow>
+        <FormRow id="key-expiry" label="Expires" error={errorFor('expiresAt')}>
+          <ExpiryField
+            id="key-expiry"
+            value={draft.expiresAt}
+            onChange={(v) => set('expiresAt', v)}
+            invalid={Boolean(errorFor('expiresAt'))}
+          />
+        </FormRow>
+      </div>
 
       <FormRow
         id="key-wallet"
@@ -94,31 +102,24 @@ export function KeySettingsForm({
         />
       </FormRow>
 
-      <div className="flex flex-col items-start">
-        <span
-          id="key-type-label"
-          className="mb-[6px] text-[12.5px] font-semibold text-fp-text-2"
-        >
-          Default type
-        </span>
-        <div role="group" aria-labelledby="key-type-label">
-          <Segmented
-            value={draft.defaultType}
-            options={TYPES}
-            onChange={(v) => set('defaultType', v)}
-          />
-        </div>
+      <div className="flex flex-col">
+        <FieldLabel>Default type</FieldLabel>
+        <PillSwitch<TxType>
+          label="Default type"
+          options={TYPES}
+          value={draft.defaultType}
+          onChange={(v) => set('defaultType', v)}
+          color={TYPE_TINT[draft.defaultType].ink}
+        />
       </div>
 
-      <div
-        className={`grid grid-cols-1 gap-4 ${subs.length > 0 ? 'sm:grid-cols-2' : ''}`}
-      >
+      <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2">
         <FormRow id="key-category" label="Default category">
           <Select
             value={draft.defaultCategory ?? NONE}
             onValueChange={(v) => set('defaultCategory', v === NONE ? null : v)}
           >
-            <SelectTrigger id="key-category" className="w-full">
+            <SelectTrigger id="key-category">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -131,15 +132,27 @@ export function KeySettingsForm({
             </SelectContent>
           </Select>
         </FormRow>
+        <FormRow
+          id="key-currency"
+          label="Default currency"
+          error={errorFor('defaultCurrency')}
+          help="Used when what arrives doesn’t say."
+        >
+          <DefaultCurrency
+            value={draft.defaultCurrency}
+            baseCurrency={baseCurrency}
+            onChange={(code) => set('defaultCurrency', code)}
+          />
+        </FormRow>
         {subs.length > 0 ? (
-          <FormRow id="key-subcategory" label="Subcategory">
+          <FormRow id="key-subcategory" label="Subcategory" optional>
             <Select
               value={draft.defaultSubcategory ?? NONE}
               onValueChange={(v) =>
                 set('defaultSubcategory', v === NONE ? null : v)
               }
             >
-              <SelectTrigger id="key-subcategory" className="w-full">
+              <SelectTrigger id="key-subcategory">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -155,78 +168,26 @@ export function KeySettingsForm({
         ) : null}
       </div>
 
-      <FormRow
-        id="key-currency"
-        label="Default currency"
-        error={errorFor('defaultCurrency')}
-        help="Used when what arrives doesn’t say."
-      >
-        {draft.defaultCurrency === null ? (
-          <Button
-            id="key-currency"
-            type="button"
-            variant="outline"
-            onClick={() => set('defaultCurrency', baseCurrency)}
-            className="justify-start bg-fp-surface-2 px-[13px] py-3 text-[14px] font-normal text-fp-text-3"
-          >
-            Not set — add one
-          </Button>
-        ) : (
-          <div className="flex items-center gap-2">
-            <CurrencyPicker
-              value={draft.defaultCurrency}
-              onChange={(code) => set('defaultCurrency', code)}
-              base={baseCurrency}
-              label="Default currency"
-              className="flex-1"
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => set('defaultCurrency', null)}
-              aria-label="Clear default currency"
-              className="h-[46px] w-[46px] shrink-0 rounded-xl text-fp-text-3"
-            >
-              <X size={16} strokeWidth={2} />
-            </Button>
-          </div>
-        )}
-      </FormRow>
-
-      <div className="flex flex-col overflow-hidden rounded-xl border border-fp-border">
-        <SwitchRow
-          id="key-auto-confirm"
-          label="Post without review"
-          desc={
-            autoConfirmError ??
-            (noWallet
+      <div className="flex flex-col">
+        <ToggleCard
+          title="Post without review"
+          description={
+            noWallet
               ? NEEDS_WALLET
-              : 'Complete transactions go straight to your ledger.')
+              : 'Complete transactions go straight to your ledger.'
           }
-          invalid={Boolean(autoConfirmError)}
-        >
-          <Switch
-            id="key-auto-confirm"
-            checked={draft.autoConfirm}
-            onCheckedChange={(on) => set('autoConfirm', on)}
-            disabled={noWallet && !draft.autoConfirm}
-            aria-describedby="key-auto-confirm-desc"
-          />
-        </SwitchRow>
-        <SwitchRow
-          id="key-stage-unmatched"
-          label="Keep payloads I can’t read"
-          desc="When nothing matches, save what was sent so you can finish it by hand."
-        >
-          <Switch
-            id="key-stage-unmatched"
-            checked={draft.stageUnmatched}
-            onCheckedChange={(on) => set('stageUnmatched', on)}
-            aria-describedby="key-stage-unmatched-desc"
-          />
-        </SwitchRow>
+          checked={draft.autoConfirm}
+          onCheckedChange={(on) => set('autoConfirm', on)}
+          disabled={noWallet && !draft.autoConfirm}
+        />
+        <FieldMessage error={errorFor('autoConfirm')} />
       </div>
+      <ToggleCard
+        title="Keep payloads I can’t read"
+        description="When nothing matches, save what was sent so you can finish it by hand."
+        checked={draft.stageUnmatched}
+        onCheckedChange={(on) => set('stageUnmatched', on)}
+      />
 
       <FormRow
         id="key-rate"
@@ -234,7 +195,7 @@ export function KeySettingsForm({
         error={rateError}
         help={`Requests a minute, ${RATE_LIMIT_MIN}–${RATE_LIMIT_MAX}. A safety rail for an app stuck retrying.`}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-[10px]">
           <Input
             id="key-rate"
             type="number"
@@ -249,42 +210,59 @@ export function KeySettingsForm({
             }
             aria-invalid={rateError ? true : undefined}
             onChange={(e) => set('rateLimitPerMinute', e.target.valueAsNumber)}
-            className="w-[110px] text-start tabular-nums"
+            className="w-[88px] text-center tabular-nums"
           />
-          <span className="text-[13px] text-fp-text-2">per minute</span>
+          <span className="text-[13px] font-semibold text-fp-text-2">
+            per minute
+          </span>
         </div>
       </FormRow>
-    </div>
+    </section>
   )
 }
 
-function SwitchRow({
-  id,
-  label,
-  desc,
-  invalid,
-  children,
+/** A key can leave the currency to whatever arrives, so "not set" is a real answer here. */
+function DefaultCurrency({
+  value,
+  baseCurrency,
+  onChange,
 }: {
-  id: string
-  label: string
-  desc: string
-  invalid?: boolean
-  children: ReactNode
+  value: CurrencyCode | null
+  baseCurrency: CurrencyCode
+  onChange: (code: CurrencyCode | null) => void
 }) {
+  if (value === null) {
+    return (
+      <button
+        id="key-currency"
+        type="button"
+        onClick={() => onChange(baseCurrency)}
+        className="flex w-full items-center gap-1 rounded-[14px] border-[1.5px] border-fp-border bg-fp-surface-2 px-[14px] py-3 text-start text-[13px] font-bold text-fp-accent-ink transition outline-none hover:border-fp-border-strong focus-visible:border-fp-accent focus-visible:ring-[3px] focus-visible:ring-fp-accent/15"
+      >
+        <Plus aria-hidden size={14} strokeWidth={2.4} />
+        Not set — add one
+      </button>
+    )
+  }
   return (
-    <div className="flex items-center gap-4 border-b border-fp-border px-[14px] py-3 last:border-b-0">
-      <div className="min-w-0 flex-1">
-        <label htmlFor={id} className="text-[14px] font-semibold">
-          {label}
-        </label>
-        <div
-          id={`${id}-desc`}
-          className={`mt-0.5 text-[12px] ${invalid ? 'text-fp-danger' : 'text-fp-text-3'}`}
-        >
-          {desc}
-        </div>
-      </div>
-      {children}
+    <div className="flex items-center gap-2">
+      <CurrencyPicker
+        value={value}
+        onChange={(code) => onChange(code)}
+        base={baseCurrency}
+        label="Default currency"
+        className="min-w-0 flex-1"
+      />
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        onClick={() => onChange(null)}
+        aria-label="Clear default currency"
+        className="size-[46px] shrink-0 rounded-[14px] text-fp-text-3"
+      >
+        <X size={16} strokeWidth={2} />
+      </Button>
     </div>
   )
 }

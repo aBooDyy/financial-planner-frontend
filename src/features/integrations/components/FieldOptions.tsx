@@ -1,4 +1,5 @@
 import { Plus, X } from 'lucide-react'
+import { FieldLabel } from '#/components/FieldLabel'
 import { Input } from '#/components/ui/input'
 import {
   Select,
@@ -89,12 +90,10 @@ function OptionSelect<T extends string>({
   onChange: (value: T) => void
 }) {
   return (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-[12px] font-semibold text-fp-text-2">
-        {label}
-      </label>
+    <div className="flex min-w-0 flex-col">
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
       <Select value={value} onValueChange={(v) => onChange(v as T)}>
-        <SelectTrigger id={id} className="w-full py-2 text-[13px]">
+        <SelectTrigger id={id}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -125,7 +124,7 @@ function TypeMap({
 
   return (
     <fieldset className="flex flex-col gap-1.5">
-      <legend className="mb-1 text-[12px] font-semibold text-fp-text-2">
+      <legend className="mb-2 text-[13px] font-bold text-fp-text-2">
         When the payload says…
       </legend>
       {entries.map(([word, type], i) => (
@@ -141,7 +140,7 @@ function TypeMap({
                 ),
               )
             }
-            className="min-w-0 flex-1 py-2 text-[13px]"
+            className="min-w-0 flex-1"
           />
           <Select
             value={type}
@@ -156,7 +155,7 @@ function TypeMap({
             <SelectTrigger
               id={`${id}-map-${i}`}
               aria-label={`Type for payload word ${i + 1}`}
-              className="w-[118px] shrink-0 py-2 text-[13px]"
+              className="w-[118px] shrink-0"
             >
               <SelectValue />
             </SelectTrigger>
@@ -169,7 +168,7 @@ function TypeMap({
             type="button"
             aria-label={`Remove payload word ${i + 1}`}
             onClick={() => write(entries.filter((_, j) => j !== i))}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-fp-text-3 hover:bg-fp-surface-2 hover:text-fp-text"
+            className="flex size-[30px] shrink-0 items-center justify-center rounded-[9px] border-[1.5px] border-fp-border text-fp-text-3 transition hover:border-fp-border-strong hover:text-fp-text"
           >
             <X size={15} strokeWidth={2} />
           </button>
@@ -179,7 +178,7 @@ function TypeMap({
         type="button"
         disabled={entries.some(([word]) => !word.trim())}
         onClick={() => write([...entries, ['', 'SPEND']])}
-        className="inline-flex items-center gap-1 self-start text-[12px] font-semibold text-fp-accent-ink hover:underline disabled:opacity-50 disabled:hover:no-underline"
+        className="inline-flex items-center gap-1 self-start text-[12.5px] font-bold text-fp-accent-ink hover:underline disabled:opacity-50 disabled:hover:no-underline"
       >
         <Plus size={13} strokeWidth={2.2} />
         Add a word

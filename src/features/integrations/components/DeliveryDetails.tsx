@@ -6,6 +6,7 @@ import type { IntegrationKey } from '#/features/integrations/api/types'
 import { canBuildFrom } from '#/features/integrations/data/deliveryText'
 import type { DeliverySummary } from '#/features/integrations/data/deliveryText'
 import { prettyJson } from '#/features/integrations/data/prettyJson'
+import { SMALL_BUTTON, SOFT_BUTTON } from './buttonStyles'
 import { DeliveryFieldReport } from './DeliveryFieldReport'
 
 type Props = {
@@ -40,7 +41,7 @@ export function DeliveryDetails({
   const noRuleFired = report !== null && delivery.ruleId === null
 
   return (
-    <div className="flex flex-col gap-3 pb-3.5 ps-[30px] pe-3.5">
+    <div className="flex flex-col gap-3 ps-[19px] pb-3">
       {summary.help ? (
         <p className="text-[12.5px] leading-relaxed text-fp-text-2">
           {summary.help}
@@ -82,7 +83,7 @@ export function DeliveryDetails({
         <div className="flex flex-col gap-1">
           <pre
             dir="ltr"
-            className="max-h-[200px] overflow-auto rounded-lg border border-fp-border bg-fp-surface-2 p-2.5 text-start font-mono text-[12px] leading-relaxed whitespace-pre-wrap break-all text-fp-text"
+            className="max-h-[200px] overflow-auto rounded-[12px] bg-fp-surface-2 p-3 text-start font-mono text-[12px] leading-relaxed break-all whitespace-pre-wrap text-fp-text"
           >
             {prettyJson(delivery.payloadExcerpt)}
           </pre>
@@ -100,10 +101,10 @@ export function DeliveryDetails({
         <div className="flex flex-wrap items-center gap-3">
           <Button
             type="button"
-            variant="outline"
+            variant="ghost"
             disabled={!online || building}
             onClick={onBuild}
-            className="gap-1.5 bg-fp-surface px-3 py-[7px] text-[12.5px] font-semibold"
+            className={`${SMALL_BUTTON} ${SOFT_BUTTON} gap-1.5`}
           >
             <Wrench size={14} strokeWidth={2} />
             {building

@@ -5,7 +5,7 @@ import type {
   Locator,
   LocatorField,
 } from '#/features/integrations/api/ruleTypes'
-import { Segmented } from '#/features/settings/components/Segmented'
+import { PillSwitch } from '#/components/dialog/PillSwitch'
 import { ConstantInput } from './ConstantInput'
 import type { ConstantChoices } from './ConstantInput'
 import { PatternHelp } from './PatternHelp'
@@ -59,13 +59,12 @@ export function LocatorInputs({
 
   return (
     <div className="flex flex-col gap-2">
-      <div
-        role="group"
-        aria-label={`Where ${label} comes from`}
-        className="self-start"
-      >
-        <Segmented value={source} options={SOURCES} onChange={switchSource} />
-      </div>
+      <PillSwitch
+        label={`Where ${label} comes from`}
+        options={SOURCES}
+        value={source}
+        onChange={switchSource}
+      />
 
       {source === 'const' ? (
         <ConstantInput
@@ -92,14 +91,14 @@ export function LocatorInputs({
             aria-describedby={describedBy}
             aria-invalid={invalid}
             onChange={(e) => onChange({ ...locator, path: e.target.value })}
-            className="py-2 text-start font-mono text-[13px]"
+            className="text-start font-mono text-[13px]"
           />
           {showPattern ? (
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center gap-2">
                 <label
                   htmlFor={`${id}-pattern`}
-                  className="shrink-0 text-[12px] font-semibold text-fp-text-2"
+                  className="shrink-0 text-[13px] font-bold text-fp-text-2"
                 >
                   Pattern
                 </label>
@@ -117,7 +116,7 @@ export function LocatorInputs({
                   onChange={(e) =>
                     onChange({ ...locator, regex: e.target.value })
                   }
-                  className="py-2 text-start font-mono text-[13px]"
+                  className="text-start font-mono text-[13px]"
                 />
                 <button
                   type="button"
@@ -129,7 +128,7 @@ export function LocatorInputs({
                     onChange(next)
                     setPatternOpen(false)
                   }}
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-fp-text-3 hover:bg-fp-surface-2 hover:text-fp-text"
+                  className="flex size-[30px] shrink-0 items-center justify-center rounded-[9px] border-[1.5px] border-fp-border text-fp-text-3 transition hover:border-fp-border-strong hover:text-fp-text"
                 >
                   <X size={15} strokeWidth={2} />
                 </button>
@@ -140,7 +139,7 @@ export function LocatorInputs({
             <button
               type="button"
               onClick={() => setPatternOpen(true)}
-              className="self-start text-[12px] font-semibold text-fp-accent-ink underline-offset-2 hover:underline"
+              className="self-start text-[12.5px] font-bold text-fp-accent-ink underline-offset-2 hover:underline"
             >
               Read part of the value with a pattern
             </button>
@@ -148,7 +147,7 @@ export function LocatorInputs({
         </>
       )}
       {problem ? (
-        <p role="alert" className="text-[12px] text-fp-danger">
+        <p role="alert" className="text-[12px] font-semibold text-fp-danger">
           {problem}
         </p>
       ) : null}

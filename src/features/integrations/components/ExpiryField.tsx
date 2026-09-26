@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Chip, ChipRow } from '#/components/dialog/Chip'
 import { DateField } from '#/components/DateField'
 import {
   Select,
@@ -24,9 +25,18 @@ type Props = {
   onChange: (expiresAt: string | null) => void
   invalid?: boolean
   disabled?: boolean
+  /** One-tap chips where there is room for them; a select in a tight column. */
+  variant?: 'chips' | 'select'
 }
 
-export function ExpiryField({ id, value, onChange, invalid, disabled }: Props) {
+export function ExpiryField({
+  id,
+  value,
+  onChange,
+  invalid,
+  disabled,
+  variant = 'select',
+}: Props) {
   const dateFormat = usePreferencesStore((s) => s.dateFormat)
   const [mode, setMode] = useState<ExpiryPreset>(
     value === null ? 'never' : 'date',
@@ -40,22 +50,39 @@ export function ExpiryField({ id, value, onChange, invalid, disabled }: Props) {
 
   return (
     <div className="flex flex-col gap-2">
-      <Select
-        value={mode}
-        onValueChange={(v) => pick(v as ExpiryPreset)}
-        disabled={disabled}
-      >
-        <SelectTrigger id={id} aria-invalid={invalid} className="w-full">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {EXPIRY_PRESETS.map((p) => (
-            <SelectItem key={p.value} value={p.value}>
-              {p.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {variant === 'chips' ? (
+        <div id={id}>
+          <ChipRow label="Expires">
+            {EXPIRY_PRESETS.map((p) => (
+              <Chip
+                key={p.value}
+                active={mode === p.value}
+                disabled={disabled}
+                onClick={() => pick(p.value)}
+              >
+                {p.label}
+              </Chip>
+            ))}
+          </ChipRow>
+        </div>
+      ) : (
+        <Select
+          value={mode}
+          onValueChange={(v) => pick(v as ExpiryPreset)}
+          disabled={disabled}
+        >
+          <SelectTrigger id={id} aria-invalid={invalid}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {EXPIRY_PRESETS.map((p) => (
+              <SelectItem key={p.value} value={p.value}>
+                {p.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
       {mode === 'date' ? (
         <DateField
           value={expiryDay(value)}
@@ -63,9 +90,10 @@ export function ExpiryField({ id, value, onChange, invalid, disabled }: Props) {
           dateFormat={dateFormat}
           invalid={invalid}
           ariaLabel="Expiry date"
+          hint
         />
       ) : mode !== 'never' && value ? (
-        <span className="text-[12px] text-fp-text-3">
+        <span className="text-[12px] font-medium text-fp-text-3">
           Stops working after {formatDate(new Date(value), dateFormat)}
         </span>
       ) : null}

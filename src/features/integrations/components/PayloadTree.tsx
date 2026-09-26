@@ -170,7 +170,7 @@ export function PayloadTree({
         dir="ltr"
         onKeyDown={onKeyDown}
         onMouseLeave={() => setPointed(null)}
-        className="max-h-[42vh] overflow-auto rounded-xl border border-fp-border bg-fp-surface py-1.5 text-start font-mono text-[12.5px] md:max-h-[380px]"
+        className="max-h-[42vh] overflow-auto rounded-[14px] border-[1.5px] border-fp-border bg-fp-surface py-1.5 text-start font-mono text-[12.5px] md:max-h-[380px]"
       >
         {root.children.map((child) => (
           <PayloadTreeItem

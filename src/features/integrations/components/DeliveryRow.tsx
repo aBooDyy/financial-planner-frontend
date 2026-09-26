@@ -48,24 +48,22 @@ export function DeliveryRow({ delivery, summary, ...details }: Props) {
 
   return (
     <Collapsible asChild open={open} onOpenChange={setOpen}>
-      <li className="border-b border-fp-border last:border-b-0">
-        <CollapsibleTrigger className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-start hover:bg-fp-surface-2">
+      <li className="border-t border-fp-border">
+        <CollapsibleTrigger className="flex w-full items-center gap-[10px] py-[10px] text-start">
           <span
             aria-hidden
-            className={cn('h-2 w-2 shrink-0 rounded-full', DOT[summary.tone])}
+            className={cn(
+              'size-[9px] shrink-0 rounded-full',
+              DOT[summary.tone],
+            )}
           />
-          <span className="min-w-0 flex-1">
-            <span
-              className={cn(
-                'block text-[13px] font-semibold',
-                DELIVERY_TONE_TEXT[summary.tone],
-              )}
-            >
+          <span className="min-w-0 flex-1 text-[13.5px]">
+            <span className={cn('font-bold', DELIVERY_TONE_TEXT[summary.tone])}>
               {summary.headline}
             </span>
             {delivery.ruleName ? (
-              <span className="block truncate text-[12px] text-fp-text-3">
-                Rule “<bdi>{delivery.ruleName}</bdi>”
+              <span className="font-medium text-fp-text-3">
+                {' · '}Rule “<bdi>{delivery.ruleName}</bdi>”
               </span>
             ) : null}
           </span>
