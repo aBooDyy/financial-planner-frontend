@@ -1,8 +1,6 @@
 import { useEffect } from 'react'
 import { Outlet, createRootRoute } from '@tanstack/react-router'
 import { Direction } from 'radix-ui'
-import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
-import { TanStackDevtools } from '@tanstack/react-devtools'
 import { useSync } from '#/db/useSync'
 import { useSessionBootstrap } from '#/features/auth/hooks/useSessionBootstrap'
 import { useEmailSyncBootstrap } from '#/features/email-sync/hooks/useEmailSyncBootstrap'
@@ -15,6 +13,7 @@ import { useCustomCurrencies } from '#/lib/config/useCustomCurrencies'
 import { applyStoredDirection, useDirectionStore } from '#/stores/direction'
 import { applyStoredTheme } from '#/stores/theme'
 import { TooltipProvider } from '#/components/ui/tooltip'
+import { Devtools } from '#/components/dev/Devtools'
 
 export const Route = createRootRoute({ component: RootLayout })
 
@@ -43,15 +42,7 @@ function RootLayout() {
         <PayloadViewContext.Provider value={ReviewPayloadTree}>
           <Outlet />
         </PayloadViewContext.Provider>
-        <TanStackDevtools
-          config={{ position: 'bottom-left' }}
-          plugins={[
-            {
-              name: 'Tanstack Router',
-              render: <TanStackRouterDevtoolsPanel />,
-            },
-          ]}
-        />
+        <Devtools />
       </TooltipProvider>
     </Direction.Provider>
   )

@@ -108,6 +108,11 @@ No server entry files exist yet, so this is clean:
    `HeadContent`, `Scripts`, and `shellComponent` rendering `<html>` — with
    `createRootRoute({ component: RootLayout })` where `RootLayout` renders `<Outlet />`
    (plus devtools). The HTML document now lives in `index.html`.
+   - **Devtools are dev-only.** Dropping `@tanstack/devtools-vite` also dropped the thing
+     that stripped `<TanStackDevtools>` from production builds — that shell does not no-op
+     itself. `<Devtools />` (`src/components/dev/`) lazy-imports the panel behind
+     `import.meta.env.DEV`, so the build eliminates it. Never import the devtools packages
+     anywhere else.
 7. **Verify scripts**: `pnpm dev`/`build`/`preview` are plain Vite; route codegen stays
    `pnpm generate-routes`.
 
