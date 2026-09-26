@@ -50,7 +50,7 @@ export function ColumnMappingStep({ csv, draft }: Props) {
         <div
           role="row"
           aria-rowindex={1}
-          className={`${GRID} sr-only border-b border-fp-border bg-fp-surface-2 px-[14px] py-2.5 text-[11.5px] font-semibold text-fp-text-2 md:not-sr-only md:grid`}
+          className={`${GRID} sr-only border-b border-fp-border bg-fp-surface-2 text-[12.5px] font-semibold text-fp-text-2 md:not-sr-only md:grid md:px-[14px] md:py-3`}
         >
           <span role="columnheader">Column</span>
           <span role="columnheader">Sample values</span>

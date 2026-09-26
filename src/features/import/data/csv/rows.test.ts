@@ -72,7 +72,7 @@ describe('buildRows — a split-column statement', () => {
       ],
       duplicateOf: null,
       duplicateOfIndex: null,
-      fingerprint: '2026-06-16|spend|4215|GBP|w1|tesco stores 3411 london',
+      fingerprint: '2026-06-16|spend|4215|GBP|w1|m:|tesco stores 3411 london',
       reference: null,
       excluded: false,
       prediction: null,

@@ -1,7 +1,7 @@
 import { db } from '#/db/db'
 import { schedulePush } from '#/db/sync'
-import { NODE_COLORS } from '#/features/balances/constants'
-import { createNodeWithId } from '#/features/balances/data/mutations'
+import { NODE_COLORS } from '#/features/wallets/constants'
+import { createNodeWithId } from '#/features/wallets/data/mutations'
 import {
   addMerchantAlias,
   createMerchantWithId,

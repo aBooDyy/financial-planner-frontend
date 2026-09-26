@@ -20,7 +20,7 @@ import type { DedupeIndex, LedgerTransaction } from './dedupe'
 import type { DedupeSettings, Mapping, ParsedRow } from './types'
 
 const LIMITS = { maxRows: 50_000, maxBytes: 10 * 1024 * 1024 }
-const WINDOW: DedupeSettings = { strategy: 'fingerprint', windowDays: 3 }
+const EXACT: DedupeSettings = { strategy: 'fingerprint' }
 
 const MESSY_MAPPING = testMapping({
   roles: ['date', 'merchant', 'amount', 'wallet'],
@@ -98,8 +98,8 @@ describe('fingerprintOf', () => {
     )
   })
 
-  it('prefers a bound merchant over the text, so spellings stop mattering', () => {
-    expect(fingerprintOf({ ...base, merchantId: 'm1' })).toBe(
+  it('keeps the note alongside a bound merchant, so only an exact repeat matches', () => {
+    expect(fingerprintOf({ ...base, merchantId: 'm1' })).not.toBe(
       fingerprintOf({
         ...base,
         merchantId: 'm1',
@@ -150,7 +150,7 @@ describe('markRow — against the ledger', () => {
     const [row] = markAll(
       coffee().slice(0, 1),
       buildDedupeIndex([ledgerRow()]),
-      WINDOW,
+      EXACT,
     )
     expect(row.duplicateOf).toBe('existing')
     expect(row.excluded).toBe(true)
@@ -158,20 +158,20 @@ describe('markRow — against the ledger', () => {
     expect(row.draft).not.toBeNull()
   })
 
-  it('matches a bank that posted two days late', () => {
+  it('does not match a day apart', () => {
     const [row] = markAll(
       coffee().slice(0, 1),
-      buildDedupeIndex([ledgerRow({ date: '2026-06-20' })]),
-      WINDOW,
+      buildDedupeIndex([ledgerRow({ date: '2026-06-19' })]),
+      EXACT,
     )
-    expect(row.duplicateOf).toBe('existing')
+    expect(row.duplicateOf).toBeNull()
   })
 
   it('does not match five days out', () => {
     const [row] = markAll(
       coffee().slice(0, 1),
       buildDedupeIndex([ledgerRow({ date: '2026-06-23' })]),
-      WINDOW,
+      EXACT,
     )
     expect(row.duplicateOf).toBeNull()
     expect(row.excluded).toBe(false)
@@ -184,11 +184,7 @@ describe('markRow — against the ledger', () => {
       ledgerRow({ id: 'c', note: 'SOMETHING ELSE' }),
       ledgerRow({ id: 'd', type: 'income' }),
     ]
-    const [row] = markAll(
-      coffee().slice(0, 1),
-      buildDedupeIndex(others),
-      WINDOW,
-    )
+    const [row] = markAll(coffee().slice(0, 1), buildDedupeIndex(others), EXACT)
     expect(row.duplicateOf).toBeNull()
   })
 
@@ -196,7 +192,7 @@ describe('markRow — against the ledger', () => {
     const [row] = markAll(
       coffee().slice(0, 1),
       buildDedupeIndex([ledgerRow()]),
-      { strategy: 'off', windowDays: 3 },
+      { strategy: 'off' },
     )
     expect(row.duplicateOf).toBeNull()
   })
@@ -204,7 +200,7 @@ describe('markRow — against the ledger', () => {
 
 describe('markRow — inside the file', () => {
   it('keeps the first of a planted pair and flags the second, with no other false positives', () => {
-    const rows = markAll(messyRows(), emptyDedupeIndex(), WINDOW)
+    const rows = markAll(messyRows(), emptyDedupeIndex(), EXACT)
     const flagged = rows.filter((row) => row.duplicateOfIndex !== null)
     expect(flagged).toHaveLength(1)
     expect(flagged[0].raw[1]).toBe('DUPLICATE COFFEE')
@@ -214,16 +210,16 @@ describe('markRow — inside the file', () => {
   })
 
   it('leaves unreadable rows out of the pass entirely', () => {
-    const rows = markAll(messyRows(), emptyDedupeIndex(), WINDOW)
+    const rows = markAll(messyRows(), emptyDedupeIndex(), EXACT)
     const unreadable = rows.filter((row) => row.draft === null)
     expect(unreadable.length).toBeGreaterThan(0)
     expect(unreadable.every((row) => row.duplicateOfIndex === null)).toBe(true)
   })
 
   it('flags every row when the same file is imported twice', () => {
-    const first = markAll(messyRows(), emptyDedupeIndex(), WINDOW)
+    const first = markAll(messyRows(), emptyDedupeIndex(), EXACT)
     const ledger = buildDedupeIndex(asLedger(first))
-    const second = markAll(messyRows(), ledger, WINDOW)
+    const second = markAll(messyRows(), ledger, EXACT)
     const committable = second.filter((row) => row.draft !== null)
     expect(committable.every((row) => row.duplicateOf !== null)).toBe(true)
   })
@@ -242,7 +238,7 @@ describe('markRow — by reference', () => {
       testContext({ today: '2026-06-30' }),
     )
 
-  const settings: DedupeSettings = { strategy: 'reference', windowDays: 3 }
+  const settings: DedupeSettings = { strategy: 'reference' }
 
   it('matches on the reference alone, whatever else changed', () => {
     const rows = referencedRows()
@@ -299,7 +295,7 @@ describe('movements in the ledger index', () => {
   it('matches a re-imported transfer side whatever its own note says', () => {
     const index = buildDedupeIndex([leg('transfer_in', 'w2')])
     const draft = {
-      date: '2026-09-10',
+      date: '2026-09-09',
       type: 'income' as const,
       amount: 30000,
       currency: 'SAR',

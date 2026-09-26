@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { CurrencyPicker } from '#/components/CurrencyPicker'
-import { Button } from '#/components/ui/button'
+import { DialogActions } from '#/components/dialog/DialogActions'
+import { NoteBox } from '#/components/dialog/NoteBox'
+import { FieldLabel } from '#/components/FieldLabel'
 import { Input } from '#/components/ui/input'
-import { Label } from '#/components/ui/label'
 import { ResponsiveDialog } from '#/components/ui/responsive-dialog'
 import type { WalletTarget } from '#/features/import/data/types'
 import type { CurrencyCode } from '#/lib/currency'
@@ -15,8 +16,6 @@ type Props = {
   baseCurrency: CurrencyCode
   onCreate: (target: WalletTarget) => void
 }
-
-const LABEL = 'mb-[6px] block text-[12px] font-semibold text-fp-text-2'
 
 /**
  * Records an account to create at import time. The id is minted here so every row bound to
@@ -58,50 +57,40 @@ export function CreateWalletDialog({
       onOpenChange={onOpenChange}
       title="New account"
       description="It is created when you import — nothing is written yet."
+      contentClassName="sm:max-w-[440px]"
       footer={
-        <>
-          <div className="flex-1" />
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-          >
-            Cancel
-          </Button>
-          <Button type="button" disabled={trimmed === ''} onClick={submit}>
-            Add account
-          </Button>
-        </>
+        <DialogActions
+          onCancel={() => onOpenChange(false)}
+          submitLabel="Add account"
+          disabled={trimmed === ''}
+          onSubmit={submit}
+        />
       }
     >
-      <div className="flex flex-col gap-[15px]">
-        <div>
-          <Label className={LABEL} htmlFor="new-wallet-name">
-            Name
-          </Label>
-          <Input
-            id="new-wallet-name"
-            value={name}
-            autoFocus
-            onChange={(event) => setName(event.target.value)}
-          />
-        </div>
-
-        <div>
-          <Label className={LABEL}>Currency</Label>
-          <CurrencyPicker
-            value={currency}
-            base={baseCurrency}
-            label="Account currency"
-            onChange={setCurrency}
-          />
-        </div>
-
-        <p className="rounded-xl bg-fp-surface-2 px-3 py-2.5 text-[12.5px] text-fp-text-2">
-          It starts at zero. Balances are worked out from your transactions, so
-          an opening amount would count the rows you are importing twice.
-        </p>
+      <div>
+        <FieldLabel htmlFor="new-wallet-name">Name</FieldLabel>
+        <Input
+          id="new-wallet-name"
+          value={name}
+          autoFocus
+          onChange={(event) => setName(event.target.value)}
+        />
       </div>
+
+      <div>
+        <FieldLabel>Currency</FieldLabel>
+        <CurrencyPicker
+          value={currency}
+          base={baseCurrency}
+          label="Account currency"
+          onChange={setCurrency}
+        />
+      </div>
+
+      <NoteBox tone="neutral">
+        It starts at zero. Balances are worked out from your transactions, so an
+        opening amount would count the rows you are importing twice.
+      </NoteBox>
     </ResponsiveDialog>
   )
 }

@@ -1,5 +1,6 @@
-import { Button } from '#/components/ui/button'
-import { ResponsiveDialog } from '#/components/ui/responsive-dialog'
+import { Undo2 } from 'lucide-react'
+import { ConfirmDialog } from '#/components/dialog/ConfirmDialog'
+import { NoteBox } from '#/components/dialog/NoteBox'
 import { batchPlan, planPhrase } from '#/features/import/data/importCounts'
 import { formatMoney } from '#/lib/currency'
 import type { LocalTransaction } from '#/db/types'
@@ -28,7 +29,7 @@ export function UndoImportDialog({ plan, busy, onClose, onConfirm }: Props) {
   const edited = plan?.edited ?? []
 
   return (
-    <ResponsiveDialog
+    <ConfirmDialog
       open={plan !== null}
       onOpenChange={(open) => {
         if (!open) onClose()
@@ -38,62 +39,45 @@ export function UndoImportDialog({ plan, busy, onClose, onConfirm }: Props) {
           ? `Remove the ${removing.transfers === 1 ? 'transfer' : 'transaction'} this import added?`
           : `Remove all ${planPhrase(removing)} this import added?`
       }
-      description="Accounts, categories and merchants it created are kept."
-      footer={
-        <>
-          <div className="flex-1" />
-          <Button type="button" variant="outline" onClick={onClose}>
-            Keep them
-          </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            disabled={busy || removable === 0}
-            onClick={onConfirm}
-          >
-            {busy ? 'Removing…' : 'Remove them'}
-          </Button>
-        </>
-      }
+      tone="danger"
+      icon={<Undo2 />}
+      cancelLabel="Keep them"
+      confirmLabel={busy ? 'Removing…' : 'Remove them'}
+      busy={busy}
+      confirmDisabled={removable === 0}
+      onConfirm={onConfirm}
+      note="Accounts, categories and merchants this import created stay. They may already hold other transactions, and an empty account is easier to live with than one that disappeared."
     >
-      <div className="flex flex-col gap-3 text-[13px] leading-relaxed text-fp-text-2">
-        <p>
-          {plan === null
-            ? null
-            : `“${plan.batch.label}” added ${planPhrase(batchPlan(plan.batch))}.`}{' '}
-          Removing them puts your balances, budgets and spending back where they
-          were.
-        </p>
+      <p>
+        {plan === null
+          ? null
+          : `“${plan.batch.label}” added ${planPhrase(batchPlan(plan.batch))}.`}{' '}
+        Removing them puts your balances, budgets and spending back where they
+        were.
+      </p>
 
-        {edited.length > 0 ? (
-          <div className="flex flex-col gap-1.5 rounded-xl bg-fp-surface-2 p-3">
-            <p className="font-semibold text-fp-text">
-              {edited.length === 1
-                ? '1 of them has changed since, and is kept:'
-                : `${number.format(edited.length)} of them have changed since, and are kept:`}
+      {edited.length > 0 ? (
+        <NoteBox tone="warn">
+          <p>
+            {edited.length === 1
+              ? '1 of them has changed since, and is kept:'
+              : `${number.format(edited.length)} of them have changed since, and are kept:`}
+          </p>
+          <ul className="mt-1 flex flex-col gap-[2px] font-medium">
+            {edited.slice(0, EDITED_SHOWN).map((tx) => (
+              <li key={tx.id} className="truncate">
+                {describe(tx)}
+              </li>
+            ))}
+          </ul>
+          {edited.length > EDITED_SHOWN ? (
+            <p className="mt-1 font-medium">
+              …and {number.format(edited.length - EDITED_SHOWN)} more you have
+              edited.
             </p>
-            <ul className="flex flex-col gap-1">
-              {edited.slice(0, EDITED_SHOWN).map((tx) => (
-                <li key={tx.id} className="truncate">
-                  {describe(tx)}
-                </li>
-              ))}
-            </ul>
-            {edited.length > EDITED_SHOWN ? (
-              <p>
-                …and {number.format(edited.length - EDITED_SHOWN)} more you have
-                edited.
-              </p>
-            ) : null}
-          </div>
-        ) : null}
-
-        <p>
-          Accounts, categories and merchants this import created stay. They may
-          already hold other transactions, and an empty account is easier to
-          live with than one that disappeared.
-        </p>
-      </div>
-    </ResponsiveDialog>
+          ) : null}
+        </NoteBox>
+      ) : null}
+    </ConfirmDialog>
   )
 }

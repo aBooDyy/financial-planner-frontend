@@ -44,9 +44,6 @@ export const referenceKey = (reference: string): string =>
 
 // --- Fingerprints --------------------------------------------------------------------
 
-/** Enough of the counterparty to tell two same-day, same-amount rows apart. */
-const LABEL_LENGTH = 40
-
 export type FingerprintParts = {
   date: string
   type: TxType
@@ -69,16 +66,14 @@ export type FingerprintParts = {
 const MOVEMENT_LABEL = '~'
 
 /**
- * The counterparty half of the key. A bound merchant id is preferred over any text: the
- * same shop is spelled one way in the file and another on the row it already created, and
- * the id is the one thing both sides agree on. The reference suffix is stripped so a row
- * imported with a reference still matches the same row typed in by hand.
+ * The counterparty half of the key: merchant and the whole note, so only a row that repeats
+ * another on every field is flagged. The reference suffix is stripped so a row imported with
+ * a reference still matches the same row typed in by hand.
  */
 const labelOf = (parts: FingerprintParts): string => {
   if (parts.movement === true) return MOVEMENT_LABEL
-  return parts.merchantId !== null && parts.merchantId !== undefined
-    ? `m:${parts.merchantId}`
-    : normalizeKey(stripReference(parts.note) ?? '').slice(0, LABEL_LENGTH)
+  const note = normalizeKey(stripReference(parts.note) ?? '')
+  return `m:${parts.merchantId ?? ''}|${note}`
 }
 
 export const fingerprintOf = (parts: FingerprintParts): string =>
@@ -90,19 +85,6 @@ export const fingerprintOf = (parts: FingerprintParts): string =>
     parts.walletId,
     labelOf(parts),
   ].join('|')
-
-/** The fingerprint without its date — what a ± window search actually matches on. */
-const dateless = (fingerprint: string): string =>
-  fingerprint.slice(fingerprint.indexOf('|') + 1)
-
-const dateOf = (fingerprint: string): string =>
-  fingerprint.slice(0, fingerprint.indexOf('|'))
-
-const DAY_MS = 24 * 60 * 60 * 1000
-
-const daysApart = (left: string, right: string): number =>
-  Math.abs(Date.parse(`${left}T00:00:00Z`) - Date.parse(`${right}T00:00:00Z`)) /
-  DAY_MS
 
 // --- The ledger index ----------------------------------------------------------------
 
@@ -145,11 +127,9 @@ export const toLedgerEntry = (row: {
         movement: true,
       }
 
-type Occurrence = { id: string; date: string }
-
 export type DedupeIndex = {
   byReference: Map<string, string>
-  byKey: Map<string, Occurrence[]>
+  byKey: Map<string, string>
 }
 
 export const emptyDedupeIndex = (): DedupeIndex => ({
@@ -158,17 +138,10 @@ export const emptyDedupeIndex = (): DedupeIndex => ({
 })
 
 const add = (index: DedupeIndex, id: string, fingerprint: string): void => {
-  const key = dateless(fingerprint)
-  const list = index.byKey.get(key)
-  const entry = { id, date: dateOf(fingerprint) }
-  if (list) list.push(entry)
-  else index.byKey.set(key, [entry])
+  if (!index.byKey.has(fingerprint)) index.byKey.set(fingerprint, id)
 }
 
-/**
- * One pass over the ledger rows the caller already narrowed to the file's date range ± the
- * window — a single Dexie read over the `date` index, never a query per row.
- */
+/** One pass over the ledger rows — a single Dexie read, never a query per row. */
 export const buildDedupeIndex = (
   rows: ReadonlyArray<LedgerTransaction>,
 ): DedupeIndex => {
@@ -182,20 +155,6 @@ export const buildDedupeIndex = (
     add(index, row.id, fingerprintOf(row))
   }
   return index
-}
-
-const matchWithin = (
-  index: DedupeIndex,
-  fingerprint: string,
-  windowDays: number,
-): string | null => {
-  const candidates = index.byKey.get(dateless(fingerprint))
-  if (!candidates) return null
-  const date = dateOf(fingerprint)
-  const hit = candidates.find(
-    (candidate) => daysApart(candidate.date, date) <= windowDays,
-  )
-  return hit ? hit.id : null
 }
 
 /** What a row repeats: an existing ledger transaction, or an earlier row of this file. */
@@ -229,7 +188,7 @@ export const markRow = (
   if (row.draft === null || row.fingerprint === '') return null
 
   // A mapped reference is exact; without one (or with the fingerprint strategy chosen)
-  // the windowed fingerprint is all there is.
+  // the same-day fingerprint is all there is.
   const key =
     settings.strategy === 'reference' && row.reference !== null
       ? referenceKey(row.reference)
@@ -238,13 +197,13 @@ export const markRow = (
   const ledgerHit =
     key !== null
       ? (ledger.byReference.get(key) ?? null)
-      : matchWithin(ledger, row.fingerprint, settings.windowDays)
+      : (ledger.byKey.get(row.fingerprint) ?? null)
   if (ledgerHit !== null) return { ledgerId: ledgerHit, earlierIndex: null }
 
   const fileHit =
     key !== null
       ? (seen.references.get(key) ?? null)
-      : earlierRow(seen.index, row.fingerprint, settings.windowDays)
+      : earlierRow(seen.index, row.fingerprint)
   if (fileHit !== null) return { ledgerId: null, earlierIndex: fileHit }
 
   if (key !== null) seen.references.set(key, row.index)
@@ -266,11 +225,7 @@ export const withDuplicate = (
         excluded: true,
       }
 
-const earlierRow = (
-  seen: DedupeIndex,
-  fingerprint: string,
-  windowDays: number,
-): number | null => {
-  const hit = matchWithin(seen, fingerprint, windowDays)
-  return hit === null ? null : Number(hit)
+const earlierRow = (seen: DedupeIndex, fingerprint: string): number | null => {
+  const hit = seen.byKey.get(fingerprint)
+  return hit === undefined ? null : Number(hit)
 }

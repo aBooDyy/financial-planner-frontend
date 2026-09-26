@@ -260,7 +260,7 @@ export const applyTemplateConfig = (
         types: { ...config.aliases.types },
         currencies: { ...config.aliases.currencies },
       },
-      dedupe: { ...config.dedupe },
+      dedupe: { strategy: config.dedupe.strategy },
     },
     unknown,
   }

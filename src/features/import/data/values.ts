@@ -12,6 +12,7 @@ import { lookup } from './types'
 import type { TxType } from '#/features/transactions/api/types'
 import type { MerchantIndex } from '#/features/merchants/data/matching'
 import type { CurrencyCode } from '#/lib/currency'
+import type { IconId } from '#/lib/icons/catalog.gen'
 import type {
   CategoryOption,
   DistinctValue,
@@ -47,6 +48,7 @@ export const ADJUSTMENT = '__adjustment__'
 /** What the two non-category answers read as, wherever a category select offers them. */
 export const MOVEMENT_TARGETS: TargetGroup = {
   label: 'Not income or spending',
+  section: 'Other',
   options: [
     { value: TRANSFER, label: 'Transfer between wallets' },
     { value: ADJUSTMENT, label: 'Balance adjustment' },
@@ -56,10 +58,21 @@ export const MOVEMENT_TARGETS: TargetGroup = {
 export type TargetOption = {
   value: string
   label: string
+  /** What a list shows under the option's own group heading, when shorter than `label`. */
+  name?: string
   hint?: string | null
+  icon?: IconId
+  color?: string
+  /** A short badge the chosen option wears on the picker's trigger, e.g. "Money in". */
+  tag?: string
 }
 
-export type TargetGroup = { label: string | null; options: TargetOption[] }
+export type TargetGroup = {
+  label: string | null
+  options: TargetOption[]
+  /** A band above the group, shared by its neighbours — money out vs money in. */
+  section?: string
+}
 
 export type ValueRow = {
   kind: ValueKind
@@ -556,5 +569,50 @@ export const preferredFirst = (
     ? options
     : [options[at], ...options.filter((_, index) => index !== at)]
 }
+
+export const CATEGORY_SECTION: Readonly<Record<TxType, string>> = {
+  spend: 'Money out',
+  income: 'Money in',
+}
+
+const TYPE_ORDER: Readonly<Record<TxType, number>> = { spend: 0, income: 1 }
+
+/**
+ * The user's categories as picker groups: each parent heads its own children, and every
+ * spending parent comes before every income one, each band named for its direction.
+ */
+export const categoryTargetGroups = (
+  categories: ReadonlyArray<CategoryOption>,
+): TargetGroup[] =>
+  categories
+    .filter((option) => option.subcategory === null)
+    .sort((a, b) => TYPE_ORDER[a.type] - TYPE_ORDER[b.type])
+    .map((parent) => ({
+      label: parent.name,
+      section: CATEGORY_SECTION[parent.type],
+      options: [
+        {
+          value: categoryValue(parent.category, null),
+          label: parent.name,
+          icon: parent.icon,
+          color: parent.color,
+          tag: CATEGORY_SECTION[parent.type],
+        },
+        ...categories
+          .filter(
+            (option) =>
+              option.category === parent.category &&
+              option.subcategory !== null,
+          )
+          .map((option) => ({
+            value: categoryValue(option.category, option.subcategory),
+            label: `${parent.name} › ${option.name}`,
+            name: option.name,
+            icon: option.icon,
+            color: option.color,
+            tag: CATEGORY_SECTION[parent.type],
+          })),
+      ],
+    }))
 
 export { distinctValues }

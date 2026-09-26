@@ -1,4 +1,5 @@
 import { History } from 'lucide-react'
+import { EmptyState } from '#/components/EmptyState'
 import { useImportHistory } from '#/features/import/hooks/useImportHistory'
 import { useUndoImport } from '#/features/import/hooks/useUndoImport'
 import { ImportHistoryRow } from './ImportHistoryRow'
@@ -16,17 +17,13 @@ export function ImportHistoryCard() {
       <h2 className="text-[15px] font-bold">Recent imports</h2>
 
       {batches.length === 0 ? (
-        <div
-          className={`${CARD} flex items-center gap-3 p-[18px] text-[13px] text-fp-text-3`}
-        >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] bg-fp-surface-2 text-fp-text-3">
-            <History size={18} strokeWidth={1.8} />
-          </span>
-          <span>
-            Nothing imported yet. Anything you bring in will be listed here so
-            you can see what it added.
-          </span>
-        </div>
+        <EmptyState
+          icon={History}
+          size="sm"
+          framed
+          title="Nothing imported yet"
+          text="Anything you bring in will be listed here so you can see what it added."
+        />
       ) : (
         <div className={`${CARD} overflow-hidden`}>
           {batches.map((batch) => (

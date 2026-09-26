@@ -1,31 +1,26 @@
 import { useState } from 'react'
 import { CurrencyPicker } from '#/components/CurrencyPicker'
 import { DateField } from '#/components/DateField'
-import { Button } from '#/components/ui/button'
+import { AmountWell } from '#/components/dialog/AmountWell'
+import type { AmountTone } from '#/components/dialog/AmountWell'
+import { DialogActions } from '#/components/dialog/DialogActions'
+import { FieldLabel } from '#/components/FieldLabel'
+import { FieldMessage } from '#/components/FormRow'
 import { Input } from '#/components/ui/input'
-import { Label } from '#/components/ui/label'
 import { ResponsiveDialog } from '#/components/ui/responsive-dialog'
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from '#/components/ui/select'
 import {
   formFor,
   formValid,
   hasFlow,
   patchFor,
 } from '#/features/import/data/rowEditForm'
-import { amountInputProps, parseAmountToMinor } from '#/lib/currency'
+import { parseAmountToMinor } from '#/lib/currency'
 import { usePreferencesStore } from '#/stores/preferences'
 import { RowKindField } from './RowKindField'
+import { TargetPicker } from './TargetPicker'
 import { WalletSelect } from './WalletSelect'
 import type { RowPatch } from '#/features/import/data/rowEdits'
-import type { RowForm } from '#/features/import/data/rowEditForm'
+import type { RowForm, RowKind } from '#/features/import/data/rowEditForm'
 import type { TargetGroup } from '#/features/import/data/values'
 import type { MappingDefaults, ParsedRow } from '#/features/import/data/types'
 import type { CurrencyCode } from '#/lib/currency'
@@ -41,7 +36,12 @@ type Props = {
   defaults: MappingDefaults
 }
 
-const LABEL = 'mb-[6px] block text-[12px] font-semibold text-fp-text-2'
+const AMOUNT_TONE: Record<RowKind, AmountTone> = {
+  spend: 'spend',
+  income: 'accent',
+  transfer: 'transfer',
+  adjustment: 'neutral',
+}
 
 /**
  * One row, corrected by hand. Only the fields the user actually changed become a patch —
@@ -91,65 +91,55 @@ function RowEditForm({
       title={`Row ${row.index + 1}`}
       description={`Line ${row.line} of the file. Fixing it re-checks it straight away.`}
       footer={
-        <>
-          <div className="flex-1" />
-          <Button type="button" variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="button" disabled={!valid} onClick={submit}>
-            Save row
-          </Button>
-        </>
+        <DialogActions
+          onCancel={onClose}
+          submitLabel="Save row"
+          disabled={!valid}
+          onSubmit={submit}
+        />
       }
     >
-      <div className="flex flex-col gap-[15px]">
-        <div>
-          <Label className={LABEL}>Date</Label>
+      <AmountWell
+        question="How much?"
+        currency={form.currency}
+        amount={form.amount}
+        onAmount={(v) => set('amount', v)}
+        invalid={amountMinor === null}
+        tone={AMOUNT_TONE[form.kind]}
+      >
+        <CurrencyPicker
+          value={form.currency}
+          base={baseCurrency}
+          label="Row currency"
+          align="center"
+          appearance="pill"
+          onChange={(code) => set('currency', code)}
+        />
+      </AmountWell>
+
+      <RowKindField
+        kind={form.kind}
+        flow={form.flow}
+        onKind={(kind) => set('kind', kind)}
+        onFlow={(flow) => set('flow', flow)}
+      />
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="min-w-0">
+          <FieldLabel>Date</FieldLabel>
           <DateField
             value={form.date}
             dateFormat={dateFormat}
             ariaLabel="Date"
             invalid={form.date === ''}
+            hint
             onChange={(iso) => set('date', iso)}
           />
         </div>
-
-        <div className="grid grid-cols-[minmax(0,1fr)_120px] gap-2.5">
-          <div>
-            <Label className={LABEL} htmlFor="row-amount">
-              Amount
-            </Label>
-            <Input
-              id="row-amount"
-              dir="ltr"
-              value={form.amount}
-              aria-invalid={amountMinor === null}
-              {...amountInputProps(form.currency)}
-              onChange={(event) => set('amount', event.target.value)}
-            />
-          </div>
-          <div>
-            <Label className={LABEL}>Currency</Label>
-            <CurrencyPicker
-              value={form.currency}
-              base={baseCurrency}
-              label="Row currency"
-              onChange={(code) => set('currency', code)}
-            />
-          </div>
-        </div>
-
-        <RowKindField
-          kind={form.kind}
-          flow={form.flow}
-          onKind={(kind) => set('kind', kind)}
-          onFlow={(flow) => set('flow', flow)}
-        />
-
-        <div>
-          <Label className={LABEL} htmlFor="row-wallet">
-            Account
-          </Label>
+        <div className="min-w-0">
+          <FieldLabel htmlFor="row-wallet">
+            {form.kind === 'transfer' ? 'From which account?' : 'Account'}
+          </FieldLabel>
           <WalletSelect
             id="row-wallet"
             value={form.walletId}
@@ -157,68 +147,51 @@ function RowEditForm({
             onChange={(walletId) => set('walletId', walletId)}
           />
         </div>
+      </div>
 
-        {form.kind === 'transfer' ? (
-          <div>
-            <Label className={LABEL} htmlFor="row-counterpart">
-              Other account
-            </Label>
-            <WalletSelect
-              id="row-counterpart"
-              value={form.counterpartId}
-              wallets={wallets}
-              exclude={form.walletId}
-              onChange={(walletId) => set('counterpartId', walletId)}
-            />
-            {pairedWith !== null ? (
-              <p className="mt-[6px] text-[12px] text-fp-text-3">
-                Paired with row {pairedWith + 1} of this file. Changing the
-                amount, date, direction or either account splits the pair.
-              </p>
-            ) : null}
-          </div>
-        ) : null}
-
-        {hasFlow(form.kind) ? null : (
-          <div>
-            <Label className={LABEL} htmlFor="row-category">
-              Category
-            </Label>
-            <Select
-              value={form.category}
-              onValueChange={(value) => set('category', value)}
-            >
-              <SelectTrigger id="row-category">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((group, index) => (
-                  <SelectGroup key={group.label ?? `categories-${index}`}>
-                    {group.label ? (
-                      <SelectLabel>{group.label}</SelectLabel>
-                    ) : null}
-                    {group.options.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
+      {form.kind === 'transfer' ? (
         <div>
-          <Label className={LABEL} htmlFor="row-note">
-            Note
-          </Label>
-          <Input
-            id="row-note"
-            value={form.note}
-            onChange={(event) => set('note', event.target.value)}
+          <FieldLabel htmlFor="row-counterpart">Other account</FieldLabel>
+          <WalletSelect
+            id="row-counterpart"
+            value={form.counterpartId}
+            wallets={wallets}
+            exclude={form.walletId}
+            onChange={(walletId) => set('counterpartId', walletId)}
+          />
+          <FieldMessage
+            help={
+              pairedWith !== null
+                ? `Paired with row ${pairedWith + 1} of this file. Changing the amount, date, direction or either account splits the pair.`
+                : null
+            }
           />
         </div>
+      ) : null}
+
+      {hasFlow(form.kind) ? null : (
+        <div>
+          <FieldLabel htmlFor="row-category">Category</FieldLabel>
+          <TargetPicker
+            id="row-category"
+            value={form.category}
+            placeholder="Pick a category"
+            searchPlaceholder="Search categories…"
+            groups={categories}
+            onChange={(value) => set('category', value)}
+          />
+        </div>
+      )}
+
+      <div>
+        <FieldLabel htmlFor="row-note" optional>
+          Note
+        </FieldLabel>
+        <Input
+          id="row-note"
+          value={form.note}
+          onChange={(event) => set('note', event.target.value)}
+        />
       </div>
     </ResponsiveDialog>
   )

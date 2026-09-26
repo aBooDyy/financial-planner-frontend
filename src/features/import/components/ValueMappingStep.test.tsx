@@ -96,8 +96,13 @@ const renderStep = (seed: Partial<StubSeed> = {}) =>
   )
 
 beforeAll(() => {
-  // jsdom implements neither of these, and the shared modal chrome needs both.
+  // jsdom implements none of these; the modal chrome and the searchable pickers need them.
   Element.prototype.scrollIntoView = () => undefined
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
   window.matchMedia = (query: string) =>
     ({
       matches: true,
@@ -230,9 +235,7 @@ describe('ValueMappingStep', () => {
       true,
     )
 
-    fireEvent.keyDown(screen.getByLabelText('What “Al Bilad” means'), {
-      key: 'Enter',
-    })
+    fireEvent.click(screen.getByLabelText('What “Al Bilad” means'))
     fireEvent.click(screen.getByRole('option', { name: 'Savings · SAR' }))
 
     expect(screen.getByLabelText('What “Al Bilad” means')).toHaveProperty(
@@ -307,9 +310,7 @@ describe('ValueMappingStep', () => {
   it('records a wallet to create without touching the database', () => {
     renderStep()
 
-    fireEvent.keyDown(screen.getByLabelText('What “MADA CARD 4471” means'), {
-      key: 'Enter',
-    })
+    fireEvent.click(screen.getByLabelText('What “MADA CARD 4471” means'))
     fireEvent.click(screen.getByRole('option', { name: 'Create an account…' }))
 
     expect(screen.getByLabelText('Name')).toHaveProperty(

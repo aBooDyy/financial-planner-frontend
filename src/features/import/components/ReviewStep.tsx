@@ -3,7 +3,10 @@ import type { KeyboardEvent } from 'react'
 import { Checkbox } from '#/components/ui/checkbox'
 import { useIsDesktop } from '#/hooks/useMediaQuery'
 import { planLabel } from '#/features/import/data/importCounts'
-import { categoryValue } from '#/features/import/data/values'
+import {
+  categoryTargetGroups,
+  categoryValue,
+} from '#/features/import/data/values'
 import { useDuplicateTargets } from '#/features/import/hooks/useDuplicateTargets'
 import { useVirtualRows } from '#/hooks/useVirtualRows'
 import { formatDate, parseISODate } from '#/lib/date'
@@ -51,6 +54,8 @@ const walletGroupsFor = (
     options: group.wallets.map((wallet) => ({
       value: wallet.id,
       label: wallet.name,
+      icon: wallet.icon,
+      color: wallet.color,
     })),
   }))
   const pending = Object.values(draft.aliases.wallets)
@@ -72,22 +77,7 @@ const categoryGroupsFor = (
     categories.find(
       (option) => option.category === slug && option.subcategory === null,
     )?.name ?? slug
-  const parents = categories.filter((option) => option.subcategory === null)
-  const groups: TargetGroup[] = parents.map((parent) => ({
-    label: parent.name,
-    options: [
-      { value: categoryValue(parent.category, null), label: parent.name },
-      ...categories
-        .filter(
-          (option) =>
-            option.category === parent.category && option.subcategory !== null,
-        )
-        .map((option) => ({
-          value: categoryValue(option.category, option.subcategory),
-          label: `${parent.name} › ${option.name}`,
-        })),
-    ],
-  }))
+  const groups = categoryTargetGroups(categories)
   const pending = Object.values(draft.aliases.categories)
     .filter((target) => target.kind === 'create')
     .map((target) => ({

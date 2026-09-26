@@ -10,6 +10,7 @@ import type { CategoryCatalog } from '#/features/categories/data/catalog'
 import type { TxType } from '#/features/transactions/api/types'
 import type { CurrencyMeta } from '#/lib/config/appConfig'
 import type { CurrencyCode } from '#/lib/currency'
+import type { IconId } from '#/lib/icons/catalog.gen'
 
 /**
  * Matching a file's own words to the things this app knows about: accounts, categories,
@@ -122,13 +123,20 @@ export type WalletOption = {
   currency: CurrencyCode | null
   /** The group path the wallet sits in ("Cards › Visa"), when it has one. */
   group?: string | null
+  icon?: IconId
+  color?: string
 }
 
 /** Flatten `walletGroupOptions()` into the candidate list the matcher scores. */
 export const walletOptionsFrom = (
   groups: ReadonlyArray<{
     label: string | null
-    wallets: ReadonlyArray<{ id: string; name: string }>
+    wallets: ReadonlyArray<{
+      id: string
+      name: string
+      icon?: IconId
+      color?: string
+    }>
   }>,
   currencyOf: (id: string) => CurrencyCode | null = () => null,
 ): WalletOption[] =>
@@ -136,6 +144,8 @@ export const walletOptionsFrom = (
     group.wallets.map((wallet) => ({
       id: wallet.id,
       name: wallet.name,
+      icon: wallet.icon,
+      color: wallet.color,
       currency: currencyOf(wallet.id),
       group: group.label,
     })),
@@ -234,6 +244,8 @@ export type CategoryOption = {
   subcategory: string | null
   name: string
   type: TxType
+  icon?: IconId
+  color?: string
 }
 
 /**
@@ -247,12 +259,16 @@ export const categoryOptions = (catalog: CategoryCatalog): CategoryOption[] =>
       subcategory: null,
       name: category.name,
       type: category.type,
+      icon: category.icon,
+      color: category.color,
     },
     ...category.subs.map((sub) => ({
       category: category.slug,
       subcategory: sub.slug,
       name: sub.name,
       type: category.type,
+      icon: sub.icon,
+      color: sub.color,
     })),
   ])
 

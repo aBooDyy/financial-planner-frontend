@@ -77,7 +77,7 @@ export function InboxSourceCard() {
         <ScanNowControl
           className="mt-1.5"
           connectionId={many ? undefined : connections[0].id}
-          label={many ? 'Scan all' : 'Scan now'}
+          label={many ? 'Sync all' : 'Sync now'}
         />
       ) : null}
     </ImportSourceCard>

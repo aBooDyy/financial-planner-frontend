@@ -1,5 +1,6 @@
 import { isSupportedCurrency, toMinor } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
+import { asciiDigits } from '#/lib/digits'
 
 /**
  * Amount reading for imported files. Every path ends at `toMinor`, which takes its scale
@@ -16,18 +17,11 @@ const BIDI_MARKS = new RegExp(
   '[\u200e\u200f\u061c\u202a-\u202e\u2066-\u2069]',
   'g',
 )
-const ARABIC_INDIC = /[٠-٩۰-۹]/g
 const ARABIC_DECIMAL = /٫/g
 const ARABIC_THOUSANDS = /٬/g
 
 /** Letters wedged between digits mean the cell is prose, not a number ("3 of 5"). */
 const PROSE = /\d[^\d.,]*(?:[A-Za-z]|\p{Script=Arabic})[^\d.,]*\d/u
-
-// Both Arabic-Indic digit blocks start at a multiple of 16, so the low nibble is the value.
-const asciiDigits = (value: string): string =>
-  value.replace(ARABIC_INDIC, (digit) =>
-    String((digit.codePointAt(0) ?? 0) & 0xf),
-  )
 
 /** Shape test for column detection, before the decimal separator is known. */
 export const isAmountLike = (value: string): boolean => {

@@ -213,19 +213,25 @@ describe('ReviewStep', () => {
     const view = render(harness(false))
 
     fireEvent.click(screen.getByLabelText('Edit row 1'))
-    fireEvent.change(screen.getByLabelText('Note'), {
+    fireEvent.change(screen.getByLabelText(/^Note/), {
       target: { value: 'weekly shop' },
     })
     // The typing itself re-rendered the step with a fresh `defaults` object, which used to
     // be enough on its own to wipe the field.
-    expect(screen.getByLabelText('Note')).toHaveProperty('value', 'weekly shop')
+    expect(screen.getByLabelText(/^Note/)).toHaveProperty(
+      'value',
+      'weekly shop',
+    )
 
     view.rerender(harness(true))
 
     // The grid goes while the pass runs; the dialog and what was typed into it do not.
     expect(screen.getByText(/Checking \d+ of 5 rows/)).toBeDefined()
     expect(screen.queryByRole('grid', { hidden: true })).toBeNull()
-    expect(screen.getByLabelText('Note')).toHaveProperty('value', 'weekly shop')
+    expect(screen.getByLabelText(/^Note/)).toHaveProperty(
+      'value',
+      'weekly shop',
+    )
   })
 
   it('renders a window, not ten thousand rows', () => {

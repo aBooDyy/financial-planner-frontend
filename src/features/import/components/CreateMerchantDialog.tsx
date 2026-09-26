@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Button } from '#/components/ui/button'
+import { DialogActions } from '#/components/dialog/DialogActions'
+import { NoteBox } from '#/components/dialog/NoteBox'
+import { FormRow } from '#/components/FormRow'
 import { Input } from '#/components/ui/input'
-import { Label } from '#/components/ui/label'
 import { ResponsiveDialog } from '#/components/ui/responsive-dialog'
 import { isUsableAlias } from '#/features/merchants/data/mutations'
 import type { MerchantTarget } from '#/features/import/data/types'
@@ -12,8 +13,6 @@ type Props = {
   raw: string
   onCreate: (target: MerchantTarget) => void
 }
-
-const LABEL = 'mb-[6px] block text-[12px] font-semibold text-fp-text-2'
 
 /**
  * Records a merchant to create at import time. The name has to survive normalisation, or it
@@ -52,48 +51,39 @@ export function CreateMerchantDialog({
       onOpenChange={onOpenChange}
       title="New merchant"
       description="It is created when you import — nothing is written yet."
+      contentClassName="sm:max-w-[440px]"
       footer={
-        <>
-          <div className="flex-1" />
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-          >
-            Cancel
-          </Button>
-          <Button type="button" disabled={!usable} onClick={submit}>
-            Add merchant
-          </Button>
-        </>
+        <DialogActions
+          onCancel={() => onOpenChange(false)}
+          submitLabel="Add merchant"
+          disabled={!usable}
+          onSubmit={submit}
+        />
       }
     >
-      <div className="flex flex-col gap-[15px]">
-        <div>
-          <Label className={LABEL} htmlFor="new-merchant-name">
-            Name
-          </Label>
-          <Input
-            id="new-merchant-name"
-            value={name}
-            autoFocus
-            aria-invalid={trimmed !== '' && !usable}
-            onChange={(event) => setName(event.target.value)}
-          />
-          {trimmed !== '' && !usable ? (
-            <p className="mt-[6px] text-[12.5px] text-fp-danger">
-              That name has no letters or digits we can recognise. Add a Latin
-              spelling so this merchant can be found again.
-            </p>
-          ) : null}
-        </div>
+      <FormRow
+        id="new-merchant-name"
+        label="Name"
+        error={
+          trimmed !== '' && !usable
+            ? 'That name has no letters or digits we can recognise. Add a Latin spelling so this merchant can be found again.'
+            : null
+        }
+      >
+        <Input
+          id="new-merchant-name"
+          value={name}
+          autoFocus
+          aria-invalid={trimmed !== '' && !usable}
+          onChange={(event) => setName(event.target.value)}
+        />
+      </FormRow>
 
-        <p className="rounded-xl bg-fp-surface-2 px-3 py-2.5 text-[12.5px] text-fp-text-2">
-          {spellingUsable
-            ? `“${raw}” is filed as another spelling for it, so the next import recognises it without asking.`
-            : `“${raw}” cannot be stored as a spelling, so this import binds it but the next one will ask again.`}
-        </p>
-      </div>
+      <NoteBox tone={spellingUsable ? 'accent' : 'warn'}>
+        {spellingUsable
+          ? `“${raw}” is filed as another spelling for it, so the next import recognises it without asking.`
+          : `“${raw}” cannot be stored as a spelling, so this import binds it but the next one will ask again.`}
+      </NoteBox>
     </ResponsiveDialog>
   )
 }

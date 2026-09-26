@@ -148,16 +148,9 @@ export const emptyAliases = (): Aliases => ({
 
 export type DedupeStrategy = 'reference' | 'fingerprint' | 'off'
 
-export type DedupeSettings = {
-  strategy: DedupeStrategy
-  /** A bank that posts a day late still matches within this many days. */
-  windowDays: number
-}
+export type DedupeSettings = { strategy: DedupeStrategy }
 
-export const DEFAULT_DEDUPE: DedupeSettings = {
-  strategy: 'fingerprint',
-  windowDays: 3,
-}
+export const DEFAULT_DEDUPE: DedupeSettings = { strategy: 'fingerprint' }
 
 export type MappingDefaults = {
   walletId: string | null

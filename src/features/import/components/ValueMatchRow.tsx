@@ -1,16 +1,7 @@
 import { AlertTriangle, ArrowRight } from 'lucide-react'
-import { memo, useState } from 'react'
+import { memo } from 'react'
 import { CurrencyPicker } from '#/components/CurrencyPicker'
 import { Badge } from '#/components/ui/badge'
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from '#/components/ui/select'
 import {
   CREATE,
   NEW,
@@ -18,7 +9,12 @@ import {
   UNSET,
   preferredFirst,
 } from '#/features/import/data/values'
-import type { TargetGroup, ValueRow } from '#/features/import/data/values'
+import { TargetPicker } from './TargetPicker'
+import type {
+  TargetGroup,
+  TargetOption,
+  ValueRow,
+} from '#/features/import/data/values'
 import type { CurrencyCode } from '#/lib/currency'
 
 type Props = {
@@ -96,65 +92,27 @@ function MatchBadge({ row }: { row: ValueRow }) {
   return null
 }
 
-type OptionsProps = {
-  options: ReadonlyArray<TargetGroup>
-  preferGroup: string | null
-  newLabel: string | null
-  createLabel: string | null
-  skipLabel: string | null
+const SEARCH: Readonly<Record<ValueRow['kind'], string>> = {
+  wallet: 'Search accounts…',
+  category: 'Search categories…',
+  merchant: 'Search merchants…',
+  type: 'Search…',
+  currency: 'Search…',
 }
 
-/**
- * Every target this value could mean. Rendered only while the menu is open: a screen of
- * seventy values against a catalogue of hundreds is thousands of elements built and thrown
- * away on each answer, and Radix evaluates these children whether or not it mounts them.
- */
-function TargetOptions({
-  options,
-  preferGroup,
-  newLabel,
-  createLabel,
-  skipLabel,
-}: OptionsProps) {
-  return (
-    <>
-      <SelectItem value={UNSET}>{NEEDS_MATCH}</SelectItem>
-      {newLabel ? <SelectItem value={NEW}>{newLabel}</SelectItem> : null}
-      {preferredFirst(options, preferGroup).map((group, index) => (
-        <SelectGroup key={group.label ?? `group-${index}`}>
-          {group.label ? <SelectLabel>{group.label}</SelectLabel> : null}
-          {group.options.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              {option.label}
-            </SelectItem>
-          ))}
-        </SelectGroup>
-      ))}
-      {createLabel ? (
-        <SelectItem value={CREATE}>{createLabel}</SelectItem>
-      ) : null}
-      {skipLabel ? <SelectItem value={SKIP}>{skipLabel}</SelectItem> : null}
-    </>
-  )
-}
+/** The answers above the catalogue: none yet, or the one this import will create. */
+const leadingFor = (row: ValueRow): TargetOption[] => [
+  { value: UNSET, label: NEEDS_MATCH },
+  ...(row.newLabel ? [{ value: NEW, label: row.newLabel }] : []),
+]
 
-/**
- * Radix reads a closed trigger's text off a mounted item, so the chosen one stays mounted
- * while the rest of the list does not.
- */
-const chosenLabel = (
-  row: ValueRow,
-  options: ReadonlyArray<TargetGroup>,
+const trailingFor = (
+  createLabel: string | null,
   skipLabel: string | null,
-): string => {
-  if (row.value === NEW) return row.newLabel ?? NEEDS_MATCH
-  if (row.value === SKIP) return skipLabel ?? NEEDS_MATCH
-  for (const group of options) {
-    const option = group.options.find((entry) => entry.value === row.value)
-    if (option) return option.label
-  }
-  return NEEDS_MATCH
-}
+): TargetOption[] => [
+  ...(createLabel ? [{ value: CREATE, label: createLabel }] : []),
+  ...(skipLabel ? [{ value: SKIP, label: skipLabel }] : []),
+]
 
 /** One distinct value from the file, and what it means here. */
 function ValueMatchRowInner({
@@ -167,7 +125,6 @@ function ValueMatchRowInner({
   onChange,
   onCreate,
 }: Props) {
-  const [open, setOpen] = useState(false)
   const name = row.blank ? '(blank)' : row.raw
   const label = `What “${name}” means`
 
@@ -219,32 +176,18 @@ function ValueMatchRowInner({
             className="min-w-0 flex-1"
           />
         ) : (
-          <Select
+          <TargetPicker
             value={row.value}
             disabled={row.blank}
-            open={open}
-            onOpenChange={setOpen}
-            onValueChange={choose}
-          >
-            <SelectTrigger aria-label={label} className="min-w-0 flex-1">
-              <SelectValue placeholder={NEEDS_MATCH} />
-            </SelectTrigger>
-            <SelectContent>
-              {open ? (
-                <TargetOptions
-                  options={options}
-                  preferGroup={row.preferGroup}
-                  newLabel={row.newLabel}
-                  createLabel={createLabel}
-                  skipLabel={skipLabel}
-                />
-              ) : (
-                <SelectItem value={row.value}>
-                  {chosenLabel(row, options, skipLabel)}
-                </SelectItem>
-              )}
-            </SelectContent>
-          </Select>
+            ariaLabel={label}
+            placeholder={NEEDS_MATCH}
+            searchPlaceholder={SEARCH[row.kind]}
+            groups={preferredFirst(options, row.preferGroup)}
+            leading={leadingFor(row)}
+            trailing={trailingFor(createLabel, skipLabel)}
+            onChange={choose}
+            className="min-w-0 flex-1"
+          />
         )}
       </div>
 

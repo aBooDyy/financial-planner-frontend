@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select'
-import type { WalletGroupOption } from '#/features/balances/data/selectors'
+import type { WalletGroupOption } from '#/features/wallets/data/selectors'
 import type { CategoryOption } from '#/features/import/data/matching'
 import type { MappingDefaults as Defaults } from '#/features/import/data/types'
 import type { CurrencyCode } from '#/lib/currency'

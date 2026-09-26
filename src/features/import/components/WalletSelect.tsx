@@ -1,12 +1,4 @@
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from '#/components/ui/select'
+import { TargetPicker } from './TargetPicker'
 import type { TargetGroup } from '#/features/import/data/values'
 
 type Props = {
@@ -21,31 +13,21 @@ type Props = {
 
 const NO_WALLET = '__none__'
 
+const LEADING = [{ value: NO_WALLET, label: 'No account' }]
+
 /** One of the user's accounts, or none — the row editor's account pickers. */
 export function WalletSelect({ id, value, onChange, wallets, exclude }: Props) {
   return (
-    <Select
+    <TargetPicker
+      id={id}
       value={value === '' ? NO_WALLET : value}
-      onValueChange={(next) => onChange(next === NO_WALLET ? '' : next)}
-    >
-      <SelectTrigger id={id} aria-invalid={value === ''}>
-        <SelectValue placeholder="Pick an account" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value={NO_WALLET}>No account</SelectItem>
-        {wallets.map((group, index) => (
-          <SelectGroup key={group.label ?? `wallets-${index}`}>
-            {group.label ? <SelectLabel>{group.label}</SelectLabel> : null}
-            {group.options
-              .filter((option) => option.value !== exclude)
-              .map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-          </SelectGroup>
-        ))}
-      </SelectContent>
-    </Select>
+      invalid={value === ''}
+      placeholder="Pick an account"
+      searchPlaceholder="Search accounts…"
+      groups={wallets}
+      leading={LEADING}
+      exclude={exclude}
+      onChange={(next) => onChange(next === NO_WALLET ? '' : next)}
+    />
   )
 }

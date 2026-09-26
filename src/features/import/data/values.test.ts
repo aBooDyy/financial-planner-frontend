@@ -9,6 +9,7 @@ import {
   SKIP,
   TRANSFER,
   UNSET,
+  categoryTargetGroups,
   chosenValue,
   distinctOf,
   preferredFirst,
@@ -289,5 +290,25 @@ describe('movement answers — transfers and balance adjustments', () => {
       TRANSFER,
       ADJUSTMENT,
     ])
+  })
+})
+
+describe('categoryTargetGroups', () => {
+  const groups = categoryTargetGroups(categoryOptions(buildCatalog([])))
+
+  it('puts every money-out parent before every money-in one', () => {
+    const sections = groups.map((group) => group.section)
+    expect(sections[0]).toBe('Money out')
+    expect(sections.at(-1)).toBe('Money in')
+    expect(sections.lastIndexOf('Money out')).toBeLessThan(
+      sections.indexOf('Money in'),
+    )
+  })
+
+  it('tags parents and children alike with their direction', () => {
+    const income = groups.find((group) => group.section === 'Money in')
+    expect(income?.options.every((option) => option.tag === 'Money in')).toBe(
+      true,
+    )
   })
 })

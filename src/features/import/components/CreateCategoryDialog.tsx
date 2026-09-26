@@ -1,16 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Button } from '#/components/ui/button'
+import { DialogActions } from '#/components/dialog/DialogActions'
+import { PillSwitch } from '#/components/dialog/PillSwitch'
+import { FieldLabel } from '#/components/FieldLabel'
+import { FieldMessage } from '#/components/FormRow'
 import { Input } from '#/components/ui/input'
-import { Label } from '#/components/ui/label'
 import { ResponsiveDialog } from '#/components/ui/responsive-dialog'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '#/components/ui/select'
-import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
+import { ParentCategorySelect } from '#/features/categories/components/ParentCategorySelect'
 import { slugify } from '#/features/categories/data/slug'
 import type { ResolvedCategory } from '#/features/categories/data/catalog'
 import type { TxType } from '#/features/transactions/api/types'
@@ -27,8 +22,10 @@ type Props = {
   onCreate: (target: CategoryTarget) => void
 }
 
-const LABEL = 'mb-[6px] block text-[12px] font-semibold text-fp-text-2'
-const TOP_LEVEL = '__top__'
+const FLOW_OPTIONS = [
+  { value: 'spend', label: 'Money out' },
+  { value: 'income', label: 'Money in' },
+] as const
 
 const uniqueSlug = (name: string, taken: ReadonlyArray<string>): string => {
   const base = slugify(name)
@@ -91,89 +88,57 @@ export function CreateCategoryDialog({
       onOpenChange={onOpenChange}
       title="New category"
       description="It is created when you import — nothing is written yet."
+      contentClassName="sm:max-w-[440px]"
       footer={
-        <>
-          <div className="flex-1" />
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-          >
-            Cancel
-          </Button>
-          <Button type="button" disabled={trimmed === ''} onClick={submit}>
-            Add category
-          </Button>
-        </>
+        <DialogActions
+          onCancel={() => onOpenChange(false)}
+          submitLabel="Add category"
+          disabled={trimmed === ''}
+          onSubmit={submit}
+        />
       }
     >
-      <div className="flex flex-col gap-[15px]">
+      <div>
+        <FieldLabel htmlFor="new-category-name">Name</FieldLabel>
+        <Input
+          id="new-category-name"
+          value={name}
+          autoFocus
+          onChange={(event) => setName(event.target.value)}
+        />
+      </div>
+
+      <div>
+        <FieldLabel htmlFor="new-category-parent">
+          Under which category?
+        </FieldLabel>
+        <ParentCategorySelect
+          id="new-category-parent"
+          value={parentId}
+          options={parents}
+          noneLabel="Nothing — a category of its own"
+          onChange={(next) => setParentId(next?.id ?? null)}
+        />
+        <FieldMessage
+          help={
+            parent
+              ? `A subcategory of ${parent.name}, so it files ${parent.type === 'spend' ? 'money out' : 'money in'} too.`
+              : null
+          }
+        />
+      </div>
+
+      {parent === null ? (
         <div>
-          <Label className={LABEL} htmlFor="new-category-name">
-            Name
-          </Label>
-          <Input
-            id="new-category-name"
-            value={name}
-            autoFocus
-            onChange={(event) => setName(event.target.value)}
+          <FieldLabel>What does it file?</FieldLabel>
+          <PillSwitch<TxType>
+            label="What this category files"
+            options={FLOW_OPTIONS}
+            value={type}
+            onChange={setType}
           />
         </div>
-
-        <div>
-          <Label className={LABEL} htmlFor="new-category-parent">
-            Under which category?
-          </Label>
-          <Select
-            value={parentId ?? TOP_LEVEL}
-            onValueChange={(value) =>
-              setParentId(value === TOP_LEVEL ? null : value)
-            }
-          >
-            <SelectTrigger id="new-category-parent">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={TOP_LEVEL}>
-                Nothing — a category of its own
-              </SelectItem>
-              {parents.map((candidate) => (
-                <SelectItem key={candidate.id} value={candidate.id}>
-                  {candidate.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {parent === null ? (
-          <div>
-            <Label className={LABEL}>What it files</Label>
-            <ToggleGroup
-              type="single"
-              value={type}
-              spacing={1}
-              aria-label="What this category files"
-              className="w-full rounded-xl bg-fp-surface-2 p-1"
-              onValueChange={(value) => {
-                if (value) setType(value as TxType)
-              }}
-            >
-              <ToggleGroupItem value="spend" className="flex-1 rounded-[9px]">
-                Money out
-              </ToggleGroupItem>
-              <ToggleGroupItem value="income" className="flex-1 rounded-[9px]">
-                Money in
-              </ToggleGroupItem>
-            </ToggleGroup>
-          </div>
-        ) : (
-          <p className="text-[12px] text-fp-text-3">
-            A subcategory of {parent.name}, so it files{' '}
-            {parent.type === 'spend' ? 'money out' : 'money in'} too.
-          </p>
-        )}
-      </div>
+      ) : null}
     </ResponsiveDialog>
   )
 }

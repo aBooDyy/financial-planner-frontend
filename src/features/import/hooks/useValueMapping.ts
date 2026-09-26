@@ -9,7 +9,7 @@ import {
   SKIP,
   TRANSFER,
   UNSET,
-  categoryValue,
+  categoryTargetGroups,
   chosenValue,
   distinctOf,
   distinctValues,
@@ -137,6 +137,8 @@ const walletTargets = (catalogue: ValueCatalogue): TargetGroup[] => {
       label: wallet.currency
         ? `${wallet.name} · ${wallet.currency}`
         : wallet.name,
+      icon: wallet.icon,
+      color: wallet.color,
     }
     const group = groups.find((entry) => entry.label === label)
     if (group) group.options.push(option)
@@ -146,30 +148,10 @@ const walletTargets = (catalogue: ValueCatalogue): TargetGroup[] => {
 }
 
 /** The user's categories, then the two answers that are not one. */
-const categoryTargets = (catalogue: ValueCatalogue): TargetGroup[] => {
-  const parents = catalogue.categories.filter(
-    (option) => option.subcategory === null,
-  )
-  const groups = parents.map((parent) => ({
-    label: parent.name,
-    options: [
-      {
-        value: categoryValue(parent.category, null),
-        label: parent.name,
-      },
-      ...catalogue.categories
-        .filter(
-          (option) =>
-            option.category === parent.category && option.subcategory !== null,
-        )
-        .map((option) => ({
-          value: categoryValue(option.category, option.subcategory),
-          label: `${parent.name} › ${option.name}`,
-        })),
-    ],
-  }))
-  return [...groups, MOVEMENT_TARGETS]
-}
+const categoryTargets = (catalogue: ValueCatalogue): TargetGroup[] => [
+  ...categoryTargetGroups(catalogue.categories),
+  MOVEMENT_TARGETS,
+]
 
 /** Why a movement answer changes what its rows become — said under the value. */
 const MOVEMENT_NOTES: Readonly<Record<string, RowNotes>> = {

@@ -12,7 +12,7 @@ import type { LocalCategory } from '#/db/types'
 import type { LedgerTransaction } from '#/features/import/data/dedupe'
 import type { MappingDraft } from '#/features/import/data/mapping'
 import type { MerchantIndex } from '#/features/merchants/data/matching'
-import type { WalletGroupOption } from '#/features/balances/data/selectors'
+import type { WalletGroupOption } from '#/features/wallets/data/selectors'
 import type { CurrencyCode } from '#/lib/currency'
 import type {
   CsvImport,
