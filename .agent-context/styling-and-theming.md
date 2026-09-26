@@ -198,9 +198,14 @@ per-call className needed for the base look): `button.tsx` (accent CTA = `defaul
 in `fp-border` that reads as borderless, accent on focus, red tint when `aria-invalid`; every
 plain text/search field sits in it — a wrapper holding an icon plus a bare input uses
 `FIELD_WELL_GROUP`, as `command.tsx`'s `CommandInput` does for every picker search; only the
-themed hero inputs like `AmountWell`/`TxAmountHero` stay transparent on their own tint), the
-select popover (16px radius, 10px-radius items, accent-soft checked row, uppercase group
-labels), `switch.tsx`/`checkbox.tsx` (fp sizing + colors). Don't pass border/radius/background
+themed hero inputs like `AmountWell`/`TxAmountHero` stay transparent on their own tint), the select popover (16px radius, 10px-radius items, accent-soft checked row, uppercase group
+labels) — its surface, row and separator are `MENU_SURFACE` / `MENU_ITEM` / `MENU_SEPARATOR` in
+`ui/menu-surface.ts`, shared by `SelectContent`, `PopoverContent` (the CurrencyPicker) and every
+`DropdownMenu` (content, sub-content, items): one hairline `fp-border` frame + soft deep shadow,
+so a menu reads on any background (decided 2026-09-27: bordered, not borderless). There is **no
+global border colour**, so a bare `border` class draws in `currentColor` — always name
+`border-fp-border` (or set the colour inline); shadcn's stock `border` is what drew a dark
+outline on the ⋯ menus. Also restyled: `switch.tsx`/`checkbox.tsx` (fp sizing + colors). Don't pass border/radius/background
 overrides to these per call — only layout (width). When you re-run `shadcn add` for a new component, re-apply this fp-
 styling to its base classes (and check RTL — the `Switch` thumb uses `rtl:` to flip).
 
