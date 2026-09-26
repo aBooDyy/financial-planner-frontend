@@ -1,4 +1,5 @@
 import { Plus, ReceiptText } from 'lucide-react'
+import type { ReactNode } from 'react'
 import type { SyncFailure } from '#/db/types'
 import type {
   ActivityListView,
@@ -24,6 +25,8 @@ type Props = {
   view: ActivityListView | null
   onAdd: () => void
   onRowClick: (row: ActivityRow) => void
+  /** Rendered just before Add. */
+  action?: ReactNode
 }
 
 function Row({
@@ -78,7 +81,7 @@ function Row({
   )
 }
 
-export function TransactionList({ view, onAdd, onRowClick }: Props) {
+export function TransactionList({ view, onAdd, onRowClick, action }: Props) {
   return (
     <div className="overflow-hidden rounded-[18px] border border-fp-border bg-fp-surface shadow-fp">
       <div className="flex items-center justify-between gap-[10px] border-b border-fp-border px-4 py-[15px]">
@@ -88,14 +91,17 @@ export function TransactionList({ view, onAdd, onRowClick }: Props) {
             <ValueOrSkeleton value={view?.countStr} className="h-3 w-20" />
           </span>
         </div>
-        <Button
-          type="button"
-          onClick={onAdd}
-          className="gap-[5px] rounded-[11px] px-[13px] py-[9px] text-[13px] text-white [&_svg]:size-[15px]"
-        >
-          <Plus size={15} strokeWidth={2.2} />
-          Add
-        </Button>
+        <div className="flex items-center gap-2">
+          {action}
+          <Button
+            type="button"
+            onClick={onAdd}
+            className="gap-[5px] rounded-[11px] px-[13px] py-[9px] text-[13px] text-white [&_svg]:size-[15px]"
+          >
+            <Plus size={15} strokeWidth={2.2} />
+            Add
+          </Button>
+        </div>
       </div>
       {view ? (
         <ActivityGroups view={view} onRowClick={onRowClick} />

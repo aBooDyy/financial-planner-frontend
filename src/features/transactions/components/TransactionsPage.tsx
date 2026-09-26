@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router'
-import { Inbox } from 'lucide-react'
 import { MobileTabBar } from '#/components/chrome/MobileTabBar'
 import { TopNav } from '#/components/chrome/TopNav'
 import { ReviewScanPrompt } from '#/features/email-sync/components/ReviewScanPrompt'
+import { PendingReviewButton } from '#/features/inbound-imports/components/PendingReviewButton'
 import { PendingReviewModal } from '#/features/inbound-imports/components/PendingReviewModal'
 import { usePendingImports } from '#/features/inbound-imports/hooks/usePendingImports'
 import { useLogout } from '#/features/auth/hooks/useLogout'
@@ -166,20 +166,6 @@ export function TransactionsPage() {
           <div className="md:col-span-2 flex flex-wrap items-center gap-[10px]">
             <SpendingViewTabs view={view} dueCount={planned.dueCount} />
             <div className="min-w-[8px] flex-1" />
-            {pendingCount > 0 ? (
-              <button
-                type="button"
-                onClick={() => setReviewOpen(true)}
-                title="Review auto-logged transactions"
-                className="inline-flex items-center gap-2 rounded-[11px] border border-fp-accent bg-fp-accent-soft px-[13px] py-[9px] text-[13px] font-bold text-fp-accent-ink"
-              >
-                <Inbox size={15} strokeWidth={2} />
-                Review
-                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-fp-accent px-1.5 text-[11px] font-bold text-white">
-                  {pendingCount}
-                </span>
-              </button>
-            ) : null}
             <ScopeSelect
               sections={sections}
               balancesLoading={loading || !deltas}
@@ -228,6 +214,14 @@ export function TransactionsPage() {
                       view={activity.list}
                       onAdd={editor.openAddTx}
                       onRowClick={onRowClick}
+                      action={
+                        pendingCount > 0 ? (
+                          <PendingReviewButton
+                            count={pendingCount}
+                            onClick={() => setReviewOpen(true)}
+                          />
+                        ) : null
+                      }
                     />
                   </>
                 ) : null}

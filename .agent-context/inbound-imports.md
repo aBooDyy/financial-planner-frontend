@@ -26,11 +26,11 @@ that. So sources depend on the queue, never the reverse:
 
 ## Surfaces
 
-| Where                         | What                                                                                    |
-| ----------------------------- | --------------------------------------------------------------------------------------- |
-| Spending → Review             | `PendingReviewModal` → one `PendingImportRow` per staged row, `toolbar` from the source |
-| Import hub inbox card         | `usePendingImports().count` via `useInboxSummary`                                       |
-| Spending → edit a transaction | `SourceSection` (this slice) — the email or payload the entry came from                 |
+| Where                         | What                                                                                                                                                                                            |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Spending → Review             | `PendingReviewButton` (beside Add in the Activity transactions card, only while rows are pending) opens `PendingReviewModal` → one `PendingImportRow` per staged row, `toolbar` from the source |
+| Import hub inbox card         | `usePendingImports().count` via `useInboxSummary`                                                                                                                                               |
+| Spending → edit a transaction | `SourceSection` (this slice) — the email or payload the entry came from                                                                                                                         |
 
 ## The row, locally
 
