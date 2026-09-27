@@ -49,6 +49,6 @@ export default [
     rules: { 'no-restricted-imports': 'off' },
   },
   {
-    ignores: ['eslint.config.js', 'prettier.config.js'],
+    ignores: ['eslint.config.js', 'prettier.config.js', '.wrangler/**'],
   },
 ]
