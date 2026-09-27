@@ -519,11 +519,11 @@ export type TxRow = {
   categoryId: string
   /** The note, else the leaf category's own name ("Cafés" rather than "Dining"). */
   name: string
-  /** "Dining", or "Dining · Cafés" once the row names a child. */
-  catLabel: string
+  /** ["Dining"], or ["Dining", "Cafés"] once the row names a child. */
+  catPath: string[]
   color: string
-  /** "Main", or "Personal · Main" when the scope spans more than one wallet. */
-  walletName: string
+  /** ["Main"], or ["Personal", "Main"] when the scope spans more than one wallet. */
+  walletPath: string[]
   walletColor: string
   isIncome: boolean
   /** The pill before the meta: what a confirmed planned item (or a goal spend) was. */
@@ -625,17 +625,25 @@ type ActivityContext = {
   withGroup: boolean
 }
 
+function walletPathOf(
+  wallet: LocalBalanceNode | undefined,
+  ctx: ActivityContext,
+  missing: string,
+): string[] {
+  if (!wallet) return [missing]
+  const group =
+    ctx.withGroup && wallet.parentId
+      ? ctx.nodeById.get(wallet.parentId)
+      : undefined
+  return group ? [group.name, wallet.name] : [wallet.name]
+}
+
 function walletLabelOf(
   wallet: LocalBalanceNode | undefined,
   ctx: ActivityContext,
   missing: string,
 ): string {
-  if (!wallet) return missing
-  const group =
-    ctx.withGroup && wallet.parentId
-      ? ctx.nodeById.get(wallet.parentId)
-      : undefined
-  return group ? `${group.name} · ${wallet.name}` : wallet.name
+  return walletPathOf(wallet, ctx, missing).join(' · ')
 }
 
 function txRowOf(t: FlowTxn, ctx: ActivityContext): TxRow {
@@ -647,9 +655,9 @@ function txRowOf(t: FlowTxn, ctx: ActivityContext): TxRow {
     id: t.id,
     categoryId: t.categoryId,
     name: t.note || ctx.catalog.get(t.categoryId).name,
-    catLabel: ctx.catalog.labelOf(t.categoryId),
+    catPath: ctx.catalog.pathOf(t.categoryId),
     color: cat.color,
-    walletName: walletLabelOf(wallet, ctx, ''),
+    walletPath: walletPathOf(wallet, ctx, ''),
     walletColor: wallet?.color ?? NO_WALLET_COLOR,
     isIncome: isInc,
     tag: txTagOf(t),

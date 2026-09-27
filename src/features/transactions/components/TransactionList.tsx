@@ -6,11 +6,9 @@ import type {
   ActivityRow,
   TxRow,
 } from '#/features/transactions/data/selectors'
-import { TX_TAG_LABEL } from '#/features/transactions/data/selectors'
 import { LEDGER_SYNC_ENTITIES } from '#/features/transactions/data/syncFailures'
 import { useFailedSyncIds } from '#/hooks/useSyncFailures'
 import { EmptyState } from '#/components/EmptyState'
-import { TagPill } from '#/components/TagPill'
 import { ValueOrSkeleton } from '#/components/ValueOrSkeleton'
 import { Button } from '#/components/ui/button'
 import { AdjustmentActivityRow } from './AdjustmentActivityRow'
@@ -19,6 +17,7 @@ import { RowSyncBadge } from './RowSyncBadge'
 import { SetAsideActivityRow } from './SetAsideActivityRow'
 import { SkeletonRows } from './SkeletonRows'
 import { TransferActivityRow } from './TransferActivityRow'
+import { TxRowMeta } from './TxRowMeta'
 
 type Props = {
   /** `null` while the period's rows load; the header and Add render regardless. */
@@ -51,23 +50,7 @@ function Row({
       </div>
       <div className="flex min-w-0 flex-col gap-px">
         <span className="truncate text-[14px] font-semibold">{row.name}</span>
-        <span className="flex items-center gap-[6px] text-[12px] text-fp-text-3">
-          {row.tag ? (
-            <TagPill
-              label={TX_TAG_LABEL[row.tag]}
-              tone={row.tag === 'obligation' ? 'neutral' : 'accent'}
-            />
-          ) : null}
-          <span className="min-w-0 truncate">{row.catLabel}</span>
-          <span aria-hidden className="text-fp-border-strong">
-            |
-          </span>
-          <span
-            className="h-[7px] w-[7px] rounded-[2px]"
-            style={{ background: row.walletColor }}
-          />
-          {row.walletName}
-        </span>
+        <TxRowMeta row={row} />
       </div>
       <div className="flex-1" />
       {failure ? (

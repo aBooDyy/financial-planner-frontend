@@ -24,7 +24,10 @@ const known = (name: string): string | null =>
 export function syncContextOf(row: ActivityRow): SyncFailureContext {
   switch (row.kind) {
     case 'tx':
-      return { wallet: known(row.walletName), category: row.catLabel }
+      return {
+        wallet: known(row.walletPath.join(' · ')),
+        category: row.catPath.join(' · '),
+      }
     case 'adjustment':
       return { wallet: known(row.walletName) }
     case 'transfer':

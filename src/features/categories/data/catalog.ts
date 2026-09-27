@@ -35,6 +35,8 @@ export type CategoryCatalog = {
   /** A child's parent; null for a root or an unknown id. */
   parentOf: (id: string) => ResolvedCategory | null
   subsOf: (rootId: string) => ResolvedSub[]
+  /** ["Dining", "Cafés"] for a child, ["Dining"] for a root. */
+  pathOf: (id: string) => string[]
   /** "Dining · Cafés" for a child, "Dining" for a root. */
   labelOf: (id: string) => string
   /** Lookup by slug — a root's alone, a child's under its parent's slug. */
@@ -150,6 +152,12 @@ export function buildCatalog(rows: LocalCategory[]): CategoryCatalog {
     return byId.get(entry.parentId) as ResolvedCategory
   }
 
+  const pathOf = (id: string): string[] => {
+    const parent = parentOf(id)
+    const name = get(id).name
+    return parent ? [parent.name, name] : [name]
+  }
+
   const rootOf = (id: string): ResolvedCategory => {
     const entry = get(id)
     return entry.parentId === null ? entry : (parentOf(id) ?? DELETED_CATEGORY)
@@ -169,11 +177,8 @@ export function buildCatalog(rows: LocalCategory[]): CategoryCatalog {
       const entry = byId.get(rootId)
       return entry?.parentId === null ? entry.subs : []
     },
-    labelOf: (id) => {
-      const entry = get(id)
-      const parent = parentOf(id)
-      return parent ? `${parent.name} · ${entry.name}` : entry.name
-    },
+    pathOf,
+    labelOf: (id) => pathOf(id).join(' · '),
     bySlug: (slug, parentSlug) => {
       if (parentSlug === undefined) return rootBySlug.get(slug) ?? null
       const parent = rootBySlug.get(parentSlug)

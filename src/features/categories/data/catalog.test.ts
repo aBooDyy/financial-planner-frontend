@@ -136,6 +136,8 @@ describe('buildCatalog', () => {
 
     expect(catalog.labelOf(dining.id)).toBe('Dining')
     expect(catalog.labelOf(cafes.id)).toBe('Dining · Cafés')
+    expect(catalog.pathOf(dining.id)).toEqual(['Dining'])
+    expect(catalog.pathOf(cafes.id)).toEqual(['Dining', 'Cafés'])
   })
 
   it('lists no children for a child id', () => {

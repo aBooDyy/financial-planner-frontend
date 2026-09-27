@@ -117,6 +117,7 @@ type CategoryCatalog = {
   rootOf: (id: string) => ResolvedCategory // itself, or a child's parent
   parentOf: (id: string) => ResolvedCategory | null // null for a root / unknown id
   subsOf: (rootId: string) => ResolvedSub[] // [] for a child / unknown id
+  pathOf: (id: string) => string[] // ["Dining", "Cafés"] | ["Dining"]
   labelOf: (id: string) => string // "Dining · Cafés" | "Dining"
   bySlug: (slug: string, parentSlug?: string) => CatalogEntry | null
   fallbackFor: (type: TxType) => ResolvedCategory | null

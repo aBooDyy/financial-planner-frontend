@@ -286,6 +286,15 @@ Two more that look physical and are not: Tailwind v4 compiles `space-x-*` to `ma
 utilities in any custom classes you add to a shadcn component, and when you re-run `shadcn add`,
 convert the physical ones it ships with — the upstream defaults are LTR-only.
 
+**`SeparatedWrap` / `SeparatedItem` — separators that vanish on wrap** (`src/components/`). A
+line of parts joined by `·` or `|` that must wrap on narrow widths without a separator dangling
+at a line start. The wrap is a `flex-wrap` container that clips its inline edges; each item
+draws its separator absolutely in the column gap before it (`end-full`, width `--sep-gap`), so
+an item that starts a line has its separator clipped. CSS only, RTL-safe. Wraps nest: the
+Spending row meta (`TxRowMeta`) is an outer wrap (category | wallet, the pipe dropped first)
+around two inner wraps (`Dining · Cafés`, `Group · Wallet`), which break only once their group
+alone overflows a line; a part still too long then truncates.
+
 **`SegmentedBar` — the one stacked bar** (`src/components/SegmentedBar.tsx`). The Cashflow hero
 (Spending) and the Total hero (Wallets) both draw a proportional stack of coloured parts, so the
 stack itself is a shared primitive: it takes `BarSegment[]` (`key`, `label`, `color`, `pct`,

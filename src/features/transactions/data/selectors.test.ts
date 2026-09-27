@@ -550,7 +550,7 @@ describe('resolving through the catalog', () => {
     const rows = txRows(
       list([tx({ categoryId: 'dining-cafes' })]).groups[0].rows,
     )
-    expect(rows[0].catLabel).toBe('Dining · Cafés')
+    expect(rows[0].catPath).toEqual(['Dining', 'Cafés'])
     expect(rows[0].categoryId).toBe('dining-cafes')
   })
 
@@ -565,7 +565,7 @@ describe('resolving through the catalog', () => {
     const rows = txRows(
       list([tx({ categoryId: 'cat-hobbies', amount: 10_000 })]).groups[0].rows,
     )
-    expect(rows[0].catLabel).toBe('Deleted category')
+    expect(rows[0].catPath).toEqual(['Deleted category'])
     expect(CATALOG.get('cat-hobbies').icon).toBe(SPEND_CATEGORY_ICON)
   })
 
@@ -663,10 +663,12 @@ describe('transfers', () => {
     const walletOf = (scope: Scope) =>
       activity(withTransfer([spend]), scope)
         .groups.flatMap((g) => g.rows)
-        .map((r) => (r.kind === 'tx' ? r.walletName : null))
-    expect(walletOf(ALL)).toEqual(['Everyday · Main'])
-    expect(walletOf({ type: 'group', id: 'g1' })).toEqual(['Everyday · Main'])
-    expect(walletOf({ type: 'wallet', id: 'w1' })).toEqual(['Main'])
+        .map((r) => (r.kind === 'tx' ? r.walletPath : null))
+    expect(walletOf(ALL)).toEqual([['Everyday', 'Main']])
+    expect(walletOf({ type: 'group', id: 'g1' })).toEqual([
+      ['Everyday', 'Main'],
+    ])
+    expect(walletOf({ type: 'wallet', id: 'w1' })).toEqual([['Main']])
   })
 
   it('leaves the cashflow hero to spend and income', () => {
