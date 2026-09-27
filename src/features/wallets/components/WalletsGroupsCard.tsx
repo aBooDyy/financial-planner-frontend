@@ -47,15 +47,7 @@ export function WalletsGroupsCard({
             Tap any wallet to edit · nest freely
           </span>
         </div>
-        <div className="flex shrink-0 gap-2 max-sm:[&>*]:flex-1">
-          <Button
-            variant="outline"
-            onClick={onAddGroup}
-            className="gap-[5px] px-3 py-[9px] text-[13px] hover:border-fp-accent"
-          >
-            <Plus size={15} strokeWidth={2} />
-            New group
-          </Button>
+        <div className="flex flex-wrap gap-2 sm:justify-end max-sm:[&>*]:grow">
           {onTransfer ? (
             <Button
               variant="outline"
@@ -67,6 +59,14 @@ export function WalletsGroupsCard({
               Transfer
             </Button>
           ) : null}
+          <Button
+            variant="outline"
+            onClick={onAddGroup}
+            className="gap-[5px] px-3 py-[9px] text-[13px] hover:border-fp-accent"
+          >
+            <Plus size={15} strokeWidth={2} />
+            New group
+          </Button>
           <Button
             onClick={onAddWallet}
             className="gap-[5px] px-[13px] py-[9px] text-[13px]"
