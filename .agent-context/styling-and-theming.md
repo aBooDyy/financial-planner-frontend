@@ -146,6 +146,11 @@ validator's 6–8 CVD band (light ΔE 7.1, dark 6.2), which is legal **only with
 encoding** — the in/out chart has it (fixed in-then-out bar order, labelled swatches with values,
 the per-month readout). Keep that encoding if either colour is reused elsewhere, and re-validate
 before changing either.
+`fp-chart-set-aside` (light `#2457B8`, dark `#5B8DEF`) is the third mark colour: money earmarked
+for goals, in the Planned rail's "Where it's headed" bar (payments = `fp-chart-out`, set-asides,
+not planned yet = `fp-chart-in`, in that order). The dark step is darker than `fp-transfer`'s
+`#8DB4F8`, which fails the validator's lightness band on the dark surface. The three pass together
+in both modes; out ↔ in are never adjacent in that bar.
 
 `ResponsiveDialog` also takes `onBack`: a back button replaces the close button before the title,
 for a sub-view of the dialog (the transaction dialog's in-place pickers).

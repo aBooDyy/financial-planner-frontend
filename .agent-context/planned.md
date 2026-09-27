@@ -218,7 +218,28 @@ The Spending page composes these; they read only the public hooks above.
   (income in accent, outflow in text colour, never red; muted rows grey with a dashed pill),
   and — due rows only — Skip + Confirm ("Confirm received" for income). A partly settled row
   has no Skip (refused with settlements); its dialog offers "Close the rest".
-  `PlannedSummaryCard` is the desktop rail: next-14-days in / out / net.
+- **The rail** (`PlannedRail`, the side column; below the list on mobile). With nothing planned it
+  is `PlanningGuideCard`: links to the four places planned rows come from (Goals › Income /
+  Obligations / Goals, Spending › Recurring). Otherwise two cards over `hooks/usePlannedOutlook`,
+  which takes the list `usePlanned()` already built plus every live account's balance in base
+  (`allAccountsMinor` over the Spending scope sections; `null` while balances load). Both look
+  `OUTLOOK_DAYS` (30) ahead through `data/outlook.ts` (open rows with a remainder, overdue ones
+  included). They cover all accounts and ignore the scope picker, as the list does.
+  - **Balance ahead** (`ForecastCard` / `ForecastChart`, pure `data/forecast.ts`, tested). End-of-day
+    balance for today + 30 days as payments and income land; set-asides do not move money, and
+    overdue items land today. It is drawn as a step line in a stretched 100×100 SVG box (non-scaling
+    stroke), clipped into three zones: accent above goal money, warn inside it, danger below zero.
+    Dots, the crosshair and the reference lines ("Goal money", and "Zero" only on a shortfall) are
+    HTML over it, so they keep their shape. In RTL the SVG mirrors (`rtl:-scale-x-100`) and overlays
+    use `inset-inline-start`. The readout rests on the lowest day. Pointer or arrow keys scrub it
+    (it is a `role="slider"` with a per-day `aria-valuetext`), and Escape returns to the lowest day.
+    Status line: short (first day below zero) beats reserved (first day under goal money) beats
+    clear. Goal money is `walletReservations` from the planner's own inputs, summed over live
+    wallets in base, and held flat: it doesn't step with future set-asides.
+  - **Where it's headed** (`HeadedCard`, pure `data/headed.ts`, tested). Planned income against
+    payments and set-asides as a `SegmentedBar` (scaled to whichever is larger), a legend with
+    values, and the leftover line ("X of what comes in has no plan yet" / "X more planned than
+    comes in").
 - **One-tap confirm** (`hooks/usePlannedRowActions`): `confirmPlanned(id)` when `row.oneTap`
   (known wallet, nothing settled), else the dialog. A refused one-tap or skip (e.g.
   `origin_gone` for a deleted goal's leftover set-aside) opens the dialog, which shows why and
@@ -258,7 +279,7 @@ budgets ([transactions.md](transactions.md)).
 ## Tests
 
 `data/{ids,generate,reconcile,settle,views,mutations,runner,sync,confirmCopy,linkedTransactions,preview}.test.ts`,
-`components/{PlannedCard,ConfirmPlannedDialog}.test.tsx`,
+`data/{forecast,headed}.test.ts`, `components/{PlannedCard,ConfirmPlannedDialog,ForecastCard}.test.tsx`,
 `hooks/usePlannedRunner.test.ts`, `hooks/useConfirmPlanned.test.tsx`, `hooks/usePlannedData.test.tsx` (consumers share one set of
 reads and one derivation; the last unmount closes them), `goals/data/paydays.test.ts`, `goals/data/progress.test.ts`. The design's worked example
 (04 §4 — Umrah 1,500 × 8 → Sep 24 behind 1,500, live 1,800 × 5, recalc Oct–Feb to 1,800 with

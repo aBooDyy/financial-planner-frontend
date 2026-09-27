@@ -17,6 +17,7 @@ import {
 } from '#/features/transactions/data/selectors'
 import type { Scope } from '#/features/transactions/data/selectors'
 import {
+  allAccountsMinor,
   scopeBalance,
 } from '#/features/transactions/data/scopePicker'
 import type { LocalTransaction } from '#/db/types'
@@ -32,7 +33,7 @@ import { usePlanned } from '#/features/planned'
 import { ConfirmPlannedDialog } from '#/features/planned/components/ConfirmPlannedDialog'
 import { PlannedCard } from '#/features/planned/components/PlannedCard'
 import { PlannedNudge } from '#/features/planned/components/PlannedNudge'
-import { PlannedSummaryCard } from '#/features/planned/components/PlannedSummaryCard'
+import { PlannedRail } from '#/features/planned/components/PlannedRail'
 import { useOriginColors } from '#/features/planned/hooks/useOriginColors'
 import { usePlannedRowActions } from '#/features/planned/hooks/usePlannedRowActions'
 import type { CurrencyCode } from '#/lib/currency'
@@ -291,8 +292,11 @@ export function TransactionsPage() {
                 />
               </>
             ) : null}
-            {view === 'planned' && !planned.isEmpty ? (
-              <PlannedSummaryCard view={planned} base={base} />
+            {view === 'planned' ? (
+              <PlannedRail
+                planned={planned}
+                balance={balancesLoading ? null : allAccountsMinor(sections)}
+              />
             ) : null}
             {view === 'budgets' ? (
               <BudgetHealthCard view={budgets} onAdd={editor.openAddBudget} />

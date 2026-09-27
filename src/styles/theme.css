@@ -35,6 +35,7 @@
   --color-fp-transfer-soft: var(--fp-transfer-soft);
   --color-fp-chart-in: var(--fp-chart-in);
   --color-fp-chart-out: var(--fp-chart-out);
+  --color-fp-chart-set-aside: var(--fp-chart-set-aside);
 
   --shadow-fp: var(--fp-shadow);
   --font-sans: 'Hanken Grotesk Variable', system-ui, sans-serif;
@@ -88,6 +89,8 @@
   /* Money in vs out as chart marks: a pair checked for colour-blind separation. */
   --fp-chart-in: #1f9d6b;
   --fp-chart-out: #e25c4f;
+  /* Money earmarked for goals, beside the in/out pair; checked against both. */
+  --fp-chart-set-aside: #2457b8;
   --fp-shadow:
     0 1px 2px rgba(20, 18, 12, 0.05), 0 12px 30px -18px rgba(20, 18, 12, 0.22);
 
@@ -135,6 +138,7 @@
   --fp-transfer-soft: rgba(59, 130, 246, 0.14);
   --fp-chart-in: #27a878;
   --fp-chart-out: #e8625a;
+  --fp-chart-set-aside: #5b8def;
   --fp-shadow:
     0 1px 2px rgba(0, 0, 0, 0.4), 0 18px 40px -22px rgba(0, 0, 0, 0.7);
 }
