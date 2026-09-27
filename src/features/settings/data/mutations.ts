@@ -1,6 +1,7 @@
 import { db } from '#/db/db'
 import { requeued } from '#/db/syncFailure'
 import { schedulePush } from '#/db/sync'
+import { newId } from '#/lib/uuid'
 import type { LocalCustomCurrency, LocalExchangeRate } from '#/db/types'
 import type { CurrencyCode } from '#/lib/currency'
 import type { UpdateRateWire } from '#/features/settings/api/types'
@@ -10,8 +11,6 @@ import {
 } from './mappers'
 
 const now = () => new Date().toISOString()
-const newId = () => crypto.randomUUID()
-
 const pending = (entity: 'customCurrency' | 'rate', id: string) =>
   db.outbox.where('[entity+id]').equals([entity, id])
 

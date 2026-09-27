@@ -588,7 +588,11 @@ are never opened. See [inbound-imports.md](inbound-imports.md).
 ## Locked decisions (recap)
 
 - **Local DB**: Dexie (IndexedDB). **No TanStack Query.**
-- **IDs**: client-generated **UUIDs** (records exist before first sync; matches backend PKs).
+- **IDs**: client-generated **UUIDv7** via `newId()` in `src/lib/uuid.ts` (records exist before
+  first sync; matches backend PKs; the time prefix keeps server index inserts ordered). Older
+  records keep their v4 ids. Planned occurrences are the exception — deterministic v5 ids
+  (see [planned.md](planned.md)). Random-suffix uses (e.g. `uniqueSlug`) stay on
+  `crypto.randomUUID()`: a v7's leading characters are the timestamp, not randomness.
 - **Push**: event-driven + 30s safety flush only when the outbox is non-empty.
 - **Pull**: always on app enter + reconnect + 5-min background interval. **Delta (cursor +
   watermark) for the collections that grow, full list for the bounded ones** — the full list is

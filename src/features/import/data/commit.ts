@@ -21,6 +21,7 @@ import type {
 } from '#/features/transactions/data/mutations'
 import type { TransferDraft } from '#/features/transactions/data/transfers'
 import type { Aliases, Mapping, ParsedRow } from './types'
+import { newId } from '#/lib/uuid'
 
 /**
  * The commit — the first and only moment an import writes anything.
@@ -318,7 +319,7 @@ export async function commitImport(
   meta: CommitMeta,
   onProgress?: CommitProgress,
 ): Promise<CommitResult> {
-  const batchId = crypto.randomUUID()
+  const batchId = newId()
   const source = batchSource(batchId)
   const spellings = merchantSpellings(rows, mapping)
 
@@ -341,7 +342,7 @@ export async function commitImport(
       }
       const draft = ledgerDraftOf(row, source, created)
       walletIds.add(draft.walletId)
-      entries.push({ id: crypto.randomUUID(), draft })
+      entries.push({ id: newId(), draft })
     }
     imported += await bulkAddTransactions(entries)
     onProgress?.(Math.min(at + chunk.length, total), total)
@@ -360,7 +361,7 @@ export async function commitImport(
       walletIds.add(draft.toWalletId)
     }
     transferred += await bulkAddTransfers(
-      slice.map((draft) => ({ id: crypto.randomUUID(), draft })),
+      slice.map((draft) => ({ id: newId(), draft })),
       source,
     )
   }

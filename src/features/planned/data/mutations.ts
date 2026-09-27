@@ -31,6 +31,7 @@ import {
   settlementsOf,
 } from './rows'
 import { dueList, indexSettlements, settledOf } from './settle'
+import { newId } from '#/lib/uuid'
 
 export type PlannedActionCode =
   | 'not_found'
@@ -315,7 +316,7 @@ export async function addContribution(
 
   if (input.mode === 'later') {
     const ts = new Date().toISOString()
-    const plannedId = crypto.randomUUID()
+    const plannedId = newId()
     await insertPlanned([
       {
         id: plannedId,

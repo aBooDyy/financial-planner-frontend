@@ -7,6 +7,7 @@ import { Input } from '#/components/ui/input'
 import { ResponsiveDialog } from '#/components/ui/responsive-dialog'
 import type { WalletTarget } from '#/features/import/data/types'
 import type { CurrencyCode } from '#/lib/currency'
+import { newId } from '#/lib/uuid'
 
 type Props = {
   open: boolean
@@ -44,7 +45,7 @@ export function CreateWalletDialog({
     if (trimmed === '') return
     onCreate({
       kind: 'create',
-      walletId: crypto.randomUUID(),
+      walletId: newId(),
       name: trimmed,
       currency,
     })

@@ -1,6 +1,7 @@
 import { db } from '#/db/db'
 import { requeued } from '#/db/syncFailure'
 import { schedulePush } from '#/db/sync'
+import { newId } from '#/lib/uuid'
 import type { LocalCategory } from '#/db/types'
 import type { DeleteCategoryWire } from '#/features/categories/api/types'
 import type { TxType } from '#/features/transactions/api/types'
@@ -16,8 +17,6 @@ import { isRequiredCategory } from './required'
 import { uniqueSlug } from './slug'
 
 const now = () => new Date().toISOString()
-const newId = () => crypto.randomUUID()
-
 export type CategoryDraft = {
   name: string
   type: TxType

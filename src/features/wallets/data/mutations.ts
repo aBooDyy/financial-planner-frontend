@@ -1,6 +1,7 @@
 import { db } from '#/db/db'
 import { requeued } from '#/db/syncFailure'
 import { schedulePush } from '#/db/sync'
+import { newId } from '#/lib/uuid'
 import { SETTINGS_KEY } from '#/db/types'
 import type { LocalBalanceNode, OutboxEntry } from '#/db/types'
 import type { CurrencyCode } from '#/lib/currency'
@@ -26,8 +27,6 @@ export type NodePatch = Partial<Omit<NodeDraft, 'kind'>> & {
 }
 
 const now = () => new Date().toISOString()
-const newId = () => crypto.randomUUID()
-
 const liveNodes = async (): Promise<LocalBalanceNode[]> =>
   (await db.balanceNodes.toArray()).filter((n) => n.deleted === 0)
 

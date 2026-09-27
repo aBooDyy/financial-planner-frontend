@@ -1,5 +1,29 @@
 import { describe, expect, it } from 'vitest'
-import { isUuid } from './uuid'
+import { isUuid, newId } from './uuid'
+
+describe('newId', () => {
+  it('is a canonical version-7, RFC-variant uuid', () => {
+    const id = newId()
+    expect(isUuid(id)).toBe(true)
+    expect(id[14]).toBe('7')
+    expect('89ab').toContain(id[19])
+  })
+
+  it('leads with the millisecond timestamp', () => {
+    const ms = 0x0192_3456_789a
+    expect(newId(ms).replace(/-/g, '').slice(0, 12)).toBe('01923456789a')
+  })
+
+  it('sorts ids from later milliseconds after earlier ones', () => {
+    const earlier = newId(1_800_000_000_000)
+    const later = newId(1_800_000_000_001)
+    expect(earlier < later).toBe(true)
+  })
+
+  it('differs between ids of the same millisecond', () => {
+    expect(newId(1_800_000_000_000)).not.toBe(newId(1_800_000_000_000))
+  })
+})
 
 describe('isUuid', () => {
   it('accepts the canonical form in either case', () => {

@@ -1,6 +1,7 @@
 import { db } from '#/db/db'
 import { requeued } from '#/db/syncFailure'
 import { schedulePush } from '#/db/sync'
+import { newId } from '#/lib/uuid'
 import type { LocalTransaction, OutboxEntry } from '#/db/types'
 import type { CurrencyCode } from '#/lib/currency'
 import type { TransferLegType } from '#/features/transactions/api/types'
@@ -21,8 +22,6 @@ export type TransferDraft = {
 }
 
 const now = () => new Date().toISOString()
-const newId = () => crypto.randomUUID()
-
 const pendingFor = (transferId: string) =>
   db.outbox.where('[entity+id]').equals(['transfer', transferId])
 

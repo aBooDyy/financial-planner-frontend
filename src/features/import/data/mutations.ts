@@ -1,6 +1,7 @@
 import { db } from '#/db/db'
 import { requeued } from '#/db/syncFailure'
 import { schedulePush } from '#/db/sync'
+import { newId } from '#/lib/uuid'
 import {
   MAX_CONFIG_BYTES,
   configByteLength,
@@ -22,8 +23,6 @@ import type { ImportTemplateConfig } from './types'
 export const MAX_TEMPLATE_NAME = 120
 
 const now = () => new Date().toISOString()
-const newId = () => crypto.randomUUID()
-
 const pending = (id: string) =>
   db.outbox.where('[entity+id]').equals(['importTemplate', id])
 

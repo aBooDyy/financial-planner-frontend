@@ -1,6 +1,7 @@
 import { db } from '#/db/db'
 import { requeued } from '#/db/syncFailure'
 import { schedulePush } from '#/db/sync'
+import { newId } from '#/lib/uuid'
 import type { LocalMerchant, LocalMerchantAlias } from '#/db/types'
 import { merchantsApi } from '#/features/merchants/api/merchantsApi'
 import type { AliasOrigin } from '#/features/merchants/api/types'
@@ -16,8 +17,6 @@ import { identityKey, MAX_ALIAS_LENGTH } from './matching'
 import { pullMerchants } from './sync'
 
 const now = () => new Date().toISOString()
-const newId = () => crypto.randomUUID()
-
 export type AliasDraft = { raw: string; origin?: AliasOrigin }
 
 export type MerchantDraft = {

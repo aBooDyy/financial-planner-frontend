@@ -6,6 +6,7 @@ import { Input } from '#/components/ui/input'
 import { ResponsiveDialog } from '#/components/ui/responsive-dialog'
 import { isUsableAlias } from '#/features/merchants/data/mutations'
 import type { MerchantTarget } from '#/features/import/data/types'
+import { newId } from '#/lib/uuid'
 
 type Props = {
   open: boolean
@@ -39,7 +40,7 @@ export function CreateMerchantDialog({
     if (!usable) return
     onCreate({
       kind: 'create',
-      merchantId: crypto.randomUUID(),
+      merchantId: newId(),
       displayName: trimmed,
     })
     onOpenChange(false)

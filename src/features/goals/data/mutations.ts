@@ -1,6 +1,7 @@
 import { db } from '#/db/db'
 import { requeued } from '#/db/syncFailure'
 import { schedulePush } from '#/db/sync'
+import { newId } from '#/lib/uuid'
 import type {
   AllocationSource,
   LocalGoal,
@@ -67,8 +68,6 @@ export type GoalPlanSnapshot = Pick<
 >
 
 const now = () => new Date().toISOString()
-const newId = () => crypto.randomUUID()
-
 const pending = (entity: OutboxEntity, id: string) =>
   db.outbox.where('[entity+id]').equals([entity, id])
 
