@@ -16,6 +16,9 @@ import {
   scopeSections,
 } from '#/features/transactions/data/selectors'
 import type { Scope } from '#/features/transactions/data/selectors'
+import {
+  scopeBalance,
+} from '#/features/transactions/data/scopePicker'
 import type { LocalTransaction } from '#/db/types'
 import { isSpendingView } from '#/features/transactions/constants'
 import { useActivityRowClick } from '#/features/transactions/hooks/useActivityRowClick'
@@ -42,8 +45,10 @@ import { DaysCard } from './DaysCard'
 import { QuickAddCard } from './QuickAddCard'
 import { RecurringCard, UpcomingCard } from './RecurringCard'
 import { TransactionList } from './TransactionList'
+import { ScopeBalanceHeader } from './ScopeBalanceHeader'
 import { ScopeSelect } from './ScopeSelect'
-import { SpendingViewTabs } from './SpendingViewTabs'
+import { SpendingSubNav } from './SpendingSubNav'
+import { SpendingTabCard } from './SpendingTabCard'
 
 const NO_ROWS: LocalTransaction[] = []
 const NO_DELTAS: Record<string, number> = {}
@@ -91,6 +96,10 @@ export function TransactionsPage() {
     [inputs, deltas],
   )
   const scope = loading ? chosenScope : offeredScope(sections, chosenScope)
+  const balance = useMemo(
+    () => scopeBalance(scope, sections, base),
+    [scope, sections, base],
+  )
   const views = useSpendingViews({
     view,
     anchor: period.anchor,
@@ -143,9 +152,25 @@ export function TransactionsPage() {
           ? !recurring
           : false
 
+  const balancesLoading = loading || !deltas
+  const scopePicker = (compact: boolean) => (
+    <ScopeSelect
+      sections={sections}
+      balancesLoading={balancesLoading}
+      value={scope}
+      onChange={setScope}
+      compact={compact}
+    />
+  )
+
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-fp-bg text-fp-text">
       <TopNav user={user} active="budget" onSignOut={() => void logout()} />
+      <SpendingSubNav
+        view={view}
+        dueCount={planned.dueCount}
+        trailing={scopePicker(true)}
+      />
 
       <div className="flex-1 overflow-auto">
         <span role="status" className="sr-only">
@@ -155,20 +180,13 @@ export function TransactionsPage() {
           aria-busy={busy}
           className="mx-auto grid w-full max-w-[560px] grid-cols-1 items-start gap-4 px-4 py-4 pb-[30px] md:max-w-[1180px] md:grid-cols-[minmax(0,1fr)_360px] md:gap-6 md:px-6 md:py-[24px] md:pb-[90px]"
         >
-          {/* Header: view tabs + global account scope */}
-          <div className="md:col-span-2 flex flex-wrap items-center gap-[10px]">
-            <SpendingViewTabs view={view} dueCount={planned.dueCount} />
-            <div className="min-w-[8px] flex-1" />
-            <ScopeSelect
-              sections={sections}
-              balancesLoading={loading || !deltas}
-              value={scope}
-              onChange={setScope}
-            />
-          </div>
-
           {/* Left column */}
           <div className="flex min-w-0 flex-col gap-4">
+            <SpendingTabCard
+              view={view}
+              dueCount={planned.dueCount}
+              trailing={scopePicker(false)}
+            />
             {view === 'activity' ? (
               <>
                 {planned.dueCount > 0 ? (
@@ -202,6 +220,12 @@ export function TransactionsPage() {
                     <CashflowHeroCard
                       view={activity.cashflow}
                       periodLabel={views.period.label}
+                      header={
+                        <ScopeBalanceHeader
+                          balance={balance}
+                          loading={balancesLoading}
+                        />
+                      }
                     />
                     <TransactionList
                       view={activity.list}

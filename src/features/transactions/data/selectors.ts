@@ -65,10 +65,16 @@ export const periodCaption = (
 
 type RatesMap = Partial<Record<string, number>>
 
-export type Scope =
-  | { type: 'all' }
+/** One ticked account in the filter; a group covers every wallet beneath it. */
+export type AccountPick =
   | { type: 'wallet'; id: string }
   | { type: 'group'; id: string }
+
+/** Everything, one account, or — once two or more are ticked — any of them. */
+export type Scope =
+  | { type: 'all' }
+  | AccountPick
+  | { type: 'accounts'; picks: AccountPick[] }
 
 export type SpendingData = {
   txns: LocalTransaction[]
@@ -112,9 +118,14 @@ function walletMatcher(
   nodes: LocalBalanceNode[],
 ): (walletId: string) => boolean {
   if (scope.type === 'all') return () => true
-  if (scope.type === 'wallet') return (id) => id === scope.id
-  const groups = ancestorGroups(nodes)
-  return (id) => groups.get(id)?.has(scope.id) ?? false
+  const picks = picksOf(scope)
+  const wallets = new Set(
+    picks.filter((p) => p.type === 'wallet').map((p) => p.id),
+  )
+  const groupIds = picks.filter((p) => p.type === 'group').map((p) => p.id)
+  const ancestors = groupIds.length > 0 ? ancestorGroups(nodes) : null
+  return (id) =>
+    wallets.has(id) || groupIds.some((g) => ancestors?.get(id)?.has(g) ?? false)
 }
 
 export type ScopeOption = {
@@ -128,10 +139,13 @@ export type ScopeOption = {
   depth: number
 }
 
-export type ScopeSection = {
+/** A filter option, whose balance in the base currency lets several picks be summed. */
+export type FilterOption = ScopeOption & { baseMinor: number }
+
+export type ScopeSection<TOption extends ScopeOption = ScopeOption> = {
   /** Heading above the section, or null when the options speak for themselves. */
   label: string | null
-  options: ScopeOption[]
+  options: TOption[]
 }
 
 /**
@@ -143,7 +157,7 @@ export type ScopeSection = {
 export function scopeSections(
   data: Pick<SpendingData, 'nodes' | 'base' | 'rates'>,
   deltas: Record<string, number>,
-): ScopeSection[] {
+): ScopeSection<FilterOption>[] {
   const { nodes, base, rates } = data
   const balances = liveBalancesFrom(nodes, deltas)
   const active = activeNodes(nodes)
@@ -164,7 +178,7 @@ export function scopeSections(
       0,
     )
 
-  const option = (n: LocalBalanceNode, depth: number): ScopeOption =>
+  const option = (n: LocalBalanceNode, depth: number): FilterOption =>
     n.kind === 'wallet'
       ? {
           value: `wallet:${n.id}`,
@@ -174,27 +188,34 @@ export function scopeSections(
             balances[n.id] ?? 0,
             n.currency ?? base,
           ),
+          baseMinor: inBase(n),
           color: n.color,
           icon: iconIdOr(n.icon, WALLET_ICON),
           depth,
         }
-      : {
-          value: `group:${n.id}`,
-          kind: 'group',
-          name: n.name,
-          amountStr: formatMoneyRounded(baseTotal(n.id), base),
-          color: n.color,
-          icon: iconIdOr(n.icon, GROUP_ICON),
-          depth,
-        }
-  const subtree = (n: LocalBalanceNode, depth: number): ScopeOption[] => [
+      : groupOption(n, depth, baseTotal(n.id))
+  const groupOption = (
+    n: LocalBalanceNode,
+    depth: number,
+    total: number,
+  ): FilterOption => ({
+    value: `group:${n.id}`,
+    kind: 'group',
+    name: n.name,
+    amountStr: formatMoneyRounded(total, base),
+    baseMinor: total,
+    color: n.color,
+    icon: iconIdOr(n.icon, GROUP_ICON),
+    depth,
+  })
+  const subtree = (n: LocalBalanceNode, depth: number): FilterOption[] => [
     option(n, depth),
     ...(children.get(n.id) ?? []).flatMap((c) => subtree(c, depth + 1)),
   ]
 
   const roots = children.get(null) ?? []
   const loose = roots.filter((n) => n.kind === 'wallet')
-  const sections: ScopeSection[] = [
+  const sections: ScopeSection<FilterOption>[] = [
     {
       label: null,
       options: [
@@ -203,6 +224,7 @@ export function scopeSections(
           kind: 'all',
           name: 'All accounts',
           amountStr: formatMoneyRounded(baseTotal(null), base),
+          baseMinor: baseTotal(null),
           color: null,
           icon: null,
           depth: 0,
@@ -221,24 +243,48 @@ export function scopeSections(
   return sections
 }
 
-/** The chosen scope while it is still on offer; `all` once its account is archived or gone. */
+/** The chosen accounts still on offer; `all` once none of them is (archived or gone). */
 export function offeredScope(sections: ScopeSection[], scope: Scope): Scope {
-  const value = scopeToValue(scope)
-  const offered = sections.some((s) => s.options.some((o) => o.value === value))
-  return offered ? scope : { type: 'all' }
+  const offered = new Set(
+    sections.flatMap((s) => s.options.map((o) => o.value)),
+  )
+  const picks = picksOf(scope)
+  const kept = picks.filter((p) => offered.has(pickValue(p)))
+  return kept.length === picks.length ? scope : scopeFromPicks(kept)
 }
 
-export function scopeFromValue(value: string): Scope {
+export const picksOf = (scope: Scope): AccountPick[] =>
+  scope.type === 'all' ? [] : scope.type === 'accounts' ? scope.picks : [scope]
+
+/** No pick is everything; a single pick is that account. */
+export const scopeFromPicks = (picks: AccountPick[]): Scope =>
+  picks.length === 0
+    ? { type: 'all' }
+    : picks.length === 1
+      ? picks[0]
+      : { type: 'accounts', picks }
+
+/** A pick's option value in `scopeSections` ("wallet:<id>" / "group:<id>"). */
+export const pickValue = (pick: AccountPick): string =>
+  `${pick.type}:${pick.id}`
+
+export function pickFromValue(value: string): AccountPick | null {
   if (value.startsWith('group:')) return { type: 'group', id: value.slice(6) }
   if (value.startsWith('wallet:')) return { type: 'wallet', id: value.slice(7) }
-  return { type: 'all' }
+  return null
 }
 
-export function scopeToValue(scope: Scope): string {
-  if (scope.type === 'group') return `group:${scope.id}`
-  if (scope.type === 'wallet') return `wallet:${scope.id}`
-  return 'all'
-}
+/** A stable string for a scope — the views memoise on it. */
+export const scopeToValue = (scope: Scope): string =>
+  scope.type === 'all' ? 'all' : picksOf(scope).map(pickValue).join(',')
+
+export const scopeFromValue = (value: string): Scope =>
+  scopeFromPicks(
+    value
+      .split(',')
+      .map(pickFromValue)
+      .filter((p): p is AccountPick => p !== null),
+  )
 
 // --- Shared filtering ----------------------------------------------------------------
 
@@ -844,14 +890,15 @@ export function buildActivityList(
         ? `${count} on ${fmtShort(anchor)}`
         : `${count} in ${rangeLabel(anchor, mode, win, DEFAULT_DATE_FORMAT)}`
 
+  const accounts = scope.type === 'accounts' ? 'these accounts' : 'this account'
   const emptyTitle =
     scope.type === 'all'
       ? 'No transactions in this period'
-      : 'Nothing for this account'
+      : `Nothing for ${accounts}`
   const emptyText =
     scope.type === 'all'
       ? 'Add one with the quick-add panel.'
-      : 'Nothing was recorded on this account in this period.'
+      : `Nothing was recorded on ${accounts} in this period.`
 
   return { groups, empty: count === 0, emptyTitle, emptyText, countStr }
 }

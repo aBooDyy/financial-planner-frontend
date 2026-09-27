@@ -119,13 +119,36 @@ flattening every red day; the square root keeps small days distinguishable from 
 
 ## UI
 
-- **Account filter** (`ScopeSelect`, in the page header; filters every tab). Built by the pure
+- **Tabs** (the Means "Transactions Tabs Options" 1b design). Desktop: `SpendingTabCard`, the
+  Goals-style carded underline tab row at the top of the **left column** (the rail starts level
+  with it), the account filter at its end. Mobile: `SpendingSubNav`, the Goals-style icon
+  sub-navbar under the top bar (outside the scroll area), the filter as a compact pill at its
+  end ("All" for everything). Both are `<Link>`s to `/transactions/<view>`, named and drawn from
+  `components/spendingViews.ts`; the Planned tab carries `DueCountBadge`.
+- **Account filter** (`ScopeSelect`, in the tab card / sub-nav; filters every tab). The trigger
+  is a **plain label** — the balance moved out of it onto the cashflow card (below). Built by the pure
   `scopeSections`: "All accounts", then one section per top-level group — the group itself,
   then its wallets and subgroups indented by depth, each with its `IconChip` and balance (a
   group's in base currency) — then an "Not in a group" section of loose wallets (headed
-  "Wallets" when there are no groups). Archived accounts are left out; `offeredScope` falls a
-  chosen scope back to `all` once its account is archived or deleted. Transactions on archived
+  "Wallets" when there are no groups). Archived accounts are left out; `offeredScope` drops a
+  pick once its account is archived or deleted (none left is `all`). Transactions on archived
   wallets stay in the history under "All accounts".
+  **Multi-select**: a `DropdownMenu` of checkbox items (`ScopeMenuTree`), not a view — the
+  choice lives in page state only and resets like before. "All accounts" clears the ticks and
+  closes; ticking an account keeps the menu open. `Scope` is `all`, one `AccountPick` (wallet or
+  group), or `{ type: 'accounts', picks }` for two or more (`scopeFromPicks` normalises); a
+  wallet matches when it or one of its ancestor groups is picked, so every tab filters through
+  the same `walletMatcher`. The pure rules live in `data/scopePicker.ts`: ticking a group folds
+  the picks beneath it into it, and those show ticked but disabled (`isCovered`) until the group
+  is unticked; the trigger reads "Main", "Main + Cash" or "3 accounts" (`scopeLabel`). A transfer
+  between two picked wallets is internal (neutral), as within one group.
+- **The chosen accounts' balance** heads `CashflowHeroCard` (its `header` slot,
+  `ScopeBalanceHeader`), from the pure `scopeBalance`: "All accounts" or the one pick's name with
+  its balance (a wallet in its own currency, a group in base); **two or more picks read "Total"**
+  — the sum of each pick's `baseMinor` in base currency — with a smaller line beneath listing each
+  pick and its own balance. `baseMinor` lives on `FilterOption` (`scopeSections`' options) only,
+  not on `ScopeOption`: the entry dialogs reuse the option shape and have no rates to fill it.
+  The names show at once; the amounts skeleton until the deltas land.
 
 `hooks/useTransactions` bundles every input **except the ledger rows** into `SpendingInputs`
 (`SpendingData` minus `txns`), memoized on its source rows, **and returns the live `catalog`
@@ -165,7 +188,7 @@ tx/budget/recurring editor state machine. Components are dumb (`components/`): p
   <type>". Top to bottom: `TxTypeSwitch` (pill segmented; the chosen type wears its tint —
   `fp-spend`, the accent, `fp-transfer` — set on the body as `--tx-ink` / `--tx-soft`),
   `TxAmountHero` (the question, currency code and a large centred amount on the tint; for
-  spend/income the `TxAccountPill` "Paid from / Paid into" sits under it and sets the currency; it opens the Spending filter's account tree — `AccountTreeGroups`, shared with `ScopeSelect`, with groups as headings rather than picks (`entryAccountSections`: no "All accounts", no empty groups, plus an in-use archived wallet)),
+  spend/income the `TxAccountPill` "Paid from / Paid into" sits under it and sets the currency; it opens the Spending filter's account tree — `AccountTreeGroups` (its row content, `AccountOptionContent`, is shared with the filter's `ScopeMenuTree`), with groups as headings rather than picks (`entryAccountSections`: no "All accounts", no empty groups, plus an in-use archived wallet)),
   then `TxCashflowFields` — "What for?" `TxCategoryChips` (`useQuickChips(type, 5)`, the chosen
   one always among them, "All categories ›"), "Where?" `TxMerchantField` (+ the "Usually X · Use
   it" suggestion), "When?" `TxDateChips` (Today / Yesterday / a `DateField` pill), the

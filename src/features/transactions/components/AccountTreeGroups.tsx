@@ -23,7 +23,8 @@ type Props = {
 
 const INDENT_PX = 18
 
-function OptionContent({
+/** An account's chip, name and balance, as one row of an account list. */
+export function AccountOptionContent({
   option,
   amountsLoading,
 }: {
@@ -83,7 +84,10 @@ export function AccountTreeGroups({
               style={indent}
               className="flex items-center gap-2 py-[7px] pe-2 text-[13px] text-fp-text"
             >
-              <OptionContent option={option} amountsLoading={amountsLoading} />
+              <AccountOptionContent
+                option={option}
+                amountsLoading={amountsLoading}
+              />
             </SelectLabel>
           ) : (
             <SelectItem
@@ -92,7 +96,10 @@ export function AccountTreeGroups({
               style={indent}
               className="text-[13px] *:[span]:last:min-w-0 *:[span]:last:flex-1"
             >
-              <OptionContent option={option} amountsLoading={amountsLoading} />
+              <AccountOptionContent
+                option={option}
+                amountsLoading={amountsLoading}
+              />
             </SelectItem>
           )
         })}

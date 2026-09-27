@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { SegmentedBar } from '#/components/SegmentedBar'
 import { ValueOrSkeleton } from '#/components/ValueOrSkeleton'
 import { Skeleton } from '#/components/ui/skeleton'
@@ -15,9 +16,11 @@ type Props = {
   /** `null` while the period's rows load; the labels and frame render regardless. */
   view: CashflowView | null
   periodLabel: string
+  /** Heads the card above the period figures, e.g. the chosen accounts' balance. */
+  header?: ReactNode
 }
 
-export function CashflowHeroCard({ view, periodLabel }: Props) {
+export function CashflowHeroCard({ view, periodLabel, header }: Props) {
   const stats: Stat[] = [
     { label: 'Income', value: view?.incomeStr },
     { op: '−', label: 'Spent', value: view?.spentStr },
@@ -33,6 +36,7 @@ export function CashflowHeroCard({ view, periodLabel }: Props) {
 
   return (
     <div className="rounded-[18px] border border-fp-border bg-fp-surface p-[20px_18px] shadow-fp md:p-[24px_26px]">
+      {header}
       <div className="mb-4 flex items-center gap-[9px]">
         <span className="text-[12px] font-bold uppercase tracking-[0.05em] text-fp-text-2">
           Cashflow

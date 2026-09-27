@@ -743,6 +743,26 @@ describe('transfers', () => {
     expect(view.countStr).toBe('2 in June 2026')
   })
 
+  it('treats a transfer between two ticked wallets as internal, and one leaving them as out', () => {
+    const both: Scope = {
+      type: 'accounts',
+      picks: [
+        { type: 'wallet', id: 'w1' },
+        { type: 'wallet', id: 'w2' },
+      ],
+    }
+    const mainAndCash: Scope = {
+      type: 'accounts',
+      picks: [
+        { type: 'wallet', id: 'w1' },
+        { type: 'wallet', id: 'w3' },
+      ],
+    }
+    expect(transferRows(withTransfer(), both)[0].direction).toBe('neutral')
+    expect(transferRows(withTransfer(), mainAndCash)[0].direction).toBe('out')
+    expect(activity(withTransfer(), mainAndCash).groups[0].rows).toHaveLength(2)
+  })
+
   it('titles a neutral transfer by its note', () => {
     const [row] = transferRows(withTransfer(legs('tr1', 'Rainy day')))
     expect(row.name).toBe('Rainy day')
