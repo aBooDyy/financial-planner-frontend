@@ -38,6 +38,7 @@ const rule = (id: string, over: Partial<EmailRule> = {}): EmailRule => ({
   walletId: null,
   type: 'spend',
   categoryId: null,
+  defaultMerchant: null,
   autoConfirm: false,
   createdAt: '',
   updatedAt: '',

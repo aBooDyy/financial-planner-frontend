@@ -90,6 +90,15 @@ describe('summarizeDelivery', () => {
       summarizeDelivery(aDelivery({ outcome: 'IGNORED' }), LIMITS).headline,
     ).toBe('No rule matched — nothing kept')
   })
+
+  it('says a skipped delivery was one the user marked as not a transaction', () => {
+    expect(
+      summarizeDelivery(aDelivery({ outcome: 'SKIPPED' }), LIMITS),
+    ).toMatchObject({
+      tone: 'idle',
+      headline: 'Skipped — you marked one like it as not a transaction',
+    })
+  })
 })
 
 describe('building a rule from a delivery', () => {

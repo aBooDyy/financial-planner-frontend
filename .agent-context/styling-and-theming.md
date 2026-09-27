@@ -173,6 +173,8 @@ values sit in field wells.
   consequence `bullets` and an optional grey `note`. Every delete goes through one.
 - `useDiscardGuard` — P4 "Discard your changes?" for editors whose close would lose edits.
 - `DoneState` — P5 check + Undo/Done body for create flows that land something undoable.
+- `UndoToast` — the dark line floating over a dialog's bottom ("Import ignored · Undo"); it is
+  absolutely positioned against the dialog content, so render it inside the dialog's body.
 - `DateField` takes `hint` ("in 5d" / "12 days ago" via `relativeDayLabel`, or a fixed word).
 - Side pane (P6): the goals `DetailPanel` — a 330px rail floating 12px in from the page's end
   edge, same header as a dialog, footer pinned; a bottom sheet on mobile.

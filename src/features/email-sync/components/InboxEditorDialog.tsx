@@ -3,7 +3,6 @@ import { useDiscardGuard } from '#/components/dialog/useDiscardGuard'
 import { ResponsiveDialog } from '#/components/ui/responsive-dialog'
 import type { LocalEmailConnection } from '#/db/types'
 import type { WalletGroupOption } from '#/features/wallets/data/selectors'
-import type { CategoryCatalog } from '#/features/categories/data/catalog'
 import { PROVIDER_LABEL } from '#/features/email-sync/data/describe'
 import { fallbackName } from '#/features/email-sync/data/ruleDraft'
 import { sampleOf } from '#/features/email-sync/data/samples'
@@ -24,7 +23,6 @@ type Props = {
   intent: EditorIntent
   online: boolean
   walletGroups: WalletGroupOption[]
-  catalog: CategoryCatalog
   baseCurrency: CurrencyCode
   onClose: () => void
 }
@@ -36,7 +34,7 @@ function doneBlocker(model: EmailRuleEditorModel): string | null {
   if (!model.current)
     return learning.pending
       ? 'Reading your sample…'
-      : (model.learnError ?? 'Finish tapping what to read.')
+      : (model.learnError ?? 'Tag the amount and currency in step 1.')
   return problems.senders ?? problems.name ?? problems.autoConfirm ?? null
 }
 
@@ -51,7 +49,6 @@ export function InboxEditorDialog({
   intent,
   online,
   walletGroups,
-  catalog,
   baseCurrency,
   onClose,
 }: Props) {
@@ -155,7 +152,6 @@ export function InboxEditorDialog({
             inbox={inbox}
             online={online}
             walletGroups={walletGroups}
-            catalog={catalog}
             baseCurrency={baseCurrency}
           />
         ) : (

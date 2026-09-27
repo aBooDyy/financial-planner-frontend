@@ -16,9 +16,13 @@ import { FIELD_WELL } from '#/components/ui/field-well'
 type Props = {
   /** Only this type's categories are offered. */
   type: TxType
-  /** The picked leaf: a subcategory's id, or a category's. */
-  categoryId: string
+  /** The picked leaf: a subcategory's id, or a category's; null only with `none`. */
+  categoryId: string | null
   onChange: (categoryId: string) => void
+  /** Offers "no category" as the first row, e.g. "Decide when reviewing". */
+  none?: { label: string; onPick: () => void }
+  id?: string
+  invalid?: boolean
   label?: string
   className?: string
   align?: 'start' | 'center' | 'end'
@@ -36,6 +40,9 @@ export function CategoryPicker({
   type,
   categoryId,
   onChange,
+  none,
+  id,
+  invalid,
   label = 'Category',
   className,
   align = 'start',
@@ -43,8 +50,9 @@ export function CategoryPicker({
 }: Props) {
   const [open, setOpen] = useState(false)
   const catalog = useCategoryCatalog()
-  const parent = catalog.rootOf(categoryId)
-  const picked = catalog.get(categoryId)
+  const empty = categoryId === null && none !== undefined
+  const parent = catalog.rootOf(categoryId ?? '')
+  const picked = catalog.get(categoryId ?? '')
   const sub = picked.parentId === null ? null : picked
 
   // Built only while open: a closed picker must not pay for the whole tree.
@@ -57,6 +65,17 @@ export function CategoryPicker({
     onChange(next)
     setOpen(false)
   }
+  const pickNone = none
+    ? () => {
+        none.onPick()
+        setOpen(false)
+      }
+    : undefined
+  const shown = empty
+    ? none.label
+    : sub
+      ? `${parent.name} › ${sub.name}`
+      : parent.name
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -64,18 +83,26 @@ export function CategoryPicker({
         <PopoverTrigger asChild>{trigger}</PopoverTrigger>
       ) : (
         <PopoverTrigger
-          aria-label={`${label}: ${sub ? `${parent.name} › ${sub.name}` : parent.name}`}
+          id={id}
+          aria-label={`${label}: ${shown}`}
+          aria-invalid={invalid ? true : undefined}
           className={cn(TRIGGER, className)}
         >
-          <IconChip
-            id={sub?.icon ?? parent.icon}
-            color={sub?.color ?? parent.color}
-            size={30}
-            iconSize={16}
-            className="rounded-[9px]"
-          />
+          {empty ? null : (
+            <IconChip
+              id={sub?.icon ?? parent.icon}
+              color={sub?.color ?? parent.color}
+              size={30}
+              iconSize={16}
+              className="rounded-[9px]"
+            />
+          )}
           <span className="flex min-w-0 flex-1 items-baseline gap-[5px] truncate text-[13.5px]">
-            {sub ? (
+            {empty ? (
+              <span className="truncate py-[6px] text-[14px] font-semibold">
+                {shown}
+              </span>
+            ) : sub ? (
               <>
                 <span className="truncate font-medium text-fp-text-2">
                   {parent.name}
@@ -99,8 +126,13 @@ export function CategoryPicker({
         {open ? (
           <CategoryOptions
             categories={categories}
-            value={categoryId}
+            value={categoryId ?? ''}
             onPick={pick}
+            none={
+              none && pickNone
+                ? { label: none.label, onPick: pickNone }
+                : undefined
+            }
           />
         ) : null}
       </PopoverContent>

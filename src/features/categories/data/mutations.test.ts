@@ -422,6 +422,7 @@ const pendingImport = (suggestedCategoryId: string): LocalInboundImport => ({
   suggestedWalletId: null,
   rawPreview: null,
   hasBody: false,
+  skippable: false,
   bodyFormat: 'text',
   status: 'pending',
   transactionId: null,

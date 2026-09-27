@@ -1,5 +1,5 @@
-import { tokenise } from './tokens'
-import type { Token } from './tokens'
+import { tokenise } from '#/lib/wordTokens'
+import type { Token } from '#/lib/wordTokens'
 
 type SampleProblem = 'empty' | 'invalid' | 'not_object' | 'too_large'
 

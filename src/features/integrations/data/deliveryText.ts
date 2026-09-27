@@ -78,6 +78,11 @@ export function summarizeDelivery(
       }
     case 'IGNORED':
       return { tone: 'warn', headline: 'No rule matched — nothing kept' }
+    case 'SKIPPED':
+      return {
+        tone: 'idle',
+        headline: 'Skipped — you marked one like it as not a transaction',
+      }
     case 'REJECTED': {
       const refused = delivery.errorCode ? REFUSED[delivery.errorCode] : null
       return refused ? refused(limits) : { tone: 'error', headline: 'Refused' }

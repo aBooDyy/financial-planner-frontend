@@ -352,9 +352,12 @@ Recorded as a sync pattern in
 
 ## The picker — `CategoryPicker`
 
-`components/CategoryPicker` is the one control for choosing a category **or** a subcategory
-(quick-add and the transaction/recurring editor). Props: `type`, `categoryId` (the leaf),
-`onChange(categoryId)`. The trigger is an `IconChip` (the child's icon/colour when
+`components/CategoryPicker` is the one control for choosing a category **or** a subcategory,
+everywhere one is chosen: quick-add, the transaction/recurring editor, the review queue, an
+email rule's and an integration key's default. Props: `type`, `categoryId` (the leaf),
+`onChange(categoryId)`, plus `none: { label, onPick }` for a surface where "no category" is an
+answer (the rule and key defaults: "Decide when reviewing") — it becomes the list's first row,
+checked while `categoryId` is null, and the trigger then shows its label without a chip. The trigger is an `IconChip` (the child's icon/colour when
 one is chosen) + "Parent › Sub" (parent muted, child bold); its accessible name is
 `"Category: Parent › Sub"`. It opens a Popover + cmdk `Command` (`components/CategoryOptions`)
 built **only while open** — the same pattern as `CurrencyPicker`:
@@ -378,8 +381,7 @@ built **only while open** — the same pattern as `CurrencyPicker`:
 | `useTransactions`                                                  | returns `catalog` alongside `SpendingData`; `TransactionsPage` threads it                                                                                                                   |
 | `CategoryPicker`, `TransactionDialog`, `QuickAddCard`, `CategoryIcon`       | `useCategoryCatalog()` directly                                                                                                                                                             |
 | `features/import`                                                  | `useCsvImport` builds the catalog from its own Dexie read; `categoryOptions(catalog)` flattens it for the matcher by id, `fallbackCategoriesOf(catalog)` picks one default per direction, a v1 template is upgraded through `bySlug` ([import.md](import.md)) |
-| `features/inbound-imports/hooks/useImportReview`                   | takes a `CategoryCatalog` and resolves the suggested `categoryId` against it — kept while the catalog holds it under the draft's type, else `fallbackFor(type)` ([inbound-imports.md](inbound-imports.md)) |
-| `SuggestedCategorySelect` (email rules, integration-key defaults)  | one id-valued select over a type's roots and their children, plus "Decide when reviewing" ([email-sync.md](email-sync.md), [integrations.md](integrations.md))                          |
+| `features/inbound-imports/hooks/useReviewQueue`                    | takes a `CategoryCatalog` and resolves each suggested `categoryId` against it (`data/reviewDraft.resolveDraft`) — kept while the catalog holds it under the draft's type, else `fallbackFor(type)` ([inbound-imports.md](inbound-imports.md)) |
 | `features/integrations/hooks/useFieldStatusContext`                | names a dry run's resolved `categoryId` (root, and child when it is one) for the status lines                                                                                             |
 | `features/settings/components/MerchantRow`                         | resolves the remembered category (`labelOf`, "Dining · Cafés") for its chip                                                                                                               |
 

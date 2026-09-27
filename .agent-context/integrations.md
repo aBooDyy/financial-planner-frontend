@@ -61,8 +61,8 @@ object with the key's `version` (the backend treats omitted nullables as cleared
 keeps it coherent: a type change clears `defaultCategoryId`, clearing the account turns
 auto-confirm off. `draftProblems` checks name (≤ 120), rate limit (1–600) and
 auto-confirm-needs-account locally; the server re-checks everything. The default category is
-one id-valued select (`SuggestedCategorySelect`, from the categories slice) over the live
-`CategoryCatalog` ([categories.md](categories.md)) — a root or a child, wire
+the shared `CategoryPicker` with a "Decide when reviewing" row ([categories.md](categories.md))
+— a root or a child, wire
 `default_category_id`; `integrations.key.category_invalid` / `default_category_id` go beside it
 (`KeyField` `defaultCategoryId`).
 
@@ -126,7 +126,7 @@ still-empty of amount → currency → date and then to nothing (`nextTarget`); 
 is only ever the target because the user chose it. Tapping with the condition as target writes
 `EQUALS` (value) / `CONTAINS` (a word) / `EXISTS` (a container).
 
-**Words inside a string (`tokens.ts`).** A string of two or more words renders its words as
+**Words inside a string (`tokens.ts`, over `tokenise`/`nameRun` in `src/lib/wordTokens.ts`).** A string of two or more words renders its words as
 child tree items. Tapping one binds the string's path **plus a generated pattern**:
 `suggestPattern` picks a capture class from what the field expects (a number for amount,
 `\b[A-Z]{3}\b` for a currency code, the date's digit shape, a multi-word name run for
@@ -231,15 +231,17 @@ caps _Add rule_ ("n of 10"); `integrationPayloadMaxBytes` bounds the sample. See
 
 ## In the review queue and the ledger
 
-`components/ReviewPayloadTree.tsx` is the payload tree as the review queue draws a staged
-webhook row: `PayloadTree` with no marks, a tap handed to the review form as `{ value, text }`
-(a word tapped inside a string grows into its name run when the target is merchant/note), with
-`explainWords={false}` — the path line does not claim a tapped word is "read with a pattern",
-because in review a tap only copies it. The queue does not import it — the root layout
-provides it through the queue's
+`components/ReviewPayloadTree.tsx` is the payload tree, read-only (no marks, taps ignored,
+`explainWords={false}`), as a webhook-sourced transaction's `SourceSection` shows the payload it
+came from. The queue does not import it — the root layout provides it through the queue's
 `PayloadViewContext` ([inbound-imports.md](inbound-imports.md)), so sources depend on the
-queue and never the reverse. The same view renders read-only under a webhook-sourced
-transaction's `SourceSection`. The queue links back here through the _Deep link_ above.
+queue and never the reverse. The review card itself draws a payload as pretty-printed lines
+(like an email), so both sources are corrected the same way. The queue links back here
+through the _Deep link_ above.
+
+**Skipped deliveries.** Under the key's settings, `SkippedShapes` (from the queue) says how
+many kinds of delivery the key skips because the user marked one "Not a transaction", with
+_Forget them_. Such a delivery is logged with the outcome `SKIPPED`.
 
 ## Delivery log
 

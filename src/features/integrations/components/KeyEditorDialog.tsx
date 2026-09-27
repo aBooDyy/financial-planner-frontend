@@ -15,6 +15,7 @@ import { useConfigLimits } from '#/lib/config/appConfig'
 import type { CurrencyCode } from '#/lib/currency'
 import { DeliveryLog } from './DeliveryLog'
 import { KeyRulesSection } from './KeyRulesSection'
+import { SkippedShapes } from '#/features/inbound-imports/components/SkippedShapes'
 import { KeySettingsForm } from './KeySettingsForm'
 import { RuleEditor } from './RuleEditor'
 
@@ -169,12 +170,18 @@ export function KeyEditorDialog({
       ) : (
         <div className="flex flex-col gap-[18px]">
           <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-            <KeySettingsForm
-              editor={editor}
-              walletGroups={walletGroups}
-              catalog={catalog}
-              baseCurrency={baseCurrency}
-            />
+            <div className="flex min-w-0 flex-col gap-[14px]">
+              <KeySettingsForm
+                editor={editor}
+                walletGroups={walletGroups}
+                baseCurrency={baseCurrency}
+              />
+              <SkippedShapes
+                parent={{ keyId: apiKey.id }}
+                noun={{ one: 'delivery', many: 'deliveries' }}
+                online={online}
+              />
+            </div>
             <div className="md:sticky md:top-0 md:self-start">
               <KeyRulesSection model={rules} locked={revoked || !online} />
             </div>

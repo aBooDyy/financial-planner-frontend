@@ -24,7 +24,7 @@ const PROBLEM: Record<
   },
   merchant: {
     anchor_not_found: 'Merchant line not found',
-    not_set: 'Merchant not read',
+    not_set: 'Tag its line in step 1',
   },
 }
 

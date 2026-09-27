@@ -1,20 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import type { ReactNode } from 'react'
-import { cn } from '#/lib/utils'
 import type { BodyFormat } from '#/features/inbound-imports/api/types'
-import type {
-  PayloadPick,
-  PickField,
-} from '#/features/inbound-imports/data/pickValues'
 import { bodyNoun } from '#/features/inbound-imports/data/sources'
-import { PickTargetBar } from './PickTargetBar'
 import { usePayloadView } from './payloadView'
-
-type PayloadPicking = {
-  target: PickField
-  onTarget: (field: PickField) => void
-  onPick: (pick: PayloadPick) => void
-}
 
 type Props = {
   format: BodyFormat
@@ -22,12 +10,6 @@ type Props = {
   truncated: boolean
   loading: boolean
   error: string | null
-  /** When given, each text line becomes tappable so its values can fill the form. */
-  onUseLine?: (line: string) => void
-  /** When given, a JSON body's values become tappable into the chosen form field. */
-  picking?: PayloadPicking
-  /** Under the body, inside its card (e.g. "Fix the rule"). */
-  footer?: ReactNode
 }
 
 const SHELL =
@@ -37,19 +19,8 @@ const MONO =
   'font-mono text-[12.5px] leading-[1.5] whitespace-pre-wrap text-fp-text'
 const FOOTNOTE = 'text-[11.5px] text-fp-text-3'
 
-function Shell({
-  children,
-  footer,
-}: {
-  children: ReactNode
-  footer?: ReactNode
-}) {
-  return (
-    <div className={SHELL}>
-      {children}
-      {footer}
-    </div>
-  )
+function Shell({ children }: { children: ReactNode }) {
+  return <div className={SHELL}>{children}</div>
 }
 
 function Notice({ children, danger }: { children: string; danger?: boolean }) {
@@ -60,49 +31,15 @@ function Notice({ children, danger }: { children: string; danger?: boolean }) {
   )
 }
 
-function TextLines({
-  lines,
-  onUseLine,
-}: {
-  lines: string[]
-  onUseLine?: (line: string) => void
-}) {
-  const [used, setUsed] = useState<number | null>(null)
-  const className = `block w-full rounded-[9px] border-[1.5px] border-transparent px-[10px] py-[7px] text-start ${MONO}`
+function TextLines({ lines }: { lines: string[] }) {
   return (
-    <>
-      {onUseLine ? (
-        <div className="text-[12px] font-bold text-fp-text-2">
-          Tap a line to use its amount
+    <div className="-mx-[6px] flex max-h-[220px] flex-col gap-[2px] overflow-auto">
+      {lines.map((line, i) => (
+        <div key={i} className={`px-[10px] py-[7px] ${MONO}`}>
+          {line}
         </div>
-      ) : null}
-      <div className="-mx-[6px] flex max-h-[220px] flex-col gap-[2px] overflow-auto">
-        {lines.map((line, i) =>
-          onUseLine ? (
-            <button
-              key={i}
-              type="button"
-              onClick={() => {
-                setUsed(i)
-                onUseLine(line)
-              }}
-              className={cn(
-                className,
-                used === i
-                  ? 'border-dashed border-fp-accent'
-                  : 'text-fp-text-2 hover:bg-fp-accent-soft',
-              )}
-            >
-              {line}
-            </button>
-          ) : (
-            <div key={i} className={className}>
-              {line}
-            </div>
-          ),
-        )}
-      </div>
-    </>
+      ))}
+    </div>
   )
 }
 
@@ -136,13 +73,9 @@ function RawJson({ text }: { text: string }) {
 function JsonBody({
   lines,
   truncated,
-  picking,
-  footer,
 }: {
   lines: string[]
   truncated: boolean
-  picking?: PayloadPicking
-  footer?: ReactNode
 }) {
   const View = usePayloadView()
   const payload = useMemo(
@@ -150,24 +83,10 @@ function JsonBody({
     [lines, truncated],
   )
 
-  if (payload && View) {
-    return (
-      <div className="flex flex-col gap-2">
-        {picking ? (
-          <PickTargetBar target={picking.target} onTarget={picking.onTarget} />
-        ) : null}
-        <View
-          payload={payload}
-          target={picking?.target ?? null}
-          onPick={picking?.onPick}
-        />
-        {footer}
-      </div>
-    )
-  }
+  if (payload && View) return <View payload={payload} />
 
   return (
-    <Shell footer={footer}>
+    <Shell>
       <RawJson
         text={payload ? JSON.stringify(payload, null, 2) : lines.join('\n')}
       />
@@ -187,14 +106,11 @@ export function BodyPreview({
   truncated,
   loading,
   error,
-  onUseLine,
-  picking,
-  footer,
 }: Props) {
   const noun = bodyNoun(format)
   if (loading || error || lines.length === 0)
     return (
-      <Shell footer={footer}>
+      <Shell>
         {loading ? (
           <Notice>{`Loading the ${noun}…`}</Notice>
         ) : error ? (
@@ -207,20 +123,11 @@ export function BodyPreview({
       </Shell>
     )
 
-  if (format === 'json') {
-    return (
-      <JsonBody
-        lines={lines}
-        truncated={truncated}
-        picking={picking}
-        footer={footer}
-      />
-    )
-  }
+  if (format === 'json') return <JsonBody lines={lines} truncated={truncated} />
 
   return (
-    <Shell footer={footer}>
-      <TextLines lines={lines} onUseLine={onUseLine} />
+    <Shell>
+      <TextLines lines={lines} />
       {truncated ? (
         <p className={FOOTNOTE}>Long email — only the first part was kept.</p>
       ) : null}

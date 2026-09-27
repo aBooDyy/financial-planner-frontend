@@ -1,15 +1,8 @@
 import { createContext, useContext } from 'react'
 import type { ComponentType } from 'react'
-import type {
-  PayloadPick,
-  PickField,
-} from '#/features/inbound-imports/data/pickValues'
 
 export type PayloadViewProps = {
   payload: Record<string, unknown>
-  /** The form field a tap fills, or null when the view is read-only. */
-  target: PickField | null
-  onPick?: (pick: PayloadPick) => void
 }
 
 /**

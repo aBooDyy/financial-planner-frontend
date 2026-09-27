@@ -22,8 +22,12 @@ export type RuleDraft = {
   type: TxType
   /** A root's or a child's id; null leaves it to the review. */
   categoryId: string | null
+  /** Filed as the merchant when an email names none. */
+  defaultMerchant: string
   autoConfirm: boolean
 }
+
+export const RULE_DEFAULT_MERCHANT_MAX = 200
 
 export const EMPTY_FILTER: RuleFilter = {
   senders: [],
@@ -44,6 +48,7 @@ export const newRule = (): RuleDraft => ({
   walletId: null,
   type: 'spend',
   categoryId: null,
+  defaultMerchant: '',
   autoConfirm: false,
 })
 
@@ -57,6 +62,7 @@ export const toDraft = (rule: EmailRule): RuleDraft => ({
   walletId: rule.walletId,
   type: rule.type,
   categoryId: rule.categoryId,
+  defaultMerchant: rule.defaultMerchant ?? '',
   autoConfirm: rule.autoConfirm,
 })
 
@@ -75,6 +81,8 @@ export function sendable(draft: RuleDraft): EmailRuleDraft | null {
     walletId: draft.walletId,
     type: draft.type,
     categoryId: draft.categoryId,
+    defaultMerchant:
+      draft.defaultMerchant.trim().slice(0, RULE_DEFAULT_MERCHANT_MAX) || null,
     autoConfirm: draft.autoConfirm && draft.walletId !== null,
   }
 }

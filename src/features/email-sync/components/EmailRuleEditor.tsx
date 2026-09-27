@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, CloudOff, Crosshair } from 'lucide-react'
 import { NoteBox } from '#/components/dialog/NoteBox'
 import type { WalletGroupOption } from '#/features/wallets/data/selectors'
-import type { CategoryCatalog } from '#/features/categories/data/catalog'
 import { pickForLine } from '#/features/email-sync/data/mapping'
 import { describeTemplate } from '#/features/email-sync/data/ruleDraft'
 import {
@@ -32,7 +31,6 @@ type Props = {
   inbox: InboxSamples
   online: boolean
   walletGroups: WalletGroupOption[]
-  catalog: CategoryCatalog
   baseCurrency: CurrencyCode
 }
 
@@ -47,7 +45,6 @@ export function EmailRuleEditor({
   inbox,
   online,
   walletGroups,
-  catalog,
   baseCurrency,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null)
@@ -152,6 +149,12 @@ export function EmailRuleEditor({
                   All picked. Choose a field under “What to read” to change it.
                 </NoteBox>
               )}
+              <FieldTargetChips
+                target={target}
+                picks={mapping.picks}
+                options={mapping.options}
+                onTarget={model.setTarget}
+              />
               <SampleLines
                 sample={sample}
                 picks={mapping.picks}
@@ -167,7 +170,7 @@ export function EmailRuleEditor({
       <div className="flex min-w-0 flex-col gap-[14px]">
         <EditorSection
           step={2}
-          title="What to read"
+          title="How to read it"
           done={learnedNow}
           aside={
             learnedNow ? (
@@ -186,12 +189,6 @@ export function EmailRuleEditor({
             </p>
           ) : (
             <>
-              <FieldTargetChips
-                target={target}
-                picks={mapping.picks}
-                options={mapping.options}
-                onTarget={model.setTarget}
-              />
               {amountLine !== null && amountPick ? (
                 <NumberChoice
                   line={amountLine}
@@ -209,6 +206,7 @@ export function EmailRuleEditor({
               />
               <ReadingSummary
                 reading={learned?.reading ?? null}
+                defaultMerchant={draft.defaultMerchant.trim() || null}
                 pending={model.learning.pending}
                 error={model.learnError}
               />
@@ -245,7 +243,6 @@ export function EmailRuleEditor({
           <RuleRoutingForm
             draft={draft}
             walletGroups={walletGroups}
-            catalog={catalog}
             onEdit={model.edit}
             problem={problem}
             nameError={model.problems.name}

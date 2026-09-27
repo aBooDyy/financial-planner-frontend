@@ -7,6 +7,7 @@ import { FieldMessage } from '#/components/FormRow'
 import type { LocalEmailConnection } from '#/db/types'
 import type { ScanFrequency } from '#/features/email-sync/api/types'
 import { lastSyncedLabel } from '#/features/email-sync/data/describe'
+import { SkippedShapes } from '#/features/inbound-imports/components/SkippedShapes'
 import type { InboxSettingsEditor } from '#/features/email-sync/hooks/useInboxSettings'
 import { cn } from '#/lib/utils'
 import { useDirectionStore } from '#/stores/direction'
@@ -78,6 +79,12 @@ export function InboxSettingsForm({ connection, editor, online }: Props) {
         />
         <FieldMessage help="How often Means will check on its own once background sync arrives." />
       </div>
+
+      <SkippedShapes
+        parent={{ connectionId: connection.id }}
+        noun={{ one: 'email', many: 'emails' }}
+        online={online}
+      />
     </div>
   )
 }

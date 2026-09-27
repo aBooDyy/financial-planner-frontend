@@ -430,6 +430,7 @@ export type LocalInboundImport = {
   rawPreview: string | null
   hasBody: boolean
   bodyFormat: BodyFormat
+  skippable: boolean
   status: ImportStatus
   transactionId: string | null
   createdAt: string

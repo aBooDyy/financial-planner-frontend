@@ -1,5 +1,5 @@
 import type { FieldPick } from '#/features/email-sync/api/types'
-import { numberTokens } from '#/features/email-sync/data/lineTokens'
+import { numberTokens } from '#/lib/lineTokens'
 import { cn } from '#/lib/utils'
 
 type Props = {

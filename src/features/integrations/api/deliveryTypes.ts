@@ -12,6 +12,7 @@ type DeliveryOutcome =
   | 'POSTED'
   | 'DUPLICATE'
   | 'IGNORED'
+  | 'SKIPPED'
   | 'REJECTED'
 
 /** How the key's rules read a delivery — the same shapes the rule tester answers with. */

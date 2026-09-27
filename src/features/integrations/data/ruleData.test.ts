@@ -18,7 +18,8 @@ import {
 import type { RuleEditorAction, RuleEditorState } from './ruleEditorState'
 import { ruleProblems } from './ruleErrors'
 import { treeMarks } from './treeMarks'
-import { guessDateFormat, nameRun, suggestPattern, tokenise } from './tokens'
+import { guessDateFormat, suggestPattern } from './tokens'
+import { nameRun, tokenise } from '#/lib/wordTokens'
 import { ApiError } from '#/lib/apiError'
 
 const SMS = 'SAR 152.75 spent at CARREFOUR on 23/09'

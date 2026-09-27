@@ -8,8 +8,7 @@ import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { WalletSelect } from '#/features/wallets/components/WalletSelect'
 import type { WalletGroupOption } from '#/features/wallets/data/selectors'
-import type { CategoryCatalog } from '#/features/categories/data/catalog'
-import { SuggestedCategorySelect } from '#/features/categories/components/SuggestedCategorySelect'
+import { CategoryPicker } from '#/features/categories/components/CategoryPicker'
 import {
   RATE_LIMIT_MAX,
   RATE_LIMIT_MIN,
@@ -32,17 +31,11 @@ const NEEDS_WALLET =
 type Props = {
   editor: KeyEditor
   walletGroups: WalletGroupOption[]
-  catalog: CategoryCatalog
   baseCurrency: CurrencyCode
 }
 
 /** Everything a key does when no rule says otherwise. Presentation only. */
-export function KeySettingsForm({
-  editor,
-  walletGroups,
-  catalog,
-  baseCurrency,
-}: Props) {
+export function KeySettingsForm({ editor, walletGroups, baseCurrency }: Props) {
   const { draft, set, errorFor } = editor
   const noWallet = draft.defaultWalletId === null
   const rateError = errorFor('rateLimitPerMinute')
@@ -107,12 +100,15 @@ export function KeySettingsForm({
           label="Default category"
           error={errorFor('defaultCategoryId')}
         >
-          <SuggestedCategorySelect
+          <CategoryPicker
             id="key-category"
             type={draft.defaultType}
-            catalog={catalog}
-            value={draft.defaultCategoryId}
+            categoryId={draft.defaultCategoryId}
             onChange={(v) => set('defaultCategoryId', v)}
+            none={{
+              label: 'Decide when reviewing',
+              onPick: () => set('defaultCategoryId', null),
+            }}
             invalid={Boolean(errorFor('defaultCategoryId'))}
           />
         </FormRow>

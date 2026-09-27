@@ -26,8 +26,12 @@ type Props = {
   /** The picked leaf's id. */
   value: string
   onPick: (categoryId: string) => void
+  /** A first row for "no category"; checked while `value` is empty. */
+  none?: { label: string; onPick: () => void }
   listClassName?: string
 }
+
+const NONE_VALUE = '__none__'
 
 type RowProps = {
   /** The category id — unique across the whole list, so it doubles as cmdk's value. */
@@ -138,6 +142,7 @@ export function CategoryOptions({
   categories,
   value,
   onPick,
+  none,
   listClassName,
 }: Props) {
   const [query, setQuery] = useState('')
@@ -148,7 +153,7 @@ export function CategoryOptions({
   )
 
   const first = sections[0]?.parent.id ?? ''
-  const [active, setActive] = useState(value)
+  const [active, setActive] = useState(value || (none ? NONE_VALUE : ''))
   const [shown, setShown] = useState(sections)
   if (shown !== sections) {
     setShown(sections)
@@ -174,6 +179,35 @@ export function CategoryOptions({
         className={cn('max-h-[min(360px,55vh)] py-1', listClassName)}
       >
         <CommandEmpty>No category matches.</CommandEmpty>
+        {none && !deferredQuery.trim() ? (
+          <CommandGroup className="py-0.5">
+            <CommandItem
+              value={NONE_VALUE}
+              onSelect={none.onPick}
+              data-checked={value === ''}
+              className={cn(
+                'gap-[10px] py-[9px]',
+                value === '' && 'text-fp-accent-ink',
+              )}
+            >
+              <span
+                className={cn(
+                  'min-w-0 flex-1 truncate text-[13.5px] font-semibold',
+                  value === '' ? 'font-bold' : 'text-fp-text-2',
+                )}
+              >
+                {none.label}
+              </span>
+              {value === '' ? (
+                <Check
+                  size={15}
+                  strokeWidth={2.4}
+                  className="shrink-0 text-fp-accent-ink"
+                />
+              ) : null}
+            </CommandItem>
+          </CommandGroup>
+        ) : null}
         {sections.map((section) => (
           <OptionSection
             key={section.parent.id}

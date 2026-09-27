@@ -55,6 +55,7 @@ const imported = (over: Partial<InboundImport>): InboundImport => ({
   suggestedWalletId: null,
   rawPreview: null,
   hasBody: true,
+  skippable: false,
   bodyFormat: 'text',
   status: 'confirmed',
   transactionId: 't1',

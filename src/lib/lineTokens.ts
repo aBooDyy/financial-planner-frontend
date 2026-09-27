@@ -1,6 +1,10 @@
-import type { DecimalStyle } from '#/features/email-sync/api/types'
+import { getAppConfig } from '#/lib/config/appConfig'
 
-export type NumberToken = { start: number; end: number; text: string }
+/** Which mark a number's decimal point is: guessed, `1,234.56` or `1.234,56`. */
+export type DecimalStyle = 'auto' | 'dot' | 'comma'
+
+/** A value written on a line, and where it sits there. */
+export type LineToken = { start: number; end: number; text: string }
 
 // Arabic-Indic and Extended Arabic-Indic digits, plus the Arabic decimal and thousands marks,
 // mapped one-for-one so positions in the translated text are positions in the line.
@@ -21,7 +25,7 @@ const toAscii = (text: string): string =>
     .join('')
 
 /** Every number written on the line, with where it sits. */
-export function numberTokens(line: string): NumberToken[] {
+export function numberTokens(line: string): LineToken[] {
   const ascii = toAscii(line)
   return [...ascii.matchAll(NUMBER)].map((m) => ({
     start: m.index,
@@ -60,4 +64,29 @@ export function readNumber(raw: string, style: DecimalStyle): number | null {
   if ((normalised.match(/\./g) ?? []).length > 1) return null
   const value = Number(normalised)
   return Number.isFinite(value) ? value : null
+}
+
+let cached: { version: string; pattern: RegExp } | null = null
+
+/**
+ * Any known currency code as a whole word. Case-sensitive on purpose: alerts write the code in
+ * caps, and matching case-insensitively across the full ISO table would catch ordinary words
+ * (TRY, ALL, CUP).
+ */
+export const currencyPattern = (): RegExp => {
+  const { version, currencies } = getAppConfig()
+  if (!cached || cached.version !== version) {
+    const codes = currencies.map((c) => c.code).join('|')
+    cached = { version, pattern: new RegExp(`\\b(${codes})\\b`, 'g') }
+  }
+  return cached.pattern
+}
+
+/** Every known currency code written on the line. */
+export function currencyTokens(line: string): LineToken[] {
+  return [...line.matchAll(currencyPattern())].map((m) => ({
+    start: m.index,
+    end: m.index + m[0].length,
+    text: m[0],
+  }))
 }

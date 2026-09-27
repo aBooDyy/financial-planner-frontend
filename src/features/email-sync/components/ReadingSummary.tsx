@@ -18,12 +18,19 @@ const FIELDS: ExtractField[] = ['amount', 'currency', 'merchant']
 
 type Props = {
   reading: Extraction | null
+  /** What an email without a merchant line is filed as. */
+  defaultMerchant?: string | null
   pending: boolean
   error: string | null
 }
 
 /** What the rule reads from the sample itself, field by field — the proof it learned right. */
-export function ReadingSummary({ reading, pending, error }: Props) {
+export function ReadingSummary({
+  reading,
+  defaultMerchant = null,
+  pending,
+  error,
+}: Props) {
   if (error) {
     return (
       <p role="alert" className="text-[12.5px] text-fp-danger">
@@ -63,6 +70,9 @@ export function ReadingSummary({ reading, pending, error }: Props) {
       <ul>
         {FIELDS.map((field) => {
           const r = reading.fields[field]
+          const tone = fieldTone(r)
+          const fallback =
+            field === 'merchant' && tone !== 'ok' ? defaultMerchant : null
           return (
             <li
               key={field}
@@ -70,13 +80,30 @@ export function ReadingSummary({ reading, pending, error }: Props) {
             >
               <span
                 aria-hidden
-                className={`h-2 w-2 shrink-0 rounded-full ${TONE[fieldTone(r)]}`}
+                className={`h-2 w-2 shrink-0 rounded-full ${TONE[fallback ? 'ok' : tone]}`}
               />
               <span className="w-[74px] shrink-0 font-semibold text-fp-text-2">
                 {FIELD_LABEL[field]}
               </span>
-              <span className="min-w-0 truncate font-bold text-fp-text">
-                <bdi>{fieldText(field, r)}</bdi>
+              <span
+                className={cn(
+                  'min-w-0 truncate font-bold',
+                  tone === 'idle' && !fallback
+                    ? 'text-fp-text-3'
+                    : 'text-fp-text',
+                )}
+              >
+                {fallback ? (
+                  <>
+                    <bdi>{fallback}</bdi>
+                    <span className="font-medium text-fp-text-3">
+                      {' '}
+                      (default)
+                    </span>
+                  </>
+                ) : (
+                  <bdi>{fieldText(field, r)}</bdi>
+                )}
                 {r.status === 'heuristic' ? (
                   <span className="font-medium text-fp-text-3">
                     {' '}

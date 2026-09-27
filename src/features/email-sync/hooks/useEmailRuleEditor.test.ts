@@ -53,6 +53,7 @@ const rule = (id: string): EmailRule => ({
   walletId: null,
   type: 'spend',
   categoryId: null,
+  defaultMerchant: null,
   autoConfirm: false,
   createdAt: '',
   updatedAt: '',

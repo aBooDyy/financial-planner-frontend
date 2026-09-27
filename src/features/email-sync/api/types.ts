@@ -176,6 +176,8 @@ export type EmailRule = {
   walletId: string | null
   type: TxType
   categoryId: string | null
+  /** Filed as the merchant when an email names none. */
+  defaultMerchant: string | null
   autoConfirm: boolean
   createdAt: string
   updatedAt: string
@@ -194,6 +196,7 @@ export type EmailRuleDraft = {
   walletId: string | null
   type: TxType
   categoryId: string | null
+  defaultMerchant: string | null
   autoConfirm: boolean
 }
 
@@ -365,6 +368,7 @@ export type EmailRuleWire = {
   wallet_id: string | null
   type: TxTypeWire
   category_id: string | null
+  default_merchant?: string | null
   auto_confirm: boolean
   created_at: string
   updated_at: string
@@ -382,6 +386,7 @@ export type EmailRuleDraftWire = {
   wallet_id: string | null
   type: TxTypeWire
   category_id: string | null
+  default_merchant: string | null
   auto_confirm: boolean
 }
 
@@ -581,6 +586,7 @@ export const toEmailRule = (w: EmailRuleWire): EmailRule => ({
   walletId: w.wallet_id,
   type: fromWireTxType(w.type),
   categoryId: w.category_id,
+  defaultMerchant: w.default_merchant ?? null,
   autoConfirm: w.auto_confirm,
   createdAt: w.created_at,
   updatedAt: w.updated_at,
@@ -601,6 +607,7 @@ export const toRuleDraftWire = (d: EmailRuleDraft): EmailRuleDraftWire => ({
   wallet_id: d.walletId,
   type: toWireTxType(d.type),
   category_id: d.categoryId,
+  default_merchant: d.defaultMerchant,
   auto_confirm: d.autoConfirm,
 })
 

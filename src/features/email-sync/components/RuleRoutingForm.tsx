@@ -5,9 +5,12 @@ import { FieldMessage, FormRow } from '#/components/FormRow'
 import { Input } from '#/components/ui/input'
 import { WalletSelect } from '#/features/wallets/components/WalletSelect'
 import type { WalletGroupOption } from '#/features/wallets/data/selectors'
-import type { CategoryCatalog } from '#/features/categories/data/catalog'
-import { SuggestedCategorySelect } from '#/features/categories/components/SuggestedCategorySelect'
-import { RULE_NAME_MAX } from '#/features/email-sync/data/ruleDraft'
+import { CategoryPicker } from '#/features/categories/components/CategoryPicker'
+import {
+  RULE_DEFAULT_MERCHANT_MAX,
+  RULE_NAME_MAX,
+  fallbackName,
+} from '#/features/email-sync/data/ruleDraft'
 import type { RuleDraft } from '#/features/email-sync/data/ruleDraft'
 import type { RuleSettingsPatch } from '#/features/email-sync/data/ruleEditorState'
 import type { RuleProblem } from '#/features/email-sync/data/ruleErrors'
@@ -21,7 +24,6 @@ const TYPES: { value: TxType; label: string }[] = [
 type Props = {
   draft: RuleDraft
   walletGroups: WalletGroupOption[]
-  catalog: CategoryCatalog
   onEdit: (patch: RuleSettingsPatch) => void
   /** What the last save said about this rule. */
   problem?: RuleProblem
@@ -32,7 +34,6 @@ type Props = {
 export function RuleRoutingForm({
   draft,
   walletGroups,
-  catalog,
   onEdit,
   problem,
   nameError,
@@ -87,16 +88,36 @@ export function RuleRoutingForm({
         />
       </div>
 
-      <FormRow id="rule-category" label="Category" error={problem?.category}>
-        <SuggestedCategorySelect
-          id="rule-category"
-          type={draft.type}
-          catalog={catalog}
-          value={draft.categoryId}
-          onChange={(categoryId) => onEdit({ categoryId })}
-          invalid={Boolean(problem?.category)}
-        />
-      </FormRow>
+      <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2">
+        <FormRow id="rule-category" label="Category" error={problem?.category}>
+          <CategoryPicker
+            id="rule-category"
+            type={draft.type}
+            categoryId={draft.categoryId}
+            onChange={(categoryId) => onEdit({ categoryId })}
+            none={{
+              label: 'Decide when reviewing',
+              onPick: () => onEdit({ categoryId: null }),
+            }}
+            invalid={Boolean(problem?.category)}
+          />
+        </FormRow>
+        <FormRow
+          id="rule-default-merchant"
+          label="Default merchant"
+          optional
+          error={problem?.defaultMerchant}
+          help="Used when an email has no merchant line."
+        >
+          <Input
+            id="rule-default-merchant"
+            value={draft.defaultMerchant}
+            maxLength={RULE_DEFAULT_MERCHANT_MAX}
+            placeholder={`e.g. ${fallbackName(draft)} purchase`}
+            onChange={(e) => onEdit({ defaultMerchant: e.target.value })}
+          />
+        </FormRow>
+      </div>
 
       <div className="min-w-0">
         <ToggleCard

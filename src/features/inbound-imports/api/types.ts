@@ -68,6 +68,8 @@ export type InboundImport = {
   /** Whether the stored body can be fetched (false for rows staged before bodies were kept). */
   hasBody: boolean
   bodyFormat: BodyFormat
+  /** "Not a transaction" can also skip ones shaped like it from the same source. */
+  skippable: boolean
   status: ImportStatus
   transactionId: string | null
   createdAt: string
@@ -116,6 +118,7 @@ export type InboundImportWire = {
   raw_preview: string | null
   has_body: boolean
   body_format: BodyFormatWire
+  skippable?: boolean
   status: ImportStatusWire
   created_at: string
   version: string
@@ -179,6 +182,7 @@ export const toInboundImport = (w: InboundImportWire): InboundImport => ({
   rawPreview: w.raw_preview,
   hasBody: w.has_body,
   bodyFormat: fromWireBodyFormat(w.body_format),
+  skippable: w.skippable ?? false,
   status: fromWireImportStatus(w.status),
   transactionId: w.transaction_id,
   createdAt: w.created_at,
@@ -204,3 +208,10 @@ export const toConfirmResult = (w: ConfirmResultWire): ConfirmResult => ({
   transaction: toTransaction(w.transaction),
   import: toInboundImport(w.inbound_import),
 })
+
+/** Which source's skip set: an inbox's or a webhook key's. */
+export type SkipParent =
+  | { connectionId: string; keyId?: never }
+  | { keyId: string; connectionId?: never }
+
+export type SkipCountWire = { count: number }

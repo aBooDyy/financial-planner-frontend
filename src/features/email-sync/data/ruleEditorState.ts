@@ -51,7 +51,13 @@ export type RuleEditorState = {
 export type RuleSettingsPatch = Partial<
   Pick<
     RuleDraft,
-    'name' | 'enabled' | 'walletId' | 'type' | 'categoryId' | 'autoConfirm'
+    | 'name'
+    | 'enabled'
+    | 'walletId'
+    | 'type'
+    | 'categoryId'
+    | 'defaultMerchant'
+    | 'autoConfirm'
   >
 >
 

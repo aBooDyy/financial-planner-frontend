@@ -6,7 +6,7 @@ import type {
 } from '#/features/integrations/api/ruleTypes'
 import { FIELD_META, FIELD_ORDER, HOP_FIELDS } from './ruleFields'
 import { guessDateFormat, suggestPattern } from './tokens'
-import type { Token } from './tokens'
+import type { Token } from '#/lib/wordTokens'
 
 /** A rule as the editor holds it: `key` is stable across edits, before and after a save. */
 export type RuleDraft = IntegrationRule & { key: string }

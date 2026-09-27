@@ -43,6 +43,7 @@ const anImport = (
   suggestedWalletId: null,
   rawPreview: null,
   hasBody: true,
+  skippable: false,
   bodyFormat: 'text',
   status,
   transactionId: null,

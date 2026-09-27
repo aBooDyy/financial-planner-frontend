@@ -7,7 +7,7 @@ import type {
   DecimalStyle,
   LearnOptions,
 } from '#/features/email-sync/api/types'
-import { readNumber } from '#/features/email-sync/data/lineTokens'
+import { readNumber } from '#/lib/lineTokens'
 import type { CurrencyCode } from '#/lib/currency'
 import { useDirectionStore } from '#/stores/direction'
 

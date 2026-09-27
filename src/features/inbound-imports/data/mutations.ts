@@ -40,7 +40,10 @@ export async function confirmImport(
   })
 }
 
-export async function dismissImport(item: InboundImport): Promise<void> {
-  await inboundImportsApi.dismissImport(item.id)
+export async function dismissImport(
+  item: InboundImport,
+  skipSimilar = false,
+): Promise<void> {
+  await inboundImportsApi.dismissImport(item.id, skipSimilar)
   await db.inboundImports.delete(item.id)
 }

@@ -62,8 +62,9 @@ which dialog is open and why the editor was opened (`EditorIntent`: `fresh` / `f
 ## The inbox editor (`InboxEditorDialog`)
 
 Wide `ResponsiveDialog` (full-height sheet on a phone). Start column: `InboxSettingsForm` —
-a Sync card (last synced + `ScanNowControl`), "Sync when I open Means" and the background-sync
-frequency. End column: `InboxRulesSection` — `EmailRuleList` (drag/arrow-key reorder via the
+a Sync card (last synced + `ScanNowControl`), "Sync when I open Means", the background-sync
+frequency and the queue's `SkippedShapes` (kinds of email skipped as "not a transaction", with
+_Forget them_). End column: `InboxRulesSection` — `EmailRuleList` (drag/arrow-key reorder via the
 shared `src/hooks/useDragReorder`, a pause switch per rule, edit, delete, "n of 20", _Add rule_),
 each row saying which emails (`describeFilter`), what it reads (`describeTemplate`) and where
 they go. Below both: `InboxPendingList`, what this inbox left for review.
@@ -91,31 +92,41 @@ Swaps the dialog body (title "Rule · name" with a mirrored back chevron; Escape
 inbox). Four numbered `EditorSection`s; desktop keeps the sample beside the steps, a phone
 stacks it first.
 
-1. **A sample email** — `SamplePicker`: the recent mail folded by the server's `groupId`
-   (`groupMessages`: identical and near-identical alerts are one card, "12 similar", likely
-   alerts first, the rule's own senders first via `groupsForSenders`), plus "Find their emails"
-   (`?sender=`) to list more from one bank. Picking a group makes its newest member the sample
-   and the rest its `similar` set (`similarOf`, capped by `emailRuleSamplesMax`). A new rule's
-   sender and name are seeded from it.
-2. **What to read** — `FieldTargetChips` (Amount, Currency, Merchant optional) and
-   `SampleLines`: each line is a button; a tap fills the target (`pickForLine`: an amount line
-   with one number is pinned by its char span, else the line alone), then the target hops
-   amount → currency → nothing; the merchant never steals it. `NumberChoice` asks which number
-   is the amount when its line has several (or "the one next to the currency").
-   `ReadingOptions`: the **decimal style** (Auto · 1,234.56 · 1.234,56, with how the tapped value
-   reads each way — `readNumber` mirrors the server) and the **currency** (read from the email,
-   or always one currency via `CurrencyPicker`, which removes the currency target). Every
-   change sends a debounced learn; `ReadingSummary` shows what the sample reads as, field by
-   field, and `GroupPreview` proves the template on the similar emails ("Read 11 of 12").
+1. **A sample email** — until one is picked (or after _Change_), `SamplePicker`: the recent
+   mail folded by the server's `groupId` (`groupMessages`: identical and near-identical alerts
+   are one card, "12 similar", likely alerts first, the rule's own senders first via
+   `groupsForSenders`), plus "Find their emails" (`?sender=`) to list more from one bank.
+   Picking a group makes its newest member the sample and the rest its `similar` set
+   (`similarOf`, capped by `emailRuleSamplesMax`); a new rule's sender and name are seeded from
+   it. With a sample, **tagging happens here, on the lines**: `FieldTargetChips` ("Pick a tag,
+   then tap its line": Amount, Currency, Merchant · optional, each with a dot that fills once
+   tagged), a hint ("Tap the line with the merchant."), and `SampleLines` — each line is a
+   button; a tap fills the tag (`pickForLine`: an amount line with one number is pinned by its
+   char span, else the line alone), then the tag hops amount → currency → nothing; the merchant
+   never steals it. A tagged line wears its tags and highlights the amount's span and the
+   currency code in place (`currencyTokens`, `src/lib/lineTokens.ts`); the line under the
+   pointer asks "Merchant?", and so does the line the learn read the merchant from by its label
+   (`merchantGuess`, a `heuristic` reading) while none is tagged.
+2. **How to read it** ("✓ Learned" once current) — `NumberChoice` asks which number is the
+   amount when its line has several (or "the one next to the currency"). `ReadingOptions`: the
+   **decimal style** (Auto · 1,234.56 · 1.234,56, with how the tapped value reads each way —
+   `readNumber` mirrors the server) and the **currency** (read from the email, or always one
+   currency via `CurrencyPicker`, which removes the currency tag). Every change sends a
+   debounced learn; `ReadingSummary` shows what the sample reads as, field by field (an untagged
+   merchant says "Tag its line in step 1", or shows the default merchant), and `GroupPreview`
+   proves the template on the similar emails ("Read 11 of 12").
 3. **Which emails** — `RuleFilterForm` (`TermsInput` chips: From, Subject has any of, Email
    text has any of, Skip emails that mention) and `MatchSummary`: the tested working set with
    the open rule as `focus_index`, so it says how many recent emails get through **this**
    filter, what each reads as, and how many an earlier rule takes first.
-4. **File into** — `RuleRoutingForm`: name, account (`WalletSelect` from balances, "Choose when
-   reviewing"), Spend/Income, one category select by id (`SuggestedCategorySelect` from the
-   categories slice: the type's roots with their children indented, plus "Decide when reviewing"),
-   post without review (disabled without an account), rule on/off. Changing the type clears
-   `categoryId` (the reducer's `edit`), and a 422 on `rules[i].category_id` sits beside it.
+4. **File into** — `RuleRoutingForm`: name (optional — `fallbackName` sends the first sender),
+   account (`WalletSelect` from balances, "Choose when reviewing"), Spend/Income, the category
+   (the shared `CategoryPicker` — a category or a subcategory in one pick — with a "Decide when
+   reviewing" row), the **default merchant** (optional, ≤ 200, wire `default_merchant`: what an
+   email with no merchant line is filed as — the scan records it as the merchant), post without
+   review (disabled without an account), rule on/off. Changing the type clears `categoryId`
+   (the reducer's `edit`); a 422 on `rules[i].category_id` / `.default_merchant` sits beside
+   its control.
 
 **State.** `useEmailRuleEditor` wraps the pure reducer `data/ruleEditorState.ts`: the draft
 set, the open rule (`OpenRule`: draft, `mapping` — sample, similar, picks, options —, target,
@@ -125,7 +136,7 @@ next is on its way), and save. **A learned template only lands on the picks it a
 the `learned` action carries the request's signature and the reducer drops a stale one.
 `templateCurrent(open)` gates **Done** (with `draftProblems`: a template, a sender, a name
 within 120, no auto-confirm without an account); the footer says what is missing ("Reading
-your sample…", "Finish tapping what to read."). A rule opened without a new sample keeps the
+your sample…", "Tag the amount and currency in step 1."). A rule opened without a new sample keeps the
 template it came with. The learned `suggestedFilter` refines the filter **until the user
 edits it by hand** (`autoFilter`). `workingSet` is the set with the open draft in place, minus
 a rule that has nothing to read yet — exactly what a test sends.
