@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from './apiError'
 import { http } from './http'
+import { useSessionStore } from '#/stores/session'
+import type { User } from '#/features/auth/api/types'
 
 /**
  * Silent token refresh. The access cookie lives 15 minutes; the refresh cookie 30 days.
@@ -96,6 +98,21 @@ describe('silent refresh', () => {
 
     await expect(http.get('/balances')).rejects.toBeInstanceOf(ApiError)
     expect(endSession).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps a sign-in that lands while a refused refresh is in flight', async () => {
+    // The Google callback page: the boot `/auth/me` check runs cookie-less alongside the
+    // code exchange, whose response sets the cookies before the refresh's 401 comes back.
+    reply = (_method, path) => {
+      if (path === '/auth/refresh') {
+        useSessionStore.getState().setUser({ id: 'u1' } as User)
+      }
+      return unauthenticated
+    }
+
+    await expect(http.get('/auth/me')).rejects.toMatchObject({ status: 401 })
+    expect(endSession).not.toHaveBeenCalled()
+    useSessionStore.getState().clear()
   })
 
   it('never refreshes for the anonymous auth endpoints', async () => {

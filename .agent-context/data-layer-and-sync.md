@@ -404,6 +404,11 @@ many times the server has _rejected_ it) and `nextAttemptAt` (no automatic retry
   retry that still `401`s does not sign out either; it just propagates.) The refresh failure
   deliberately replaces the caller's `401` with its own — usually `common.network` — which the
   sync engine reads as "keep the outbox, flag it unavailable, and stop".
+- **A refused refresh only signs out the session it was sent for.** `runRefresh` snapshots the
+  session user before sending and skips `endSession()` if the user changed while it was out. The
+  case: on `/auth/google/callback` the root's boot `GET /auth/me` runs cookie-less alongside the
+  code exchange; the exchange sets the cookies and `setUser`s, then the stale refresh `401` lands
+  — without the guard it wiped the fresh sign-in and bounced the user to `/auth/login`.
 - `clearLocalDb()` empties every user table (`USER_TABLES`: the synced tables, `outbox`,
   `syncState` and `importBatches`), removes the cached user (below), and **keeps `appConfig`**:
   it holds no user data, and keeping it means the next sign-in already knows the currency table

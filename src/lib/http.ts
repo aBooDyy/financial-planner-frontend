@@ -1,4 +1,5 @@
 import { endSession } from '#/features/auth/endSession'
+import { useSessionStore } from '#/stores/session'
 import { ApiError } from './apiError'
 
 const BASE_URL =
@@ -113,12 +114,22 @@ function refreshSession(): Promise<void> {
 }
 
 async function runRefresh(): Promise<void> {
+  const userAtSend = useSessionStore.getState().user
   try {
     await send<unknown>('POST', REFRESH_PATH)
   } catch (error) {
     // Only the server saying "not authenticated" ends the session. Any other failure means
     // we could not ask: an offline client keeps its session and its unsynced local data.
-    if (error instanceof ApiError && error.isUnauthenticated) await endSession()
+    // The refusal judges the cookies this request carried, so a sign-in that landed while
+    // it was out has newer ones and must survive it.
+    const sessionReplaced = useSessionStore.getState().user !== userAtSend
+    if (
+      error instanceof ApiError &&
+      error.isUnauthenticated &&
+      !sessionReplaced
+    ) {
+      await endSession()
+    }
     // The refresh failure replaces the caller's 401 deliberately — a transient one carries
     // `common.network`, which reads as "the server is unreachable", not as a verdict.
     throw error
