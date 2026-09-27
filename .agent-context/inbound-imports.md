@@ -29,7 +29,7 @@ that. So sources depend on the queue, never the reverse:
 
 | Where                         | What                                                                                                                                                                                            |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Spending → Review             | `PendingReviewButton` (beside Add in the Activity transactions card, only while rows are pending) opens `PendingReviewModal` → one `ReviewCard` at a time on a `CardStack`, `toolbar` from the source |
+| Spending → Review             | `PendingReviewButton` (beside Add in the Activity transactions card, only while rows are pending) opens `PendingReviewModal` → one `ReviewCard` at a time on a swipeable `CardStack`, `toolbar` from the source |
 | Import hub inbox card         | `usePendingImports().count` via `useInboxSummary`                                                                                                                                               |
 | Spending → edit a transaction | `SourceSection` (this slice) — the email or payload the entry came from                                                                                                                         |
 
@@ -57,6 +57,23 @@ Nothing that was parsed is final. `PendingReviewModal` shows **one import at a t
 stack** (`CardStack`: "1 of 3", prev/next that wrap, two faint cards behind while more wait),
 with the source's `toolbar` above and a pinned footer for the whole queue: what still needs
 details, **Ignore all** and **Confirm all · n** (only the ready ones; the rest stay).
+
+**The stack animates with `motion` (`motion/react`, framer-motion's successor).** The top card
+is a `SwipeCard`: dragged sideways (mouse or touch) it tilts with the pointer, and a drag past
+28% of its width or a flick turns it — toward the reading direction's start (left in LTR, right
+in RTL) is **next**, the other way **previous**. Next flies the card off and the next one rises
+from the stack; previous sinks the card back into the stack while the previous one flies in over
+it. The prev/next buttons play the same turns. A card that leaves without a turn (confirmed,
+ignored) fades up. `CardStack` tells these apart by whether a turn was pending when `itemKey`
+changed. Gotchas:
+- Motion already skips a drag that starts in a text input; a drag that ends over a button or an
+  email word has its click swallowed (`onClickCapture`), so a swipe never also taps.
+- The card carries `data-vaul-no-drag`, else a slightly diagonal swipe also drags the mobile
+  sheet down. Vertical scrolling still works (`drag="x"` sets `touch-action: pan-y`).
+- The exiting card stays mounted until its exit ends; it is `inert` + `aria-hidden`, so only the
+  new card answers queries and focus.
+- The dialog body is `overflow-x-hidden` so a flying card never shows a horizontal scrollbar.
+- `MotionConfig reducedMotion="user"` drops the movement for reduced-motion users.
 
 **State lives in the queue, not the card** (`hooks/useReviewQueue`). Every import's edits are a
 patch over its prefill (`data/reviewDraft.ts`: `initialDraft` → `resolveDraft`), so paging

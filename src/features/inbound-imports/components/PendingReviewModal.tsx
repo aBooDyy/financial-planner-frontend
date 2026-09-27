@@ -60,7 +60,7 @@ export function PendingReviewModal({
       title="Pending auto-logged"
       description={subtitle}
       contentClassName="sm:max-w-[560px]"
-      bodyClassName="gap-0 px-0 pt-[14px] pb-0"
+      bodyClassName="gap-0 overflow-x-hidden px-0 pt-[14px] pb-0"
       footer={
         count ? (
           <div className="flex w-full flex-wrap items-center gap-2">
@@ -108,6 +108,7 @@ export function PendingReviewModal({
       {card ? (
         <div ref={stackRef} className="scroll-mt-4 px-5 pt-4 pb-2">
           <CardStack
+            itemKey={card.item.id}
             position={queue.position}
             count={count}
             onPrev={queue.prev}
