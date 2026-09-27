@@ -33,8 +33,16 @@ vi.mock('#/features/inbound-imports/api/inboundImportsApi', () => ({
 
 const TEMPLATE: ExtractionTemplate = {
   kind: 'anchored_lines',
-  amount: { anchor: 'amount', numberIndex: null, decimal: 'auto' },
-  currency: { mode: 'from_email', anchor: 'amount', code: 'SAR' },
+  amount: {
+    label: { text: 'amount', offset: 0 },
+    numberIndex: null,
+    decimal: 'auto',
+  },
+  currency: {
+    mode: 'from_email',
+    label: { text: 'amount', offset: 0 },
+    code: 'SAR',
+  },
   merchant: null,
 }
 
@@ -87,6 +95,23 @@ const LEARNED: LearnResult = {
     subjectAny: ['Purchase'],
     bodyAny: [],
     excludeAny: [],
+  },
+  labels: {
+    amount: {
+      line: 0,
+      text: 'Amount',
+      offset: 0,
+      source: 'same_line',
+      verified: true,
+    },
+    currency: {
+      line: 0,
+      text: 'Amount',
+      offset: 0,
+      source: 'same_line',
+      verified: true,
+    },
+    merchant: null,
   },
 }
 

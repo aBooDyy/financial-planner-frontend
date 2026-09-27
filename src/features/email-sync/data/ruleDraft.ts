@@ -3,8 +3,10 @@ import type {
   EmailRuleDraft,
   ExtractionTemplate,
   RuleFilter,
+  TemplateLabel,
 } from '#/features/email-sync/api/types'
 import type { TxType } from '#/features/transactions/api/types'
+import { describeLabel } from './labels'
 
 export const RULE_NAME_MAX = 120
 export const TERM_MAX = 100
@@ -123,16 +125,26 @@ export function describeFilter(filter: RuleFilter): string {
   return parts.join(' · ')
 }
 
-/** What the template reads, in words: "Reads amount, currency, merchant". */
+const sameLabel = (a: TemplateLabel | null, b: TemplateLabel | null) =>
+  a?.text === b?.text && a?.offset === b?.offset
+
+/**
+ * What the template reads and where, in words:
+ * "Reads amount below “amount”, currency, merchant after “at”". The currency is only placed
+ * when it is found somewhere other than the amount.
+ */
 export function describeTemplate(template: ExtractionTemplate | null): string {
   if (!template) return 'Nothing to read yet'
-  const parts = ['amount']
+  const { amount, currency, merchant } = template
+  const parts = [`amount ${describeLabel(amount.label)}`]
   parts.push(
-    template.currency.mode === 'fixed'
-      ? `always ${template.currency.code}`
-      : 'currency',
+    currency.mode === 'fixed'
+      ? `always ${currency.code}`
+      : sameLabel(currency.label, amount.label)
+        ? 'currency'
+        : `currency ${describeLabel(currency.label)}`,
   )
-  if (template.merchant) parts.push('merchant')
+  if (merchant) parts.push(`merchant ${describeLabel(merchant.label)}`)
   return `Reads ${parts.join(', ')}`
 }
 

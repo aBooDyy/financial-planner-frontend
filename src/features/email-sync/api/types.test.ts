@@ -6,6 +6,7 @@ import type {
   LearnResultWire,
   SampleVerdictWire,
   SyncResultWire,
+  TemplateWire,
 } from './types'
 import {
   fromWireFrequency,
@@ -91,36 +92,63 @@ describe('email-sync wire mappers', () => {
     })
   })
 
-  it('round-trips both kinds of template', () => {
-    const fromEmail = toTemplate({
+  it('round-trips both kinds of template, labels and all', () => {
+    const wire: TemplateWire = {
       kind: 'anchored_lines',
-      amount: { anchor: 'amount', number_index: 1, decimal: 'COMMA' },
-      currency: { mode: 'FROM_EMAIL', anchor: 'amount', code: 'SAR' },
-      merchant: { anchor: 'merchant' },
-    })
+      amount: {
+        label: { text: 'amount', offset: 1 },
+        number_index: 1,
+        decimal: 'COMMA',
+      },
+      currency: {
+        mode: 'FROM_EMAIL',
+        label: { text: 'amount', offset: 1 },
+        code: 'SAR',
+      },
+      merchant: { label: { text: 'merchant name', offset: 1 } },
+    }
+    const fromEmail = toTemplate(wire)
     expect(fromEmail.amount).toEqual({
-      anchor: 'amount',
+      label: { text: 'amount', offset: 1 },
       numberIndex: 1,
       decimal: 'comma',
     })
     expect(fromEmail.currency).toEqual({
       mode: 'from_email',
-      anchor: 'amount',
+      label: { text: 'amount', offset: 1 },
       code: 'SAR',
     })
-    expect(toTemplateWire(fromEmail).amount.decimal).toBe('COMMA')
+    expect(fromEmail.merchant).toEqual({
+      label: { text: 'merchant name', offset: 1 },
+    })
+    expect(toTemplateWire(fromEmail)).toEqual(wire)
 
     const fixed = toTemplate({
       kind: 'anchored_lines',
-      amount: { anchor: 'total', number_index: null, decimal: 'AUTO' },
+      amount: { label: null, number_index: null, decimal: 'AUTO' },
       currency: { mode: 'FIXED', code: 'KWD' },
       merchant: null,
     })
+    expect(fixed.amount.label).toBeNull()
     expect(fixed.currency).toEqual({ mode: 'fixed', code: 'KWD' })
-    expect(toTemplateWire(fixed).currency).toEqual({
-      mode: 'FIXED',
-      code: 'KWD',
+    expect(toTemplateWire(fixed)).toEqual({
+      kind: 'anchored_lines',
+      amount: { label: null, number_index: null, decimal: 'AUTO' },
+      currency: { mode: 'FIXED', code: 'KWD' },
+      merchant: null,
     })
+  })
+
+  it('keeps no trace of the old anchor shape', () => {
+    const t = toTemplateWire(
+      toTemplate({
+        kind: 'anchored_lines',
+        amount: { label: null, number_index: null, decimal: 'AUTO' },
+        currency: { mode: 'FROM_EMAIL', label: null, code: null },
+        merchant: null,
+      }),
+    )
+    expect(JSON.stringify(t)).not.toContain('anchor"')
   })
 
   it('orders a rule set by position and sends a new rule without an id', () => {
@@ -139,8 +167,12 @@ describe('email-sync wire mappers', () => {
         },
         template: {
           kind: 'anchored_lines',
-          amount: { anchor: 'amount', number_index: null, decimal: 'AUTO' },
-          currency: { mode: 'FROM_EMAIL', anchor: 'amount', code: null },
+          amount: {
+            label: { text: 'amount', offset: 0 },
+            number_index: null,
+            decimal: 'AUTO',
+          },
+          currency: { mode: 'FROM_EMAIL', label: null, code: null },
           merchant: null,
         },
         wallet_id: null,
@@ -178,36 +210,65 @@ describe('email-sync wire mappers', () => {
     expect(e.fields.merchant.status).toBe('not_set')
   })
 
-  it('sends a learn request in wire casing', () => {
+  it('sends a learn request in wire casing, with each pick’s label line', () => {
     const wire = toLearnRequestWire({
       sample: {
         id: 'm1',
         senderEmail: 'alerts@bank.com',
         subject: 'Purchase',
-        bodyLines: ['Amount: SAR 38.50'],
+        bodyLines: ['Amount', 'SAR 38.50', 'Merchant', 'Jarir'],
       },
       picks: {
-        amount: { line: 0, start: 12, end: 17 },
-        currency: { line: 0 },
-        merchant: null,
+        amount: { line: 1, start: 4, end: 9, labelLine: 0 },
+        currency: { line: 1 },
+        merchant: { line: 3, labelLine: 2 },
       },
       options: { decimal: 'dot', currency: { mode: 'from_email', code: null } },
       similar: [],
     })
     expect(wire.sample.sender_email).toBe('alerts@bank.com')
-    expect(wire.picks.amount).toEqual({ line: 0, start: 12, end: 17 })
+    expect(wire.picks).toEqual({
+      amount: { line: 1, start: 4, end: 9, label_line: 0 },
+      currency: { line: 1, label_line: null },
+      merchant: { line: 3, label_line: 2 },
+    })
     expect(wire.options).toEqual({
       decimal: 'DOT',
       currency: { mode: 'FROM_EMAIL', code: null },
     })
   })
 
-  it('maps a learn result with its suggested filter', () => {
+  it('maps a learn result with its suggested filter and labels', () => {
     const wire: LearnResultWire = {
       template: {
         kind: 'anchored_lines',
-        amount: { anchor: 'amount', number_index: 0, decimal: 'AUTO' },
-        currency: { mode: 'FROM_EMAIL', anchor: 'amount', code: 'SAR' },
+        amount: {
+          label: { text: 'amount', offset: 1 },
+          number_index: 0,
+          decimal: 'AUTO',
+        },
+        currency: {
+          mode: 'FROM_EMAIL',
+          label: { text: 'amount', offset: 1 },
+          code: 'SAR',
+        },
+        merchant: null,
+      },
+      labels: {
+        amount: {
+          line: 7,
+          text: 'Amount',
+          offset: 1,
+          source: 'NEARBY',
+          verified: true,
+        },
+        currency: {
+          line: null,
+          text: null,
+          offset: null,
+          source: 'KEYWORDS',
+          verified: false,
+        },
         merchant: null,
       },
       reading: extractionWire(),
@@ -222,6 +283,24 @@ describe('email-sync wire mappers', () => {
     const result = toLearnResult(wire)
     expect(result.similar).toHaveLength(2)
     expect(result.suggestedFilter.subjectAny).toEqual(['Purchase'])
+    expect(result.labels).toEqual({
+      amount: {
+        line: 7,
+        text: 'Amount',
+        offset: 1,
+        source: 'nearby',
+        verified: true,
+      },
+      currency: {
+        line: null,
+        text: null,
+        offset: null,
+        source: 'keywords',
+        verified: false,
+      },
+      merchant: null,
+    })
+    expect(result.template.amount.label).toEqual({ text: 'amount', offset: 1 })
   })
 
   it('maps a test verdict with its focus reading', () => {

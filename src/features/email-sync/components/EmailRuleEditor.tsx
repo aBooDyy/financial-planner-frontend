@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, CloudOff, Crosshair } from 'lucide-react'
+import { Check, CloudOff } from 'lucide-react'
 import { NoteBox } from '#/components/dialog/NoteBox'
 import type { WalletGroupOption } from '#/features/wallets/data/selectors'
+import { labelLineMarks, labelModeOf } from '#/features/email-sync/data/labels'
 import { pickForLine } from '#/features/email-sync/data/mapping'
 import { describeTemplate } from '#/features/email-sync/data/ruleDraft'
 import {
@@ -15,6 +16,7 @@ import type { InboxSamples } from '#/features/email-sync/hooks/useInboxSamples'
 import { useConfigLimits } from '#/lib/config/appConfig'
 import type { CurrencyCode } from '#/lib/currency'
 import { EditorSection } from './EditorSection'
+import { FieldLabels } from './FieldLabels'
 import { FieldTargetChips } from './FieldTargetChips'
 import { GroupPreview } from './GroupPreview'
 import { MatchSummary } from './MatchSummary'
@@ -25,6 +27,7 @@ import { RuleFilterForm } from './RuleFilterForm'
 import { RuleRoutingForm } from './RuleRoutingForm'
 import { SampleLines } from './SampleLines'
 import { SamplePicker } from './SamplePicker'
+import { TapHint } from './TapHint'
 
 type Props = {
   model: EmailRuleEditorModel
@@ -64,7 +67,7 @@ export function EmailRuleEditor({
   )
   if (!open) return null
 
-  const { draft, mapping, target } = open
+  const { draft, mapping, target, labelFor } = open
   const sample = mapping.sample
   const selectedGroupId =
     groups.find((g) => g.members.some((m) => m.id === sample?.id))?.id ?? null
@@ -79,6 +82,9 @@ export function EmailRuleEditor({
     amountPick.end !== undefined
       ? amountLine.slice(amountPick.start, amountPick.end)
       : (learned?.reading.fields.amount.raw ?? null)
+  const merchantReading = learned?.reading.fields.merchant
+  const merchantGuess =
+    merchantReading?.status === 'heuristic' ? merchantReading.line : null
   const problem = model.saveProblems.byRule.get(open.index)
   const learnedNow = model.current && draft.template !== null
 
@@ -90,8 +96,10 @@ export function EmailRuleEditor({
     setBrowsing(false)
   }
   const tap = (line: number) => {
-    if (!sample || !target) return
-    model.pick(pickForLine(sample.bodyLines[line] ?? '', line, target))
+    if (!sample) return
+    if (labelFor) model.pickLabel(line)
+    else if (target)
+      model.pick(pickForLine(sample.bodyLines[line] ?? '', line, target))
   }
 
   return (
@@ -140,26 +148,34 @@ export function EmailRuleEditor({
           ) : null}
           {sample && !browsing ? (
             <>
-              {target ? (
-                <NoteBox icon={<Crosshair />}>
-                  Tap the line with the {target}.
-                </NoteBox>
-              ) : (
-                <NoteBox tone="neutral">
-                  All picked. Choose a field under “What to read” to change it.
-                </NoteBox>
-              )}
               <FieldTargetChips
                 target={target}
                 picks={mapping.picks}
                 options={mapping.options}
                 onTarget={model.setTarget}
               />
+              <TapHint target={target} labelFor={labelFor} />
+              <FieldLabels
+                picks={mapping.picks}
+                options={mapping.options}
+                labels={learned?.labels ?? null}
+                pending={model.learning.pending}
+                labelFor={labelFor}
+                onLabelMode={model.setLabelMode}
+                onAuto={model.clearLabel}
+              />
               <SampleLines
                 sample={sample}
                 picks={mapping.picks}
                 options={mapping.options}
                 target={target}
+                merchantGuess={merchantGuess}
+                labelMarks={labelLineMarks(
+                  mapping.picks,
+                  mapping.options,
+                  learned?.labels ?? null,
+                )}
+                labelMode={labelModeOf(sample, mapping.picks, labelFor)}
                 onTap={tap}
               />
             </>

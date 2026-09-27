@@ -29,12 +29,18 @@ editor that swaps in with a back chevron and Done/Cancel. Plan and contract:
   for the list. Where an email goes is **the rule's** business, not the inbox's.
 - **A rule** (`EmailRule`, fetched with the set when an inbox's editor opens, never cached) is
   a filter (`senders`, `subjectAny`, `bodyAny`, `excludeAny`), a learned **template** (how to
-  read the amount — anchor, which number, decimal style —, the currency — read from the email
-  or fixed —, and optionally the merchant), and routing (`walletId`, `type`, `categoryId` —
+  read the amount — its label, which number, decimal style —, the currency — read from the
+  email or fixed —, and optionally the merchant), and routing (`walletId`, `type`, `categoryId` —
   the leaf, a root's or a child's id, wire `category_id` —, `autoConfirm`, `enabled`). The set is ordered; the first enabled
   rule whose filter matches an email handles it. One `version` for the whole set.
 - The template is **learned by the server** (`POST …/rules/learn`) from the user's taps — the
   client never builds one. That keeps the heuristic (and later an AI strategy) in one place.
+- **Labels, not anchors.** Each field is found by a `TemplateLabel` — `{ text, offset }`: the
+  normalised label phrase and how many lines after the label's line the value sits (`0` = same
+  line, `-3..3`) — or `label: null` (amount/currency), which reads it by the server's keyword
+  lexicon alone. `merchant` is `{ label } | null`. There is no `anchor` any more and no
+  fallback for it: the backend migrated stored rules once (plan:
+  `working.local/email-label-anchors/PLAN.md`).
 
 ## Settings → Email sync
 
@@ -66,8 +72,10 @@ a Sync card (last synced + `ScanNowControl`), "Sync when I open Means", the back
 frequency and the queue's `SkippedShapes` (kinds of email skipped as "not a transaction", with
 _Forget them_). End column: `InboxRulesSection` — `EmailRuleList` (drag/arrow-key reorder via the
 shared `src/hooks/useDragReorder`, a pause switch per rule, edit, delete, "n of 20", _Add rule_),
-each row saying which emails (`describeFilter`), what it reads (`describeTemplate`) and where
-they go. Below both: `InboxPendingList`, what this inbox left for review.
+each row saying which emails (`describeFilter`), what it reads and by which label
+(`describeTemplate`: "Reads amount below “amount”, currency, merchant after “at”"; a null
+label reads "by keywords"; the currency is only placed when its label differs from the
+amount's) and where they go. Below both: `InboxPendingList`, what this inbox left for review.
 
 **Closing and deleting.** Cancel / close / Esc go through `useDiscardGuard` (P4) twice over:
 the inbox editor asks while the settings or the rule set are dirty; the open rule asks while
@@ -107,6 +115,24 @@ stacks it first.
    currency code in place (`currencyTokens`, `src/lib/lineTokens.ts`); the line under the
    pointer asks "Merchant?", and so does the line the learn read the merchant from by its label
    (`merchantGuess`, a `heuristic` reading) while none is tagged.
+   **How each value is found.** The user still only taps values; the server finds each one's
+   label. The learn answer carries `labels` (per field, null when untagged or a fixed currency:
+   `line`, `text` as the email writes it, `offset`, `source` — `picked` / `same_line` /
+   `nearby` / `keywords` — and `verified`, whether re-reading the sample gives back the tap).
+   `FieldLabels` lists one `FieldLabelRow` per tagged field under the hint (`TapHint`): a
+   `LabelChip` — `Found by “Amount” · line above` / `same line` / `2 lines below`, or
+   `Read by keywords (Amount, Total…)` —, in the warn tone with "Couldn’t find this again — tap
+   the label line" when not verified. **Change label** enters label-tap mode for that field
+   (`OpenRule.labelFor`): only lines within `LABEL_OFFSET_MAX` (3) of the value that carry a
+   word before any digit (the value's own line only when words precede the value) are tappable
+   (`labelCandidates`, `labelModeOf`); a tap sets the pick's `labelLine` (wire `label_line`)
+   and the changed request re-learns. The reducer refuses any other line and stays waiting.
+   **Auto** (shown once a label was chosen) drops `labelLine`. A new value tap for a field
+   drops its `labelLine`; choosing another number on the same line (`setPick`) keeps it. The
+   label line of each field — the user's own first, else the learned one — wears an outlined
+   "Amount label" tag on a `fp-surface-2` / `fp-border-strong` line (`labelLineMarks`), apart
+   from the accent value highlight. Picking a target, a new sample or a fixed currency leaves
+   label mode.
 2. **How to read it** ("✓ Learned" once current) — `NumberChoice` asks which number is the
    amount when its line has several (or "the one next to the currency"). `ReadingOptions`: the
    **decimal style** (Auto · 1,234.56 · 1.234,56, with how the tapped value reads each way —
@@ -129,8 +155,9 @@ stacks it first.
    its control.
 
 **State.** `useEmailRuleEditor` wraps the pure reducer `data/ruleEditorState.ts`: the draft
-set, the open rule (`OpenRule`: draft, `mapping` — sample, similar, picks, options —, target,
-`learnedFor`, `autoFilter`), and the effects: load, the debounced learn and test
+set, the open rule (`OpenRule`: draft, `mapping` — sample, similar, picks (each with an
+optional `labelLine`), options —, target, `labelFor`, `learnedFor`, `autoFilter`), and the
+effects: load, the debounced learn and test
 (`useDebouncedCall`: one request per burst, latest wins, the previous answer stays while the
 next is on its way), and save. **A learned template only lands on the picks it answers** —
 the `learned` action carries the request's signature and the reducer drops a stale one.
@@ -189,19 +216,26 @@ mirrors it. Email sync never touches the `inboundImports` table directly.
 
 ## Tests
 
-`api/types.test.ts` (connection + rule summaries, both template kinds round-tripped, rule set
-order and new-rule drafts, reading statuses, learn request casing, learn result, test verdicts,
-sync result with defaults), `data/samples.test.ts` (grouping, likely-first, merge, similar cap,
-own senders first), `data/lineTokens.test.ts` (spans, Arabic-Indic digits, each decimal style,
+`api/types.test.ts` (connection + rule summaries, both template kinds round-tripped with their
+labels and no `anchor`, rule set order and new-rule drafts, reading statuses, learn request
+casing with `label_line`, learn result with `labels`, test verdicts, sync result with
+defaults), `data/labels.test.ts` (label positions, keyword-only labels, rule-row wording,
+label candidates within reach in any script, label-line marks),
+`components/LabelChip.test.tsx` (chip text per offset and source, warn tone, the unverified
+prompt, Change label / Cancel / Auto), `data/samples.test.ts` (grouping, likely-first, merge, similar cap,
+own senders first), `src/lib/lineTokens.test.ts` (spans, Arabic-Indic digits, each decimal style,
 auto like the server), `data/ruleEditorState.test.ts` (seeding from the sample, the hop, span
 picks, fixed currency, learned-only-for-its-picks, hand-edited filters stop adopting
-suggestions, Done/Cancel, reorder/pause/remove, routing coherence, startFrom, the working set,
+suggestions, label-tap mode on the Bank Albilad layout — the label line sent with the learn,
+far or wordless lines refused, a new pick drops it, a refined one keeps it, Auto, leaving the
+mode —, `describeTemplate` by label, Done/Cancel, reorder/pause/remove, routing coherence, startFrom, the working set,
 drafts), `data/ruleHelpers.test.ts` (verdict counts, focus matches, `ruleProblems`,
 `connectedReturnUrl`), `hooks/useEmailRuleEditor.test.ts` (fresh inbox, debounced learn gating
 Done, save with the set version, 422 beside its rule + 409 conflict, fix-the-rule sample),
 `hooks/useManualScan.test.ts` (manual body, single flight, in-progress retry, summaries, the
 catch-up loop and its cap, ignored mail), `components/RuleMapping.test.tsx` (`SampleLines`
-marks and taps, `NumberChoice`), `components/InboxRow.test.tsx` (summary, Sync now, no-rules
+marks and taps, the label-line mark, label-tap mode letting only candidates be tapped,
+`NumberChoice`), `components/InboxRow.test.tsx` (summary, Sync now, no-rules
 state, offline).
 
 ## Not here

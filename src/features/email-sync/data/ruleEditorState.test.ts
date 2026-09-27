@@ -6,7 +6,7 @@ import type {
   LearnResult,
 } from '#/features/email-sync/api/types'
 import { learnRequestOf, pickForLine, signatureOf } from './mapping'
-import { describeFilter, sendable } from './ruleDraft'
+import { describeFilter, describeTemplate, sendable } from './ruleDraft'
 import {
   initialRuleEditorState,
   openRuleEdited,
@@ -18,8 +18,16 @@ import type { RuleEditorAction, RuleEditorState } from './ruleEditorState'
 
 const TEMPLATE: ExtractionTemplate = {
   kind: 'anchored_lines',
-  amount: { anchor: 'amount', numberIndex: null, decimal: 'auto' },
-  currency: { mode: 'from_email', anchor: 'amount', code: 'SAR' },
+  amount: {
+    label: { text: 'amount', offset: 0 },
+    numberIndex: null,
+    decimal: 'auto',
+  },
+  currency: {
+    mode: 'from_email',
+    label: { text: 'amount', offset: 0 },
+    code: 'SAR',
+  },
   merchant: null,
 }
 
@@ -82,6 +90,7 @@ const learnResult = (over: Partial<LearnResult> = {}): LearnResult => ({
     bodyAny: [],
     excludeAny: [],
   },
+  labels: { amount: null, currency: null, merchant: null },
   ...over,
 })
 
@@ -205,6 +214,145 @@ describe('ruleEditorReducer — a new rule from a sample', () => {
   })
 })
 
+/** The Bank Albilad layout: every label on its own line, its value on the next. */
+const TABLE: EmailSample = {
+  id: 'm2',
+  senderEmail: 'alerts@albilad.com',
+  senderName: 'Bank Albilad',
+  subject: 'Purchase',
+  bodyLines: [
+    'Bank Albilad',
+    'DATE AND TIME',
+    '2026-08-08 23:26',
+    'التاريخ والوقت',
+    'TRANSACTION REF',
+    'FT26220827282127',
+    'رقم العملية',
+    'Amount',
+    '10   ( SAR )',
+    'مبلغ وقدره',
+    'Merchant name',
+    'MUGHASIL',
+  ],
+}
+
+const tagged = (): RuleEditorState =>
+  run(
+    loaded(),
+    { type: 'add' },
+    { type: 'useSample', sample: TABLE, similar: [] },
+    { type: 'pick', pick: pickForLine(TABLE.bodyLines[8], 8, 'amount') },
+    { type: 'pick', pick: { line: 8 } },
+  )
+
+describe('ruleEditorReducer — choosing a label', () => {
+  it('names the label with the next tap and sends it with the learn', () => {
+    let state = ruleEditorReducer(tagged(), {
+      type: 'labelMode',
+      field: 'amount',
+    })
+    expect(state.open?.labelFor).toBe('amount')
+    const before = signatureOf(learnRequestOf(state.open!.mapping))
+
+    state = ruleEditorReducer(state, { type: 'pickLabel', line: 7 })
+    expect(state.open?.labelFor).toBeNull()
+    expect(state.open?.target).toBeNull()
+    const request = learnRequestOf(state.open!.mapping)
+    expect(request?.picks.amount).toEqual({
+      line: 8,
+      start: 0,
+      end: 2,
+      labelLine: 7,
+    })
+    expect(request?.picks.currency).toEqual({ line: 8 })
+    expect(signatureOf(request)).not.toBe(before)
+  })
+
+  it('refuses a line too far from the value, or one without words, and stays waiting', () => {
+    const choosing = ruleEditorReducer(tagged(), {
+      type: 'labelMode',
+      field: 'amount',
+    })
+    for (const line of [1, 4, 8]) {
+      const state = ruleEditorReducer(choosing, { type: 'pickLabel', line })
+      expect(state.open?.labelFor).toBe('amount')
+      expect(state.open?.mapping.picks.amount?.labelLine).toBeUndefined()
+    }
+  })
+
+  it('does not enter label mode for a field that is not tagged', () => {
+    const state = ruleEditorReducer(tagged(), {
+      type: 'labelMode',
+      field: 'merchant',
+    })
+    expect(state.open?.labelFor).toBeNull()
+  })
+
+  it('drops the label when the value is tapped again, but keeps it for another number on the line', () => {
+    const labelled = run(
+      loaded(),
+      { type: 'add' },
+      { type: 'useSample', sample: TABLE, similar: [] },
+      { type: 'pick', pick: { line: 8 } },
+      { type: 'pick', pick: { line: 8 } },
+      { type: 'labelMode', field: 'amount' },
+      { type: 'pickLabel', line: 7 },
+    )
+    const refined = ruleEditorReducer(labelled, {
+      type: 'setPick',
+      field: 'amount',
+      pick: { line: 8, start: 0, end: 2 },
+    })
+    expect(refined.open?.mapping.picks.amount?.labelLine).toBe(7)
+
+    const retap: RuleEditorAction[] = [
+      { type: 'target', target: 'amount' },
+      { type: 'pick', pick: { line: 8 } },
+    ]
+    const retapped = retap.reduce(ruleEditorReducer, labelled)
+    expect(retapped.open?.mapping.picks.amount).toEqual({ line: 8 })
+  })
+
+  it('lets the server find the label again on Auto', () => {
+    const state = run(
+      loaded(),
+      { type: 'add' },
+      { type: 'useSample', sample: TABLE, similar: [] },
+      { type: 'pick', pick: { line: 8 } },
+      { type: 'pick', pick: { line: 8 } },
+      { type: 'labelMode', field: 'currency' },
+      { type: 'pickLabel', line: 7 },
+      { type: 'clearLabel', field: 'currency' },
+    )
+    expect(state.open?.mapping.picks.currency).toEqual({ line: 8 })
+  })
+
+  it('leaves label mode on a new target, a new sample or a fixed currency', () => {
+    const choosing = ruleEditorReducer(tagged(), {
+      type: 'labelMode',
+      field: 'currency',
+    })
+    expect(
+      ruleEditorReducer(choosing, { type: 'target', target: 'merchant' }).open
+        ?.labelFor,
+    ).toBeNull()
+    expect(
+      ruleEditorReducer(choosing, {
+        type: 'useSample',
+        sample: SAMPLE,
+        similar: [],
+      }).open?.labelFor,
+    ).toBeNull()
+    expect(
+      ruleEditorReducer(choosing, {
+        type: 'currency',
+        mode: 'fixed',
+        code: 'SAR',
+      }).open?.labelFor,
+    ).toBeNull()
+  })
+})
+
 describe('ruleEditorReducer — the set', () => {
   it('adds a new rule only on Done', () => {
     const cancelled = run(
@@ -297,6 +445,33 @@ describe('rule drafts', () => {
   it('never sends auto-confirm without an account', () => {
     const state = run(loaded(rule('r1', { autoConfirm: true })))
     expect(sendable(state.rules[0])?.autoConfirm).toBe(false)
+  })
+
+  it('describes a template by its labels and where the values sit', () => {
+    expect(describeTemplate(TEMPLATE)).toBe(
+      'Reads amount after “amount”, currency',
+    )
+    expect(
+      describeTemplate({
+        kind: 'anchored_lines',
+        amount: {
+          label: { text: 'amount', offset: 1 },
+          numberIndex: null,
+          decimal: 'auto',
+        },
+        currency: { mode: 'from_email', label: null, code: 'SAR' },
+        merchant: { label: { text: 'merchant name', offset: 2 } },
+      }),
+    ).toBe(
+      'Reads amount below “amount”, currency by keywords, merchant 2 lines below “merchant name”',
+    )
+    expect(
+      describeTemplate({
+        ...TEMPLATE,
+        amount: { ...TEMPLATE.amount, label: null },
+        currency: { mode: 'fixed', code: 'KWD' },
+      }),
+    ).toBe('Reads amount by keywords, always KWD')
   })
 
   it('describes a filter in words', () => {

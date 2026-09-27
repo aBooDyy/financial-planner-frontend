@@ -10,12 +10,15 @@ import type {
   RuleFilter,
 } from '#/features/email-sync/api/types'
 import type { CurrencyCode } from '#/lib/currency'
+import { labelCandidates } from './labels'
 import {
   blankMapping,
   firstTarget,
+  keepLabelLine,
   learnRequestOf,
   nextTarget,
   signatureOf,
+  withLabelLine,
   withPick,
 } from './mapping'
 import type { Mapping } from './mapping'
@@ -29,6 +32,8 @@ export type OpenRule = {
   isNew: boolean
   mapping: Mapping
   target: ExtractField | null
+  /** The field whose label the next tap on the sample names, instead of a value. */
+  labelFor: ExtractField | null
   /** The learn request the draft's template answers; null when it came with the rule. */
   learnedFor: string | null
   /**
@@ -77,6 +82,9 @@ export type RuleEditorAction =
   | { type: 'pick'; pick: FieldPick }
   | { type: 'setPick'; field: ExtractField; pick: FieldPick }
   | { type: 'clearPick'; field: ExtractField }
+  | { type: 'labelMode'; field: ExtractField | null }
+  | { type: 'pickLabel'; line: number }
+  | { type: 'clearLabel'; field: ExtractField }
   | { type: 'decimal'; style: DecimalStyle }
   | { type: 'currency'; mode: CurrencyMode; code: CurrencyCode | null }
   | { type: 'learned'; signature: string; result: LearnResult }
@@ -98,6 +106,7 @@ const opened = (index: number, draft: RuleDraft, isNew: boolean): OpenRule => {
     isNew,
     mapping,
     target: firstTarget(mapping),
+    labelFor: null,
     learnedFor: null,
     autoFilter: isNew,
   }
@@ -228,10 +237,15 @@ export function ruleEditorReducer(
           draft,
           mapping,
           target: firstTarget(mapping),
+          labelFor: null,
         }
       })
     case 'target':
-      return withOpen(state, (open) => ({ ...open, target: action.target }))
+      return withOpen(state, (open) => ({
+        ...open,
+        target: action.target,
+        labelFor: null,
+      }))
     case 'pick':
       return withOpen(state, (open) => {
         if (!open.target || !open.mapping.sample) return open
@@ -243,12 +257,46 @@ export function ruleEditorReducer(
       })
     case 'setPick':
       return withOpen(state, (open) =>
-        withMapping(open, withPick(open.mapping, action.field, action.pick)),
+        withMapping(
+          open,
+          withPick(
+            open.mapping,
+            action.field,
+            keepLabelLine(open.mapping.picks[action.field], action.pick),
+          ),
+        ),
       )
     case 'clearPick':
       return withOpen(state, (open) => ({
         ...withMapping(open, withPick(open.mapping, action.field, null)),
         target: action.field,
+        labelFor: open.labelFor === action.field ? null : open.labelFor,
+      }))
+    case 'labelMode':
+      return withOpen(state, (open) =>
+        action.field === null || open.mapping.picks[action.field]
+          ? { ...open, labelFor: action.field }
+          : open,
+      )
+    case 'pickLabel':
+      return withOpen(state, (open) => {
+        const field = open.labelFor
+        const pick = field ? open.mapping.picks[field] : null
+        const lines = open.mapping.sample?.bodyLines
+        if (!field || !pick || !lines) return open
+        if (!labelCandidates(lines, pick, field).has(action.line)) return open
+        return {
+          ...withMapping(open, withLabelLine(open.mapping, field, action.line)),
+          labelFor: null,
+        }
+      })
+    case 'clearLabel':
+      return withOpen(state, (open) => ({
+        ...withMapping(
+          open,
+          withLabelLine(open.mapping, action.field, undefined),
+        ),
+        labelFor: open.labelFor === action.field ? null : open.labelFor,
       }))
     case 'decimal':
       return withOpen(state, (open) =>
@@ -266,11 +314,14 @@ export function ruleEditorReducer(
             currency: { mode: action.mode, code: action.code },
           },
         }
+        const fixed = action.mode === 'fixed'
         const target =
-          action.mode === 'fixed' && open.target === 'currency'
+          fixed && open.target === 'currency'
             ? firstTarget(mapping)
             : open.target
-        return { ...withMapping(open, mapping), target }
+        const labelFor =
+          fixed && open.labelFor === 'currency' ? null : open.labelFor
+        return { ...withMapping(open, mapping), target, labelFor }
       })
     case 'learned':
       return withOpen(state, (open) => {

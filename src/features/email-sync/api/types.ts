@@ -36,6 +36,7 @@ export type ReadingStatusWire =
   | 'HEURISTIC'
   | 'NOT_SET'
 export type WouldWire = 'STAGE' | 'POST' | 'IGNORE'
+export type LabelSourceWire = 'PICKED' | 'SAME_LINE' | 'NEARBY' | 'KEYWORDS'
 
 const PROVIDER_TO_WIRE: Record<EmailProvider, EmailProviderWire> = {
   google: 'GOOGLE',
@@ -120,15 +121,26 @@ export type EmailSample = {
 export type DecimalStyle = 'auto' | 'dot' | 'comma'
 export type CurrencyMode = 'from_email' | 'fixed'
 
+/**
+ * The words a value is found by, and where it sits from them: `offset` lines after the label's
+ * line (0 = on the same line, after the label).
+ */
+export type TemplateLabel = { text: string; offset: number }
+
 export type AmountSpec = {
-  anchor: string
-  /** Which number on the anchored line; null reads the one next to the currency. */
+  /** Null reads the amount by keywords alone. */
+  label: TemplateLabel | null
+  /** Which number on the value line; null reads the one next to the currency. */
   numberIndex: number | null
   decimal: DecimalStyle
 }
 
 export type CurrencySpec =
-  | { mode: 'from_email'; anchor: string; code: CurrencyCode | null }
+  | {
+      mode: 'from_email'
+      label: TemplateLabel | null
+      code: CurrencyCode | null
+    }
   | { mode: 'fixed'; code: CurrencyCode }
 
 /** How a rule reads an email — learned from the user's picks on a sample. */
@@ -136,7 +148,7 @@ export type ExtractionTemplate = {
   kind: string
   amount: AmountSpec
   currency: CurrencySpec
-  merchant: { anchor: string } | null
+  merchant: { label: TemplateLabel } | null
 }
 
 export type ReadingStatus = Lowercase<ReadingStatusWire>
@@ -200,8 +212,16 @@ export type EmailRuleDraft = {
   autoConfirm: boolean
 }
 
-/** The value the user tapped: a whole line, or a span inside it. */
-export type FieldPick = { line: number; start?: number; end?: number }
+/**
+ * The value the user tapped: a whole line, or a span inside it. `labelLine` is the line the
+ * user says labels it; left out, the server finds the label itself.
+ */
+export type FieldPick = {
+  line: number
+  start?: number
+  end?: number
+  labelLine?: number
+}
 
 export type FieldPicks = {
   amount: FieldPick | null
@@ -221,11 +241,29 @@ export type LearnRequest = {
   similar: EmailSample[]
 }
 
+export type LabelSource = Lowercase<LabelSourceWire>
+
+/** How the learned rule finds one field on the sample. */
+export type LearnedLabel = {
+  /** The label's line in the sample; null (with `text` and `offset`) when read by keywords. */
+  line: number | null
+  /** The label as the email writes it. */
+  text: string | null
+  offset: number | null
+  source: LabelSource
+  /** Reading the sample again with the rule gives back what was tapped. */
+  verified: boolean
+}
+
+/** Null for a field that was not tapped, or a fixed currency. */
+export type LearnedLabels = Record<ExtractField, LearnedLabel | null>
+
 export type LearnResult = {
   template: ExtractionTemplate
   reading: Extraction
   similar: Extraction[]
   suggestedFilter: RuleFilter
+  labels: LearnedLabels
 }
 
 export type Would = 'stage' | 'post' | 'ignore'
@@ -324,17 +362,23 @@ export type EmailSampleWire = {
   body_lines: string[]
 }
 
+export type TemplateLabelWire = { text: string; offset: number }
+
 export type TemplateWire = {
   kind: string
   amount: {
-    anchor: string
+    label: TemplateLabelWire | null
     number_index: number | null
     decimal: DecimalStyleWire
   }
   currency:
-    | { mode: 'FROM_EMAIL'; anchor: string; code: string | null }
+    | {
+        mode: 'FROM_EMAIL'
+        label: TemplateLabelWire | null
+        code: string | null
+      }
     | { mode: 'FIXED'; code: string }
-  merchant: { anchor: string } | null
+  merchant: { label: TemplateLabelWire } | null
 }
 
 export type FieldReadingWire = {
@@ -390,12 +434,19 @@ export type EmailRuleDraftWire = {
   auto_confirm: boolean
 }
 
+export type FieldPickWire = {
+  line: number
+  start?: number
+  end?: number
+  label_line: number | null
+}
+
 export type LearnRequestWire = {
   sample: EmailSampleWire
   picks: {
-    amount: FieldPick
-    currency: FieldPick | null
-    merchant: FieldPick | null
+    amount: FieldPickWire
+    currency: FieldPickWire | null
+    merchant: FieldPickWire | null
   }
   options: {
     decimal: DecimalStyleWire
@@ -404,11 +455,20 @@ export type LearnRequestWire = {
   similar: EmailSampleWire[]
 }
 
+export type LearnedLabelWire = {
+  line: number | null
+  text: string | null
+  offset: number | null
+  source: LabelSourceWire
+  verified: boolean
+}
+
 export type LearnResultWire = {
   template: TemplateWire
   reading: ExtractionWire
   similar: ExtractionWire[]
   suggested_filter: RuleFilterWire
+  labels: Record<ExtractField, LearnedLabelWire | null>
 }
 
 export type TestRequestWire = {
@@ -508,10 +568,27 @@ export const toSampleWire = (s: EmailSample): EmailSampleWire => ({
   body_lines: s.bodyLines,
 })
 
+const toLabel = (w: TemplateLabelWire): TemplateLabel => ({
+  text: w.text,
+  offset: w.offset,
+})
+
+const toLabelOrNull = (w: TemplateLabelWire | null): TemplateLabel | null =>
+  w ? toLabel(w) : null
+
+const toLabelWire = (l: TemplateLabel): TemplateLabelWire => ({
+  text: l.text,
+  offset: l.offset,
+})
+
+const toLabelWireOrNull = (
+  l: TemplateLabel | null,
+): TemplateLabelWire | null => (l ? toLabelWire(l) : null)
+
 export const toTemplate = (w: TemplateWire): ExtractionTemplate => ({
   kind: w.kind,
   amount: {
-    anchor: w.amount.anchor,
+    label: toLabelOrNull(w.amount.label),
     numberIndex: w.amount.number_index,
     decimal: lower<DecimalStyle>(w.amount.decimal),
   },
@@ -520,16 +597,16 @@ export const toTemplate = (w: TemplateWire): ExtractionTemplate => ({
       ? { mode: 'fixed', code: w.currency.code }
       : {
           mode: 'from_email',
-          anchor: w.currency.anchor,
+          label: toLabelOrNull(w.currency.label),
           code: fromWireCurrencyOrNull(w.currency.code),
         },
-  merchant: w.merchant ? { anchor: w.merchant.anchor } : null,
+  merchant: w.merchant ? { label: toLabel(w.merchant.label) } : null,
 })
 
 export const toTemplateWire = (t: ExtractionTemplate): TemplateWire => ({
   kind: t.kind,
   amount: {
-    anchor: t.amount.anchor,
+    label: toLabelWireOrNull(t.amount.label),
     number_index: t.amount.numberIndex,
     decimal: upper<DecimalStyleWire>(t.amount.decimal),
   },
@@ -538,10 +615,10 @@ export const toTemplateWire = (t: ExtractionTemplate): TemplateWire => ({
       ? { mode: 'FIXED', code: t.currency.code }
       : {
           mode: 'FROM_EMAIL',
-          anchor: t.currency.anchor,
+          label: toLabelWireOrNull(t.currency.label),
           code: t.currency.code,
         },
-  merchant: t.merchant ? { anchor: t.merchant.anchor } : null,
+  merchant: t.merchant ? { label: toLabelWire(t.merchant.label) } : null,
 })
 
 const toReading = (w: FieldReadingWire): FieldReading => ({
@@ -622,12 +699,23 @@ export const summaryOf = (r: EmailRule): EmailRuleSummary => ({
   autoConfirm: r.autoConfirm,
 })
 
+export const toPickWire = (p: FieldPick): FieldPickWire => ({
+  line: p.line,
+  ...(p.start !== undefined && p.end !== undefined
+    ? { start: p.start, end: p.end }
+    : {}),
+  label_line: p.labelLine ?? null,
+})
+
+const toPickWireOrNull = (p: FieldPick | null): FieldPickWire | null =>
+  p ? toPickWire(p) : null
+
 export const toLearnRequestWire = (r: LearnRequest): LearnRequestWire => ({
   sample: toSampleWire(r.sample),
   picks: {
-    amount: r.picks.amount,
-    currency: r.picks.currency,
-    merchant: r.picks.merchant,
+    amount: toPickWire(r.picks.amount),
+    currency: toPickWireOrNull(r.picks.currency),
+    merchant: toPickWireOrNull(r.picks.merchant),
   },
   options: {
     decimal: upper<DecimalStyleWire>(r.options.decimal),
@@ -639,11 +727,27 @@ export const toLearnRequestWire = (r: LearnRequest): LearnRequestWire => ({
   similar: r.similar.map(toSampleWire),
 })
 
+const toLearnedLabel = (w: LearnedLabelWire | null): LearnedLabel | null =>
+  w
+    ? {
+        line: w.line,
+        text: w.text,
+        offset: w.offset,
+        source: lower<LabelSource>(w.source),
+        verified: w.verified,
+      }
+    : null
+
 export const toLearnResult = (w: LearnResultWire): LearnResult => ({
   template: toTemplate(w.template),
   reading: toExtraction(w.reading),
   similar: w.similar.map(toExtraction),
   suggestedFilter: toFilter(w.suggested_filter),
+  labels: {
+    amount: toLearnedLabel(w.labels.amount),
+    currency: toLearnedLabel(w.labels.currency),
+    merchant: toLearnedLabel(w.labels.merchant),
+  },
 })
 
 export const toSampleVerdict = (w: SampleVerdictWire): SampleVerdict => ({

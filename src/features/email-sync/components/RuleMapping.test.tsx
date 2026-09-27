@@ -34,11 +34,86 @@ describe('SampleLines', () => {
 
     expect(screen.getAllByRole('listitem')).toHaveLength(3)
     const amountLine = screen.getByRole('button', {
-      name: /Amount: SAR 38.50, fills Amount, Currency, press Enter to use for Merchant/,
+      name: /Amount: SAR 38.50, tagged Amount, Currency, press Enter to tag as Merchant/,
     })
     expect(amountLine).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /^At: Jarir/ }))
     expect(onTap).toHaveBeenCalledWith(3)
+  })
+
+  it('highlights the tagged amount and currency codes inside their line', () => {
+    const { container } = render(
+      <SampleLines
+        sample={SAMPLE}
+        picks={{
+          amount: { line: 2, start: 12, end: 17 },
+          currency: { line: 2 },
+          merchant: null,
+        }}
+        options={FROM_EMAIL}
+        target={null}
+        onTap={() => undefined}
+      />,
+    )
+    const marked = [
+      ...container.querySelectorAll('.font-bold.text-fp-accent-ink'),
+    ]
+    expect(marked.map((el) => el.textContent)).toEqual(['SAR', '38.50'])
+  })
+
+  it('asks about the line the rule would guess the merchant from', () => {
+    render(
+      <SampleLines
+        sample={SAMPLE}
+        picks={{ amount: { line: 2 }, currency: { line: 2 }, merchant: null }}
+        options={FROM_EMAIL}
+        target="merchant"
+        merchantGuess={3}
+        onTap={() => undefined}
+      />,
+    )
+    expect(
+      screen.getByRole('button', { name: /^At: Jarir, may be the merchant/ }),
+    ).toBeTruthy()
+  })
+
+  it('marks the line that labels a tagged value, apart from the value itself', () => {
+    render(
+      <SampleLines
+        sample={SAMPLE}
+        picks={{ amount: { line: 2 }, currency: { line: 2 }, merchant: null }}
+        options={FROM_EMAIL}
+        target={null}
+        labelMarks={new Map([[0, ['amount']]])}
+        onTap={() => undefined}
+      />,
+    )
+    const label = screen.getByRole('button', {
+      name: /^Dear customer, labels Amount$/,
+    })
+    expect(label.textContent).toContain('Amount label')
+    expect(label.className).toContain('bg-fp-surface-2')
+  })
+
+  it('lets only the label candidates be tapped while choosing a label', () => {
+    const onTap = vi.fn()
+    render(
+      <SampleLines
+        sample={SAMPLE}
+        picks={{ amount: { line: 2 }, currency: { line: 2 }, merchant: null }}
+        options={FROM_EMAIL}
+        target="merchant"
+        labelMode={{ field: 'amount', candidates: new Set([0]) }}
+        onTap={onTap}
+      />,
+    )
+    const candidate = screen.getByRole('button', {
+      name: /^Dear customer, press Enter to use as the Amount’s label$/,
+    })
+    const far = screen.getByRole('button', { name: /^At: Jarir$/ })
+    expect(far).toHaveProperty('disabled', true)
+    fireEvent.click(candidate)
+    expect(onTap).toHaveBeenCalledWith(0)
   })
 
   it('does not mark a currency line when the currency is fixed', () => {

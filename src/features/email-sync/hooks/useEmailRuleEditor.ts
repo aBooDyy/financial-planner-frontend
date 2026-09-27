@@ -96,6 +96,11 @@ export type EmailRuleEditorModel = {
   /** Refine one field's pick without moving the target — which number on the line. */
   setPick: (field: ExtractField, pick: FieldPick) => void
   clearPick: (field: ExtractField) => void
+  /** Makes the next tap on the sample name `field`'s label; null leaves that mode. */
+  setLabelMode: (field: ExtractField | null) => void
+  pickLabel: (line: number) => void
+  /** Lets the server find `field`'s label again. */
+  clearLabel: (field: ExtractField) => void
   setDecimal: (style: DecimalStyle) => void
   setCurrency: (mode: CurrencyMode, code: CurrencyCode | null) => void
   save: () => Promise<boolean>
@@ -306,6 +311,9 @@ export function useEmailRuleEditor({
     pick: (pick) => dispatch({ type: 'pick', pick }),
     setPick: (field, pick) => dispatch({ type: 'setPick', field, pick }),
     clearPick: (field) => dispatch({ type: 'clearPick', field }),
+    setLabelMode: (field) => dispatch({ type: 'labelMode', field }),
+    pickLabel: (line) => dispatch({ type: 'pickLabel', line }),
+    clearLabel: (field) => dispatch({ type: 'clearLabel', field }),
     setDecimal: (style) => dispatch({ type: 'decimal', style }),
     setCurrency: (mode, code) => dispatch({ type: 'currency', mode, code }),
     save,

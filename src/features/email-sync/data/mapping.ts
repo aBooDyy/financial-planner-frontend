@@ -74,6 +74,31 @@ export const withPick = (
   pick: FieldPick | null,
 ): Mapping => ({ ...mapping, picks: { ...mapping.picks, [field]: pick } })
 
+/** A refined pick on the same line keeps the label the user chose for it; a new line does not. */
+export const keepLabelLine = (
+  previous: FieldPick | null,
+  next: FieldPick,
+): FieldPick =>
+  previous?.labelLine !== undefined && previous.line === next.line
+    ? { ...next, labelLine: previous.labelLine }
+    : next
+
+/** Sets (or, with undefined, clears) the line the user says labels `field`. */
+export function withLabelLine(
+  mapping: Mapping,
+  field: ExtractField,
+  line: number | undefined,
+): Mapping {
+  const pick = mapping.picks[field]
+  if (!pick) return mapping
+  const { labelLine: _previous, ...value } = pick
+  return withPick(
+    mapping,
+    field,
+    line === undefined ? value : { ...value, labelLine: line },
+  )
+}
+
 /** The learn call these picks make, or null while one is still missing. */
 export function learnRequestOf(mapping: Mapping): LearnRequest | null {
   const { sample, picks, options } = mapping
