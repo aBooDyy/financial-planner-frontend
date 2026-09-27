@@ -5,11 +5,14 @@ import {
   ChevronRight,
   ChevronsUpDown,
 } from 'lucide-react'
-import { useSwipe } from '#/hooks/useSwipe'
+import { useDragControls } from 'motion/react'
+import { useCalendarSlide } from '#/features/transactions/hooks/useCalendarSlide'
 import type { RangeMode } from '#/features/transactions/constants'
 import type { CalendarView } from '#/features/transactions/data/selectors'
 import { DayGrid } from './DayGrid'
 import { MonthGrid } from './MonthGrid'
+import { PeriodSlide } from './PeriodSlide'
+import { WeekdayLabels } from './WeekdayLabels'
 
 type Props = {
   calendar: CalendarView
@@ -56,7 +59,8 @@ export function DaysCard({
   onPickDay,
   onPickMonth,
 }: Props) {
-  const swipe = useSwipe((step) => (step === 1 ? onNext() : onPrev()))
+  const dragControls = useDragControls()
+  const slide = useCalendarSlide(calendar, mode)
   const unit = calendar.grid === 'months' ? 'year' : 'month'
   const expandTitle = calOpen
     ? `Fold the ${unit} back`
@@ -64,7 +68,9 @@ export function DaysCard({
 
   return (
     <div
-      {...swipe}
+      onPointerDown={(e) => {
+        if (e.pointerType === 'touch') dragControls.start(e)
+      }}
       className="touch-pan-y rounded-[18px] border border-fp-border bg-fp-surface p-[14px] shadow-fp"
     >
       <div className="flex flex-wrap items-center gap-[10px]">
@@ -114,21 +120,30 @@ export function DaysCard({
           </button>
         </div>
 
-        {calendar.grid === 'months' ? (
-          <MonthGrid
-            grid={calendar}
-            open={calOpen}
-            loading={loading}
-            onPick={onPickMonth}
-          />
-        ) : (
-          <DayGrid
-            grid={calendar}
-            open={calOpen}
-            loading={loading}
-            onPick={onPickDay}
-          />
-        )}
+        {calendar.grid === 'days' ? (
+          <WeekdayLabels labels={calendar.weekdayLabels} />
+        ) : null}
+        <PeriodSlide
+          slide={slide}
+          dragControls={dragControls}
+          onStep={(step) => (step === 1 ? onNext() : onPrev())}
+        >
+          {calendar.grid === 'months' ? (
+            <MonthGrid
+              grid={calendar}
+              open={calOpen}
+              loading={loading}
+              onPick={onPickMonth}
+            />
+          ) : (
+            <DayGrid
+              grid={calendar}
+              open={calOpen}
+              loading={loading}
+              onPick={onPickDay}
+            />
+          )}
+        </PeriodSlide>
       </div>
     </div>
   )

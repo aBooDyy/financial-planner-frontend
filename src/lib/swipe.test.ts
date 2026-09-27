@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { swipeStep } from './useSwipe'
+import { swipeStep } from './swipe'
 
 describe('swipeStep', () => {
   it('steps forward on a leftward drag and back on a rightward one', () => {

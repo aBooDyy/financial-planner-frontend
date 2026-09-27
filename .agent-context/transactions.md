@@ -165,8 +165,7 @@ tx/budget/recurring editor state machine. Components are dumb (`components/`): p
   the builder holds the catalog and the base currency, the bar holds neither.
   `buildRecurringView` fills the same shape per recurring item (name, monthly equivalent).
 - `DaysCard` (period header + toggle; a sideways swipe anywhere on it steps the period like the
-  arrows — `useSwipe` in `src/hooks/`, mirrored in RTL, `touch-pan-y` so vertical scroll still
-  works) with `DayGrid`/`MonthGrid` and the
+  arrows) with `DayGrid`/`MonthGrid` and the
   shared `CalendarCell`, `TransactionList`, `QuickAddCard` (single-line desktop;
   mobile uses the tab bar's add button — see _App-wide add_ below), `BreakdownCard`,
   `BudgetsCard`/`BudgetHealthCard`, `RecurringCard`/`UpcomingCard`, `TransactionDialog`,
@@ -313,8 +312,18 @@ More's place, in its own colour, and reopens the list. Subcategories are saved.
 - **Motion.** `QuickCategoryChips` animates re-ranks with `src/hooks/useFlipLayout` — a
   dependency-free FLIP over `[data-flip-key]` children (Web Animations API: moved chips
   slide, new ones fade/scale in, reduced motion respected, a no-op in jsdom). The container
-  must be the chips' offset parent (`relative`). No framer-motion: reuse this hook for other
-  reorders before reaching for a library. Removed chips vanish (no exit animation).
+  must be the chips' offset parent (`relative`). Reuse this hook for other reorders before
+  reaching for `motion`. Removed chips vanish (no exit animation).
+- **Calendar paging.** `PeriodSlide` (`motion`) pages the grid: the weekday labels stay put and
+  the new period slides in from the side it lies on (mirrored in RTL); a switch between the day
+  and month grids fades. `useCalendarSlide` decides the page: a new page only when the *same*
+  mode moves to another period (ordered by the first in-period cell's ISO key) — changing mode
+  within the day grid or folding keeps the page, so `FoldingGrid`'s own fold still animates.
+  A touch `pointerdown` anywhere on `DaysCard` starts the page's drag through `useDragControls`
+  (mouse never drags; desktop uses the arrows); it rubber-bands against zero constraints and
+  `swipeStep` (`src/lib/swipe.ts`, distance plus a flick bonus) decides the step on release.
+  The card keeps `touch-pan-y` so vertical scroll still works; a drag swallows the click it ends
+  on. Reduced motion is respected via `MotionConfig`.
 
 `CategoryIcon({ categoryId })` resolves a row's glyph live from the leaf id — a child's own icon
 (which the resolver already falls back to the parent's).
