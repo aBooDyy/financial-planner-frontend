@@ -150,7 +150,7 @@ a config default (the server creates the row), and the stored `version` once a r
 - `src/components/CurrencyPicker.tsx` — the one currency control: shadcn `Command` in a
   `Popover`, searching code or name, with the base + recently used codes (persisted in
   `usePreferencesStore.recentCurrencies`) on top. Used by the wallet, goal, transaction/budget
-  and import-review editors, the `TopNav` base switch and Settings.
+  and import-review editors and Settings.
 - **Settings → Currencies & rates** (`/settings/currencies`) lists **every** currency, not
   only the ones the user holds: a rate you can only reach by first holding the money is a
   rate you can't prepare with. Three cards — base + auto-update, "Your currencies" (add /

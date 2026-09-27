@@ -7,7 +7,6 @@ import { PendingReviewButton } from '#/features/inbound-imports/components/Pendi
 import { PendingReviewModal } from '#/features/inbound-imports/components/PendingReviewModal'
 import { usePendingImports } from '#/features/inbound-imports/hooks/usePendingImports'
 import { useLogout } from '#/features/auth/hooks/useLogout'
-import { setBaseCurrency } from '#/features/wallets/data/mutations'
 import { useSessionStore } from '#/stores/session'
 import { usePreferencesStore } from '#/stores/preferences'
 import { currencySymbol } from '#/lib/currency'
@@ -146,13 +145,7 @@ export function TransactionsPage() {
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-fp-bg text-fp-text">
-      <TopNav
-        user={user}
-        active="budget"
-        base={base}
-        onBaseChange={(code: CurrencyCode) => void setBaseCurrency(code)}
-        onSignOut={() => void logout()}
-      />
+      <TopNav user={user} active="budget" onSignOut={() => void logout()} />
 
       <div className="flex-1 overflow-auto">
         <span role="status" className="sr-only">

@@ -3,12 +3,9 @@ import { MobileTabBar } from '#/components/chrome/MobileTabBar'
 import { TopNav } from '#/components/chrome/TopNav'
 import { Button } from '#/components/ui/button'
 import { useLogout } from '#/features/auth/hooks/useLogout'
-import { setBaseCurrency } from '#/features/wallets/data/mutations'
-import { useWallets } from '#/features/wallets/hooks/useWallets'
 import { SectionHeader } from '#/features/settings/components/SectionHeader'
 import { useCsvImport } from '#/features/import/hooks/useCsvImport'
 import { useSessionStore } from '#/stores/session'
-import type { CurrencyCode } from '#/lib/currency'
 import { CsvImportWizard } from './CsvImportWizard'
 
 /** The file wizard, full width so the review grid has room. Settings › Import is its way in. */
@@ -16,7 +13,6 @@ export function ImportPage() {
   const user = useSessionStore((s) => s.user)
   const logout = useLogout()
   const navigate = useNavigate()
-  const { base } = useWallets()
   const csv = useCsvImport()
 
   if (!user) return null
@@ -28,12 +24,7 @@ export function ImportPage() {
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-fp-bg text-fp-text">
-      <TopNav
-        user={user}
-        base={base}
-        onBaseChange={(code: CurrencyCode) => void setBaseCurrency(code)}
-        onSignOut={() => void logout()}
-      />
+      <TopNav user={user} onSignOut={() => void logout()} />
 
       <div className="flex-1 overflow-auto">
         <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-5 px-[14px] py-4 pb-[30px] md:gap-6 md:px-6 md:py-[26px] md:pb-[90px]">

@@ -4,11 +4,9 @@ import { useLogout } from '#/features/auth/hooks/useLogout'
 import { usePreferencesStore } from '#/stores/preferences'
 import { useSessionStore } from '#/stores/session'
 import { formatMoney } from '#/lib/currency'
-import type { CurrencyCode } from '#/lib/currency'
 import {
   archiveNode,
   deleteNode,
-  setBaseCurrency,
   toggleCollapse,
 } from '#/features/wallets/data/mutations'
 import { useAdjustBalance } from '#/features/wallets/hooks/useAdjustBalance'
@@ -88,13 +86,7 @@ export function WalletsPage() {
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-fp-bg text-fp-text">
-      <TopNav
-        user={user}
-        active="wallets"
-        base={base}
-        onBaseChange={(code: CurrencyCode) => void setBaseCurrency(code)}
-        onSignOut={() => void logout()}
-      />
+      <TopNav user={user} active="wallets" onSignOut={() => void logout()} />
 
       <div className="flex-1 overflow-auto">
         <span role="status" className="sr-only">

@@ -2,8 +2,6 @@ import { Link } from '@tanstack/react-router'
 import { MoonStar, Sun } from 'lucide-react'
 import { useThemeStore } from '#/stores/theme'
 import type { User } from '#/features/auth/api/types'
-import { CurrencyPicker } from '#/components/CurrencyPicker'
-import type { CurrencyCode } from '#/lib/currency'
 import { AccountMenu } from './AccountMenu'
 import { BrandMark } from './BrandMark'
 import { OfflineIndicator } from './OfflineIndicator'
@@ -15,8 +13,6 @@ import type { AppSection } from './sections'
 type Props = {
   user: User
   active?: AppSection
-  base: CurrencyCode
-  onBaseChange: (code: CurrencyCode) => void
   onSignOut: () => void
 }
 
@@ -39,7 +35,7 @@ const LINK =
 const DISABLED =
   'rounded-[10px] px-[14px] py-2 text-[14px] font-medium text-fp-text-3 opacity-60 cursor-not-allowed'
 
-export function TopNav({ user, active, base, onBaseChange, onSignOut }: Props) {
+export function TopNav({ user, active, onSignOut }: Props) {
   const preference = useThemeStore((s) => s.preference)
   const setPreference = useThemeStore((s) => s.setPreference)
   const isDark =
@@ -84,13 +80,6 @@ export function TopNav({ user, active, base, onBaseChange, onSignOut }: Props) {
         <div className="flex-1" />
 
         <div className="flex items-center gap-[9px]">
-          <CurrencyPicker
-            value={base}
-            onChange={onBaseChange}
-            label="Base currency"
-            align="end"
-            className="w-auto rounded-[10px] border-transparent bg-fp-surface-2 px-[10px] py-[7px] text-[13px] font-bold text-fp-text hover:bg-fp-border/70"
-          />
           <SyncIndicator />
           <OfflineIndicator />
 

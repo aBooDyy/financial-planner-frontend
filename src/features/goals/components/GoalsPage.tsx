@@ -4,14 +4,12 @@ import { Receipt, Target } from 'lucide-react'
 import { MobileTabBar } from '#/components/chrome/MobileTabBar'
 import { TopNav } from '#/components/chrome/TopNav'
 import { useLogout } from '#/features/auth/hooks/useLogout'
-import { setBaseCurrency } from '#/features/wallets/data/mutations'
 import { RECURRING_KINDS } from '#/features/goals/constants'
 import { swapGoalPositions } from '#/features/goals/data/mutations'
 import { useGoals } from '#/features/goals/hooks/useGoals'
 import { useGoalEditor } from '#/features/goals/hooks/useGoalEditor'
 import { useGoalDetail } from '#/features/goals/hooks/useGoalDetail'
 import { useSessionStore } from '#/stores/session'
-import type { CurrencyCode } from '#/lib/currency'
 import { GoalDetailPanel } from './detail/GoalDetailPanel'
 import { DetailPanelOverlay } from './DetailPanel'
 import { GoalEditor } from './GoalEditor'
@@ -195,13 +193,7 @@ export function GoalsPage() {
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-fp-bg text-fp-text">
-      <TopNav
-        user={user}
-        active="goals"
-        base={base}
-        onBaseChange={(code: CurrencyCode) => void setBaseCurrency(code)}
-        onSignOut={() => void logout()}
-      />
+      <TopNav user={user} active="goals" onSignOut={() => void logout()} />
       <SectionTabs active={section} alerts={alerts} onNavigate={closePanel} />
 
       <div className="relative flex min-h-0 flex-1">
