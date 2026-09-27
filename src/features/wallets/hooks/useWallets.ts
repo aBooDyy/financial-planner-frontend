@@ -92,6 +92,7 @@ export function useWallets() {
     nodes: active,
     archivedCount: liveNodes.filter(isArchived).length,
     deltas,
+    reservations,
     view,
   }
 }

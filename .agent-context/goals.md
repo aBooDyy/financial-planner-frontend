@@ -103,8 +103,7 @@ whether the plan is feasible. Domain terms: root
   (so it draws no income) — but it is **still listed** in a "Completed" group at the bottom of
   the Goals section as a dimmed `CompletedGoalRow` (selectable for edit/delete, no priority
   controls) so a finished goal never looks deleted. Recurring/sinking have no `target` and
-  never complete. `totalCount`/`horizonStr` count active goals only; `savedGoalsPct` still
-  spans all goals.
+  never complete. `totalCount`/`horizonStr` count active goals only.
 - Kinds & frequencies are lowercase in the domain, mapped to the backend's UPPER_SNAKE wire in
   `api/types.ts` (`toWireKind`/`toWireFreq` etc.); `constants.ts` holds `FREQUENCIES`, `KINDS`,
   `GOAL_COLORS`, and fixed `STATUS_COLORS`.

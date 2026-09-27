@@ -10,6 +10,8 @@ import {
   toggleCollapse,
 } from '#/features/wallets/data/mutations'
 import { useAdjustBalance } from '#/features/wallets/hooks/useAdjustBalance'
+import { useComingUp } from '#/features/wallets/hooks/useComingUp'
+import { useMonthlyFlow } from '#/features/wallets/hooks/useMonthlyFlow'
 import { useWallets } from '#/features/wallets/hooks/useWallets'
 import { useNodeEditor } from '#/features/wallets/hooks/useNodeEditor'
 import { useTransferDialog } from '#/features/wallets/hooks/useTransferDialog'
@@ -19,9 +21,9 @@ import { MobileTabBar } from '#/components/chrome/MobileTabBar'
 import { TopNav } from '#/components/chrome/TopNav'
 import { AdjustBalanceDialog } from './AdjustBalanceDialog'
 import { ArchiveNodeDialog } from './ArchiveNodeDialog'
-import { BaselineTeaserCard } from './BaselineTeaserCard'
-import { CurrencyBreakdownCard } from './CurrencyBreakdownCard'
+import { ComingUpCard } from './ComingUpCard'
 import { DeleteNodeDialog } from './DeleteNodeDialog'
+import { MonthlyFlowCard } from './MonthlyFlowCard'
 import { NodeEditor } from './NodeEditor'
 import { TotalHeroCard } from './TotalHeroCard'
 import { TransferDialog } from './TransferDialog'
@@ -31,13 +33,28 @@ export function WalletsPage() {
   const user = useSessionStore((s) => s.user)
   const logout = useLogout()
   const dateFormat = usePreferencesStore((s) => s.dateFormat)
-  const { base, nodes, deltas, rates, view, archivedCount, balancesLoading } =
-    useWallets()
+  const {
+    base,
+    nodes,
+    deltas,
+    reservations,
+    rates,
+    view,
+    archivedCount,
+    balancesLoading,
+  } = useWallets()
   const editor = useNodeEditor(base)
   const wallets = transferWallets(nodes, deltas, base)
   const transfer = useTransferDialog(wallets, rates)
   const onTransfer = wallets.length >= 2 ? transfer.openDialog : undefined
   const adjust = useAdjustBalance(wallets)
+  const comingUp = useComingUp({
+    wallets,
+    reservations,
+    rates,
+    balancesLoading,
+  })
+  const monthlyFlow = useMonthlyFlow(base, rates, !balancesLoading)
   const editingWallet = wallets.find((w) => w.id === editor.editing?.id)
   const navigate = useNavigate()
   const [archivingId, setArchivingId] = useState<string | null>(null)
@@ -117,12 +134,8 @@ export function WalletsPage() {
           </div>
 
           <div className="flex flex-col gap-4">
-            <CurrencyBreakdownCard
-              breakdown={view.breakdown}
-              loading={balancesLoading}
-              base={base}
-            />
-            <BaselineTeaserCard />
+            <ComingUpCard view={comingUp} />
+            <MonthlyFlowCard view={monthlyFlow} />
           </div>
         </div>
       </div>

@@ -48,7 +48,7 @@ those without a coordinated backend + Dexie migration.
   goals, transactions, allocations, overrides); anything that renders a rate list uses it.
 - `src/features/wallets/data/selectors.ts` — pure `buildWalletsView(nodes, base, rates,
 walletDeltas?, reservations?)` builds the flattened tree (honoring collapse), grand total,
-  per-currency breakdown, and top-level bars. `groupParentOptions` powers the "Place inside"
+  counts, and top-level bars. `groupParentOptions` powers the "Place inside"
   picker (excludes self + descendants). Unit-tested in `selectors.test.ts` / `currency.test.ts`.
 - **Icons resolve in the selector, not the row.** A node carries `icon: string | null` — never
   `undefined`, because an update wire is built from the row and a dropped key reads as "clear
@@ -61,7 +61,7 @@ walletDeltas?, reservations?)` builds the flattened tree (honoring collapse), gr
   to `null` rather than freezing it into the draft, so an id from a newer pack degrades to
   "the default for this kind" instead of sticking. See [icons.md](icons.md).
 - **Collapse is view-only.** A group's `collapsed` flag decides which rows are emitted and
-  nothing else. Wallet/group/currency counts, the grand total and the currency breakdown are
+  nothing else. Wallet/group/currency counts and the grand total are
   tallied over the whole synced tree (`tally` in `buildWalletsView`, separate from the row
   `walk`), so collapsing a group never changes a headline figure.
 - **Reserved vs available (goal earmarks).** The 5th arg, `reservations` (per-wallet reserve
@@ -99,8 +99,7 @@ walletDeltas?, reservations?)` builds the flattened tree (honoring collapse), gr
   counts, actions), titles, labels, the base pill and the wallet/group/currency counts at once;
   each figure goes through the shared `ValueOrSkeleton` with `loading` passed down —
   `TotalHeroCard` (total, group-bar values, the bar itself), `GroupRow` (subtotal), `WalletRow`
-  (balance; the foreign base line waits), `CurrencyBreakdownCard` (share, sum, bar, base line),
-  and the editor's `BalanceNowStrip` (`currentBalance: null`). `ReservedWalletLines`/`PotRow`
+  (balance; the foreign base line waits), and the editor's `BalanceNowStrip` (`currentBalance: null`). `ReservedWalletLines`/`PotRow`
   need no flag: with no reservations while loading, no wallet has pots until the figures land.
   The page grid is `aria-busy` with one `sr-only` `role="status"`.
   `components/walletsLoading.test.tsx` pins chrome present, no money figure, skeletons in place.
@@ -114,14 +113,15 @@ walletDeltas?, reservations?)` builds the flattened tree (honoring collapse), gr
   `MobileTabBar`, `AccountMenu`, `BrandMark`, `sections.ts`), section-aware via an `active`
   prop and reused by both Wallets and Goals — Wallets/Goals nav items navigate (TanStack
   `Link`), Budget is disabled. Wallets-specific UI: `TotalHeroCard`, `WalletsGroupsCard`
-  (+ `GroupRow`/`WalletRow`), the rail (`CurrencyBreakdownCard`, `BaselineTeaserCard`), and
+  (+ `GroupRow`/`WalletRow`), the rail (`ComingUpCard`, `MonthlyFlowCard` — see
+  [The rail](#the-rail)), and
   `NodeEditor` (centered modal on desktop, bottom sheet on mobile). Every wallet and group row
   leads with an `IconChip` — the node's glyph in its colour on a 12%-tint square — in place of
   the old 11px colour dot, which is what makes a tree of eight accounts readable at a glance.
   `NodeEditor` puts a 56px chip above the name field as the `IconPicker`'s trigger; the picker
   is rendered **inside** the editor's `ResponsiveDialog` children, never beside it
   ([icons.md](icons.md#a-nested-picker-goes-inside-the-parent-dialogs-children)).
-  `TotalHeroCard` and `CurrencyBreakdownCard` gain no icons — an aggregate has none to be.
+  `TotalHeroCard` gains no icon — an aggregate has none to be.
   `TotalHeroCard`'s group bar is the shared `SegmentedBar`: each root group's chunk names
   itself, its base-currency total and its share of the grand total on hover/focus/tap, which
   is what `GroupBar.pctStr` exists for
@@ -141,12 +141,40 @@ walletDeltas?, reservations?)` builds the flattened tree (honoring collapse), gr
   to the next line); **only the name truncates** — at 320px included. Tapping a pot navigates to `/goals?goal=<id>`, which opens that goal's read view. A
   wallet with nothing reserved looks exactly as before. `TotalHeroCard` still shows the overall
   available / "reserved for goals" split when anything is reserved. `ExchangeRatesCard` exists
-  but is **not** mounted on the page (FX editing belongs to Settings). `BaselineTeaserCard`
-  reads `useGoals().view.savedGoalsPct` — it shows real saved-toward-target progress once a
-  goal with a target exists, and just the message (no bar) otherwise.
+  but is **not** mounted on the page (FX editing belongs to Settings).
 - Route `/wallets` (guarded like the auth routes); the index redirects authenticated users
   there (it replaced the old `SignedInHome` placeholder). API types/mappers in
   `api/types.ts`, calls in `api/walletsApi.ts` (the HTTP client gained `patch`/`del`).
+
+## The rail
+
+The side column (below the tree on mobile) answers "what's about to happen to this money" and
+"how has it been going". A per-currency split card used to sit here; it was removed
+(2026-09-27) as noise for the common one- or two-currency user — the hero already counts
+currencies and each foreign wallet row carries its "≈ base" line. The "Your baseline feeds
+planning" teaser went the same day (its "planning pages coming next" copy was stale).
+
+- **Coming up** (`ComingUpCard`, `hooks/useComingUp`, pure `data/comingUp.ts`, tested). Open
+  planned **payments and income** due within `COMING_UP_DAYS` (30), overdue ones included (owed,
+  so they land "now"), grouped by wallet. Set-asides are left out — they earmark money without
+  moving it. Rows come from `usePlanned()` (the Planned tab's own `PlannedRowView`s, so the
+  remainder, "in 3 days"/"2 days late" text and filtering agree with that tab); balances are
+  `transferWallets` (opening + deltas) and goal reserves are `useWallets().reservations`. Each
+  wallet shows now → after, up to three items (+N more), and one alert from walking its items in
+  date order: **short** (first day it goes below zero, red) beats **reserved** (first day it drops
+  under what it holds for goals, amber). Wallets with an alert sort first. Rows whose wallet is
+  missing or archived are only counted ("N items have no wallet yet"). "See all" →
+  `/transactions/planned`. `null` view (skeleton) until both balances and planned rows land.
+- **Money in & out** (`MonthlyFlowCard`, `hooks/useMonthlyFlow`, pure `data/monthlyFlow.ts`,
+  tested). Income vs spending per calendar month for the last `FLOW_MONTHS` (6), the running
+  month included, in base currency. Same rule as every report: spend/income with a category only
+  — transfers and adjustments never count. Reads **only the window**
+  (`readLedgerSince(flowWindowStart(today))` on the `date` index), not the whole ledger. The chart
+  is plain divs: per month one button (the hit target) holding an in and an out `FlowBar`
+  (10px, 4px rounded top, 2px gap, `fp-chart-in`/`fp-chart-out`), a hairline top + baseline, and
+  one compact scale reading (the peak, `formatMoneyCompact`). Hover/focus/tap selects a month;
+  `MonthlyFlowReadout` above shows its title, net (signed) and in/out — its swatches are the
+  legend. Mouse-leave falls back to the running month. Each button carries a full `aria-label`.
 
 ## Archiving
 

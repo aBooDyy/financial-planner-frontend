@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { LocalBalanceNode } from '#/db/types'
 import { buildWalletsView } from '#/features/wallets/data/selectors'
 import { BalanceNowStrip } from './BalanceNowStrip'
-import { CurrencyBreakdownCard } from './CurrencyBreakdownCard'
+import { MonthlyFlowCard } from './MonthlyFlowCard'
 import { TotalHeroCard } from './TotalHeroCard'
 import { WalletsGroupsCard } from './WalletsGroupsCard'
 
@@ -96,14 +96,11 @@ describe('Wallets while the balances load', () => {
     expect(skeletons(container)).toBe(VIEW.rows.length)
   })
 
-  it('the currency split lists each currency, and no share or sum', () => {
-    const { container } = render(
-      <CurrencyBreakdownCard breakdown={VIEW.breakdown} loading base="SAR" />,
-    )
-    expect(screen.getByText('By currency')).toBeTruthy()
-    expect(screen.getByText('USD')).toBeTruthy()
+  it('the monthly in/out card keeps its title, and no figure', () => {
+    const { container } = render(<MonthlyFlowCard view={null} />)
+    expect(screen.getByText('Money in & out')).toBeTruthy()
     expect(hasMoney(container)).toBe(false)
-    expect(container.textContent).not.toMatch(/%/)
+    expect(skeletons(container)).toBeGreaterThanOrEqual(1)
   })
 
   it('the editor strip keeps its label and action, not a balance', () => {

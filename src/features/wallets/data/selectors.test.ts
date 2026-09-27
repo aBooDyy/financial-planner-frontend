@@ -77,21 +77,13 @@ describe('buildWalletsView', () => {
     expect(collapsed.rows.map((r) => r.id)).toEqual(['g1', 'w3'])
   })
 
-  it('keeps totals, counts and the breakdown independent of collapse', () => {
+  it('keeps totals and counts independent of collapse', () => {
     const open = buildWalletsView(sampleTree(false), 'SAR', rates)
     const collapsed = buildWalletsView(sampleTree(true), 'SAR', rates)
     expect(collapsed.walletCount).toBe(open.walletCount)
     expect(collapsed.groupCount).toBe(open.groupCount)
     expect(collapsed.currencyCount).toBe(open.currencyCount)
     expect(collapsed.grandTotalStr).toBe(open.grandTotalStr)
-    expect(collapsed.breakdown).toEqual(open.breakdown)
-  })
-
-  it('orders the currency breakdown by base value, largest first', () => {
-    const view = buildWalletsView(sampleTree(), 'SAR', rates)
-    expect(view.breakdown.map((b) => b.currency)).toEqual(['SAR', 'USD'])
-    expect(view.breakdown[0].showBase).toBe(false)
-    expect(view.breakdown[1].showBase).toBe(true)
   })
 
   it('carries a node icon through, defaulting by kind when unset or unknown', () => {

@@ -129,6 +129,19 @@ export const formatMoneyRounded = (
   return `${prefixFor(code)}${formatted}`
 }
 
+/** Format minor units compactly for a chart scale, e.g. "SR 12K". */
+export const formatMoneyCompact = (
+  amountMinor: number,
+  code: CurrencyCode,
+  locale = 'en-US',
+): string => {
+  const formatted = new Intl.NumberFormat(locale, {
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(toMajor(amountMinor, code))
+  return `${prefixFor(code)}${formatted}`
+}
+
 /**
  * Convert minor units from one currency to another using a rate map. Rates are "units of a
  * common reference per 1 unit of the currency", so the conversion is a pure ratio:

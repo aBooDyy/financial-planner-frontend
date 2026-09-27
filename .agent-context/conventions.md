@@ -12,7 +12,8 @@ minimal non-stale comments).
 - Presentational components are **dumb**: props in, UI out, no data access, theme/direction
   via tokens and logical utilities.
 - Prefer composition over props explosion. Extract shared pieces into `src/components/`
-  (e.g. `SegmentedBar`, the stacked proportional bar both hero cards draw).
+  (e.g. `SegmentedBar`, the stacked proportional bar both hero cards draw; `RailCardHeader`, the
+  title / caption / action header of every side-rail card).
 - One component per file; file name matches the component.
 - **Use shadcn/ui primitives** from `#/components/ui/*` for anything shadcn provides
   (Button, Input, Select, Switch, Checkbox, Dialog/Drawer, DropdownMenu, Tabs, ToggleGroup,

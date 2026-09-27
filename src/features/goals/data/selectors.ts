@@ -241,10 +241,6 @@ export type GoalsView = {
   verdict: Verdict
   timeline: TimelineItem[]
   timelineEmpty: boolean
-  // Share of everything you're saving toward that's already set aside (saved / target,
-  // summed across goals that have a target, in base currency). Null when no goal has a
-  // target yet — i.e. nothing to show progress against.
-  savedGoalsPct: number | null
 }
 
 const EPS = 1
@@ -404,7 +400,6 @@ export function buildGoalsView(
     today,
     progress,
   )
-  const withContributions = [...entries.map((e) => e.goal), ...completed]
   const activeGoals = entries.map((e) => e.goal)
   const ordered = activeGoals
 
@@ -626,19 +621,6 @@ export function buildGoalsView(
   // --- Completion timeline ---
   const timeline = buildTimeline(planned, today)
 
-  // --- Overall saved-toward-target progress (Wallets baseline teaser) ---
-  let savedSum = 0
-  let targetSum = 0
-  for (const g of withContributions) {
-    const target = g.target ?? 0
-    if (target <= 0) continue
-    const targetBase = convertMinor(target, g.currency, base, rates)
-    const savedBase = convertMinor(g.saved, g.currency, base, rates)
-    savedSum += Math.min(savedBase, targetBase)
-    targetSum += targetBase
-  }
-  const savedGoalsPct = targetSum > 0 ? savedSum / targetSum : null
-
   return {
     incomeMonthly,
     totalRequired: totalNow,
@@ -671,7 +653,6 @@ export function buildGoalsView(
     verdict,
     timeline,
     timelineEmpty: timeline.length === 0,
-    savedGoalsPct,
   }
 }
 

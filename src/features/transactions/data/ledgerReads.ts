@@ -74,6 +74,14 @@ export async function readLedgerSummary(
   }
 }
 
+/** Every row dated on or after `from` (ISO), in primary-key order. */
+export async function readLedgerSince(
+  from: string,
+): Promise<LocalTransaction[]> {
+  const rows = await db.transactions.where('date').aboveOrEqual(from).toArray()
+  return rows.sort(byId)
+}
+
 /** A transfer's live legs, wherever their dates fall. */
 export async function readTransferLegs(
   transferId: string,

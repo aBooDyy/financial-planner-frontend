@@ -139,6 +139,13 @@ Added beyond the design: `fp-danger` (form errors) — light `#B42318`, dark `#F
 The transaction dialog's type tints: `fp-spend` / `fp-spend-soft` (light `#B4561A` on
 `rgba(232,131,58,.11)`, dark `#F4A66E`) and `fp-transfer` / `fp-transfer-soft` (light `#2457B8` on
 `rgba(59,130,246,.10)`, dark `#8DB4F8`); income uses the accent.
+Chart marks for money in vs out: `fp-chart-in` / `fp-chart-out` (light `#1F9D6B` / `#E25C4F`, dark
+`#27A878` / `#E8625A`) — green vs a clean coral-red. The user rejected the first out colour (the
+spend brown `#B4561A`) as looking off beside the red net figure. Red vs green sits in the dataviz
+validator's 6–8 CVD band (light ΔE 7.1, dark 6.2), which is legal **only with secondary
+encoding** — the in/out chart has it (fixed in-then-out bar order, labelled swatches with values,
+the per-month readout). Keep that encoding if either colour is reused elsewhere, and re-validate
+before changing either.
 
 `ResponsiveDialog` also takes `onBack`: a back button replaces the close button before the title,
 for a sub-view of the dialog (the transaction dialog's in-place pickers).

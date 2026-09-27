@@ -53,16 +53,6 @@ export type BalanceRow = {
   reservations: ReservationRow[]
 }
 
-export type CurrencyBreakdown = {
-  currency: CurrencyCode
-  color: string
-  amountStr: string
-  baseStr: string
-  pct: number
-  pctStr: string
-  showBase: boolean
-}
-
 export type GroupBar = {
   id: string
   label: string
@@ -82,7 +72,6 @@ export type WalletsView = {
   currencyCountStr: string
   rows: BalanceRow[]
   groupBars: GroupBar[]
-  breakdown: CurrencyBreakdown[]
   // Total earmarked for goals across all wallets, in base currency, and what's left free.
   reservedTotal: number
   hasReserved: boolean
@@ -251,7 +240,7 @@ export function buildWalletsView(
 
   // Totals and counts describe everything the user owns, so they tally the whole tree.
   // Collapsing a group only hides rows below; it must never change these figures.
-  const byCurrency = new Map<CurrencyCode, number>()
+  const currencies = new Set<CurrencyCode>()
   let walletCount = 0
   let groupCount = 0
 
@@ -262,11 +251,7 @@ export function buildWalletsView(
       return
     }
     walletCount += 1
-    const currency = node.currency ?? base
-    byCurrency.set(
-      currency,
-      (byCurrency.get(currency) ?? 0) + effectiveAmount(node),
-    )
+    currencies.add(node.currency ?? base)
   }
   for (const root of roots) tally(root)
 
@@ -365,40 +350,16 @@ export function buildWalletsView(
       }
     })
 
-  // Multi-currency breakdown, largest base-value first.
-  const PALETTE = ['#1F9D6B', '#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B']
-  const breakdown: CurrencyBreakdown[] = [...byCurrency.entries()]
-    .map(([currency, amount]) => {
-      const baseVal = convertMinor(amount, currency, base, rates)
-      return {
-        currency,
-        amount,
-        baseVal,
-        pct: grand > 0 ? (baseVal / grand) * 100 : 0,
-      }
-    })
-    .sort((a, b) => b.baseVal - a.baseVal)
-    .map((b, i) => ({
-      currency: b.currency,
-      color: PALETTE[i % PALETTE.length],
-      amountStr: formatMoney(b.amount, b.currency),
-      baseStr: `≈ ${formatMoney(b.baseVal, base)}`,
-      pct: b.pct,
-      pctStr: formatShare(b.pct),
-      showBase: b.currency !== base,
-    }))
-
   return {
     grandTotalStr: formatMoney(grand, base),
     walletCount,
     groupCount,
-    currencyCount: byCurrency.size,
+    currencyCount: currencies.size,
     walletCountStr: plural(walletCount, 'wallet', 'wallets'),
     groupCountStr: plural(groupCount, 'group', 'groups'),
-    currencyCountStr: plural(byCurrency.size, 'currency', 'currencies'),
+    currencyCountStr: plural(currencies.size, 'currency', 'currencies'),
     rows,
     groupBars,
-    breakdown,
     reservedTotal,
     hasReserved: reservedTotal > 0,
     reservedTotalStr: formatMoney(reservedTotal, base),
