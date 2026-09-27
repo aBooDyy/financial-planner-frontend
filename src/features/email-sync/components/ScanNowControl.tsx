@@ -1,4 +1,6 @@
+import { OfflineNotice } from '#/components/OfflineNotice'
 import { useManualScan } from '#/features/email-sync/hooks/useManualScan'
+import { useOnline } from '#/hooks/useOnline'
 import { cn } from '#/lib/utils'
 import { OlderEmailsMenu } from './OlderEmailsMenu'
 import { ScanResultLine } from './ScanResultLine'
@@ -7,7 +9,7 @@ import { SyncNowButton } from './SyncNowButton'
 type Props = {
   /** Scope the sync to one inbox. Omitted syncs every connected inbox. */
   connectionId?: string
-  /** Button only: no backfill menu, no review link — for tight headers. */
+  /** Button only: no backfill menu, no review link, no offline line — for tight headers. */
   compact?: boolean
   label?: string
   /** The result line sits in a tinted box once there is one. */
@@ -28,20 +30,31 @@ export function ScanNowControl({
   className,
 }: Props) {
   const { state, summary, scan } = useManualScan()
+  const online = useOnline()
   const running = state.status === 'scanning' || state.status === 'busy'
-  const sync = () => void scan({ connectionId })
+  const sync = () => {
+    if (online) void scan({ connectionId })
+  }
 
   return (
     <div className={cn('flex min-w-0 flex-col gap-3', className)}>
       <div className="flex flex-wrap items-center gap-2">
-        <SyncNowButton state={state} onSync={sync} label={label} />
+        <SyncNowButton
+          state={state}
+          onSync={sync}
+          label={label}
+          disabled={!online}
+        />
         {compact ? null : (
           <OlderEmailsMenu
-            disabled={running}
+            disabled={running || !online}
             onPick={(days) => void scan({ connectionId, lookbackDays: days })}
           />
         )}
       </div>
+      {online || compact ? null : (
+        <OfflineNotice>Syncing your inbox needs a connection.</OfflineNotice>
+      )}
       <ScanResultLine
         state={state}
         summary={summary}

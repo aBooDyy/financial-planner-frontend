@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '#/db/db'
+import { plannerInputsOnDevice } from '#/db/plannerInputs'
 import { usePullStateStore } from '#/db/pullState'
 import { startOfToday } from '#/features/goals/data/planning'
 import { isoOf } from '#/features/planned/data/dates'
@@ -19,15 +20,20 @@ const stamp = (rows: ReadonlyArray<Stampable>): string =>
  * Keeps planned rows in line with the goals, income streams and schedules they come from,
  * for the whole session — mounted once, by the root layout, like sync.
  *
- * It waits for the first pull of the planner's inputs: on a fresh device, generating before
- * the server's rows arrive would only re-create them (harmless with deterministic ids, but
- * noise). After that it runs, debounced, whenever an origin changes, a pull lands, a plan
- * rewrite is requested, or the day turns.
+ * It waits until this device has pulled the planner's inputs: on a fresh device, generating
+ * before the server's rows arrive would only re-create them (harmless with deterministic ids,
+ * but noise). A device that pulled them on an earlier launch does not wait for this one's pull,
+ * so an app opened offline still posts what came due. After that it runs, debounced, whenever
+ * an origin changes, a pull lands, a plan rewrite is requested, or the day turns.
  */
 export function usePlannedRunner(): void {
   const authenticated = useSessionStore((s) => s.status === 'authenticated')
   const userId = useSessionStore((s) => s.user?.id ?? null)
   const pulled = usePullStateStore((s) => s.plannerInputsPulled)
+  const pulledBefore = useLiveQuery(
+    () => (userId ? plannerInputsOnDevice(userId) : false),
+    [userId],
+  )
   const origins = useLiveQuery(async () => {
     const [goals, income, recurrings] = await Promise.all([
       db.goals.toArray(),
@@ -55,10 +61,10 @@ export function usePlannedRunner(): void {
   }, [])
 
   useEffect(() => {
-    if (!authenticated || !userId || pulled === 0) return
+    if (!authenticated || !userId || (pulled === 0 && !pulledBefore)) return
     const timer = setTimeout(() => {
       void runPlanner(userId, startOfToday()).catch(() => undefined)
     }, DEBOUNCE_MS)
     return () => clearTimeout(timer)
-  }, [authenticated, userId, pulled, origins, day, requests])
+  }, [authenticated, userId, pulled, pulledBefore, origins, day, requests])
 }

@@ -20,7 +20,7 @@ export function SettingsLayout() {
   if (!user) return null
 
   return (
-    <div className="relative flex h-screen flex-col overflow-hidden bg-fp-bg text-fp-text">
+    <div className="relative flex h-dvh flex-col overflow-hidden bg-fp-bg text-fp-text">
       <TopNav
         user={user}
         base={base}

@@ -1,0 +1,15 @@
+# Cloudflare static-asset headers. The service worker, the shell and the manifest must be
+# revalidated on every load so an update is seen; hashed build output never changes.
+# Rules match the request path, so the shell needs `/` as well as `/index.html` (which the
+# host redirects to `/`). SPA-fallback routes keep the host default, already
+# `max-age=0, must-revalidate`. Matching rules merge, so keep them from overlapping.
+/
+  Cache-Control: no-cache
+/index.html
+  Cache-Control: no-cache
+/sw.js
+  Cache-Control: no-cache
+/manifest.webmanifest
+  Cache-Control: no-cache
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

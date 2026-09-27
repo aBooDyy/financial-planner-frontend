@@ -10,7 +10,8 @@ root product [`.agent-context/`](../../.agent-context/). Keep
   folder structure, data flow.
 - [data-layer-and-sync.md](data-layer-and-sync.md) — local DB (Dexie/IndexedDB), the
   outbox/sync engine, bulk push, the incremental (delta) pull and its watermarks, optimistic
-  updates, conflict (`409`) handling, and the silent refresh on `401`.
+  updates, conflict (`409`) handling, the silent refresh on `401`, and the offline session
+  (the cached user, what signs out and what doesn't).
 - [wallets.md](wallets.md) — the Wallets feature (first synced entity): how the Dexie +
   sync engine, money/derivation, and the recreated UI are realized; the transfer and
   adjust-balance dialogs.
@@ -63,7 +64,9 @@ root product [`.agent-context/`](../../.agent-context/). Keep
 - [styling-and-theming.md](styling-and-theming.md) — Tailwind v4, the `fp-` design tokens,
   light/dark, privacy mode (`.fp-sensitive`), **RTL/LTR** support, and the shadcn/Radix layer (the direction provider, the
   logical-property conversions, and what stays physical), and the **dialog kit** (`src/components/dialog/`: field wells, amount well, chips, confirm/discard/done patterns, the side pane).
-- [pwa-and-mobile.md](pwa-and-mobile.md) — PWA/service worker, offline, native-like mobile,
+- [pwa-and-mobile.md](pwa-and-mobile.md) — PWA: `vite-plugin-pwa` config, the precache and
+  its no-glob rule, the update prompt, persistent storage, hosting requirements; offline (the
+  nav's offline pill, the online-only actions list and `OfflineNotice`), native-like mobile,
   responsive/platform-specific nav.
 - [conventions.md](conventions.md) — component size, naming, structure, style.
 

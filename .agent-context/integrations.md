@@ -98,7 +98,8 @@ list that left the server before a create/rotate/delete landed would undo it, so
 counts mutation writes and drops a pull that was overtaken. It also drops one that was in flight
 when sign-out wiped the database (`localDbGeneration()` from `db/db.ts`, checked inside the write
 transaction), so the next user never sees the previous user's keys. Offline, every server action is
-disabled with a sentence saying why; `stale` shows when the last refresh failed.
+disabled with a sentence saying why (the section line and the delivery log use the shared
+`OfflineNotice`); `stale` shows when the last refresh failed.
 
 ## Rules — the editor
 

@@ -6,7 +6,9 @@ import { CurrencyPicker } from '#/components/CurrencyPicker'
 import type { CurrencyCode } from '#/lib/currency'
 import { AccountMenu } from './AccountMenu'
 import { BrandMark } from './BrandMark'
+import { OfflineIndicator } from './OfflineIndicator'
 import { PrivacyToggle } from './PrivacyToggle'
+import { SyncIndicator } from './SyncIndicator'
 import { NAV_SECTIONS } from './sections'
 import type { AppSection } from './sections'
 
@@ -44,7 +46,9 @@ export function TopNav({ user, active, base, onBaseChange, onSignOut }: Props) {
     preference === 'dark' || (preference === 'system' && prefersDark())
 
   return (
-    <div className="flex-none border-b border-fp-border bg-fp-surface/70 backdrop-blur-[14px]">
+    // iOS softens a strip just past the status bar in home-screen apps; the extra
+    // padding keeps the bar's controls below it.
+    <div className="flex-none border-b border-fp-border bg-fp-surface/70 pt-[env(safe-area-inset-top)] backdrop-blur-[14px] max-md:standalone:pt-[calc(env(safe-area-inset-top)+12px)]">
       <div className="mx-auto flex h-14 max-w-[1180px] items-center gap-[10px] px-4 md:h-16 md:gap-[18px] md:px-6">
         <BrandMark />
 
@@ -87,6 +91,8 @@ export function TopNav({ user, active, base, onBaseChange, onSignOut }: Props) {
             align="end"
             className="w-auto rounded-[10px] border-transparent bg-fp-surface-2 px-[10px] py-[7px] text-[13px] font-bold text-fp-text hover:bg-fp-border/70"
           />
+          <SyncIndicator />
+          <OfflineIndicator />
 
           <PrivacyToggle />
 

@@ -1,8 +1,12 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
+@import '@fontsource-variable/hanken-grotesk';
 
 /* Dark theme activates when <html> carries the `dark` class (set by the theme store). */
 @custom-variant dark (&:where(.dark, .dark *));
+
+/* Launched from the home screen as an installed PWA rather than in a browser tab. */
+@custom-variant standalone (@media (display-mode: standalone));
 
 /*
  * Single source of truth for the Means design tokens. Tokens are referenced as runtime
@@ -31,7 +35,7 @@
   --color-fp-transfer-soft: var(--fp-transfer-soft);
 
   --shadow-fp: var(--fp-shadow);
-  --font-sans: 'Hanken Grotesk', system-ui, sans-serif;
+  --font-sans: 'Hanken Grotesk Variable', system-ui, sans-serif;
 
   /*
    * shadcn/ui semantic tokens, bridged onto the fp- palette so installed shadcn
@@ -176,8 +180,13 @@ body,
   min-height: 100%;
 }
 
+/* `viewport-fit=cover` lets the page run under a landscape notch; the side insets are
+   physical, so they stay physical padding in RTL too. The top and bottom insets belong to
+   the chrome that owns those edges (top bar, tab bar, sheets). */
 body {
   margin: 0;
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
   background: var(--fp-bg);
   color: var(--fp-text);
   font-family: var(--font-sans);

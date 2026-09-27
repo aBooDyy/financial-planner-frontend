@@ -1,4 +1,5 @@
 import Dexie from 'dexie'
+import { removeCachedUser } from '#/stores/cachedUser'
 import { resetPullState } from './pullState'
 import type { EntityTable } from 'dexie'
 import type {
@@ -146,6 +147,8 @@ export const localDbGeneration = (): number => clears
 export async function clearLocalDb(): Promise<void> {
   clears += 1
   resetPullState()
+  // The cached user would reopen this device signed in over the tables emptied below.
+  removeCachedUser()
   // `syncState` goes too: without it the next user on this device resumes a stranger's
   // delta window.
   await db.transaction('rw', USER_TABLES, async () => {

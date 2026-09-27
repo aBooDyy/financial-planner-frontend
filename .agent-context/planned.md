@@ -95,9 +95,12 @@ that is done, skipped, pinned, settled (even partly) or due; never touches MANUA
 
 ## The planner (`data/runner.ts`, `hooks/usePlannedRunner.ts`)
 
-`usePlannedRunner()` is mounted **once, in the root layout** (like `useSync`). It waits for the
-first successful pull of the planner's inputs (`db/pullState.ts` — `pullAll` notes it when
-goals, spending and planned all came home), then runs debounced 500 ms on origin changes (a
+`usePlannedRunner()` is mounted **once, in the root layout** (like `useSync`). It waits until this
+device has pulled the planner's inputs (`db/plannerInputs.ts` — `pullAll` records it when goals,
+spending and planned all came home: an in-memory counter in `db/pullState.ts` plus a per-user
+`syncState` marker that outlives the tab). A device that pulled them on an earlier launch does
+not wait for this launch's pull, so an app opened offline still generates and auto-posts what
+came due. Then it runs debounced 500 ms on origin changes (a
 stamp of goals / income / recurrings), each pull, each plan-rewrite request, and day rollover.
 `runPlanner` is single-flight through one queue shared with recalc and undo:
 

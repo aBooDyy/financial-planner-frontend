@@ -45,7 +45,8 @@ import {
 import { configLimits } from '#/lib/config/appConfig'
 import { ApiError } from '#/lib/apiError'
 import { db } from './db'
-import { notePlannerInputsPulled } from './pullState'
+import { recordPlannerInputsPulled } from './plannerInputs'
+import { trackSync } from './syncActivity'
 import {
   failureOf,
   flagEntry,
@@ -167,15 +168,20 @@ export function schedulePush(): void {
  * something it points at had not reached the server yet may go through now.
  */
 export async function flushOutbox(): Promise<void> {
+  // Offline the push can only fail, flagging the head entry "couldn't reach the server" for
+  // a state that is expected; the entries wait as plain pending ones and go on reconnect.
+  if (navigator.onLine === false) return
   if (pushing) {
     pushQueued = true
     return
   }
   pushing = true
   try {
-    while ((await drainPass()) === 'released') {
-      // The released entries are retried by the next pass.
-    }
+    await trackSync(async () => {
+      while ((await drainPass()) === 'released') {
+        // The released entries are retried by the next pass.
+      }
+    })
   } finally {
     pushing = false
     if (pushQueued) {
@@ -507,23 +513,28 @@ async function pushSettings(entry: OutboxEntry): Promise<void> {
 // --- Pull ----------------------------------------------------------------------------
 
 export async function pullAll(): Promise<void> {
+  if (navigator.onLine === false) return
   if (pulling) return
   pulling = true
   try {
-    await Promise.all([
-      pullNodes(),
-      pullSettings(),
-      pullRates(),
-      pullCategories(),
-      pullCustomCurrencies(),
-      pullMerchantsAll(),
-      pullImportTemplates(),
-      // Everything the planner generates from, so it only ever runs over the server's rows.
-      Promise.all([pullGoalsAll(), pullSpendingAll(), pullPlannedDelta()]).then(
-        notePlannerInputsPulled,
-      ),
-      pullInboundImportsDelta(),
-    ])
+    await trackSync(() =>
+      Promise.all([
+        pullNodes(),
+        pullSettings(),
+        pullRates(),
+        pullCategories(),
+        pullCustomCurrencies(),
+        pullMerchantsAll(),
+        pullImportTemplates(),
+        // Everything the planner generates from, so it only ever runs over the server's rows.
+        Promise.all([
+          pullGoalsAll(),
+          pullSpendingAll(),
+          pullPlannedDelta(),
+        ]).then(recordPlannerInputsPulled),
+        pullInboundImportsDelta(),
+      ]),
+    )
   } catch {
     // Pull is best-effort; a failed pull just retries on the next trigger.
   } finally {

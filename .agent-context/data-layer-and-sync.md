@@ -52,7 +52,9 @@ declaration and, when installed data cannot follow, bumping the version with an 
   version, timestamp).
 - A **`syncState`** table holds one watermark per user per incrementally-pulled entity. It is
   sync bookkeeping, not user data, and it lives in the database precisely so that wiping the
-  database takes it too — see [Incremental pull](#incremental-pull-the-delta-streams).
+  database takes it too — see [Incremental pull](#incremental-pull-the-delta-streams). It also
+  holds one `${userId}:plannerInputs` marker, for the same reason
+  ([the planner's gate](#the-planners-gate-dbpullstatets)); no delta stream uses that name.
 - **`categories`** (indexed `'id, slug, parentId, dirty, deleted'`) is a **tree** in
   one table — `parentId === null` is a top-level category, anything else is a subcategory of
   it. `parentId` is indexed because the resolver walks children per parent and the subtree
@@ -186,10 +188,14 @@ declaration and, when installed data cannot follow, bumping the version with an 
 ### The planner's gate (`db/pullState.ts`)
 
 `pullAll` wraps the pulls the planner generates from — goals, spending, planned rows — in one
-`Promise.all` and, when all three came home, bumps `plannerInputsPulled` in a small Zustand
-store. `usePlannedRunner` does nothing until it is non-zero, so a fresh device never generates
-rows the server already holds (harmless with deterministic ids, but noise), and re-runs after
-every successful pull. `clearLocalDb` resets it.
+`Promise.all` and, when all three came home, calls `recordPlannerInputsPulled`
+(`db/plannerInputs.ts`): it bumps `plannerInputsPulled` in a small Zustand store (this app load)
+and writes a per-user `syncState` marker (this device). `usePlannedRunner` does nothing until
+one of them says the inputs arrived, so a fresh device never generates rows the server already
+holds (harmless with deterministic ids, but noise), and re-runs after every successful pull. The
+marker is what lets an app opened **offline** run the planner over the rows an earlier launch
+pulled; the counter alone would hold it until a pull succeeds. `clearLocalDb` resets the counter
+and, with `syncState`, the marker.
 
 ### Where sync is started
 
@@ -399,12 +405,51 @@ many times the server has _rejected_ it) and `nextAttemptAt` (no automatic retry
   deliberately replaces the caller's `401` with its own — usually `common.network` — which the
   sync engine reads as "keep the outbox, flag it unavailable, and stop".
 - `clearLocalDb()` empties every user table (`USER_TABLES`: the synced tables, `outbox`,
-  `syncState` and `importBatches`) and **keeps `appConfig`**:
+  `syncState` and `importBatches`), removes the cached user (below), and **keeps `appConfig`**:
   it holds no user data, and keeping it means the next sign-in already knows the currency table
   offline. It also resets the pull state (so the planner waits for the next user's first pull)
   and bumps `localDbGeneration()` first: a server-owned cache whose pull was already
   in flight at sign-out (integration keys, the inbound-import queue) compares the generation
   inside its write transaction and drops the stale answer instead of refilling the wiped table.
+
+### The offline session
+
+An installed app opened without a network must come up **signed in, with its Dexie data**. So
+the last user the server returned is cached on the device, and only the server's refusal signs
+out.
+
+- **The cache** — `stores/cachedUser.ts`, localStorage `fp-session-user`. localStorage, not a
+  Dexie row, because the session store reads it **synchronously when it is created**: a device
+  that has it starts `status: 'authenticated'` with `verified: false` and renders the app on the
+  first frame, with no Splash waiting on IndexedDB. Every `setUser` writes it (every caller hands
+  it a user the server just returned: `/auth/me`, login, sign-up, Google, onboarding, profile
+  edit) and `clear()` removes it; `clearLocalDb()` removes it too, so no wipe leaves a device
+  that reopens signed in over empty tables. A value that is not a well-formed `User` reads as
+  nothing cached.
+- **`verified`** is true once the server confirmed the session in this app load. Work that needs
+  the server rather than just a user waits for it: the config refresh
+  ([app-config.md](app-config.md)) and the once-per-load email scan
+  ([email-sync.md](email-sync.md)). Sync and the planner don't — they are local-first and start
+  on `authenticated`, so an offline launch keeps its outbox flushing on reconnect.
+- **`verifySession()`** (`features/auth/verifySession.ts`, single-flight) asks `GET /auth/me`:
+
+  | Answer | Outcome |
+  |---|---|
+  | a user | `setUser` (verified, re-cached). If it is a different user than the cached one, `clearLocalDb()` first — the tables are the cached user's. |
+  | `401` / `403` (after `http`'s refresh) | `endSession()` — the one sign-out path: clear, forget the cache, wipe. |
+  | anything else (network `0`, `408`, `429`, `5xx`, …) | keep the cached user, still unverified; with no cache, `clear()` → anonymous → login. |
+
+  An answer that arrives after the session changed under it (the user signed out meanwhile) is
+  dropped.
+- **Re-verifying** — `useSessionBootstrap` verifies once on mount and runs
+  `watchUnverifiedSession()`, which re-asks while the session is authenticated but unverified, on
+  the window's `online` event and on each successful planner-inputs pull (a server that was down
+  while the network was up fires no `online`). A later refusal goes through `endSession()` like
+  any other. A **verified** session is not re-asked: its expiry reaches the sync engine's refresh,
+  which ends the session itself.
+- **Known cost:** a session that expired while offline for longer than the refresh cookie lives
+  ends on reconnect **with its unsynced outbox** — the server's refusal is the same verdict the
+  refresh path already acts on.
 
 **Implemented (auth slice):** `src/lib/http.ts` is the client — base URL from
 `VITE_API_BASE_URL` (default `http://localhost:8000/api/v1`; production `/api/v1`, same-origin
@@ -414,7 +459,8 @@ unwraps the standard `{ success, data, url, method }` envelope's `data`, and thr
 carrying the backend's stable `code` + field `details`. The remote-only auth calls live in
 `src/features/auth/api/authApi.ts` (register/login/logout/me) and map the wire `snake_case`
 user to a `camelCase` `User` at the boundary. Session lives in `src/stores/session.ts`
-(`status: loading|authenticated|anonymous`), bootstrapped once via `GET /auth/me`.
+(`status: loading|authenticated|anonymous`, plus `verified`), hydrated from the device's cached
+user and verified through `GET /auth/me` — see [The offline session](#the-offline-session).
 
 **Implemented (Wallets slice):** Dexie + the outbox/sync engine described here now exist —
 `src/db/` (`db.ts`, `sync.ts`, `types.ts`) with tables `balanceNodes`, `balanceSettings`,
@@ -549,12 +595,25 @@ server-side increment, so a use bump is an ordinary, rebasable `PATCH` queued li
 ## Offline
 
 - Everything works offline: reads from local DB, writes queue in the outbox. On reconnect
-  the engine flushes the outbox and pulls updates. Surface a subtle sync/offline indicator.
-- **That indicator does not exist yet**, and it is now owed two things: an op the outbox had
-  to _park_ rather than retry (a name-conflicted import template, visible only on its Settings
-  card), and **flagged entries** of every entity other than ledger rows — only transactions,
-  adjustments and transfer legs show their badge today. `retryAllFailed()` is already there
-  for it. Build them together.
+  the engine flushes the outbox and pulls updates.
+- **No push while the browser reports offline** (`navigator.onLine === false`): `flushOutbox`
+  returns at once. A push then could only fail, and it would flag the head entry "couldn't
+  reach the server", so the first row written offline showed a sync-failure badge for an
+  expected state. Offline entries stay plainly pending (the offline pill counts them); the
+  `online` listener flushes them. A connection that is up but can't reach the server still
+  goes through the unavailable path above.
+- **Sync activity** is counted in `db/syncActivity.ts`: `flushOutbox`'s drain and `pullAll`'s
+  fan-out run inside `trackSync`, and `useSyncing()` is true while any of them is running. The
+  nav's `SyncIndicator` reads it ([pwa-and-mobile.md](pwa-and-mobile.md#offline)). One-off
+  pulls outside `pullAll` (after onboarding, the review queue's delta) are deliberately left out.
+- **The offline indicator exists**: `OfflineIndicator` in `TopNav`, with the outbox count
+  (`usePendingChangeCount`). Actions that need the server are listed in
+  [pwa-and-mobile.md](pwa-and-mobile.md#online-only-actions). It only reports being offline.
+  A **global sync-trouble cue is still owed** two things: an op the outbox had to _park_
+  rather than retry (a name-conflicted import template, visible only on its Settings card), and
+  **flagged entries** of every entity other than ledger rows. Only transactions, adjustments
+  and transfer legs show their badge today. `retryAllFailed()` is already there for it. Build
+  them together, beside the offline pill.
 
 ## Exception: Email sync and inbound imports (online-only, server-owned cache)
 

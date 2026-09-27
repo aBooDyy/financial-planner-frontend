@@ -11,7 +11,10 @@ backend [onboarding.md](../../financial-planner-backend/.agent-context/onboardin
 `components/SessionGate.tsx` — `loading` → `Splash`, `anonymous` → `/auth/login`, not onboarded
 → `/setup`, categories not on this device yet → `Splash` ([categories.md](categories.md#the-loading-gate--sessiongate))
 — so nothing in the app opens before setup, whichever URL was typed. Sign-up and the
-Google callback just navigate to `/`; the gate does the rest.
+Google callback just navigate to `/`; the gate does the rest. `loading` only happens on a device
+with no cached user: one that has it starts `authenticated` and the gate reads `onboardedAt` from
+that cached copy, so an app opened offline goes straight in
+([data-layer-and-sync.md](data-layer-and-sync.md#the-offline-session)).
 
 `routes/setup.tsx` is the exception that must not use the gate. It decides "already set up"
 **once, on arrival** (`useState` initialiser): finishing setup marks the user onboarded
@@ -65,6 +68,10 @@ render where the user is onboarded but the wizard is still on step 5. "Open Mean
 to `/wallets`, then clears the draft.
 
 Online-only, like sign-up itself: the categories prune and the marker are server decisions.
+Offline, `useOnboardingFlow` holds the step-5 CTA (`waitingForNetwork`) and returns an
+`offlineNote`, which `OnboardingFooter` shows as an `OfflineNotice`. The draft is kept, so
+finishing works once the connection returns. On the email step, the provider buttons and
+_Undo_ are disabled too.
 
 ## Email sync step
 

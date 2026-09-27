@@ -1,20 +1,14 @@
 import { useEffect } from 'react'
-import { useSessionStore } from '#/stores/session'
-import { authApi } from '../api/authApi'
+import { verifySession } from '../verifySession'
+import { watchUnverifiedSession } from '../watchUnverifiedSession'
 
-let started = false
-
-/** Resolves the session once on app start by asking the backend who the cookie belongs to. */
+/**
+ * Resolves the session on app start by asking the backend who the cookie belongs to, and keeps
+ * asking on reconnect while the answer has only been the device's cached user.
+ */
 export function useSessionBootstrap() {
-  const setUser = useSessionStore((s) => s.setUser)
-  const clear = useSessionStore((s) => s.clear)
-
   useEffect(() => {
-    if (started) return
-    started = true
-    authApi
-      .me()
-      .then(setUser)
-      .catch(() => clear())
-  }, [setUser, clear])
+    void verifySession()
+    return watchUnverifiedSession()
+  }, [])
 }

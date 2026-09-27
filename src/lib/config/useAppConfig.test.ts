@@ -32,6 +32,7 @@ const signIn = () =>
   useSessionStore.setState({
     status: 'authenticated',
     user: { id: 'u1' } as User,
+    verified: true,
   })
 
 beforeEach(() => {
@@ -40,7 +41,7 @@ beforeEach(() => {
     ratesVersion: BUNDLED_CONFIG.version,
   })
   usePreferencesStore.setState({ autoUpdateRates: true })
-  useSessionStore.setState({ status: 'anonymous', user: null })
+  useSessionStore.setState({ status: 'anonymous', user: null, verified: false })
   fetchConfig.mockReset().mockResolvedValue(aConfig())
   loadCached.mockReset().mockResolvedValue(null)
   saveCached.mockReset().mockResolvedValue(undefined)
@@ -96,6 +97,23 @@ describe('useAppConfig', () => {
   it('does not fetch without a session', () => {
     renderHook(() => useAppConfig())
     expect(fetchConfig).not.toHaveBeenCalled()
+  })
+
+  it('refreshes a session opened from the device cache once the server confirms it', async () => {
+    useSessionStore.setState({
+      status: 'authenticated',
+      user: { id: 'u1' } as User,
+      verified: false,
+    })
+    const { rerender } = renderHook(() => useAppConfig())
+    expect(fetchConfig).not.toHaveBeenCalled()
+
+    signIn()
+    rerender()
+
+    await waitFor(() =>
+      expect(useAppConfigStore.getState().config.version).toBe('test.1'),
+    )
   })
 
   it('pins the rates but still refreshes the table when auto-update is off', async () => {

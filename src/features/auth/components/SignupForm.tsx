@@ -3,6 +3,7 @@ import { Button } from '#/components/Button'
 import { Checkbox } from '#/components/Checkbox'
 import { PasswordField } from '#/components/PasswordField'
 import { TextField } from '#/components/TextField'
+import { useOnline } from '#/hooks/useOnline'
 import { useSignup } from '../hooks/useSignup'
 import { passwordStrength } from '../passwordStrength'
 import { FormError } from './FormError'
@@ -10,6 +11,7 @@ import { PasswordStrengthMeter } from './PasswordStrengthMeter'
 
 export function SignupForm() {
   const { form, submit, formError } = useSignup()
+  const online = useOnline()
   const {
     register,
     control,
@@ -80,7 +82,11 @@ export function SignupForm() {
         ) : null}
       </div>
 
-      <Button type="submit" disabled={isSubmitting} className="mt-0.5">
+      <Button
+        type="submit"
+        disabled={isSubmitting || !online}
+        className="mt-0.5"
+      >
         {isSubmitting ? 'Creating account…' : 'Create account'}
       </Button>
     </form>

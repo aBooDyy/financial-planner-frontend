@@ -12,7 +12,7 @@ import { loadCachedConfig, saveCachedConfig } from './configCache'
  * where a stale value is strictly better than an error.
  */
 export function useAppConfig(): void {
-  const status = useSessionStore((s) => s.status)
+  const verified = useSessionStore((s) => s.verified)
   const autoUpdateRates = usePreferencesStore((s) => s.autoUpdateRates)
   const refreshed = useRef(false)
   const mounted = useRef(true)
@@ -29,12 +29,14 @@ export function useAppConfig(): void {
     }
   }, [])
 
-  // `GET /config` is authenticated, so the refresh waits for a session and re-runs when a
-  // new one starts (a user who just signed in on a fresh device has only the snapshot). It
-  // also re-runs when the rates preference flips, which is what lets turning auto-update
-  // back on adopt the rates the last refresh was told to leave alone.
+  // `GET /config` is authenticated, so the refresh waits for the server to confirm a session
+  // and re-runs when a new one starts (a user who just signed in on a fresh device has only
+  // the snapshot). A session opened offline from the device's cache is confirmed once the
+  // server is reachable again, which is when a refresh can succeed. It also re-runs when the
+  // rates preference flips, which is what lets turning auto-update back on adopt the rates the
+  // last refresh was told to leave alone.
   useEffect(() => {
-    if (status !== 'authenticated') return
+    if (!verified) return
     void (async () => {
       try {
         const fresh = await configApi.get()
@@ -48,5 +50,5 @@ export function useAppConfig(): void {
         // Offline or unreachable: the cached or bundled config stands.
       }
     })()
-  }, [status, autoUpdateRates])
+  }, [verified, autoUpdateRates])
 }

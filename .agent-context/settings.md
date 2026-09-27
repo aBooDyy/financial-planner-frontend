@@ -15,6 +15,7 @@ Notifications, Archived, Data & privacy. Each pane is its own route — see
 - **Account** (`AccountSection`): initials-only avatar (no photo upload — product decision),
   real name/email form. `useProfile` saves via `authApi.updateProfile` (`PATCH /auth/me`) — a
   direct online call (identity isn't local-first), refreshing the session store on success.
+  Offline, Save is disabled and the footer shows an `OfflineNotice`.
 - **Preferences**: Appearance → `useThemeStore`; Base currency → `setBaseCurrency` (synced
   balance settings). Number format, **date format**, week start, default account,
   hide-empty-wallets → `stores/preferences.ts` (`usePreferencesStore`, persisted to
@@ -65,6 +66,8 @@ Notifications, Archived, Data & privacy. Each pane is its own route — see
   This is the only entry point to importing; the Spending header has no Import button.
 - **Data & privacy**: real **CSV/JSON export** from the local DB (`data/exportData.ts`),
   auto-backup preference, Sign out (real), Delete account (disabled — no backend endpoint).
+  Sign out is disabled offline, here and in the account menu, with the reason shown
+  ([pwa-and-mobile.md](pwa-and-mobile.md#online-only-actions)). `SignOutConfirm` refuses too.
 
 ## Data layer (Dexie + sync)
 

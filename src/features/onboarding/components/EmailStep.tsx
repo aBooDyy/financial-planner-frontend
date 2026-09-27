@@ -1,4 +1,6 @@
+import { OfflineNotice } from '#/components/OfflineNotice'
 import type { EmailProvider } from '#/features/email-sync/api/types'
+import { useOnline } from '#/hooks/useOnline'
 import { useInboxConnect } from '../hooks/useInboxConnect'
 import { ConnectedInbox } from './ConnectedInbox'
 import { PrivacyPromises } from './PrivacyPromises'
@@ -22,6 +24,7 @@ const PROVIDERS: {
 
 export function EmailStep() {
   const { inbox, connecting, error, connect, undo } = useInboxConnect()
+  const online = useOnline()
 
   return (
     <>
@@ -37,6 +40,7 @@ export function EmailStep() {
         {inbox ? (
           <ConnectedInbox
             email={inbox.email}
+            canUndo={online}
             onUndo={() => void undo(inbox.id)}
           />
         ) : (
@@ -47,10 +51,16 @@ export function EmailStep() {
               color={p.color}
               note={p.note}
               busy={connecting === p.id}
-              disabled={connecting !== null}
+              disabled={connecting !== null || !online}
               onClick={() => void connect(p.id)}
             />
           ))
+        )}
+        {online || inbox ? null : (
+          <OfflineNotice>
+            Connecting an inbox needs a connection. You can also do it later in
+            Settings.
+          </OfflineNotice>
         )}
         {error && (
           <p role="alert" className="text-[13.5px] text-fp-danger">

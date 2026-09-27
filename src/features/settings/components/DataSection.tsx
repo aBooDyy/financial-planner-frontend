@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { SignOutConfirm } from '#/components/chrome/SignOutConfirm'
+import { OfflineNotice } from '#/components/OfflineNotice'
 import { Button } from '#/components/ui/button'
 import { useLogout } from '#/features/auth/hooks/useLogout'
 import { exportCsv, exportJson } from '#/features/settings/data/exportData'
+import { useOnline } from '#/hooks/useOnline'
 import { usePreferencesStore } from '#/stores/preferences'
 import { SectionHeader } from './SectionHeader'
 import { SettingRow } from './SettingRow'
@@ -15,6 +17,7 @@ const GHOST =
 export function DataSection() {
   const logout = useLogout()
   const [confirmingSignOut, setConfirmingSignOut] = useState(false)
+  const online = useOnline()
   const autoBackup = usePreferencesStore((s) => s.autoBackup)
   const setAutoBackup = usePreferencesStore((s) => s.setAutoBackup)
 
@@ -73,6 +76,7 @@ export function DataSection() {
           <Button
             type="button"
             variant="outline"
+            disabled={!online}
             onClick={() => setConfirmingSignOut(true)}
             className="rounded-[11px] border-fp-border-strong bg-fp-surface px-[15px] py-2.5 text-[13px] font-semibold text-fp-text hover:border-fp-accent hover:bg-fp-surface"
           >
@@ -88,6 +92,12 @@ export function DataSection() {
             Delete account
           </Button>
         </div>
+        {online ? null : (
+          <OfflineNotice className="mt-3">
+            Signing out needs a connection, so changes you made offline can
+            finish syncing first.
+          </OfflineNotice>
+        )}
       </div>
       <SignOutConfirm
         open={confirmingSignOut}

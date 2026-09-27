@@ -138,10 +138,16 @@ slice.
 ## Sync now
 
 `useEmailSyncBootstrap` still fires one scan per app load with **no options** — the automatic
-path (only `autoSync` inboxes, from each cursor) — and it must stay that way. Everything else
+path (only `autoSync` inboxes, from each cursor) — and it must stay that way. It waits for the
+server to confirm the session (`session.verified`), not merely for a signed-in state: an app
+opened offline starts signed in from the device's cached user, and scanning then would fail and
+use up the load's one scan ([data-layer-and-sync.md](data-layer-and-sync.md#the-offline-session)). Everything else
 goes through `useManualScan` (→ `runEmailSync(options)` → `POST /email-connections/sync` with a
 body): `ScanNowControl` (Sync now + the _Older emails_ menu + `ScanResultLine`) in the inbox
 editor and the import hub, compact in the review queue, and `InboxRow`'s own button and menu.
+`ScanNowControl` gates itself on `useOnline()`. Offline, the button, the menu and Retry are
+off, and the non-compact form adds an `OfflineNotice`. The compact form stays silent, because
+its host (the review queue) already says it is offline.
 
 - **The body is what makes a scan manual.** The backend infers manual mode from _any_ field
   being present; `useManualScan` always sends `limit`, so a manual scan is never `{}`.

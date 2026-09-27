@@ -10,6 +10,8 @@ import {
   DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '#/components/ui/avatar'
+import { OFFLINE_HINT } from '#/components/OfflineNotice'
+import { useOnline } from '#/hooks/useOnline'
 import type { User } from '#/features/auth/api/types'
 import { SignOutConfirm } from './SignOutConfirm'
 
@@ -24,6 +26,7 @@ const ITEM =
 
 export function AccountMenu({ user, initials, onSignOut }: Props) {
   const [confirming, setConfirming] = useState(false)
+  const online = useOnline()
   return (
     <>
       <DropdownMenu>
@@ -67,10 +70,18 @@ export function AccountMenu({ user, initials, onSignOut }: Props) {
           <DropdownMenuSeparator className="mx-1 my-[6px] bg-fp-border" />
           <DropdownMenuItem
             className={`${ITEM} text-fp-danger focus:text-fp-danger`}
+            disabled={!online}
             onSelect={() => setConfirming(true)}
           >
             <LogOut size={17} strokeWidth={1.7} />
-            <span>Sign out</span>
+            <span className="flex min-w-0 flex-col">
+              Sign out
+              {online ? null : (
+                <span className="text-[11.5px] font-medium text-fp-text-2">
+                  {OFFLINE_HINT}
+                </span>
+              )}
+            </span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

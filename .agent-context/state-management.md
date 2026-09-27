@@ -29,6 +29,11 @@ Query / server-cache layer** — see below.)
   store; components call them.
 - Persist only what should survive reload (e.g. theme, direction) via Zustand `persist`.
   Do **not** persist domain data here — that's the DB's job.
+- **The session store persists its user by hand** (`stores/cachedUser.ts`, localStorage key
+  `fp-session-user`), not with `persist`: the store is _created_ from it synchronously, so a
+  device that has one renders the app on the first frame, and `status`/`verified` are derived
+  from whether it was there rather than restored. See
+  [data-layer-and-sync.md](data-layer-and-sync.md#the-offline-session).
 
 ## Server data → handled by the data layer, not a cache library
 

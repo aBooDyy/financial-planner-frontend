@@ -167,6 +167,25 @@ describe('startSync', () => {
     stop()
   })
 
+  it('pulls nothing while the browser is offline, and everything once it is back', async () => {
+    const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    const { startSync } = await import('./sync')
+    const stop = startSync()
+    await settle()
+
+    expect(pulls).toHaveLength(0)
+
+    onLine.mockReturnValue(true)
+    window.dispatchEvent(new Event('online'))
+    await settle()
+
+    for (const name of collections) {
+      expect(pulls.filter((p) => p === name)).toHaveLength(1)
+    }
+    onLine.mockRestore()
+    stop()
+  })
+
   it('counts a pull of the planner’s inputs only once they are all home', async () => {
     const { usePullStateStore } = await import('./pullState')
     const before = usePullStateStore.getState().plannerInputsPulled

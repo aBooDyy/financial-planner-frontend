@@ -1,5 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { Divider } from '#/components/Divider'
+import { OfflineNotice } from '#/components/OfflineNotice'
+import { useOnline } from '#/hooks/useOnline'
 import { BrandMark } from './BrandMark'
 import { BrandPanel } from './BrandPanel'
 import { LoginForm } from './LoginForm'
@@ -25,6 +27,8 @@ const COPY = {
     switchPrompt: 'New to Means?',
     switchAction: 'Create account',
     switchTo: '/auth/signup',
+    offline:
+      'You’re offline. Signing in needs a connection — try again once you’re back online.',
   },
   signup: {
     brandHeadline: 'Start with a clear picture of your money.',
@@ -36,14 +40,17 @@ const COPY = {
     switchPrompt: 'Already have an account?',
     switchAction: 'Log in',
     switchTo: '/auth/login',
+    offline:
+      'You’re offline. Creating an account needs a connection — try again once you’re back online.',
   },
 } as const
 
 export function AuthScreen({ mode }: { mode: Mode }) {
   const copy = COPY[mode]
+  const online = useOnline()
 
   return (
-    <div className="flex min-h-screen w-full overflow-hidden bg-fp-bg text-fp-text">
+    <div className="flex min-h-dvh w-full overflow-hidden bg-fp-bg text-fp-text">
       <BrandPanel
         headline={copy.brandHeadline}
         sub={copy.brandSub}
@@ -65,6 +72,12 @@ export function AuthScreen({ mode }: { mode: Mode }) {
           <p className="mt-[9px] text-[14.5px] leading-[1.5] text-fp-text-2">
             {copy.sub}
           </p>
+
+          {online ? null : (
+            <OfflineNotice className="mt-[18px] rounded-xl bg-fp-surface-2 px-3.5 py-2.5 text-[13px]">
+              {copy.offline}
+            </OfflineNotice>
+          )}
 
           <div className="mt-[26px]">
             <SocialAuthButtons showPasskey={mode === 'login'} />

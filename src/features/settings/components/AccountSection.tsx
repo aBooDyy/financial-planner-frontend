@@ -1,8 +1,10 @@
 import { useState } from 'react'
+import { OfflineNotice } from '#/components/OfflineNotice'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { useProfile } from '#/features/settings/hooks/useProfile'
+import { useOnline } from '#/hooks/useOnline'
 import { useSessionStore } from '#/stores/session'
 import { SectionHeader } from './SectionHeader'
 
@@ -23,6 +25,7 @@ export function AccountSection() {
   const [name, setName] = useState(user?.name ?? '')
   const [email, setEmail] = useState(user?.email ?? '')
   const { save, saving, error, saved } = useProfile()
+  const online = useOnline()
 
   if (!user) return null
 
@@ -31,7 +34,8 @@ export function AccountSection() {
     return Number.isNaN(d.getTime()) ? null : d.getFullYear()
   })()
   const dirty = name.trim() !== user.name || email.trim() !== user.email
-  const canSave = dirty && name.trim() !== '' && email.trim() !== '' && !saving
+  const canSave =
+    online && dirty && name.trim() !== '' && email.trim() !== '' && !saving
 
   return (
     <div className="flex flex-col gap-4">
@@ -88,7 +92,11 @@ export function AccountSection() {
           />
         </div>
         <div className="flex items-center justify-end gap-3 px-[18px] py-[14px]">
-          {error ? (
+          {!online ? (
+            <OfflineNotice className="me-auto">
+              Profile changes need a connection.
+            </OfflineNotice>
+          ) : error ? (
             <span className="me-auto text-[13px] text-fp-danger">{error}</span>
           ) : null}
           {saved && !dirty ? (

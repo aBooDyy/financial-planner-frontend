@@ -145,7 +145,7 @@ export function TransactionsPage() {
           : false
 
   return (
-    <div className="relative flex h-screen flex-col overflow-hidden bg-fp-bg text-fp-text">
+    <div className="relative flex h-dvh flex-col overflow-hidden bg-fp-bg text-fp-text">
       <TopNav
         user={user}
         active="budget"

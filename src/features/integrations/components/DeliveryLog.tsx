@@ -1,5 +1,6 @@
 import { History, RefreshCw } from 'lucide-react'
 import { EmptyState } from '#/components/EmptyState'
+import { OfflineNotice } from '#/components/OfflineNotice'
 import { Button } from '#/components/ui/button'
 import type { CategoryCatalog } from '#/features/categories/data/catalog'
 import type { Delivery } from '#/features/integrations/api/deliveryTypes'
@@ -70,9 +71,9 @@ export function DeliveryLog({
       </div>
 
       {log.status === 'offline' ? (
-        <p className="text-[12.5px] text-fp-text-3">
+        <OfflineNotice>
           You’re offline. The delivery log needs the server.
-        </p>
+        </OfflineNotice>
       ) : log.status === 'failed' ? (
         <p role="alert" className="text-[12.5px] text-fp-danger">
           Couldn’t load the delivery log.

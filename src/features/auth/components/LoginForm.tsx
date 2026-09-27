@@ -3,11 +3,13 @@ import { Button } from '#/components/Button'
 import { Checkbox } from '#/components/Checkbox'
 import { PasswordField } from '#/components/PasswordField'
 import { TextField } from '#/components/TextField'
+import { useOnline } from '#/hooks/useOnline'
 import { useLogin } from '../hooks/useLogin'
 import { FormError } from './FormError'
 
 export function LoginForm() {
   const { form, submit, formError } = useLogin()
+  const online = useOnline()
   const {
     register,
     control,
@@ -60,7 +62,11 @@ export function LoginForm() {
         )}
       />
 
-      <Button type="submit" disabled={isSubmitting} className="mt-0.5">
+      <Button
+        type="submit"
+        disabled={isSubmitting || !online}
+        className="mt-0.5"
+      >
         {isSubmitting ? 'Logging in…' : 'Log in'}
       </Button>
     </form>

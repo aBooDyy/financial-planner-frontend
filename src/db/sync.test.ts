@@ -367,6 +367,25 @@ describe('flushOutbox', () => {
     expect(await db.outbox.count()).toBe(2)
   })
 
+  it('sends nothing and flags nothing while the browser is offline', async () => {
+    const { db } = await import('./db')
+    const { flushOutbox } = await import('./sync')
+    await db.outbox.clear()
+    await db.outbox.bulkAdd([txEntry(0), txEntry(1)])
+    vi.stubGlobal('navigator', { onLine: false })
+
+    try {
+      await flushOutbox()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+
+    expect(batches).toHaveLength(0)
+    const left = await db.outbox.toArray()
+    expect(left).toHaveLength(2)
+    expect(left.every((entry) => entry.failure === undefined)).toBe(true)
+  })
+
   it('falls back to one request per row when the batch is refused as a whole', async () => {
     const { db } = await import('./db')
     const { flushOutbox } = await import('./sync')

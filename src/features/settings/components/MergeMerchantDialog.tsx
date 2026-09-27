@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { DialogActions } from '#/components/dialog/DialogActions'
 import { NoteBox } from '#/components/dialog/NoteBox'
 import { FormRow } from '#/components/FormRow'
+import { OFFLINE_HINT } from '#/components/OfflineNotice'
 import { ResponsiveDialog } from '#/components/ui/responsive-dialog'
 import {
   Select,
@@ -11,6 +12,7 @@ import {
   SelectValue,
 } from '#/components/ui/select'
 import type { MerchantView } from '#/features/merchants/hooks/useMerchants'
+import { useOnline } from '#/hooks/useOnline'
 import { messageForApiError } from '#/lib/errorMessages'
 
 type Props = {
@@ -38,11 +40,12 @@ export function MergeMerchantDialog({
   )
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const online = useOnline()
 
   const target = candidates.find((c) => c.id === targetId) ?? null
 
   const submit = () => {
-    if (!targetId || busy) return
+    if (!targetId || busy || !online) return
     setBusy(true)
     setError(null)
     void onMerge(targetId)
@@ -63,10 +66,11 @@ export function MergeMerchantDialog({
       description={`Its spellings and transactions move to the merchant you pick, and “${source.displayName}” is removed.`}
       footer={
         <DialogActions
+          hint={online ? null : `Merging needs a connection. ${OFFLINE_HINT}`}
           onCancel={onClose}
           submitLabel={busy ? 'Merging…' : 'Merge'}
           onSubmit={submit}
-          disabled={!targetId || busy}
+          disabled={!targetId || busy || !online}
         />
       }
       contentClassName="sm:max-w-[430px]"

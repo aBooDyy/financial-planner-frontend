@@ -2,9 +2,8 @@ import { create } from 'zustand'
 
 type PullState = {
   /**
-   * Pulls that brought the planner's inputs (goals, spending, planned rows) home without an
-   * error. Zero means this device has not seen the server's rows yet, so nothing may be
-   * generated from them.
+   * Pulls in this app load that brought the planner's inputs (goals, spending, planned rows)
+   * home without an error. Whether the device has ever had them is `plannerInputsOnDevice`.
    */
   plannerInputsPulled: number
 }

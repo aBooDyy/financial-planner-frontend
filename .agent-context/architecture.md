@@ -94,6 +94,10 @@ builds must set the build variable `VITE_API_BASE_URL=/api/v1` (dashboard → Bu
 bundle calls the `http://localhost:8000` default. Only `/api/*` counts against the Workers request
 quota; static assets don't.
 
+**Cache headers (`public/_headers`):** `no-cache` on `sw.js`, `index.html` and
+`manifest.webmanifest`, immutable on `/assets/*` — what the service worker's update flow needs;
+see [pwa-and-mobile.md](pwa-and-mobile.md#hosting-requirements).
+
 **Why (not SSR):** data lives in the browser's IndexedDB (local-first), so the server can't
 render real data anyway — SSR would paint an empty shell the client immediately re-fills
 from the local DB. An offline-capable PWA loads from cached static assets via the service

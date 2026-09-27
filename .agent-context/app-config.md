@@ -23,8 +23,10 @@ rates they convert at while still taking a refreshed currency table.
 **Bootstrap order: bundled snapshot → cached Dexie row → background network refresh.** The
 store is _constructed_ from the bundle, so config is never absent and nothing blocks first
 paint. A failed fetch is silent — this is the one place where a stale value beats an error.
-The refresh runs when the session is `authenticated` (the endpoint is authenticated) and
-re-runs on a new session. `applyConfig` no-ops when the `version` stamp is unchanged.
+The refresh runs once the server has confirmed the session (`session.verified` — the endpoint
+is authenticated) and re-runs on a new session. A session opened offline from the device's
+cached user is not confirmed until the server is reachable again, which is exactly when a
+refresh can succeed ([data-layer-and-sync.md](data-layer-and-sync.md#the-offline-session)). `applyConfig` no-ops when the `version` stamp is unchanged.
 `clearLocalDb()` deliberately **keeps** the `appConfig` row: it holds no user data.
 
 **A cached row is filled from the bundle on load** (`loadCachedConfig`): `limits` is merged

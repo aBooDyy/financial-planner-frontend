@@ -1,5 +1,6 @@
 import { ScanFace } from 'lucide-react'
 import { Button } from '#/components/Button'
+import { useOnline } from '#/hooks/useOnline'
 import { useGoogleAuth } from '../hooks/useGoogleAuth'
 import { FormError } from './FormError'
 
@@ -33,13 +34,14 @@ type Props = { showPasskey?: boolean }
 
 export function SocialAuthButtons({ showPasskey = false }: Props) {
   const google = useGoogleAuth()
+  const online = useOnline()
 
   return (
     <div className="flex flex-col gap-2.5">
       <Button
         variant="secondary"
         onClick={google.start}
-        disabled={google.pending}
+        disabled={google.pending || !online}
       >
         <GoogleIcon />
         {google.pending ? 'Connecting…' : 'Continue with Google'}

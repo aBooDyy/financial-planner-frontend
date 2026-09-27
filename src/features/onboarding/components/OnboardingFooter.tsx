@@ -1,4 +1,5 @@
 import { ChevronLeft } from 'lucide-react'
+import { OfflineNotice } from '#/components/OfflineNotice'
 import { Button } from '#/components/ui/button'
 
 type Props = {
@@ -6,6 +7,7 @@ type Props = {
   ctaDisabled: boolean
   canGoBack: boolean
   error: string | null
+  offlineNote?: string | null
   onNext: () => void
   onBack: () => void
 }
@@ -16,6 +18,7 @@ export function OnboardingFooter({
   ctaDisabled,
   canGoBack,
   error,
+  offlineNote,
   onNext,
   onBack,
 }: Props) {
@@ -27,6 +30,9 @@ export function OnboardingFooter({
             {error}
           </p>
         )}
+        {offlineNote ? (
+          <OfflineNotice className="mb-3">{offlineNote}</OfflineNotice>
+        ) : null}
         <div className="flex items-center gap-3">
           {canGoBack && (
             <Button

@@ -217,7 +217,7 @@ export function ResponsiveDialog({
     <Drawer open={open} onOpenChange={onOpenChange} dismissible={dismissible}>
       <DrawerContent
         className={cn(
-          'max-h-[92%] border-fp-border bg-fp-surface',
+          'max-h-[92%] border-fp-border bg-fp-surface pb-[env(safe-area-inset-bottom)]',
           sheetClassName,
         )}
       >

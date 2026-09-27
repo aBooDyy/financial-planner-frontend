@@ -6,6 +6,7 @@ import { useSessionBootstrap } from '#/features/auth/hooks/useSessionBootstrap'
 import { useEmailSyncBootstrap } from '#/features/email-sync/hooks/useEmailSyncBootstrap'
 import { PayloadViewContext } from '#/features/inbound-imports/components/payloadView'
 import { usePlannedRunner } from '#/features/planned'
+import { UpdatePrompt, usePersistentStorage } from '#/features/pwa'
 import { ReviewPayloadTree } from '#/features/integrations/components/ReviewPayloadTree'
 import { useAppConfig } from '#/lib/config/useAppConfig'
 import { loadIconPaths } from '#/lib/icons/paths'
@@ -24,6 +25,7 @@ function RootLayout() {
   useSync()
   usePlannedRunner()
   useEmailSyncBootstrap()
+  usePersistentStorage()
 
   // Radix portals its menus outside the app subtree and falls back to `ltr` unless a
   // DirectionProvider supplies the direction, so logical utilities inside them need this.
@@ -42,6 +44,7 @@ function RootLayout() {
         <PayloadViewContext.Provider value={ReviewPayloadTree}>
           <Outlet />
         </PayloadViewContext.Provider>
+        <UpdatePrompt />
         <Devtools />
       </TooltipProvider>
     </Direction.Provider>

@@ -2,6 +2,11 @@
 import 'fake-indexeddb/auto'
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { db } from '#/db/db'
+import {
+  plannerInputsOnDevice,
+  recordPlannerInputsPulled,
+} from '#/db/plannerInputs'
 import { notePlannerInputsPulled, resetPullState } from '#/db/pullState'
 import { requestPlanRecalc } from '#/features/planned/data/recalcRequests'
 import { useSessionStore } from '#/stores/session'
@@ -25,10 +30,11 @@ const signIn = () =>
 
 afterEach(cleanup)
 
-beforeEach(() => {
+beforeEach(async () => {
   runPlanner.mockReset().mockResolvedValue(undefined)
   resetPullState()
   useSessionStore.getState().clear()
+  await db.syncState.clear()
 })
 
 describe('usePlannedRunner', () => {
@@ -42,6 +48,26 @@ describe('usePlannedRunner', () => {
 
     await waitFor(() => expect(runPlanner).toHaveBeenCalledTimes(1))
     expect(runPlanner.mock.calls[0][0]).toBe('u1')
+  })
+
+  it('runs without this launch’s pull when the device pulled the inputs before', async () => {
+    signIn()
+    await recordPlannerInputsPulled()
+    resetPullState()
+
+    renderHook(() => usePlannedRunner())
+
+    await waitFor(() => expect(runPlanner).toHaveBeenCalledTimes(1))
+  })
+
+  it('remembers a pull per user, on this device', async () => {
+    signIn()
+    expect(await plannerInputsOnDevice('u1')).toBe(false)
+
+    await recordPlannerInputsPulled()
+
+    expect(await plannerInputsOnDevice('u1')).toBe(true)
+    expect(await plannerInputsOnDevice('u2')).toBe(false)
   })
 
   it('never runs without a session', async () => {

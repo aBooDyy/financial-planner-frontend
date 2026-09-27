@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import type { User } from '#/features/auth/api/types'
+import { useOnline } from '#/hooks/useOnline'
 import { messageForApiError } from '#/lib/errorMessages'
 import { useSessionStore } from '#/stores/session'
 import { completeOnboarding } from '../data/complete'
@@ -45,6 +46,7 @@ export function useOnboardingFlow(user: User, hasInbox: boolean) {
   const { selected } = useCategorySelection()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const online = useOnline()
 
   const { userId, start } = draft
   useEffect(() => {
@@ -53,8 +55,12 @@ export function useOnboardingFlow(user: User, hasInbox: boolean) {
 
   const step = draft.step
   const name = draft.name.trim()
+  const waitingForNetwork = step === FINISH_STEP && !online
   const disabled =
-    busy || (step === 1 && !name) || (step === 3 && selected.length === 0)
+    busy ||
+    waitingForNetwork ||
+    (step === 1 && !name) ||
+    (step === 3 && selected.length === 0)
 
   const finish = useCallback(async () => {
     setBusy(true)
@@ -111,6 +117,9 @@ export function useOnboardingFlow(user: User, hasInbox: boolean) {
       disabled,
     },
     error,
+    offlineNote: waitingForNetwork
+      ? 'Finishing setup needs a connection. Your choices are kept — finish once you’re back online.'
+      : null,
     next,
     back,
   }

@@ -46,7 +46,7 @@ function GoogleCallback() {
   if (!error) return <Splash />
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-fp-bg px-6 text-center text-fp-text">
+    <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-fp-bg px-6 text-center text-fp-text">
       <p className="max-w-sm text-[14.5px] text-fp-text-2">{error}</p>
       <Link
         to="/auth/login"

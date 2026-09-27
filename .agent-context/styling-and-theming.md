@@ -148,7 +148,11 @@ for a sub-view of the dialog (the transaction dialog's in-place pickers).
   persisted) setting `dir`/`lang` on `<html>` **and** feeding Radix's `Direction.Provider`. Both
   are applied on app start from `__root.tsx`.
 - Auth screens use logical utilities (`ps-/pe-`, `end-0`) so they work LTR + RTL. The font
-  (Hanken Grotesk) is loaded in `index.html` and wired to `--font-sans`.
+  (Hanken Grotesk) is **self-hosted**: `@fontsource-variable/hanken-grotesk` is imported at the
+  top of `theme.css` (one variable woff2 per unicode subset, weights 100–900, so 400–800 are all
+  there) and `--font-sans` names its family, **`'Hanken Grotesk Variable'`** — the package's name
+  for it, not Google's. The files become hashed build output, so the service worker precaches
+  them ([pwa-and-mobile.md](pwa-and-mobile.md)). No font `<link>` in `index.html`.
 
 > When you add a token, add it to the `@theme` block (and the dark overrides) — that's the
 > single source of truth. Record palette decisions here.

@@ -20,7 +20,9 @@ const SPLIT = Math.ceil(NAV_SECTIONS.length / 2)
 
 export function MobileTabBar({ active }: Props) {
   return (
-    <div className="flex flex-none items-stretch border-t border-fp-border bg-fp-surface/70 backdrop-blur-[14px] md:hidden">
+    // In a home-screen app the bar sits on the screen's rounded bottom corners, so it
+    // clears them by more than the home-indicator inset alone.
+    <div className="flex flex-none items-stretch border-t border-fp-border bg-fp-surface/70 pb-[env(safe-area-inset-bottom)] backdrop-blur-[14px] standalone:pb-[calc(env(safe-area-inset-bottom)+10px)] md:hidden">
       <TabGroup sections={NAV_SECTIONS.slice(0, SPLIT)} active={active} />
       <AddTab />
       <TabGroup sections={NAV_SECTIONS.slice(SPLIT)} active={active} />
@@ -92,7 +94,7 @@ function AddTab() {
         onClick={show}
         title="Add transaction"
         aria-label="Add transaction"
-        className="flex h-[52px] w-[52px] -translate-y-4 items-center justify-center rounded-full border-4 border-fp-bg bg-fp-accent text-white shadow-[0_10px_22px_-6px_var(--fp-accent)] transition-transform active:scale-95"
+        className="flex h-[52px] w-[52px] -translate-y-4 items-center justify-center rounded-full border-4 border-fp-bg bg-fp-accent text-white shadow-[0_4px_18px_-6px_var(--fp-accent)] transition-transform active:scale-95"
       >
         <Plus size={26} strokeWidth={2.4} />
       </button>

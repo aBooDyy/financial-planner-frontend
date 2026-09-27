@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { getRouteApi, useNavigate } from '@tanstack/react-router'
-import { CloudOff, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
+import { OfflineNotice } from '#/components/OfflineNotice'
 import { Button } from '#/components/ui/button'
 import { walletGroupOptions } from '#/features/wallets/data/selectors'
 import { useWallets } from '#/features/wallets/hooks/useWallets'
@@ -63,14 +64,10 @@ export function IntegrationsSection() {
       <EndpointCard endpoint={endpoint} />
 
       {!model.online ? (
-        <p
-          role="status"
-          className="flex items-center gap-2 text-[12.5px] text-fp-text-2"
-        >
-          <CloudOff size={15} strokeWidth={1.8} className="shrink-0" />
+        <OfflineNotice>
           You’re offline. These are your keys as of the last sync — creating or
           changing one needs the server.
-        </p>
+        </OfflineNotice>
       ) : model.stale ? (
         <p role="status" className="text-[12.5px] text-fp-text-2">
           Couldn’t refresh your keys. Showing the last copy on this device.

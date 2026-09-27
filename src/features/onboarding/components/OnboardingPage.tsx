@@ -48,6 +48,7 @@ export function OnboardingPage({ user }: Props) {
         ctaDisabled={flow.cta.disabled}
         canGoBack={flow.canGoBack}
         error={flow.error}
+        offlineNote={flow.offlineNote}
         onNext={flow.next}
         onBack={flow.back}
       />
