@@ -246,7 +246,8 @@ function recurringRows(
   const from = r.autopost
     ? '0000-01-01'
     : addDaysISO(today, -MANUAL_LOOKBACK_DAYS)
-  return occurrencesFrom(r.nextDue, r.frequency, from, until).map((date) => ({
+  const to = r.endsOn && r.endsOn < until ? r.endsOn : until
+  return occurrencesFrom(r.nextDue, r.frequency, from, to).map((date) => ({
     origin: 'recurring',
     originId: r.id,
     role: r.type === 'income' ? 'income' : 'payment',

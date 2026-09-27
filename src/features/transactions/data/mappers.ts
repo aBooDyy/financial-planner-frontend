@@ -160,9 +160,12 @@ export const localRecurringToCreateWire = (
   category_id: l.categoryId,
   wallet_id: l.walletId,
   goal_id: l.goalId,
+  merchant_id: l.merchantId ?? null,
   frequency: toWireFreq(l.frequency),
   next_due: l.nextDue,
+  ends_on: l.endsOn ?? null,
   autopost: l.autopost,
+  note: l.note ?? null,
 })
 
 export const localRecurringToUpdateWire = (
@@ -176,7 +179,10 @@ export const localRecurringToUpdateWire = (
   category_id: l.categoryId,
   wallet_id: l.walletId,
   goal_id: l.goalId,
+  merchant_id: l.merchantId ?? null,
   frequency: toWireFreq(l.frequency),
   next_due: l.nextDue,
+  ends_on: l.endsOn ?? null,
   autopost: l.autopost,
+  note: l.note ?? null,
 })

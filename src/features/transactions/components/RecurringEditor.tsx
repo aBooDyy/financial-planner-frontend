@@ -4,13 +4,19 @@ import { PillSwitch } from '#/components/dialog/PillSwitch'
 import { FieldLabel } from '#/components/FieldLabel'
 import { FieldMessage } from '#/components/FormRow'
 import { Input } from '#/components/ui/input'
-import type { LocalGoal } from '#/db/types'
+import type { LocalGoal, LocalMerchant } from '#/db/types'
 import type { TransferWallet } from '#/features/wallets/data/transferDialog'
 import { CategoryOptions } from '#/features/categories/components/CategoryOptions'
 import { useCategoryCatalog } from '#/features/categories/hooks/useCategoryCatalog'
-import { recurringDeleteCopy } from '#/features/transactions/data/scheduleEditor'
+import { MerchantOptions } from '#/features/merchants/components/MerchantOptions'
+import { useMerchantName } from '#/features/merchants/hooks/useMerchantName'
+import {
+  recurringDeleteCopy,
+  recurringEndBlock,
+} from '#/features/transactions/data/scheduleEditor'
 import type { ScopeSection } from '#/features/transactions/data/selectors'
 import {
+  NOTE_INPUT,
   TYPE_TINT,
   cashflowBlock,
   entryAccountSections,
@@ -29,6 +35,7 @@ import { RecurringGoalSelect } from './RecurringGoalSelect'
 import { RecurringScheduleFields } from './RecurringScheduleFields'
 import { TxAccountPill } from './TxAccountPill'
 import { TxCategoryChips } from './TxCategoryChips'
+import { TxMerchantField } from './TxMerchantField'
 import { TxSection } from './TxSection'
 
 type Props = {
@@ -47,6 +54,8 @@ type Props = {
   onType: (t: EditorTxType) => void
   onCategory: (categoryId: string) => void
   onGoal: (id: string | null) => void
+  onMerchant: (merchant: LocalMerchant | null) => void
+  onApplySuggestion: () => void
   onSave: () => void
   onDelete: () => void
   onClose: () => void
@@ -60,7 +69,9 @@ const TYPES = [
 const CHIP_COUNT = 4
 const PANE_LIST = 'max-h-[min(440px,56vh)] min-h-[min(440px,56vh)]'
 
-/** New / edit a recurring spend or income: what, how much, which category, and when it repeats. */
+type Pane = 'category' | 'merchant'
+
+/** New / edit a recurring spend or income: what, how much, which category, where, and when it repeats. */
 export function RecurringEditor({
   editing,
   accounts,
@@ -72,12 +83,14 @@ export function RecurringEditor({
   onType,
   onCategory,
   onGoal,
+  onMerchant,
+  onApplySuggestion,
   onSave,
   onDelete,
   onClose,
 }: Props) {
-  const { id, draft } = editing
-  const [picking, setPicking] = useState(false)
+  const { id, draft, suggestion } = editing
+  const [pane, setPane] = useState<Pane | null>(null)
   const [attempted, setAttempted] = useState(false)
   const catalog = useCategoryCatalog()
   const dateFormat = usePreferencesStore((s) => s.dateFormat)
@@ -95,24 +108,23 @@ export function RecurringEditor({
   const walletArchived = wallet !== null && archivedIds.has(wallet.id)
   const currency = wallet?.currency ?? base
   const amountMinor = parseAmountToMinor(draft.amount, currency)
-  const hint = cashflowBlock(amountMinor, wallet !== null)
+  const merchantName = useMerchantName(draft.merchantId, draft.merchantName)
+  const endBlock = recurringEndBlock(draft.date, draft.endsOn)
+  const hint = cashflowBlock(amountMinor, wallet !== null) ?? endBlock
   const amountMissing = attempted && (amountMinor ?? 0) <= 0
   const walletMissing = attempted && wallet === null
 
-  const back = () => setPicking(false)
+  const back = () => setPane(null)
+  const paneTitle: Record<Pane, string> = {
+    category: flowType === 'income' ? 'Income category' : 'Category',
+    merchant: 'Merchant',
+  }
 
   return (
     <EditorDialog
       title={id ? 'Edit recurring' : 'New recurring'}
       onClose={onClose}
-      pane={
-        picking
-          ? {
-              title: flowType === 'income' ? 'Income category' : 'Category',
-              onBack: back,
-            }
-          : null
-      }
+      pane={pane ? { title: paneTitle[pane], onBack: back } : null}
       hint={hint}
       submitLabel={id ? 'Save' : 'Add'}
       onSubmit={() => (hint === null ? onSave() : setAttempted(true))}
@@ -125,7 +137,16 @@ export function RecurringEditor({
           : null
       }
     >
-      {picking ? (
+      {pane === 'merchant' ? (
+        <MerchantOptions
+          value={draft.merchantId}
+          onPick={(merchant) => {
+            onMerchant(merchant)
+            back()
+          }}
+          listClassName={PANE_LIST}
+        />
+      ) : pane === 'category' ? (
         <CategoryOptions
           categories={categories}
           value={draft.categoryId}
@@ -199,7 +220,26 @@ export function RecurringEditor({
               chips={chips}
               categoryId={draft.categoryId}
               onChange={onCategory}
-              onAll={() => setPicking(true)}
+              onAll={() => setPane('category')}
+            />
+          </TxSection>
+
+          <Input
+            value={draft.note}
+            onChange={(e) => onField('note', e.target.value)}
+            aria-label="Note"
+            placeholder="Add a note to each one"
+            className={NOTE_INPUT}
+          />
+
+          <TxSection label="Where?">
+            <TxMerchantField
+              name={merchantName}
+              onOpen={() => setPane('merchant')}
+              suggestion={
+                suggestion ? catalog.labelOf(suggestion.categoryId) : null
+              }
+              onApplySuggestion={onApplySuggestion}
             />
           </TxSection>
 
@@ -214,11 +254,14 @@ export function RecurringEditor({
           <RecurringScheduleFields
             frequency={draft.frequency}
             date={draft.date}
+            endsOn={draft.endsOn}
+            endInvalid={endBlock !== null}
             autopost={draft.autopost}
             tint={tint}
             dateFormat={dateFormat}
             onFrequency={(f) => onField('frequency', f)}
             onDate={(iso) => onField('date', iso)}
+            onEndsOn={(endsOn) => onField('endsOn', endsOn)}
             onAutopost={(on) => onField('autopost', on)}
           />
         </>

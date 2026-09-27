@@ -79,6 +79,8 @@ export type TxEditorDraft = {
   name: string
   frequency: GoalFrequency
   autopost: boolean
+  /** The last date an occurrence may fall on; null repeats forever. */
+  endsOn: string | null
   // budget
   scopeType: BudgetScope
   period: BudgetPeriod
@@ -178,6 +180,7 @@ export function useTxEditor(
     name: '',
     frequency: 'monthly',
     autopost: false,
+    endsOn: null,
     scopeType: 'category',
     period: 'monthly',
     customDays: '30',
@@ -279,9 +282,12 @@ export function useTxEditor(
         categoryId: r.categoryId,
         walletId: r.walletId,
         goalId: r.goalId,
+        merchantId: r.merchantId ?? null,
         frequency: r.frequency,
         autopost: r.autopost,
         date: r.nextDue,
+        endsOn: r.endsOn ?? null,
+        note: r.note ?? '',
       },
     })
 
@@ -524,9 +530,12 @@ export function useTxEditor(
       categoryId: draft.categoryId,
       walletId: draft.walletId,
       goalId: draft.type === 'spend' ? draft.goalId : null,
+      merchantId: draft.merchantId,
       frequency: draft.frequency,
       nextDue: draft.date,
+      endsOn: draft.endsOn,
       autopost: draft.autopost,
+      note: draft.note.trim() || null,
     }
     if (id) await updateRecurring(id, payload)
     else await createRecurring(payload)

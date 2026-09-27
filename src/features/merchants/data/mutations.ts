@@ -5,7 +5,10 @@ import { newId } from '#/lib/uuid'
 import type { LocalMerchant, LocalMerchantAlias } from '#/db/types'
 import { merchantsApi } from '#/features/merchants/api/merchantsApi'
 import type { AliasOrigin } from '#/features/merchants/api/types'
-import { pullTransactions } from '#/features/transactions/data/sync'
+import {
+  pullRecurrings,
+  pullTransactions,
+} from '#/features/transactions/data/sync'
 import type { TxType } from '#/features/transactions/api/types'
 import { ApiError } from '#/lib/apiError'
 import {
@@ -237,10 +240,13 @@ export async function deleteMerchant(id: string): Promise<void> {
 
   await db.transaction(
     'rw',
-    db.merchants,
-    db.merchantAliases,
-    db.transactions,
-    db.outbox,
+    [
+      db.merchants,
+      db.merchantAliases,
+      db.transactions,
+      db.recurrings,
+      db.outbox,
+    ],
     async () => {
       await pending('merchant', id).delete()
       for (const alias of aliases)
@@ -252,6 +258,9 @@ export async function deleteMerchant(id: string): Promise<void> {
       await db.transactions
         .where('merchantId')
         .equals(id)
+        .modify({ merchantId: null })
+      await db.recurrings
+        .filter((r) => r.merchantId === id)
         .modify({ merchantId: null })
       if (!neverSynced) {
         await db.outbox.add({
@@ -347,7 +356,7 @@ export async function removeMerchantAlias(aliasId: string): Promise<void> {
 
 /**
  * Fold one merchant into another. Deliberately **not** queued through the outbox: the server
- * repoints transactions and email imports in one transaction and bumps every version it
+ * repoints transactions, schedules and email imports in one transaction and bumps every version it
  * touches, so the client pulls the result rather than guessing at it. Requires a connection.
  */
 export async function mergeMerchants(
@@ -362,5 +371,5 @@ export async function mergeMerchants(
     target_id: targetId,
     version: source.version,
   })
-  await Promise.all([pullMerchants(), pullTransactions()])
+  await Promise.all([pullMerchants(), pullTransactions(), pullRecurrings()])
 }

@@ -462,6 +462,28 @@ describe('Spending schedules on the planned pipeline', () => {
     expect(await db.transactions.count()).toBe(1)
   })
 
+  it('posts each occurrence with the schedule’s merchant and note', async () => {
+    await db.goals.clear()
+    await db.recurrings.put(
+      recurring({
+        id: 'gym',
+        name: 'Gym',
+        autopost: true,
+        nextDue: '2026-09-05',
+        merchantId: 'm-fitness',
+        note: 'Family plan',
+      }),
+    )
+
+    await runPlanner(USER, SEP_24)
+
+    const [posted] = await db.transactions.toArray()
+    expect(posted).toMatchObject({
+      merchantId: 'm-fitness',
+      note: 'Family plan',
+    })
+  })
+
   it('treats an entry the old auto-poster made as that occurrence, so nothing double-posts', async () => {
     await db.goals.clear()
     await db.recurrings.put(

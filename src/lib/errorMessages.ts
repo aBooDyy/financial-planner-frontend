@@ -47,6 +47,8 @@ const MESSAGES: Record<string, string> = {
   'integrations.key.category_invalid': 'Choose one of your categories.',
   'inbound.import.category_invalid': 'Choose one of your categories.',
   'spending.transaction.merchant_invalid': 'Choose one of your merchants.',
+  'spending.recurring.merchant_invalid': 'Choose one of your merchants.',
+  'spending.recurring.end_date_invalid': 'Enter a valid end date.',
   'spending.transaction.wallet_invalid': 'Choose one of your accounts.',
   'spending.transaction.goal_invalid': 'That goal is no longer available.',
   'spending.transaction.type_invalid': 'Choose spending or income.',

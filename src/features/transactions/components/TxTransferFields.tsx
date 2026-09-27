@@ -127,7 +127,7 @@ export function TxTransferFields({
           onChange={(e) => onField('note', e.target.value)}
           maxLength={NOTE_MAX}
           aria-label="Note"
-          placeholder="Add a note (optional), e.g. ATM withdrawal"
+          placeholder="Add a note, e.g. ATM withdrawal"
           className={`${NOTE_INPUT} pe-16`}
         />
         <span className="pointer-events-none absolute end-[14px] top-1/2 -translate-y-1/2 text-[11.5px] font-semibold text-fp-text-3 tabular-nums">

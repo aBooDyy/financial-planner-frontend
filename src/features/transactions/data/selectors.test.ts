@@ -300,6 +300,9 @@ describe('buildRecurringView', () => {
     categoryId: 'cat-housing',
     walletId: 'w1',
     goalId: null,
+    merchantId: null,
+    endsOn: null,
+    note: null,
     frequency: 'monthly',
     nextDue: '2026-06-25',
     autopost: true,
@@ -335,6 +338,32 @@ describe('buildRecurringView', () => {
     // Only the June item is "upcoming this month".
     expect(view.upcoming).toHaveLength(1)
     expect(view.upcoming[0].name).toBe('Rent')
+  })
+
+  it('keeps an ended schedule listed but out of the totals and upcoming', () => {
+    const view = buildRecurringView(
+      data({
+        recurrings: [
+          recurring({ endsOn: '2027-06-01' }),
+          recurring({
+            id: 'r2',
+            name: 'Old gym',
+            nextDue: '2026-06-28',
+            endsOn: '2026-05-28',
+          }),
+        ],
+      }),
+      CATALOG,
+      ALL,
+      TODAY,
+    )
+    expect(view.monthlyStr).toBe('SR 3,500')
+    expect(view.activeCount).toBe(1)
+    expect(view.upcoming.map((u) => u.name)).toEqual(['Rent'])
+    expect(view.rows.map((r) => [r.name, r.ended, r.untilStr])).toEqual([
+      ['Rent', false, 'until Jun 1, 2027'],
+      ['Old gym', true, null],
+    ])
   })
 })
 
@@ -525,6 +554,13 @@ describe('resolving through the catalog', () => {
     expect(rows[0].categoryId).toBe('dining-cafes')
   })
 
+  it('titles a note-less row with its subcategory, not the parent', () => {
+    const rows = txRows(
+      list([tx({ categoryId: 'dining-cafes', note: null })]).groups[0].rows,
+    )
+    expect(rows[0].name).toBe('Cafés')
+  })
+
   it('falls back to a generic name and icon when the category was deleted', () => {
     const rows = txRows(
       list([tx({ categoryId: 'cat-hobbies', amount: 10_000 })]).groups[0].rows,
@@ -623,6 +659,16 @@ describe('transfers', () => {
       g.rows.filter((r): r is TransferRow => r.kind === 'transfer'),
     )
 
+  it('prefixes a wallet with its group across wallets, and drops it inside one', () => {
+    const walletOf = (scope: Scope) =>
+      activity(withTransfer([spend]), scope)
+        .groups.flatMap((g) => g.rows)
+        .map((r) => (r.kind === 'tx' ? r.walletName : null))
+    expect(walletOf(ALL)).toEqual(['Everyday · Main'])
+    expect(walletOf({ type: 'group', id: 'g1' })).toEqual(['Everyday · Main'])
+    expect(walletOf({ type: 'wallet', id: 'w1' })).toEqual(['Main'])
+  })
+
   it('leaves the cashflow hero to spend and income', () => {
     const view = buildCashflow(withTransfer(), CATALOG, ALL, ANCHOR, 'month')
     expect(view.spentStr).toBe('SR 100')
@@ -688,8 +734,8 @@ describe('transfers', () => {
     expect(transfer).toMatchObject({
       id: 'tr1',
       name: 'Transfer',
-      fromName: 'Main',
-      toName: 'Savings',
+      fromName: 'Everyday · Main',
+      toName: 'Everyday · Savings',
       direction: 'neutral',
       amountStr: 'SR 500',
     })

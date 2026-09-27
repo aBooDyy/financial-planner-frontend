@@ -22,6 +22,7 @@ const api = {
   remove: vi.fn(),
 }
 const listTransactions = vi.fn()
+const listRecurrings = vi.fn().mockResolvedValue([])
 
 vi.mock('#/features/merchants/api/merchantsApi', () => ({
   merchantsApi: new Proxy(
@@ -37,7 +38,7 @@ vi.mock('#/features/merchants/api/merchantsApi', () => ({
 vi.mock('#/features/transactions/api/transactionsApi', () => ({
   transactionsApi: { list: (...args: unknown[]) => listTransactions(...args) },
   budgetsApi: { list: vi.fn() },
-  recurringsApi: { list: vi.fn() },
+  recurringsApi: { list: (...args: unknown[]) => listRecurrings(...args) },
 }))
 vi.mock('#/db/sync', () => ({ schedulePush: vi.fn() }))
 
@@ -436,6 +437,7 @@ describe('mergeMerchants', () => {
     expect(await db.merchantAliases.get('a-src')).toBeUndefined()
     expect((await db.merchants.get(WINNER))?.version).toBe('m-v1')
     expect(listTransactions).toHaveBeenCalled()
+    expect(listRecurrings).toHaveBeenCalled()
   })
 
   it('refuses to merge a merchant into itself', async () => {

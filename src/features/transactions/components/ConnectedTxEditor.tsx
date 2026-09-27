@@ -68,6 +68,8 @@ export function ConnectedTxEditor({
         onType={editor.setType}
         onCategory={editor.setCategory}
         onGoal={editor.setGoal}
+        onMerchant={editor.setMerchant}
+        onApplySuggestion={editor.applySuggestion}
         onSave={() => void editor.save()}
         onDelete={() => void editor.remove()}
         onClose={editor.close}

@@ -32,7 +32,7 @@ type Props = {
 const HINT =
   'rounded-[11px] bg-fp-surface-2 px-3 py-[10px] text-[12.5px] leading-[1.5] text-fp-text-2'
 
-/** A spend or income entry's body under the amount: what for, where, when, and what it settles. */
+/** A spend or income entry's body under the amount: what for, a note, when, where, and what it settles. */
 export function TxCashflowFields({
   draft,
   chips,
@@ -58,20 +58,28 @@ export function TxCashflowFields({
         />
       </TxSection>
 
-      <TxSection label="Where?" invalid={flaggedField === 'merchant_id'}>
-        <TxMerchantField
-          name={merchantName}
-          onOpen={() => onOpen('merchant')}
-          suggestion={suggestion}
-          onApplySuggestion={onApplySuggestion}
-        />
-      </TxSection>
+      <Input
+        value={draft.note}
+        onChange={(e) => onField('note', e.target.value)}
+        aria-label="Note"
+        placeholder="Add a note"
+        className={NOTE_INPUT}
+      />
 
       <TxSection label="When?" invalid={flaggedField === 'date'}>
         <TxDateChips
           value={draft.date}
           onChange={(iso) => onField('date', iso)}
           dateFormat={dateFormat}
+        />
+      </TxSection>
+
+      <TxSection label="Where?" invalid={flaggedField === 'merchant_id'}>
+        <TxMerchantField
+          name={merchantName}
+          onOpen={() => onOpen('merchant')}
+          suggestion={suggestion}
+          onApplySuggestion={onApplySuggestion}
         />
       </TxSection>
 
@@ -104,14 +112,6 @@ export function TxCashflowFields({
           No planned payday near this date — it saves as regular income.
         </p>
       ) : null}
-
-      <Input
-        value={draft.note}
-        onChange={(e) => onField('note', e.target.value)}
-        aria-label="Note"
-        placeholder="Add a note (optional)"
-        className={NOTE_INPUT}
-      />
     </>
   )
 }

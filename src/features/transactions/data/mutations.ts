@@ -436,9 +436,12 @@ export type RecurringDraft = {
   categoryId: string
   walletId: string
   goalId: string | null
+  merchantId: string | null
   frequency: GoalFrequency
   nextDue: string
+  endsOn: string | null
   autopost: boolean
+  note: string | null
 }
 
 const buildRecurring = (

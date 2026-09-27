@@ -1,5 +1,6 @@
 import type {
   LocalMerchantAlias,
+  LocalRecurring,
   LocalTransaction,
   OutboxEntry,
 } from '#/db/types'
@@ -9,8 +10,8 @@ import type {
  *
  * When `POST /merchants` is refused with `409 merchants.alias.taken`, nothing was written:
  * the temp merchant does not exist server-side, so every local reference to it has to move
- * to the winner the server named. A transaction whose push is *still queued* only needs its
- * queued payload rewritten — enqueueing a second update for a row the server has never seen
+ * to the winner the server named. A transaction or schedule whose push is *still queued* only
+ * needs its queued payload rewritten — enqueueing a second update for a row the server has never seen
  * would push a `merchant_id` the server would reject, then immediately correct it.
  */
 
@@ -19,6 +20,8 @@ export type AdoptionInput = {
   winnerId: string
   /** Local transactions that point at the temp merchant. */
   transactions: Pick<LocalTransaction, 'id' | 'merchantId'>[]
+  /** Local recurring schedules that point at the temp merchant. */
+  recurrings: Pick<LocalRecurring, 'id' | 'merchantId'>[]
   /** The whole outbox as it stands. */
   queued: OutboxEntry[]
   /** The aliases the temp merchant carried. */
@@ -30,10 +33,13 @@ export type AdoptionInput = {
 export type AdoptionPlan = {
   /** Local transaction rows to repoint at the winner. */
   repointTransactionIds: string[]
-  /** Queued transaction payloads whose `merchant_id` becomes the winner's, in place. */
+  /** Queued payloads whose `merchant_id` becomes the winner's, in place. */
   rewrites: { seq: number; payload: unknown }[]
   /** Already-pushed transactions that need a real `PATCH`. */
   patchTransactionIds: string[]
+  repointRecurringIds: string[]
+  /** Already-pushed schedules that need a real `PATCH`. */
+  patchRecurringIds: string[]
   /** Temp alias rows to repoint at the winner and push onto it. */
   aliasesToFold: LocalMerchantAlias[]
   /** Temp alias rows whose key belongs to a third merchant — dropped, not pushed. */
@@ -45,27 +51,38 @@ const isPayloadObject = (
 ): payload is Record<string, unknown> =>
   typeof payload === 'object' && payload !== null
 
+type LinkedEntity = 'transaction' | 'recurring'
+
+const queueKey = (entity: LinkedEntity, id: string) => `${entity}:${id}`
+
 export function planAdoption(input: AdoptionInput): AdoptionPlan {
   const { tempId, winnerId } = input
 
   const rewritable = new Map<string, OutboxEntry[]>()
   for (const entry of input.queued) {
-    if (entry.entity !== 'transaction' || entry.op === 'delete') continue
-    if (!isPayloadObject(entry.payload)) continue
-    const list = rewritable.get(entry.id)
+    if (entry.entity !== 'transaction' && entry.entity !== 'recurring') continue
+    if (entry.op === 'delete' || !isPayloadObject(entry.payload)) continue
+    const key = queueKey(entry.entity, entry.id)
+    const list = rewritable.get(key)
     if (list) list.push(entry)
-    else rewritable.set(entry.id, [entry])
+    else rewritable.set(key, [entry])
   }
 
-  const repointTransactionIds: string[] = []
   const rewrites: AdoptionPlan['rewrites'] = []
-  const patchTransactionIds: string[] = []
-
-  for (const tx of input.transactions) {
-    if (tx.merchantId !== tempId) continue
-    repointTransactionIds.push(tx.id)
-    const entries = rewritable.get(tx.id)
-    if (entries) {
+  const planLinked = (
+    entity: LinkedEntity,
+    rows: { id: string; merchantId: string | null }[],
+  ) => {
+    const repoint: string[] = []
+    const patch: string[] = []
+    for (const row of rows) {
+      if (row.merchantId !== tempId) continue
+      repoint.push(row.id)
+      const entries = rewritable.get(queueKey(entity, row.id))
+      if (!entries) {
+        patch.push(row.id)
+        continue
+      }
       for (const entry of entries) {
         if (entry.seq === undefined) continue
         const payload = entry.payload as Record<string, unknown>
@@ -74,10 +91,11 @@ export function planAdoption(input: AdoptionInput): AdoptionPlan {
           payload: { ...payload, merchant_id: winnerId },
         })
       }
-    } else {
-      patchTransactionIds.push(tx.id)
     }
+    return { repoint, patch }
   }
+  const transactions = planLinked('transaction', input.transactions)
+  const recurrings = planLinked('recurring', input.recurrings)
 
   const ownedElsewhere = new Set(
     input.knownAliases
@@ -98,9 +116,11 @@ export function planAdoption(input: AdoptionInput): AdoptionPlan {
   }
 
   return {
-    repointTransactionIds,
+    repointTransactionIds: transactions.repoint,
     rewrites,
-    patchTransactionIds,
+    patchTransactionIds: transactions.patch,
+    repointRecurringIds: recurrings.repoint,
+    patchRecurringIds: recurrings.patch,
     aliasesToFold,
     aliasesToDiscard,
   }

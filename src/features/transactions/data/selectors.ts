@@ -471,10 +471,12 @@ export type TxRow = {
   id: string
   /** The leaf the row is filed under — its icon is the most specific one to draw. */
   categoryId: string
+  /** The note, else the leaf category's own name ("Cafés" rather than "Dining"). */
   name: string
   /** "Dining", or "Dining · Cafés" once the row names a child. */
   catLabel: string
   color: string
+  /** "Main", or "Personal · Main" when the scope spans more than one wallet. */
   walletName: string
   walletColor: string
   isIncome: boolean
@@ -573,6 +575,21 @@ type ActivityContext = {
   catalog: CategoryCatalog
   nodeById: Map<string, LocalBalanceNode>
   inScope: (walletId: string) => boolean
+  /** Across several wallets a name alone is ambiguous, so the wallet's group prefixes it. */
+  withGroup: boolean
+}
+
+function walletLabelOf(
+  wallet: LocalBalanceNode | undefined,
+  ctx: ActivityContext,
+  missing: string,
+): string {
+  if (!wallet) return missing
+  const group =
+    ctx.withGroup && wallet.parentId
+      ? ctx.nodeById.get(wallet.parentId)
+      : undefined
+  return group ? `${group.name} · ${wallet.name}` : wallet.name
 }
 
 function txRowOf(t: FlowTxn, ctx: ActivityContext): TxRow {
@@ -583,10 +600,10 @@ function txRowOf(t: FlowTxn, ctx: ActivityContext): TxRow {
     kind: 'tx',
     id: t.id,
     categoryId: t.categoryId,
-    name: t.note || cat.name,
+    name: t.note || ctx.catalog.get(t.categoryId).name,
     catLabel: ctx.catalog.labelOf(t.categoryId),
     color: cat.color,
-    walletName: wallet?.name ?? '',
+    walletName: walletLabelOf(wallet, ctx, ''),
     walletColor: wallet?.color ?? NO_WALLET_COLOR,
     isIncome: isInc,
     tag: txTagOf(t),
@@ -604,7 +621,7 @@ function adjustmentRowOf(
     kind: 'adjustment',
     id: t.id,
     name: t.note || ADJUSTMENT_LABEL,
-    walletName: wallet?.name ?? DELETED_ACCOUNT,
+    walletName: walletLabelOf(wallet, ctx, DELETED_ACCOUNT),
     walletColor: wallet?.color ?? NO_WALLET_COLOR,
     direction,
     amountStr: `${direction === 'in' ? '+' : '−'}${formatMoneyRounded(toBase(t, ctx.data), ctx.data.base)}`,
@@ -627,6 +644,7 @@ function transferRowOf(
     const wallet = leg ? ctx.nodeById.get(leg.walletId) : undefined
     return {
       name: wallet?.name ?? DELETED_ACCOUNT,
+      label: walletLabelOf(wallet, ctx, DELETED_ACCOUNT),
       color: wallet?.color ?? NO_WALLET_COLOR,
     }
   }
@@ -648,9 +666,9 @@ function transferRowOf(
         : direction === 'out'
           ? `Transfer to ${to.name}`
           : `Transfer from ${from.name}`,
-    fromName: from.name,
+    fromName: from.label,
     fromColor: from.color,
-    toName: to.name,
+    toName: to.label,
     toColor: to.color,
     direction,
     amountStr:
@@ -674,7 +692,7 @@ function setAsideRowOf(
     sourceName:
       a.source === 'external'
         ? (a.externalLabel ?? 'External')
-        : (wallet?.name ?? DELETED_ACCOUNT),
+        : walletLabelOf(wallet, ctx, DELETED_ACCOUNT),
     sourceColor: wallet?.color ?? NO_WALLET_COLOR,
     amountStr: formatMoneyRounded(
       convertMinor(a.amount, a.currency, ctx.data.base, ctx.data.rates),
@@ -763,6 +781,7 @@ export function buildActivityList(
     catalog,
     nodeById: new Map(data.nodes.map((n) => [n.id, n])),
     inScope: walletMatcher(scope, data.nodes),
+    withGroup: scope.type !== 'wallet',
   }
   const txns = windowRows(data, win, ctx.inScope).sort(
     (a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id),
@@ -1313,6 +1332,10 @@ export type RecurringRow = {
   isIncome: boolean
   amountStr: string
   nextStr: string
+  /** Past its end date: it schedules nothing more. */
+  ended: boolean
+  /** "until Jun 1, 2027" while an end date is still ahead; null when it repeats forever. */
+  untilStr: string | null
 }
 
 export type UpcomingItem = {
@@ -1338,6 +1361,13 @@ export type RecurringView = {
   upcomingEmpty: boolean
 }
 
+/** A schedule whose next occurrence would fall after its end date. */
+const hasEnded = (r: LocalRecurring): boolean =>
+  r.endsOn != null && r.nextDue > r.endsOn
+
+const fmtLong = (d: Date): string =>
+  d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+
 export function buildRecurringView(
   data: SpendingData,
   catalog: CategoryCatalog,
@@ -1349,9 +1379,14 @@ export function buildRecurringView(
     (r) => r.deleted === 0 && matcher(r.walletId),
   )
   const nodeById = new Map(data.nodes.map((n) => [n.id, n]))
-  const sorted = [...items].sort((a, b) => a.nextDue.localeCompare(b.nextDue))
+  const sorted = [...items].sort(
+    (a, b) =>
+      Number(hasEnded(a)) - Number(hasEnded(b)) ||
+      a.nextDue.localeCompare(b.nextDue),
+  )
+  const live = sorted.filter((r) => !hasEnded(r))
 
-  const spend = items.filter((r) => r.type === 'spend')
+  const spend = live.filter((r) => r.type === 'spend')
   const monthly = spend.reduce(
     (s, r) =>
       s +
@@ -1367,15 +1402,15 @@ export function buildRecurringView(
     return midnight(d) >= midnight(mStart) && midnight(d) <= midnight(mEnd)
   }
   let dueThis = 0
-  for (const r of items) {
+  for (const r of live) {
     if (r.type === 'spend' && inThisMonth(r.nextDue))
       dueThis += convertMinor(r.amount, r.currency, data.base, data.rates)
   }
 
   const next =
-    sorted.length > 0
-      ? (sorted.find((r) => midnight(parseISO(r.nextDue)) >= midnight(today)) ??
-        sorted[0])
+    live.length > 0
+      ? (live.find((r) => midnight(parseISO(r.nextDue)) >= midnight(today)) ??
+        live[0])
       : undefined
   const denom = Math.max(monthly, 1)
 
@@ -1398,10 +1433,15 @@ export function buildRecurringView(
         data.base,
       )}`,
       nextStr: fmtShort(parseISO(r.nextDue)),
+      ended: hasEnded(r),
+      untilStr:
+        r.endsOn && !hasEnded(r)
+          ? `until ${fmtLong(parseISO(r.endsOn))}`
+          : null,
     }
   })
 
-  const upcoming = sorted
+  const upcoming = live
     .filter((r) => inThisMonth(r.nextDue))
     .map((r): UpcomingItem => {
       const cat = catalog.rootOf(r.categoryId)
@@ -1424,7 +1464,7 @@ export function buildRecurringView(
     countStr: `${items.length} item${items.length === 1 ? '' : 's'}`,
     monthlyStr: formatMoneyRounded(monthly, data.base),
     dueThisStr: formatMoneyRounded(dueThis, data.base),
-    activeCount: items.length,
+    activeCount: live.length,
     nextLabel: next
       ? `Next: ${next.name} · ${fmtShort(parseISO(next.nextDue))}`
       : 'Nothing scheduled',

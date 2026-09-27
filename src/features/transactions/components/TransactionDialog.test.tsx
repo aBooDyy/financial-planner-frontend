@@ -85,6 +85,7 @@ const draft = (over: Partial<TxEditorDraft>): TxEditorDraft => ({
   name: '',
   frequency: 'monthly',
   autopost: false,
+  endsOn: null,
   scopeType: 'category',
   period: 'monthly',
   customDays: '30',

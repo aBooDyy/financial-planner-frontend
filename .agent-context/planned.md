@@ -75,7 +75,8 @@ builds the rows the origins call for today:
   `fill` (old occurrences removed, new ones created — paydays have no stored plan).
 - **Spending schedules** (ADR-6): PAYMENT or INCOME by type, iterating `advanceDue` from
   `nextDue` (the old auto-poster's exact dates, so its markers match). Auto-post schedules catch
-  up from `nextDue`; hand-confirmed ones surface only the last 31 days.
+  up from `nextDue`; hand-confirmed ones surface only the last 31 days. Nothing is generated
+  after `endsOn` (inclusive); `nextDue` may still advance past it, which is how a schedule ends.
 
 ## Reconciliation (`data/reconcile.ts`) — pure
 
@@ -114,7 +115,8 @@ stamp of goals / income / recurrings), each pull, each plan-rewrite request, and
    MANUAL rows are left alone unless they are set-asides of a deleted goal.
 4. Open RECURRING rows due today or earlier: fully settled ones (legacy marker) are closed;
    auto-post ones are confirmed with the planned amount and wallet (source marker kept) and the
-   schedule's `nextDue` moves past them. This **replaced `transactions/data/autopost.ts`** and
+   schedule's `nextDue` moves past them. `confirmPlanned` (auto or by hand) files a recurring
+   row's transaction under the schedule's goal and merchant, with its note, else the item's name. This **replaced `transactions/data/autopost.ts`** and
    its Spending-page mount effect.
 
 **Plan-changing edits** (`goals/data/mutations.updateGoal` / `setGoalDate` when target, due

@@ -5,31 +5,39 @@ import { FieldLabel } from '#/components/FieldLabel'
 import { FREQUENCIES } from '#/features/goals/constants'
 import type { GoalFrequency } from '#/features/goals/api/types'
 import type { DateFormat } from '#/lib/date'
+import { RecurringEndField } from './RecurringEndField'
 import { TxSection } from './TxSection'
 
 type Props = {
   frequency: GoalFrequency
   date: string
+  endsOn: string | null
+  /** Marks the end date as falling before the next due date. */
+  endInvalid: boolean
   autopost: boolean
   /** The chosen frequency's colour. */
   tint: string
   dateFormat: DateFormat
   onFrequency: (f: GoalFrequency) => void
   onDate: (iso: string) => void
+  onEndsOn: (endsOn: string | null) => void
   onAutopost: (on: boolean) => void
 }
 
 const FREQUENCY_KEYS = Object.keys(FREQUENCIES) as GoalFrequency[]
 
-/** When a recurring entry comes round: how often, the next due date, and whether it posts itself. */
+/** When a recurring entry comes round: how often, the next due date, when it stops, and whether it posts itself. */
 export function RecurringScheduleFields({
   frequency,
   date,
+  endsOn,
+  endInvalid,
   autopost,
   tint,
   dateFormat,
   onFrequency,
   onDate,
+  onEndsOn,
   onAutopost,
 }: Props) {
   return (
@@ -60,6 +68,15 @@ export function RecurringScheduleFields({
           hint
         />
       </div>
+
+      <RecurringEndField
+        endsOn={endsOn}
+        nextDue={date}
+        tint={tint}
+        dateFormat={dateFormat}
+        invalid={endInvalid}
+        onChange={onEndsOn}
+      />
 
       <ToggleCard
         title="Auto-post on due date"

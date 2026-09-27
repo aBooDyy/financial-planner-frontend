@@ -9,7 +9,7 @@
  */
 import { db } from '#/db/db'
 import { schedulePush } from '#/db/sync'
-import type { LocalGoal, LocalPlanned } from '#/db/types'
+import type { LocalGoal, LocalPlanned, LocalRecurring } from '#/db/types'
 import { buildCatalog } from '#/features/categories/data/catalog'
 import { createAllocation } from '#/features/goals/data/mutations'
 import type { PlannedRole } from '#/features/planned/api/types'
@@ -117,6 +117,7 @@ export type ConfirmInput = {
   date?: string
   /** Income and payments: the leaf category the transaction is filed under. */
   categoryId?: string | null
+  /** Defaults to the schedule's note, else the item's name. */
   note?: string | null
   /** Provenance marker for the transaction (the auto-poster marks its rows). */
   source?: string | null
@@ -187,15 +188,19 @@ export async function confirmPlanned(
       const type: TxType = item.role === 'income' ? 'income' : 'spend'
       const wanted =
         input.categoryId !== undefined ? input.categoryId : item.categoryId
+      const schedule = await scheduleOf(item)
       const settlementId = await createTransaction({
         type,
         amount: inWallet,
         currency,
         categoryId: await categoryFor(type, wanted),
         walletId,
-        goalId: type === 'spend' ? await goalIdOf(item) : null,
+        goalId:
+          type === 'spend' ? (item.goalId ?? schedule?.goalId ?? null) : null,
+        merchantId: schedule?.merchantId ?? null,
         date,
-        note: input.note !== undefined ? input.note : item.name,
+        note:
+          input.note !== undefined ? input.note : schedule?.note || item.name,
         source: input.source ?? null,
         plannedId: item.id,
       })
@@ -209,11 +214,10 @@ export async function confirmPlanned(
   return { ...result, status: after?.status ?? 'open' }
 }
 
-/** A payment toward a goal carries the goal, whichever origin planned it. */
-async function goalIdOf(item: LocalPlanned): Promise<string | null> {
-  if (item.goalId) return item.goalId
+/** The recurring schedule that planned `item`: its goal, merchant and note carry onto each posting. */
+async function scheduleOf(item: LocalPlanned): Promise<LocalRecurring | null> {
   if (item.origin !== 'recurring' || !item.recurringId) return null
-  return (await db.recurrings.get(item.recurringId))?.goalId ?? null
+  return (await db.recurrings.get(item.recurringId)) ?? null
 }
 
 /** Done, with whatever is still open abandoned — the goal is simply behind by that much. */

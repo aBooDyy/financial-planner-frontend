@@ -250,9 +250,15 @@ export type LocalRecurring = {
   categoryId: string
   walletId: string
   goalId: string | null
+  /** Who each occurrence pays (or is paid by); copied onto what it posts. */
+  merchantId: string | null
   frequency: GoalFrequency
   nextDue: string
+  /** The last date an occurrence may fall on; null repeats forever. */
+  endsOn: string | null
   autopost: boolean
+  /** Copied onto every occurrence it posts, in place of the name. */
+  note: string | null
   createdAt: string
   updatedAt: string
   version: string

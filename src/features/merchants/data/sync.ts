@@ -10,7 +10,10 @@ import type {
   MerchantAlias,
   UpdateMerchantWire,
 } from '#/features/merchants/api/types'
-import { localTransactionToUpdateWire } from '#/features/transactions/data/mappers'
+import {
+  localRecurringToUpdateWire,
+  localTransactionToUpdateWire,
+} from '#/features/transactions/data/mappers'
 import { ApiError } from '#/lib/apiError'
 import { planAdoption } from './adopt'
 import {
@@ -247,33 +250,44 @@ async function adoptWinner(entry: OutboxEntry, error: ApiError): Promise<void> {
     return
   }
 
-  const [tempAliases, transactions, queued, knownAliases] = await Promise.all([
-    db.merchantAliases.where('merchantId').equals(tempId).toArray(),
-    db.transactions.where('merchantId').equals(tempId).toArray(),
-    db.outbox.toArray(),
-    db.merchantAliases.toArray(),
-  ])
+  const [tempAliases, transactions, recurrings, queued, knownAliases] =
+    await Promise.all([
+      db.merchantAliases.where('merchantId').equals(tempId).toArray(),
+      db.transactions.where('merchantId').equals(tempId).toArray(),
+      db.recurrings.filter((r) => r.merchantId === tempId).toArray(),
+      db.outbox.toArray(),
+      db.merchantAliases.toArray(),
+    ])
 
   const plan = planAdoption({
     tempId,
     winnerId,
     transactions,
+    recurrings,
     queued,
     tempAliases,
     knownAliases,
   })
   const byId = new Map(transactions.map((t) => [t.id, t]))
+  const recurringById = new Map(recurrings.map((r) => [r.id, r]))
 
   await db.transaction(
     'rw',
-    db.merchants,
-    db.merchantAliases,
-    db.transactions,
-    db.outbox,
+    [
+      db.merchants,
+      db.merchantAliases,
+      db.transactions,
+      db.recurrings,
+      db.outbox,
+    ],
     async () => {
       await db.transactions
         .where('id')
         .anyOf(plan.repointTransactionIds)
+        .modify({ merchantId: winnerId })
+      await db.recurrings
+        .where('id')
+        .anyOf(plan.repointRecurringIds)
         .modify({ merchantId: winnerId })
 
       for (const rewrite of plan.rewrites) {
@@ -297,6 +311,22 @@ async function adoptWinner(entry: OutboxEntry, error: ApiError): Promise<void> {
             merchantId: winnerId,
           }),
           baseVersion: tx.version,
+          createdAt: now(),
+        })
+      }
+
+      for (const id of plan.patchRecurringIds) {
+        const recurring = recurringById.get(id)
+        if (!recurring) continue
+        await db.outbox.add({
+          op: 'update',
+          entity: 'recurring',
+          id,
+          payload: localRecurringToUpdateWire({
+            ...recurring,
+            merchantId: winnerId,
+          }),
+          baseVersion: recurring.version,
           createdAt: now(),
         })
       }

@@ -6,6 +6,7 @@ import type {
 import { EmptyState } from '#/components/EmptyState'
 import { ValueOrSkeleton } from '#/components/ValueOrSkeleton'
 import { Button } from '#/components/ui/button'
+import { cn } from '#/lib/utils'
 import { CategoryIcon } from './CategoryIcon'
 import { SkeletonRows } from './SkeletonRows'
 
@@ -20,7 +21,10 @@ function Row({ r, onEdit }: { r: RecurringRow; onEdit: (id: string) => void }) {
   return (
     <div
       onClick={() => onEdit(r.id)}
-      className="mb-[9px] cursor-pointer rounded-[14px] border border-fp-border bg-fp-surface p-[13px] hover:border-fp-border-strong"
+      className={cn(
+        'mb-[9px] cursor-pointer rounded-[14px] border border-fp-border bg-fp-surface p-[13px] hover:border-fp-border-strong',
+        r.ended && 'opacity-60',
+      )}
     >
       <div className="flex items-center gap-3">
         <div
@@ -49,6 +53,12 @@ function Row({ r, onEdit }: { r: RecurringRow; onEdit: (id: string) => void }) {
               style={{ background: r.walletColor }}
             />
             {r.walletName}
+            {r.untilStr ? (
+              <>
+                <span className="h-[3px] w-[3px] rounded-full bg-fp-border-strong" />
+                {r.untilStr}
+              </>
+            ) : null}
           </div>
         </div>
         <div className="flex-none text-right">
@@ -61,7 +71,7 @@ function Row({ r, onEdit }: { r: RecurringRow; onEdit: (id: string) => void }) {
             {r.amountStr}
           </div>
           <div className="mt-[2px] text-[11.5px] tabular-nums text-fp-text-3">
-            next {r.nextStr}
+            {r.ended ? 'ended' : `next ${r.nextStr}`}
           </div>
         </div>
       </div>

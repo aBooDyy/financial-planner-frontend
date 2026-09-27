@@ -59,7 +59,9 @@ function Row({
             />
           ) : null}
           <span className="min-w-0 truncate">{row.catLabel}</span>
-          <span className="h-[3px] w-[3px] rounded-full bg-fp-border-strong" />
+          <span aria-hidden className="text-fp-border-strong">
+            |
+          </span>
           <span
             className="h-[7px] w-[7px] rounded-[2px]"
             style={{ background: row.walletColor }}

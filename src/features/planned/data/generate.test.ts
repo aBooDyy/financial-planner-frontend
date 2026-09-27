@@ -375,6 +375,29 @@ describe('desiredPlanned — Spending schedules', () => {
     ])
   })
 
+  it('stops a schedule on its end date, that date included', () => {
+    const out = generate({
+      recurrings: [
+        recurring({
+          id: 'ending',
+          autopost: true,
+          nextDue: '2026-09-05',
+          endsOn: '2026-10-05',
+        }),
+      ],
+    })
+    expect(out.map((r) => r.occurrence)).toEqual(['2026-09-05', '2026-10-05'])
+  })
+
+  it('schedules nothing once a schedule is past its end date', () => {
+    const out = generate({
+      recurrings: [
+        recurring({ id: 'over', nextDue: '2026-10-05', endsOn: '2026-09-30' }),
+      ],
+    })
+    expect(out).toEqual([])
+  })
+
   it('surfaces only the recent past of a schedule confirmed by hand', () => {
     const out = generate({
       recurrings: [recurring({ id: 'manual', nextDue: '2025-01-05' })],

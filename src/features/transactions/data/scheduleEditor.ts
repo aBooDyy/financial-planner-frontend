@@ -6,6 +6,7 @@ import type {
   BudgetPeriod,
   BudgetScope,
 } from '#/features/transactions/api/types'
+import { parseISO, ymd } from './planning'
 
 export const BUDGET_SCOPES: ReadonlyArray<{
   value: BudgetScope
@@ -93,3 +94,18 @@ export function adjustmentDeleteCopy(walletName: string | null): DeleteCopy {
     ],
   }
 }
+
+/** Where "Ends on a date" starts: a year after the next occurrence. */
+export function defaultEndDate(nextDue: string): string {
+  const d = parseISO(nextDue)
+  return ymd(new Date(d.getFullYear() + 1, d.getMonth(), d.getDate()))
+}
+
+/** An end before the next occurrence would leave nothing to schedule. */
+export const recurringEndBlock = (
+  nextDue: string,
+  endsOn: string | null,
+): string | null =>
+  endsOn !== null && endsOn < nextDue
+    ? 'End date is before the next due date'
+    : null

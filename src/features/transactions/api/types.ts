@@ -160,9 +160,15 @@ export type Recurring = {
   categoryId: string
   walletId: string
   goalId: string | null
+  /** Who each occurrence pays (or is paid by); copied onto what it posts. */
+  merchantId: string | null
   frequency: GoalFrequency
   nextDue: string
+  /** The last date an occurrence may fall on; null repeats forever. */
+  endsOn: string | null
   autopost: boolean
+  /** Copied onto every occurrence it posts, in place of the name. */
+  note: string | null
   createdAt: string
   updatedAt: string
   version: string
@@ -212,9 +218,12 @@ export type RecurringWire = {
   category_id: string
   wallet_id: string
   goal_id: string | null
+  merchant_id: string | null
   frequency: GoalFrequencyWire
   next_due: string
+  ends_on: string | null
   autopost: boolean
+  note: string | null
   created_at: string
   updated_at: string
   version: string
@@ -386,9 +395,12 @@ export type CreateRecurringWire = {
   category_id: string
   wallet_id: string
   goal_id: string | null
+  merchant_id: string | null
   frequency: GoalFrequencyWire
   next_due: string
+  ends_on: string | null
   autopost: boolean
+  note: string | null
 }
 export type UpdateRecurringWire = Omit<CreateRecurringWire, 'id'> & {
   version: string
@@ -484,9 +496,12 @@ export const toRecurring = (w: RecurringWire): Recurring => ({
   categoryId: w.category_id,
   walletId: w.wallet_id,
   goalId: w.goal_id,
+  merchantId: w.merchant_id ?? null,
   frequency: fromWireFreq(w.frequency),
   nextDue: w.next_due,
+  endsOn: w.ends_on ?? null,
   autopost: w.autopost,
+  note: w.note ?? null,
   createdAt: w.created_at,
   updatedAt: w.updated_at,
   version: w.version,

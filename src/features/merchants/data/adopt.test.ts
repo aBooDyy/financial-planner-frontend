@@ -38,6 +38,7 @@ describe('planAdoption', () => {
       tempId: TEMP,
       winnerId: WINNER,
       transactions: [{ id: 't1', merchantId: TEMP }],
+      recurrings: [],
       queued: [entry({ seq: 7 })],
       tempAliases: [],
       knownAliases: [],
@@ -49,6 +50,34 @@ describe('planAdoption', () => {
     expect(plan.patchTransactionIds).toEqual([])
   })
 
+  it('moves schedules too, keeping a queued one apart from a transaction of the same id', () => {
+    const plan = planAdoption({
+      tempId: TEMP,
+      winnerId: WINNER,
+      transactions: [],
+      recurrings: [
+        { id: 't1', merchantId: TEMP },
+        { id: 'r2', merchantId: TEMP },
+      ],
+      queued: [
+        entry({ seq: 3 }),
+        entry({
+          seq: 4,
+          entity: 'recurring',
+          payload: { id: 't1', merchant_id: TEMP },
+        }),
+      ],
+      tempAliases: [],
+      knownAliases: [],
+    })
+    expect(plan.repointRecurringIds).toEqual(['t1', 'r2'])
+    expect(plan.rewrites).toEqual([
+      { seq: 4, payload: { id: 't1', merchant_id: WINNER } },
+    ])
+    expect(plan.patchRecurringIds).toEqual(['r2'])
+    expect(plan.patchTransactionIds).toEqual([])
+  })
+
   it('patches only the rows the server has already seen', () => {
     const plan = planAdoption({
       tempId: TEMP,
@@ -57,6 +86,7 @@ describe('planAdoption', () => {
         { id: 'queued', merchantId: TEMP },
         { id: 'pushed', merchantId: TEMP },
       ],
+      recurrings: [],
       queued: [entry({ seq: 1, id: 'queued' })],
       tempAliases: [],
       knownAliases: [],
@@ -73,6 +103,7 @@ describe('planAdoption', () => {
         { id: 't1', merchantId: 'someone-else' },
         { id: 't2', merchantId: null },
       ],
+      recurrings: [],
       queued: [],
       tempAliases: [],
       knownAliases: [],
@@ -86,6 +117,7 @@ describe('planAdoption', () => {
       tempId: TEMP,
       winnerId: WINNER,
       transactions: [{ id: 't1', merchantId: TEMP }],
+      recurrings: [],
       queued: [entry({ seq: 3, op: 'delete', payload: null })],
       tempAliases: [],
       knownAliases: [],
@@ -99,6 +131,7 @@ describe('planAdoption', () => {
       tempId: TEMP,
       winnerId: WINNER,
       transactions: [{ id: 't1', merchantId: TEMP }],
+      recurrings: [],
       queued: [entry({ seq: 4, entity: 'budget' })],
       tempAliases: [],
       knownAliases: [],
@@ -115,6 +148,7 @@ describe('planAdoption', () => {
       tempId: TEMP,
       winnerId: WINNER,
       transactions: [],
+      recurrings: [],
       queued: [],
       tempAliases: [mine, theirs, dupe],
       knownAliases: [
@@ -137,6 +171,7 @@ describe('planAdoption', () => {
       tempId: TEMP,
       winnerId: WINNER,
       transactions: [],
+      recurrings: [],
       queued: [],
       tempAliases: [colliding],
       knownAliases: [

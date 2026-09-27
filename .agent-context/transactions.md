@@ -112,8 +112,8 @@ flattening every red day; the square root keeps small days distinguishable from 
 
 - **Auto-post moved onto planned rows** (ADR-6). `autopost.ts` and its Spending-page mount
   effect are gone: recurring schedules generate planned rows, and the app-level planner confirms
-  the `autopost` ones on their date (same amount, wallet, note and `recurring:<id>:<date>`
-  source marker) and advances `next_due` — once per session instead of on page enter, with
+  the `autopost` ones on their date (same amount and wallet, the schedule's merchant, its note —
+  else its name — and the `recurring:<id>:<date>` source marker) and advances `next_due` — once per session instead of on page enter, with
   deterministic ids instead of the per-device marker, so two devices no longer double-post. A
   pre-existing marker counts as the settlement of its occurrence. See [planned.md](planned.md).
 
@@ -198,9 +198,18 @@ tx/budget/recurring editor state machine. Components are dumb (`components/`): p
   "Currency SAR ▾" pill), "Which category/account?" `BudgetTargetSelect`, `BudgetPeriodFields`
   (Weekly / Monthly / Custom days chips + "Period length __ days", at least 1). `RecurringEditor`:
   Spend | Income `PillSwitch`, "What is it? optional", `AmountWell` "How much each time?" with the
-  `TxAccountPill` (currency follows the wallet), category chips, `RecurringGoalSelect` (spend only),
-  `RecurringScheduleFields` (Repeats chips, Next due `DateField` with its "in 22d" hint, the
-  Auto-post `ToggleCard`). `AdjustmentEditor`: see _Balance adjustments_ below.
+  `TxAccountPill` (currency follows the wallet), category chips, a note copied onto every
+  occurrence, "Where?" (`TxMerchantField` opening the `MerchantOptions` pane, as in the transaction
+  dialog), `RecurringGoalSelect` (spend only), `RecurringScheduleFields` (Repeats chips, Next due
+  `DateField` with its "in 22d" hint, `RecurringEndField` — Ends: Never | On a date, defaulting a
+  year after next due, blocked by `recurringEndBlock` when before it — and the Auto-post
+  `ToggleCard`). A schedule whose `nextDue` has passed its `endsOn` has **ended**: the Recurring
+  tab still lists it (dimmed, last, "ended") but leaves it out of the totals, "next" and upcoming.
+- **Ledger row title** is the note, else the **leaf** category's own name ("Cafés", not
+  "Dining"); the line under it reads "Dining · Cafés | Everyday · Main". Whenever the scope spans
+  more than one wallet (All accounts, a group) every activity row names a wallet with its
+  immediate group ("Everyday · Main") so same-named wallets in different groups stay apart; a
+  single-wallet scope shows the bare name. `AdjustmentEditor`: see _Balance adjustments_ below.
 - **Counts toward (1e).** The dialog shows one `CountsTowardRow` ("Counts toward · Nothing ·
   Regular spending ›"); it opens `CountsTowardOptions`: "Nothing", **Suggested** — the top five
   of `data/countsToward.ts#rankGoalOptions` (in tiers: an open planned **payment** within ±30

@@ -282,7 +282,6 @@ async function autoConfirm(
         walletId: item.walletId ?? r.walletId,
         date: item.date,
         categoryId: item.categoryId ?? r.categoryId,
-        note: r.name,
         source: legacyMarkerOf(r.id, item.occurrence),
       })
       confirmed += 1
