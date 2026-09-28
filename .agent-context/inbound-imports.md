@@ -80,13 +80,15 @@ patch over its prefill (`data/reviewDraft.ts`: `initialDraft` → `resolveDraft`
 keeps them and Confirm all posts exactly what each card would. The card API it hands out
 (`ReviewCard` type) has the resolved draft, `draftState` (`amountMissing`, `currencyMissing`,
 `needsDetails`, `ready` = amount + currency + account + category), the picked field, the
-row's error, and `setField` / `setType` / `use` / `confirm` / `ignore` / `notTransaction`.
+row's error, the import's `merchant` (`MerchantCategories` or null), and `setField` /
+`setType` / `pickCategory` (a category plus its own type) / `use` / `confirm` / `ignore` /
+`notTransaction`.
 The header counts drafts that still need details, so filling one in updates "1 needs details".
 
 **The card** (`ReviewCard`): the header (`PendingImportHeader`: initial, who — the merchant
 title-cased by `displayName`, else the source — source · day, the amount or _Needs details_),
-the merchant hint (`MerchantHint`: "✦ Careem — you filed it under Transport 6 times", from the
-detail), Spend/Income, then `ReviewFields` — amount and currency (red with "Enter it, or tap it
+the merchant hint (`MerchantHint`: "✦ Careem — you filed it under" + one `Chip` per category,
+the selected one active; tapping one picks it, switching Spend/Income with it), Spend/Income, then `ReviewFields` — amount and currency (red with "Enter it, or tap it
 in the email below." while missing), merchant, date, **category (the shared `CategoryPicker`:
 a category or a subcategory in one pick)**, account, note ("Defaults to the subject"). Then the
 body, then Ignore · Not a transaction · Confirm & add (disabled until `ready`).
@@ -126,9 +128,18 @@ body, then Ignore · Not a transaction · Confirm & add (disabled until `ready`)
 - **Confirm is final** (no Undo): "Added to your ledger" / "n added to your ledger" as a
   plain toast. The merchant is only sent when it was **edited** — resending it would re-count
   the sighting. Errors surface through `messageForApiError` (the UI keys off `code`).
-- **The category is resolved at render, not on write**: kept while the catalog holds it under
-  the draft's type, else `catalog.fallbackFor(type)` — so a suggestion Dexie has not delivered
-  yet upgrades when the catalog lands, and switching Spend/Income re-points it. The account is
+- **Merchant category suggestions are local** (`hooks/useMerchantCategories` →
+  `data/categorySuggestions.ts`): for each import's `merchantId`, the synced merchant's
+  `learnedCategoryId` first, then the categories its local transactions are filed under, most
+  used first (later date breaks a tie), catalog-known only, at most 5. Local, so Confirm all
+  uses them for cards never opened, and a merchant learned *after* the email was staged (the
+  staged `suggestedCategoryId` is frozen) still wins.
+- **The category is resolved at render, not on write**: the draft starts with no category;
+  `resolveDraft` keeps the user's pick while the catalog holds it under the draft's type, else
+  the first of `categoryCandidates` of that type, else `catalog.fallbackFor(type)`. Candidates
+  are the merchant's categories then the staged suggestion for an inbox row, the staged
+  suggestion first for a webhook row (it may be a payload-named category). So suggestions Dexie
+  has not delivered yet apply when they land, and switching Spend/Income re-points it. The account is
   resolved the same way (the suggested wallet, else the first).
 
 **Seeing and forgetting skips.** `SkippedShapes` (exported for sources) reads

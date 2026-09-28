@@ -15,6 +15,7 @@ import {
 } from '#/features/inbound-imports/data/mutations'
 import { readPick } from '#/features/inbound-imports/data/pickValues'
 import {
+  categoryCandidates,
   confirmInput,
   draftState,
   initialDraft,
@@ -28,6 +29,7 @@ import type { TxType } from '#/features/transactions/api/types'
 import { messageForApiError } from '#/lib/errorMessages'
 import { useHeldBatch } from './useHeldBatch'
 import type { HeldBatch } from './useHeldBatch'
+import { useMerchantCategories } from './useMerchantCategories'
 
 const NOTICE_MS = 3000
 
@@ -88,6 +90,7 @@ export function useReviewQueue(
     }
   }
   const batch = useHeldBatch(sendBatch)
+  const merchantCategories = useMerchantCategories(imports, catalog)
 
   const showNotice = (message: string) => {
     if (noticeTimer.current) clearTimeout(noticeTimer.current)
@@ -95,13 +98,25 @@ export function useReviewQueue(
     noticeTimer.current = setTimeout(() => setNotice(null), NOTICE_MS)
   }
 
-  const draftOf = (item: LocalInboundImport): ReviewDraft =>
-    resolveDraft(
-      { ...initialDraft(item, wallets, catalog), ...edits[item.id] },
+  const merchantOf = (item: LocalInboundImport) =>
+    item.merchantId ? (merchantCategories.get(item.merchantId) ?? null) : null
+
+  const draftOf = (item: LocalInboundImport): ReviewDraft => {
+    const candidates = categoryCandidates(
+      item,
+      merchantOf(item)?.categoryIds ?? [],
+    )
+    return resolveDraft(
+      {
+        ...initialDraft(item, wallets, catalog, candidates),
+        ...edits[item.id],
+      },
       item,
       wallets,
       catalog,
+      candidates,
     )
+  }
 
   const visible = imports.filter((i) => !batch.hidden.has(i.id))
   const count = visible.length
@@ -152,6 +167,7 @@ export function useReviewQueue(
     return {
       item,
       draft,
+      merchant: merchantOf(item),
       ...draftState(draft),
       target,
       error: errors[item.id] ?? null,
@@ -162,6 +178,9 @@ export function useReviewQueue(
         value: ReviewDraft[TKey],
       ) => edit(item.id, { [key]: value }),
       setType: (type: TxType) => edit(item.id, { type }),
+      /** A suggested category brings its own type with it. */
+      pickCategory: (categoryId: string) =>
+        edit(item.id, { categoryId, type: catalog.get(categoryId).type }),
       /** Fill `field` from text tapped in the body, then move on to what is still empty. */
       use: (field: ReadField, text: string) => {
         const read = readPick(field, { value: text, text }, draft.currency)

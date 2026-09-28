@@ -33,7 +33,6 @@ type Props = {
 export function ReviewCard({ card, wallets, catalog, busy }: Props) {
   const { item, draft } = card
   const detail = useImportDetail({ kind: 'import', id: item.id }, true)
-  const merchant = detail.detail?.merchant ?? null
 
   return (
     <div className="flex flex-col gap-3">
@@ -53,7 +52,14 @@ export function ReviewCard({ card, wallets, catalog, busy }: Props) {
         currency={draft.currency}
       />
 
-      {merchant ? <MerchantHint merchant={merchant} catalog={catalog} /> : null}
+      {card.merchant ? (
+        <MerchantHint
+          merchant={card.merchant}
+          catalog={catalog}
+          selectedId={draft.categoryId}
+          onPick={card.pickCategory}
+        />
+      ) : null}
 
       <PillSwitch<TxType>
         label="Type"

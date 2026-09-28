@@ -37,31 +37,47 @@ const pickWallet = (
   wallets.find((w) => w.id === suggested) ??
   (wallets.length > 0 ? wallets[0] : null)
 
-/** What the source said, else what its suggested category is filed as, else a spend. */
+/**
+ * The categories to pre-select from, best first. A webhook's own suggestion leads — it may
+ * be a category the payload named. An inbox's was fixed when the email was staged, so what
+ * the merchant has been filed under since comes first.
+ */
+export function categoryCandidates(
+  item: LocalInboundImport,
+  merchantCategoryIds: string[],
+): string[] {
+  const staged = item.suggestedCategoryId ? [item.suggestedCategoryId] : []
+  return item.source === 'webhook'
+    ? [...staged, ...merchantCategoryIds]
+    : [...merchantCategoryIds, ...staged]
+}
+
+/** What the source said, else the type of the category it would pre-select, else a spend. */
 const initialType = (
   item: LocalInboundImport,
+  candidates: string[],
   catalog: CategoryCatalog,
 ): TxType => {
   if (item.suggestedType) return item.suggestedType
-  const suggested = item.suggestedCategoryId
-  return suggested && catalog.has(suggested)
-    ? catalog.get(suggested).type
-    : 'spend'
+  const known = candidates.find((id) => catalog.has(id))
+  return known ? catalog.get(known).type : 'spend'
 }
 
+/** The draft before any edit. Its category is left unchosen for `resolveDraft` to fill. */
 export function initialDraft(
   item: LocalInboundImport,
   wallets: LocalBalanceNode[],
   catalog: CategoryCatalog,
+  candidates: string[],
 ): ReviewDraft {
   const wallet = pickWallet(wallets, item.suggestedWalletId)
   const currency = item.currency ?? wallet?.currency ?? 'SAR'
   return {
-    type: initialType(item, catalog),
+    type: initialType(item, candidates, catalog),
     amount: item.amount != null ? minorToInputValue(item.amount, currency) : '',
     currency,
     date: item.occurredOn ?? ymd(startOfToday()),
-    categoryId: item.suggestedCategoryId ?? '',
+    categoryId: '',
     walletId: wallet?.id ?? '',
     merchant: item.suggestedMerchant ?? '',
     note: '',
@@ -70,21 +86,26 @@ export function initialDraft(
 
 /**
  * The draft as this device can honour it. The category is kept while the catalog holds it
- * under the draft's type, else the type's fallback; the account while it is one of the loaded
- * wallets, else the suggested one. Derived rather than stored, so a suggestion naming rows
- * Dexie has not delivered yet is applied once they arrive, and a type switch re-points it.
+ * under the draft's type, else the first candidate of that type, else the type's fallback;
+ * the account while it is one of the loaded wallets, else the suggested one. Derived rather
+ * than stored, so a suggestion naming rows Dexie has not delivered yet is applied once they
+ * arrive, and a type switch re-points it.
  */
 export function resolveDraft(
   raw: ReviewDraft,
   item: LocalInboundImport,
   wallets: LocalBalanceNode[],
   catalog: CategoryCatalog,
+  candidates: string[],
 ): ReviewDraft {
-  const entry = catalog.get(raw.categoryId)
+  const fits = (id: string) => {
+    const entry = catalog.get(id)
+    return entry.id !== DELETED_CATEGORY_ID && entry.type === raw.type
+  }
   const categoryId =
-    entry.id !== DELETED_CATEGORY_ID && entry.type === raw.type
-      ? entry.id
-      : (catalog.fallbackFor(raw.type)?.id ?? '')
+    [raw.categoryId, ...candidates].find(fits) ??
+    catalog.fallbackFor(raw.type)?.id ??
+    ''
   const walletId = wallets.some((w) => w.id === raw.walletId)
     ? raw.walletId
     : (pickWallet(wallets, item.suggestedWalletId)?.id ?? '')
