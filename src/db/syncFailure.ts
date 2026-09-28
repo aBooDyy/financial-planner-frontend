@@ -154,3 +154,14 @@ export async function failureOfRow(
     .sortBy('seq')
   return entries.find((e) => e.failure)?.failure ?? null
 }
+
+export type FailureTally = { rejected: number; unavailable: number }
+
+/** How many queued entries carry each kind of failure. */
+export async function tallyFailures(): Promise<FailureTally> {
+  const tally: FailureTally = { rejected: 0, unavailable: 0 }
+  await db.outbox.each((entry) => {
+    if (entry.failure) tally[entry.failure.kind] += 1
+  })
+  return tally
+}

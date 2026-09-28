@@ -608,17 +608,23 @@ server-side increment, so a use bump is an ordinary, rebasable `PATCH` queued li
   `online` listener flushes them. A connection that is up but can't reach the server still
   goes through the unavailable path above.
 - **Sync activity** is counted in `db/syncActivity.ts`: `flushOutbox`'s drain and `pullAll`'s
-  fan-out run inside `trackSync`, and `useSyncing()` is true while any of them is running. The
-  nav's `SyncIndicator` reads it ([pwa-and-mobile.md](pwa-and-mobile.md#offline)). One-off
+  fan-out run inside `trackSync`, and `useSyncing()` is true while any of them is running.
+  `trackSync` also records `lastSyncedAt` (a run finished without throwing) and
+  `lastPassFailed` (the latest run threw — e.g. a pull that couldn't reach the server). One-off
   pulls outside `pullAll` (after onboarding, the review queue's delta) are deliberately left out.
+- **The nav's sync status** (`useSyncStatus()` → `syncStatusOf` in `lib/syncStatus.ts`) folds
+  that together with the outbox count and `tallyFailures()` (flagged entries by kind) into one
+  state: `syncing` › `failed` (any rejected/unavailable entry, or `lastPassFailed`) › `waiting`
+  (queued, no trouble) › `synced` › `connecting`. `SyncIndicator` shows it
+  ([pwa-and-mobile.md](pwa-and-mobile.md#offline)); its Retry now is `syncNow()` in
+  `db/syncRetry.ts` (`retryAllFailed()` plus a `pullAll()`).
 - **The offline indicator exists**: `OfflineIndicator` in `TopNav`, with the outbox count
   (`usePendingChangeCount`). Actions that need the server are listed in
   [pwa-and-mobile.md](pwa-and-mobile.md#online-only-actions). It only reports being offline.
-  A **global sync-trouble cue is still owed** two things: an op the outbox had to _park_
-  rather than retry (a name-conflicted import template, visible only on its Settings card), and
-  **flagged entries** of every entity other than ledger rows. Only transactions, adjustments
-  and transfer legs show their badge today. `retryAllFailed()` is already there for it. Build
-  them together, beside the offline pill.
+  The **global sync-trouble cue** is the sync cloud's alert state: it counts flagged entries of
+  every entity (rows badge only for transactions, adjustments and transfer legs). Still owed: an
+  op the outbox had to _park_ rather than retry (a name-conflicted import template, visible only
+  on its Settings card) is not flagged, so the cloud doesn't count it.
 
 ## Exception: Email sync and inbound imports (online-only, server-owned cache)
 

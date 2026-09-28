@@ -131,13 +131,23 @@ path **merge** (values joined with a comma), so never add a catch-all `/*` next 
   that says changes are saved here and sync on reconnect, with the outbox count
   (`usePendingChangeCount`). It is information, not a warning, so it uses no warn or danger
   tint. Per-row sync failures are a separate thing: `SyncFailureBadge` / `SyncFailureBanner`.
-- **The syncing mark** is `SyncIndicator` (`components/chrome/`), just before the offline pill
-  in `TopNav`: a small cloud with turning arrows, shown only while a sync talks to the server.
-  It reads `useSyncing()` from `db/syncActivity.ts` through `useCalmFlag` (it shows only after
-  300 ms and then stays for at least 700 ms), so quick pushes and background pulls never make it
-  flicker. It stays mounted and collapses its width and gap when idle, so it fades both in and
-  out. The arrows stop under `prefers-reduced-motion`, and it has a `role="status"` line for
-  screen readers.
+- **The sync cloud** is `SyncIndicator` (`components/chrome/`), just before the offline pill
+  in `TopNav`, driven by `useSyncStatus()` ([data-layer-and-sync.md](data-layer-and-sync.md#offline)).
+  The glyph (`SyncCloudGlyph`) is hand-drawn from Lucide's `cloud-sync` / `cloud-check` /
+  `cloud-alert` paths (lucide-react 0.545 has no `cloud-sync`), so only the arrow group turns,
+  around (12,16) of the view box. Per state:
+  - **syncing** — arrows turn (after 300 ms, for at least 700 ms, via `useCalmFlag`);
+    **waiting** — same arrows, still.
+  - **synced** — the check pops in and draws itself in `fp-accent`, holds 2.5 s
+    (`useFlashOnEnter`), then the whole mark collapses away. Idle-and-synced shows nothing.
+  - **failed** — the alert pops in and nudges once, `fp-warn` (server unreachable) or
+    `fp-danger` (a change refused), and **stays** until the trouble clears.
+  Whenever shown, hover opens a tooltip and a press opens a popover (the same text, "Last synced
+  …", and Retry now when failed) — the `SyncFailureBadge` tooltip-inside-popover pattern. It
+  stays mounted and collapses width + gap (`inert` while hidden), so it fades both ways; it
+  renders nothing offline (the offline pill speaks). Keyframes `fp-pop-in-soft`,
+  `fp-stroke-draw`, `fp-nudge` live in `theme.css`; all motion stops under
+  `prefers-reduced-motion`. A `role="status"` line announces "Syncing".
 - **"Online" means `useOnline()`** (`hooks/useOnline.ts`, `navigator.onLine` plus the
   `online`/`offline` events). It's optimistic: a captive portal still reads as online, so every
   online-only call keeps its own error path too.

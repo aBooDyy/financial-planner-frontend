@@ -1,5 +1,5 @@
 import { db } from './db'
-import { flushOutbox } from './sync'
+import { flushOutbox, pullAll } from './sync'
 import { releaseRow } from './syncFailure'
 import type { OutboxEntity } from './types'
 
@@ -20,4 +20,9 @@ export async function retryAllFailed(): Promise<void> {
       entry.nextAttemptAt = null
     })
   await flushOutbox()
+}
+
+/** Sync everything now: every flagged change goes again and the server is asked for updates. */
+export async function syncNow(): Promise<void> {
+  await Promise.all([retryAllFailed(), pullAll()])
 }

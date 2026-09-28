@@ -709,10 +709,9 @@ endpoints — see [data-layer-and-sync.md](data-layer-and-sync.md).
 - **`MAX_CONFIG_BYTES` (64 KiB) is hard-coded** in `api/types.ts` to match the backend's
   `import_template_rules.py`; `GET /config`'s `limits` does not publish it, so the two
   constants move together by hand until it does.
-- **A parked `nameConflict` template surfaces only in Settings › Import.** The global chrome
-  shows only being offline (`OfflineIndicator`). The cue belongs with a sync-trouble indicator
-  beside it when that is built; inventing global chrome whose only occupant is one parked
-  template would be the wrong shape.
+- **A parked `nameConflict` template surfaces only in Settings › Import.** A parked op is not
+  a flagged outbox entry, so the nav's sync cloud (which alerts on flagged entries) doesn't
+  count it. Feeding parked ops into `useSyncStatus` is the place to add it.
 - **`lib/errorMessages.ts` is a single-locale map.** Every `import.*` code the client can
   produce or receive has text in it; a second locale is a seam (the codes stay, the strings
   move), not a second map to maintain by hand.

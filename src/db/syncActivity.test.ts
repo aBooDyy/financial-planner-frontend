@@ -3,7 +3,13 @@ import { trackSync, useSyncActivityStore } from './syncActivity'
 
 const running = () => useSyncActivityStore.getState().running
 
-beforeEach(() => useSyncActivityStore.setState({ running: 0 }))
+beforeEach(() =>
+  useSyncActivityStore.setState({
+    running: 0,
+    lastSyncedAt: null,
+    lastPassFailed: false,
+  }),
+)
 
 describe('trackSync', () => {
   it('counts the work only while it runs', async () => {
@@ -37,5 +43,22 @@ describe('trackSync', () => {
     finishFirst()
     await first
     expect(running()).toBe(0)
+  })
+
+  it('records when a run last finished cleanly', async () => {
+    await trackSync(() => Promise.resolve())
+
+    const state = useSyncActivityStore.getState()
+    expect(state.lastSyncedAt).not.toBeNull()
+    expect(state.lastPassFailed).toBe(false)
+  })
+
+  it('marks the latest pass failed until a later one succeeds', async () => {
+    await trackSync(() => Promise.reject(new Error('down'))).catch(() => {})
+    expect(useSyncActivityStore.getState().lastPassFailed).toBe(true)
+    expect(useSyncActivityStore.getState().lastSyncedAt).toBeNull()
+
+    await trackSync(() => Promise.resolve())
+    expect(useSyncActivityStore.getState().lastPassFailed).toBe(false)
   })
 })

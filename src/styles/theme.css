@@ -253,3 +253,41 @@ body {
     transform: translateY(0) scale(1);
   }
 }
+
+/* The nav's sync cloud: a glyph taking over pops in, a stroke draws itself (it needs
+   `pathLength="1"` and `stroke-dasharray: 1`), an alert nudges once. */
+@keyframes fp-pop-in-soft {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes fp-stroke-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes fp-nudge {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-1.5px);
+  }
+  50% {
+    transform: translateX(1.5px);
+  }
+  75% {
+    transform: translateX(-1px);
+  }
+}
