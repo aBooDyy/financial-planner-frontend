@@ -118,7 +118,7 @@ function ancestorGroups(nodes: LocalBalanceNode[]): Map<string, Set<string>> {
   return out
 }
 
-function walletMatcher(
+export function walletMatcher(
   scope: Scope,
   nodes: LocalBalanceNode[],
 ): (walletId: string) => boolean {
@@ -1338,6 +1338,53 @@ function budgetSpentMinor(
   return sum
 }
 
+export type BudgetIdentity = Pick<
+  BudgetRow,
+  'name' | 'color' | 'categoryId' | 'scopeSub'
+>
+
+/** What a budget is called and drawn as: its category, its account, or everything. */
+export function budgetIdentity(
+  b: LocalBudget,
+  catalog: CategoryCatalog,
+  nodeById: ReadonlyMap<string, LocalBalanceNode>,
+): BudgetIdentity {
+  if (b.scopeType === 'category') {
+    const cat = catalog.get(b.categoryId ?? DELETED_CATEGORY_ID)
+    return {
+      name: cat.name,
+      color: cat.color,
+      categoryId: cat.id,
+      scopeSub: 'Category cap',
+    }
+  }
+  if (b.scopeType === 'wallet') {
+    const w = nodeById.get(b.walletId ?? '')
+    return {
+      name: w?.name ?? 'Account',
+      color: w?.color ?? '#64748B',
+      categoryId: null,
+      scopeSub: 'Account cap',
+    }
+  }
+  return {
+    name: 'Total spendable',
+    color: '#64748B',
+    categoryId: null,
+    scopeSub: 'Everything combined',
+  }
+}
+
+/** "Weekly", "Monthly", or a custom span's "30d". */
+export const budgetPeriodLabel = (
+  b: Pick<LocalBudget, 'period' | 'customDays'>,
+): string =>
+  b.period === 'custom'
+    ? `${b.customDays ?? 30}d`
+    : b.period === 'weekly'
+      ? 'Weekly'
+      : 'Monthly'
+
 export function buildBudgetsView(
   data: SpendingData,
   catalog: CategoryCatalog,
@@ -1352,35 +1399,10 @@ export function buildBudgetsView(
     const pct = b.limit > 0 ? spent / b.limit : 0
     const over = pct >= 1
     const remain = b.limit - spent
-    let name = 'Total spendable'
-    let color = '#64748B'
-    let categoryId: string | null = null
-    let scopeSub = 'Everything combined'
-    if (b.scopeType === 'category') {
-      const cat = catalog.get(b.categoryId ?? DELETED_CATEGORY_ID)
-      name = cat.name
-      color = cat.color
-      categoryId = cat.id
-      scopeSub = 'Category cap'
-    } else if (b.scopeType === 'wallet') {
-      const w = nodeById.get(b.walletId ?? '')
-      name = w?.name ?? 'Account'
-      color = w?.color ?? '#64748B'
-      scopeSub = 'Account cap'
-    }
-    const periodLabel =
-      b.period === 'custom'
-        ? `${b.customDays ?? 30}d`
-        : b.period === 'weekly'
-          ? 'Weekly'
-          : 'Monthly'
     return {
       id: b.id,
-      name,
-      color,
-      categoryId,
-      scopeSub,
-      periodLabel,
+      ...budgetIdentity(b, catalog, nodeById),
+      periodLabel: budgetPeriodLabel(b),
       spentStr: formatMoneyRounded(spent, b.currency),
       limitStr: formatMoneyRounded(b.limit, b.currency),
       remainStr: over

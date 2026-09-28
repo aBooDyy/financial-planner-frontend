@@ -78,7 +78,10 @@ rendering its feature component directly:
   `&fresh=1` (the OAuth callback: open the new inbox onto its first rule) or `&sample=` and
   an optional `&rule=` (the queue's "Fix the rule" for an inbox row) — `EmailSyncSearch`;
   every id must be uuid-shaped or the whole intent is dropped. `/transactions?review=1` is the
-  other search-driven entry.
+  other search-driven entry, with `?open=<kind>:<id>` (`tx`, `adjustment`, `transfer` — by
+  `transferId` — `planned`, `budget`, `recurring`; `data/openParam.ts`, the id uuid-shaped or the
+  param is dropped): the global search's way of opening a result. `useOpenFromSearch` waits for the
+  page's data, opens that editor, then strips `open` with `replace`, re-arming on the next value.
 
 ## Goals and Spending tabs
 

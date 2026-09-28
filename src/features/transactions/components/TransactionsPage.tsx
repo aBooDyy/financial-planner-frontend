@@ -19,18 +19,21 @@ import type { Scope } from '#/features/transactions/data/selectors'
 import {
   allAccountsMinor,
   scopeBalance,
+  scopeLabel,
 } from '#/features/transactions/data/scopePicker'
 import type { LocalTransaction } from '#/db/types'
 import { isSpendingView } from '#/features/transactions/constants'
 import { useActivityRowClick } from '#/features/transactions/hooks/useActivityRowClick'
 import { useAdjustmentEditor } from '#/features/transactions/hooks/useAdjustmentEditor'
 import { useLedgerWindow } from '#/features/transactions/hooks/useLedgerWindow'
+import { useOpenFromSearch } from '#/features/transactions/hooks/useOpenFromSearch'
 import { useSpendingPeriod } from '#/features/transactions/hooks/useSpendingPeriod'
 import { useSpendingViews } from '#/features/transactions/hooks/useSpendingViews'
 import { useTransactions } from '#/features/transactions/hooks/useTransactions'
 import { useTxEditor } from '#/features/transactions/hooks/useTxEditor'
 import { useEntryDefaults } from '#/features/transactions/hooks/useEntryDefaults'
 import { useEntrySession } from '#/features/transactions/stores/entrySession'
+import { usePublishSearchContext } from '#/features/search/hooks/usePublishSearchContext'
 import { usePlanned } from '#/features/planned'
 import { ConfirmPlannedDialog } from '#/features/planned/components/ConfirmPlannedDialog'
 import { PlannedCard } from '#/features/planned/components/PlannedCard'
@@ -127,6 +130,17 @@ export function TransactionsPage() {
     adjustment,
     ledger?.rows ?? NO_ROWS,
   )
+  useOpenFromSearch(!loading, {
+    editor,
+    adjustment,
+    inputs,
+    openPlanned: setConfirmId,
+  })
+  usePublishSearchContext({
+    view,
+    scope,
+    scopeLabel: scopeLabel(scope, sections),
+  })
 
   if (!user) return null
 

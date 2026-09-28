@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { MoonStar, Sun } from 'lucide-react'
 import { useThemeStore } from '#/stores/theme'
+import { SearchTrigger } from '#/features/search/components/SearchTrigger'
 import type { User } from '#/features/auth/api/types'
 import { AccountMenu } from './AccountMenu'
 import { BrandMark } from './BrandMark'
@@ -80,6 +81,7 @@ export function TopNav({ user, active, onSignOut }: Props) {
         <div className="flex-1" />
 
         <div className="flex items-center gap-[9px]">
+          <SearchTrigger />
           <SyncIndicator />
           <OfflineIndicator />
 
