@@ -1,5 +1,3 @@
-import { Input } from '#/components/ui/input'
-import { NOTE_INPUT } from '#/features/transactions/data/txDialog'
 import type { QuickChip } from '#/features/transactions/data/quickChips'
 import type { CountsToward } from '#/features/transactions/hooks/useCountsToward'
 import type { TxEditorDraft } from '#/features/transactions/hooks/useTxEditor'
@@ -9,6 +7,7 @@ import { PlannedLinkBanner } from './PlannedLinkBanner'
 import { TxCategoryChips } from './TxCategoryChips'
 import { TxDateChips } from './TxDateChips'
 import { TxMerchantField } from './TxMerchantField'
+import { TxNoteField } from './TxNoteField'
 import { TxSection } from './TxSection'
 
 type Props = {
@@ -58,12 +57,11 @@ export function TxCashflowFields({
         />
       </TxSection>
 
-      <Input
+      <TxNoteField
         value={draft.note}
-        onChange={(e) => onField('note', e.target.value)}
-        aria-label="Note"
+        onChange={(note) => onField('note', note)}
+        kind={draft.type}
         placeholder="Add a note"
-        className={NOTE_INPUT}
       />
 
       <TxSection label="When?" invalid={flaggedField === 'date'}>

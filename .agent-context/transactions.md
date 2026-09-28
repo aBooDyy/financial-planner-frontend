@@ -216,6 +216,13 @@ tx/budget/recurring editor state machine. Components are dumb (`components/`): p
   entry starts on `useEntryDefaults`: the session's wallet, else Settings' **Default account**
   (`preferences.defaultAccountId`), else the first live wallet (`data/entryDefaults.ts`; archived
   or deleted picks fall through). The desktop Quick add card files to the same wallet.
+- **Note completion**: both dialog notes are `TxNoteField` over the shared
+  `components/CompletionInput` — one inline suggestion drawn dimmed after the caret (an
+  `aria-hidden` overlay with the input's own classes, scroll-synced), shown only while the caret
+  is at the end. Taken with Tab, the arrow toward the line end, or a swipe toward it (`swipeStep`
+  = -1, direction-aware). Suggestions: `rankNotes` over the last `NOTE_LOOKBACK_DAYS` of the
+  same kind (spend / income / transfer legs), most used then most recent, case merged;
+  `noteCompletion` needs 2+ typed characters and a case-insensitive prefix.
 - **The transaction dialog** (`TransactionDialog`, from the "New Transaction Redesign" handoff).
   One `ResponsiveDialog` for Spend / Income / Transfer, titled "New transaction" or "Edit
   <type>". Top to bottom: `TxTypeSwitch` (pill segmented; the chosen type wears its tint —

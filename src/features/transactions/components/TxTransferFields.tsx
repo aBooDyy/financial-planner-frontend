@@ -8,10 +8,9 @@ import type { RatesMap } from '#/lib/config/rates'
 import { parseAmountToMinor } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
 import type { DateFormat } from '#/lib/date'
-import { Input } from '#/components/ui/input'
-import { NOTE_INPUT } from '#/features/transactions/data/txDialog'
 import { TransferSideCard } from './TransferSideCard'
 import { TxDateChips } from './TxDateChips'
+import { TxNoteField } from './TxNoteField'
 import { TxSection } from './TxSection'
 
 const NOTE_MAX = 200
@@ -122,13 +121,13 @@ export function TxTransferFields({
       </TxSection>
 
       <div className="relative">
-        <Input
+        <TxNoteField
           value={draft.note}
-          onChange={(e) => onField('note', e.target.value)}
+          onChange={(note) => onField('note', note)}
+          kind="transfer"
           maxLength={NOTE_MAX}
-          aria-label="Note"
           placeholder="Add a note, e.g. ATM withdrawal"
-          className={`${NOTE_INPUT} pe-16`}
+          className="pe-16"
         />
         <span className="pointer-events-none absolute end-[14px] top-1/2 -translate-y-1/2 text-[11.5px] font-semibold text-fp-text-3 tabular-nums">
           {draft.note.length}/{NOTE_MAX}
