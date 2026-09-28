@@ -32,9 +32,8 @@ export function TransferFxBox({
             {currencySymbol(currency)}
           </span>
           <input
-            value={value}
             aria-label={`Received (${currency})`}
-            {...amountInputProps(currency, onChange)}
+            {...amountInputProps(currency, value, onChange)}
             className="w-full min-w-0 flex-1 border-none bg-transparent text-[17px] font-extrabold text-fp-text tabular-nums outline-none placeholder:text-fp-text-3"
           />
         </span>

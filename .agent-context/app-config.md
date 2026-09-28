@@ -100,8 +100,8 @@ user's own currencies**, which is why those gates let a user-defined code throug
 `decimalsFor` sizes its amounts correctly: `decimalsFor` (0 for JPY, 3 for KWD/BHD/IQD/…, 2
 otherwise), `isSupportedCurrency`, `currencySymbol`, `currencyName`, `supportedCurrencies()`. `toMinor`/`toMajor`/`parseAmountToMinor`/`minorToInputValue`/
 `formatMoney`/`convertMinor` kept their signatures and take their scale from `decimalsFor`,
-so every money path was fixed by fixing the data. `amountInputProps(code, onValue)` gives an amount
-field its keypad, typing guard and placeholder — a JPY input takes no decimals, a KWD input
+so every money path was fixed by fixing the data. `amountInputProps(code, value, onValue)` gives an amount
+field its keypad, typing guard, thousands grouping and placeholder — a JPY input takes no decimals, a KWD input
 three (guard rules in [conventions.md](conventions.md#money--dates)).
 
 ## Currencies the user defines

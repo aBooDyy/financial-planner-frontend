@@ -22,6 +22,7 @@ export function TxAmountHero({
   invalid,
   children,
 }: Props) {
+  const input = amountInputProps(currency, amount, onAmount)
   return (
     <div
       className={cn(
@@ -35,10 +36,9 @@ export function TxAmountHero({
           {currency}
         </span>
         <input
-          value={amount}
           aria-label="Amount"
-          {...amountInputProps(currency, onAmount)}
-          style={{ width: `${Math.max(4, amount.length + 0.6)}ch` }}
+          {...input}
+          style={{ width: `${Math.max(4, input.value.length + 0.6)}ch` }}
           className="max-w-full min-w-0 border-none bg-transparent p-0 text-center text-[46px] font-extrabold tracking-[-0.03em] text-fp-text tabular-nums outline-none placeholder:text-fp-text-3"
         />
       </label>

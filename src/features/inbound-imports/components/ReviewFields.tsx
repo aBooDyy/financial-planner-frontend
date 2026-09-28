@@ -39,8 +39,9 @@ export function ReviewFields({ card, wallets }: Props) {
           <FieldLabel htmlFor={`${id}-amount`}>Amount</FieldLabel>
           <Input
             id={`${id}-amount`}
-            value={draft.amount}
-            {...amountInputProps(draft.currency, (v) => setField('amount', v))}
+            {...amountInputProps(draft.currency, draft.amount, (v) =>
+              setField('amount', v),
+            )}
             aria-invalid={card.amountMissing ? true : undefined}
             className="tabular-nums"
           />

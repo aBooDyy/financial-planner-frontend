@@ -1,6 +1,6 @@
 import { currencyList, currencyMeta } from '#/lib/config/appConfig'
 import type { CurrencyMeta } from '#/lib/config/appConfig'
-import { numericInputProps } from '#/lib/numericInput'
+import { groupThousands, numericInputProps } from '#/lib/numericInput'
 
 /**
  * Currency metadata + money helpers. Money is an integer in the currency's minor unit
@@ -77,25 +77,28 @@ export const parseAmountToMinor = (
   return toMinor(value, code)
 }
 
-/** Minor units → a plain editable string for inputs ("18420.5"), no symbol or grouping. */
+/** Minor units → a plain editable string for inputs ("18420.50"), no symbol or grouping. */
 export const minorToInputValue = (
   amountMinor: number,
   code: CurrencyCode,
-): string => String(toMajor(amountMinor, code))
+): string => toMajor(amountMinor, code).toFixed(decimalsFor(code))
 
 /**
  * What an amount field should offer for a currency: a yen input takes whole numbers, a
- * dinar input takes three decimals. Keeps keypad, typing guard and placeholder in one
- * decision; `onValue` only ever receives digits (plus a point, and a leading minus if `signed`).
+ * dinar input takes three decimals. Keeps keypad, typing guard, thousands grouping and
+ * placeholder in one decision; the field shows "18,420.50" while `onValue` only ever
+ * receives digits (plus a point, and a leading minus if `signed`).
  */
 export const amountInputProps = (
   code: CurrencyCode,
+  value: string,
   onValue: (value: string) => void,
   { signed = false }: { signed?: boolean } = {},
 ) => {
   const decimals = decimalsFor(code)
   return {
-    ...numericInputProps({ decimals, signed }, onValue),
+    value: groupThousands(value),
+    ...numericInputProps({ decimals, signed }, onValue, groupThousands),
     placeholder: decimals === 0 ? '0' : `0.${'0'.repeat(decimals)}`,
   }
 }

@@ -82,13 +82,15 @@ minimal non-stale comments).
 
 - Never format money/dates by hand. Use the `lib/` helpers built on `Intl`, locale- and
   direction-aware. Money matches the wire representation end-to-end.
-- **Every numeric field is guarded.** An amount input spreads `amountInputProps(code, onValue)`
+- **Every numeric field is guarded.** An amount input spreads `amountInputProps(code, value, onValue)`
   (`lib/currency.ts`) instead of writing its own `onChange`/`inputMode`; any other decimal
   field (FX rates) spreads `numericInputProps(rules, onValue)` (`lib/numericInput.ts`). Both
   open the phone's number keypad and pass `onValue` only sanitized text: Arabic-Indic digits
   and `٫` become ASCII, letters/commas never appear, one point, the fraction capped at the
   currency's decimals, and a leading `-` only with `{ signed: true }` (balances can go
   negative; transfer, spend and goal amounts can't). The caret stays where the user typed.
+  An amount field *shows* its value grouped (`18,420.50`, via `groupThousands`) while state
+  keeps the plain `18420.50`; `minorToInputValue` prefills with the currency's full decimals.
 
 ## Comments
 

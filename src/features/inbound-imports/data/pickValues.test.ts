@@ -15,13 +15,13 @@ describe('readPick', () => {
       amount: '152.75',
     })
     expect(readPick('amount', whole('1,234.50'), 'SAR')).toEqual({
-      amount: '1234.5',
+      amount: '1234.50',
     })
   })
 
   it('brings the currency along when the tapped text carries one', () => {
     expect(readPick('amount', whole('SAR 38.00'), 'USD')).toEqual({
-      amount: '38',
+      amount: '38.00',
       currency: 'SAR',
     })
   })

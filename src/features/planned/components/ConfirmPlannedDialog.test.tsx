@@ -89,7 +89,7 @@ describe('ConfirmPlannedDialog', () => {
     const onOpenChange = vi.fn()
     render(<ConfirmPlannedDialog plannedId="sep" onOpenChange={onOpenChange} />)
 
-    await waitFor(() => expect(amountField().value).toBe('1500'))
+    await waitFor(() => expect(amountField().value).toBe('1,500.00'))
     expect(screen.getByRole('heading').textContent).toBe(
       `Planned for ${shortDate(daysAgo(23))} · 23 days agoUmrah trip`,
     )
@@ -113,7 +113,7 @@ describe('ConfirmPlannedDialog', () => {
 
   it('turns a smaller amount into a partial and says what stays open', async () => {
     render(<ConfirmPlannedDialog plannedId="sep" onOpenChange={vi.fn()} />)
-    await waitFor(() => expect(amountField().value).toBe('1500'))
+    await waitFor(() => expect(amountField().value).toBe('1,500.00'))
     fireEvent.change(amountField(), { target: { value: '1000' } })
     expect(await screen.findByText('Partial:')).toBeTruthy()
     expect(
@@ -126,7 +126,7 @@ describe('ConfirmPlannedDialog', () => {
 
   it('disables confirming with no amount', async () => {
     render(<ConfirmPlannedDialog plannedId="sep" onOpenChange={vi.fn()} />)
-    await waitFor(() => expect(amountField().value).toBe('1500'))
+    await waitFor(() => expect(amountField().value).toBe('1,500.00'))
     fireEvent.change(amountField(), { target: { value: '' } })
     expect(await screen.findByText('Enter an amount to confirm.')).toBeTruthy()
     expect(
@@ -136,7 +136,7 @@ describe('ConfirmPlannedDialog', () => {
 
   it('confirms income as received, into the wallet', async () => {
     render(<ConfirmPlannedDialog plannedId="pay" onOpenChange={vi.fn()} />)
-    await waitFor(() => expect(amountField().value).toBe('12000'))
+    await waitFor(() => expect(amountField().value).toBe('12,000.00'))
     expect(
       await screen.findByText('Main Checking goes to SR 32,000.00.'),
     ).toBeTruthy()
@@ -162,7 +162,7 @@ describe('ConfirmPlannedDialog', () => {
       tx({ walletId: 'w2', amount: m(1000) }),
     ])
     render(<ConfirmPlannedDialog plannedId="pay" onOpenChange={vi.fn()} />)
-    await waitFor(() => expect(amountField().value).toBe('12000'))
+    await waitFor(() => expect(amountField().value).toBe('12,000.00'))
     // 20,000 − 35 + 500 − 70 + 40 + 10 − 5 + 12,000
     expect(
       await screen.findByText('Main Checking goes to SR 32,440.00.'),
@@ -172,7 +172,7 @@ describe('ConfirmPlannedDialog', () => {
   it('skips the item once asked', async () => {
     const onOpenChange = vi.fn()
     render(<ConfirmPlannedDialog plannedId="sep" onOpenChange={onOpenChange} />)
-    await waitFor(() => expect(amountField().value).toBe('1500'))
+    await waitFor(() => expect(amountField().value).toBe('1,500.00'))
     fireEvent.click(screen.getByRole('button', { name: 'Skip this one' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Skip it' }))
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))

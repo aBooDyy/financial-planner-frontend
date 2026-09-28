@@ -29,7 +29,7 @@ describe('minor-unit round trips', () => {
   // A currency mis-scaled by 100× is a silent, destructive money bug — one case per class.
   const cases: Array<[string, string, number, string]> = [
     ['JPY', '1200', 1200, '1200'],
-    ['SAR', '18420.50', 1842050, '18420.5'],
+    ['SAR', '18420.50', 1842050, '18420.50'],
     ['KWD', '12.345', 12345, '12.345'],
   ]
 
@@ -63,18 +63,24 @@ describe('formatMoney', () => {
 describe('amountInputProps', () => {
   const noop = () => {}
   it('sizes an input from the currency', () => {
-    expect(amountInputProps('JPY', noop)).toMatchObject({
+    expect(amountInputProps('JPY', '', noop)).toMatchObject({
       inputMode: 'numeric',
       placeholder: '0',
     })
-    expect(amountInputProps('SAR', noop)).toMatchObject({
+    expect(amountInputProps('SAR', '', noop)).toMatchObject({
       inputMode: 'decimal',
       placeholder: '0.00',
     })
-    expect(amountInputProps('KWD', noop)).toMatchObject({
+    expect(amountInputProps('KWD', '', noop)).toMatchObject({
       inputMode: 'decimal',
       placeholder: '0.000',
     })
+  })
+
+  it('shows the value grouped by thousands', () => {
+    expect(amountInputProps('SAR', '1234567.5', noop).value).toBe('1,234,567.5')
+    expect(amountInputProps('SAR', '-1234', noop).value).toBe('-1,234')
+    expect(amountInputProps('SAR', '999', noop).value).toBe('999')
   })
 })
 

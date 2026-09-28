@@ -42,6 +42,7 @@ export function AmountWell({
   children,
 }: Props) {
   const { soft, ink } = TONE[tone]
+  const input = amountInputProps(currency, amount, onAmount, { signed })
   const unitNode = (
     <span
       className={cn(
@@ -66,12 +67,11 @@ export function AmountWell({
       <label className="mt-1 flex min-w-0 cursor-text items-baseline justify-center gap-2">
         {unit === 'symbol' ? unitNode : null}
         <input
-          value={amount}
           aria-label={question}
           aria-invalid={invalid || undefined}
           autoFocus={autoFocus}
-          {...amountInputProps(currency, onAmount, { signed })}
-          style={{ width: `${Math.max(4, amount.length + 0.6)}ch` }}
+          {...input}
+          style={{ width: `${Math.max(4, input.value.length + 0.6)}ch` }}
           className="max-w-full min-w-0 border-none bg-transparent p-0 text-center text-[40px] font-extrabold tracking-[-0.03em] text-fp-text tabular-nums outline-none placeholder:text-fp-text-3"
         />
         {unit === 'code' ? unitNode : null}

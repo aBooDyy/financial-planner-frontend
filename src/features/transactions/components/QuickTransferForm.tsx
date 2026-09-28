@@ -31,9 +31,8 @@ export function QuickTransferForm({ wallets, base, rates }: Props) {
             {currencySymbol(t.fromCurrency)}
           </span>
           <input
-            value={t.amount}
             aria-label="Amount"
-            {...amountInputProps(t.fromCurrency, t.changeAmount)}
+            {...amountInputProps(t.fromCurrency, t.amount, t.changeAmount)}
             className={AMOUNT_INPUT}
           />
         </div>
@@ -43,9 +42,8 @@ export function QuickTransferForm({ wallets, base, rates }: Props) {
               {currencySymbol(t.toCurrency)}
             </span>
             <input
-              value={t.received}
               aria-label={`Received (${t.toCurrency})`}
-              {...amountInputProps(t.toCurrency, t.setReceived)}
+              {...amountInputProps(t.toCurrency, t.received, t.setReceived)}
               className={AMOUNT_INPUT}
             />
           </div>

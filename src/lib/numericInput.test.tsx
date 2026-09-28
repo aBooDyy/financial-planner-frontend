@@ -2,7 +2,11 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { useState } from 'react'
 import { describe, expect, it } from 'vitest'
-import { numericInputProps, sanitizeNumeric } from '#/lib/numericInput'
+import {
+  groupThousands,
+  numericInputProps,
+  sanitizeNumeric,
+} from '#/lib/numericInput'
 
 describe('sanitizeNumeric', () => {
   it('drops letters and symbols', () => {
@@ -44,6 +48,24 @@ function Field() {
   )
 }
 
+function GroupedField({ onValue }: { onValue: (value: string) => void }) {
+  const [value, setValue] = useState('')
+  return (
+    <input
+      aria-label="Grouped"
+      value={groupThousands(value)}
+      {...numericInputProps(
+        { decimals: 2 },
+        (v) => {
+          setValue(v)
+          onValue(v)
+        },
+        groupThousands,
+      )}
+    />
+  )
+}
+
 describe('numericInputProps', () => {
   it('asks for the decimal keypad, or the plain one for whole numbers', () => {
     const noop = () => {}
@@ -58,5 +80,18 @@ describe('numericInputProps', () => {
     expect(input.value).toBe('12')
     fireEvent.change(input, { target: { value: '12e' } })
     expect(input.value).toBe('12')
+  })
+})
+
+describe('grouped numeric input', () => {
+  it('shows thousands separators but hands back the plain number', () => {
+    let latest = ''
+    render(<GroupedField onValue={(v) => (latest = v)} />)
+    const input = screen.getByLabelText<HTMLInputElement>('Grouped')
+    fireEvent.change(input, { target: { value: '1234567.89' } })
+    expect(input.value).toBe('1,234,567.89')
+    expect(latest).toBe('1234567.89')
+    fireEvent.change(input, { target: { value: '1,234,567.891' } })
+    expect(input.value).toBe('1,234,567.89')
   })
 })

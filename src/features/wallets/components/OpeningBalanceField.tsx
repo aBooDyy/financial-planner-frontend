@@ -36,8 +36,7 @@ export function OpeningBalanceField({
         </span>
         <input
           id="node-amount"
-          value={amount}
-          {...amountInputProps(currency, onAmount, { signed: true })}
+          {...amountInputProps(currency, amount, onAmount, { signed: true })}
           className="min-w-0 flex-1 border-none bg-transparent p-0 text-[14px] font-semibold text-fp-text tabular-nums outline-none placeholder:font-medium placeholder:text-fp-text-3"
         />
         <CurrencyPicker

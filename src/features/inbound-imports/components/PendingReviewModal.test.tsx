@@ -196,7 +196,7 @@ describe('PendingReviewModal', () => {
       await screen.findByRole('button', { name: 'Use “212.40” as the amount' }),
     )
 
-    expect(screen.getByLabelText('Amount')).toHaveProperty('value', '212.4')
+    expect(screen.getByLabelText('Amount')).toHaveProperty('value', '212.40')
     expect(
       screen.getByRole('button', { name: 'Confirm & add' }),
     ).toHaveProperty('disabled', false)

@@ -135,8 +135,7 @@ export function QuickAddCard({
                 <ValueOrSkeleton value={symbol} className="h-3.5 w-5" />
               </span>
               <input
-                value={amount}
-                {...amountInputProps(currency, setAmount)}
+                {...amountInputProps(currency, amount, setAmount)}
                 className="w-[78px] border-none bg-transparent py-[11px] text-[18px] font-extrabold tabular-nums text-fp-text outline-none"
               />
             </div>
