@@ -63,6 +63,10 @@ const initialType = (
   return known ? catalog.get(known).type : 'spend'
 }
 
+/** A webhook's note is one its rule read off the payload; an email's subject is no note. */
+const initialNote = (item: LocalInboundImport): string =>
+  item.source === 'webhook' ? (item.subject ?? '') : ''
+
 /** The draft before any edit. Its category is left unchosen for `resolveDraft` to fill. */
 export function initialDraft(
   item: LocalInboundImport,
@@ -80,7 +84,7 @@ export function initialDraft(
     categoryId: '',
     walletId: wallet?.id ?? '',
     merchant: item.suggestedMerchant ?? '',
-    note: '',
+    note: initialNote(item),
   }
 }
 

@@ -90,7 +90,8 @@ title-cased by `displayName`, else the source — source · day, the amount or _
 the merchant hint (`MerchantHint`: "✦ Careem — you filed it under" + one `Chip` per category,
 the selected one active; tapping one picks it, switching Spend/Income with it), Spend/Income, then `ReviewFields` — amount and currency (red with "Enter it, or tap it
 in the email below." while missing), merchant, date, **category (the shared `CategoryPicker`:
-a category or a subcategory in one pick)**, account, note ("Defaults to the subject"). Then the
+a category or a subcategory in one pick)**, account, note — **empty by default**: an email's subject is never the note (the backend no longer
+falls back to it either); a webhook row's `subject` is the note its rule read, so it prefills. Then the
 body, then Ignore · Not a transaction · Confirm & add (disabled until `ready`).
 
 - **The body is not cached.** The card fetches `GET /inbound-imports/{id}` when it shows

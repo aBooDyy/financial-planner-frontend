@@ -130,4 +130,10 @@ describe('initialDraft + resolveDraft', () => {
         .categoryId,
     ).toBe(catId('dining'))
   })
+
+  it("leaves an email's note empty, but keeps the note a webhook read", () => {
+    expect(draftFor([]).note).toBe('')
+    const webhook = { ...item, source: 'webhook', subject: 'Lunch' } as const
+    expect(initialDraft(webhook, wallets, catalog, []).note).toBe('Lunch')
+  })
 })

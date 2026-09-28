@@ -132,11 +132,7 @@ export function ReviewFields({ card, wallets }: Props) {
           id={`${id}-note`}
           value={draft.note}
           onChange={(e) => setField('note', e.target.value)}
-          placeholder={
-            item.subject
-              ? 'Defaults to the subject'
-              : 'Defaults to the merchant'
-          }
+          placeholder="Add a note"
         />
       </div>
     </div>
