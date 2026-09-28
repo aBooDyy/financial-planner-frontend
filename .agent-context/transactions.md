@@ -158,7 +158,8 @@ flattening every red day; the square root keeps small days distinguishable from 
   pick once its account is archived or deleted (none left is `all`). Transactions on archived
   wallets stay in the history under "All accounts".
   **Multi-select**: a `DropdownMenu` of checkbox items (`ScopeMenuTree`), not a view — the
-  choice lives in page state only and resets like before. "All accounts" clears the ticks and
+  choice is kept for the session in `useEntrySession` (below), so leaving Spending and coming
+  back keeps it. "All accounts" clears the ticks and
   closes; ticking an account keeps the menu open. `Scope` is `all`, one `AccountPick` (wallet or
   group), or `{ type: 'accounts', picks }` for two or more (`scopeFromPicks` normalises); a
   wallet matches when it or one of its ancestor groups is picked, so every tab filters through
@@ -206,6 +207,15 @@ tx/budget/recurring editor state machine. Components are dumb (`components/`): p
   takes the page's `SpendingInputs` and its whole-ledger `deltas` to hand the dialog its
   accounts with live balances (`transferWallets` and `scopeSections` over those deltas); both
   callers render it only once `deltas` has landed.
+- **Session memory** (`stores/entrySession.ts`, `useEntrySession`): the wallet (and a
+  transfer's destination) and day of the last **new** entry, and the Spending account filter.
+  Zustand persisted to **sessionStorage** (`fp-entry-session`), so it survives route changes and
+  reloads but not a closed home-screen app; it is also dropped when the app comes back after more
+  than `SESSION_IDLE_MS` (1 h) hidden — the clock only runs while `visibilitychange` says hidden.
+  A day equal to today is stored as null, so the default keeps following the calendar. A new
+  entry starts on `useEntryDefaults`: the session's wallet, else Settings' **Default account**
+  (`preferences.defaultAccountId`), else the first live wallet (`data/entryDefaults.ts`; archived
+  or deleted picks fall through). The desktop Quick add card files to the same wallet.
 - **The transaction dialog** (`TransactionDialog`, from the "New Transaction Redesign" handoff).
   One `ResponsiveDialog` for Spend / Income / Transfer, titled "New transaction" or "Edit
   <type>". Top to bottom: `TxTypeSwitch` (pill segmented; the chosen type wears its tint —

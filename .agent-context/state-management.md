@@ -29,6 +29,9 @@ Query / server-cache layer** — see below.)
   store; components call them.
 - Persist only what should survive reload (e.g. theme, direction) via Zustand `persist`.
   Do **not** persist domain data here — that's the DB's job.
+- **Per-session UI memory** goes to **sessionStorage** (`createJSONStorage(() => sessionStorage)`),
+  not localStorage: `useEntrySession` (last entry wallet/day, Spending filter — see
+  [transactions.md](transactions.md)) and the onboarding draft. A closed home-screen app loses it.
 - **The session store persists its user by hand** (`stores/cachedUser.ts`, localStorage key
   `fp-session-user`), not with `persist`: the store is _created_ from it synchronously, so a
   device that has one renders the app on the first frame, and `status`/`verified` are derived

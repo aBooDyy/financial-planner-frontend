@@ -20,7 +20,8 @@ Notifications, Archived, Data & privacy. Each pane is its own route — see
   balance settings) — the **only** place to change it; `TopNav` carried a base switch until
   2026-09-27, removed as too prominent for a set-once choice. Number format, **date format**, week start, default account,
   hide-empty-wallets → `stores/preferences.ts` (`usePreferencesStore`, persisted to
-  localStorage). `dateFormat` is consumed app-wide: every specific calendar date renders via
+  localStorage). Default account is the new-entry wallet when the session has none of its own
+  (`useEntryDefaults`, [transactions.md](transactions.md)). `dateFormat` is consumed app-wide: every specific calendar date renders via
   `formatDate(date, fmt)` from `lib/date.ts` (default `dmy` → `16/06/2026`; also `mdy`, `ymd`).
   The transactions selectors (`buildActivityList`/`buildCashflow`/`buildBreakdown`/
   `buildCalendar`) and `buildGoalsView` take `dateFormat` as a trailing param (default `dmy`),

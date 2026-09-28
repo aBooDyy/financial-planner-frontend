@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type {
   LocalBalanceNode,
   LocalBudget,
@@ -55,6 +55,8 @@ import {
 } from '#/features/transactions/data/mutations'
 import type { CurrencyCode } from '#/lib/currency'
 import { minorToInputValue, parseAmountToMinor } from '#/lib/currency'
+import { useEntrySession } from '#/features/transactions/stores/entrySession'
+import { useEntryDefaults } from './useEntryDefaults'
 
 export type TxEditorKind = 'tx' | 'budget' | 'recurring'
 
@@ -152,11 +154,18 @@ export function useTxEditor(
   wallets: LocalBalanceNode[],
   base: CurrencyCode,
   rates: RatesMap,
+  archivedIds: ReadonlySet<string>,
 ) {
   const catalog = useCategoryCatalog()
   const [editing, setEditing] = useState<TxEditorState | null>(null)
+  const live = useMemo(
+    () => wallets.filter((w) => !archivedIds.has(w.id)),
+    [wallets, archivedIds],
+  )
+  const defaults = useEntryDefaults(live)
+  const rememberEntry = useEntrySession((s) => s.rememberEntry)
 
-  const defaultWalletId = wallets[0]?.id ?? ''
+  const defaultWalletId = defaults.walletId
   const walletCurrency = (walletId: string): CurrencyCode =>
     wallets.find((w) => w.id === walletId)?.currency ?? base
   const otherWallet = (walletId: string): string =>
@@ -185,9 +194,9 @@ export function useTxEditor(
     plannedId: null,
     merchantId: null,
     merchantName: '',
-    date: ymd(startOfToday()),
+    date: defaults.date,
     note: '',
-    toWalletId: otherWallet(defaultWalletId),
+    toWalletId: defaults.toWalletId,
     toAmount: '',
     toAmountEdited: false,
     name: '',
@@ -460,6 +469,12 @@ export function useTxEditor(
       }
     })
 
+  const remember = (
+    walletId: string,
+    toWalletId: string | undefined,
+    date: string,
+  ) => rememberEntry({ walletId, toWalletId, date, today: ymd(startOfToday()) })
+
   /** `link` overrides the draft's planned link and goal — the "Counts toward" field resolves them. */
   const save = async (link?: SaveLink) => {
     if (!editing) return
@@ -480,7 +495,10 @@ export function useTxEditor(
         note: draft.note.trim() || null,
       }
       if (id) await updateTransfer(id, payload)
-      else await createTransfer(payload)
+      else {
+        await createTransfer(payload)
+        remember(draft.walletId, draft.toWalletId, draft.date)
+      }
       close()
       return
     }
@@ -505,7 +523,10 @@ export function useTxEditor(
         note: draft.note.trim() || null,
       }
       if (id) await updateTransaction(id, payload)
-      else await createTransaction(payload)
+      else {
+        await createTransaction(payload)
+        remember(draft.walletId, undefined, draft.date)
+      }
       close()
       return
     }

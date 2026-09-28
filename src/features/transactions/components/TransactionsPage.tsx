@@ -29,6 +29,8 @@ import { useSpendingPeriod } from '#/features/transactions/hooks/useSpendingPeri
 import { useSpendingViews } from '#/features/transactions/hooks/useSpendingViews'
 import { useTransactions } from '#/features/transactions/hooks/useTransactions'
 import { useTxEditor } from '#/features/transactions/hooks/useTxEditor'
+import { useEntryDefaults } from '#/features/transactions/hooks/useEntryDefaults'
+import { useEntrySession } from '#/features/transactions/stores/entrySession'
 import { usePlanned } from '#/features/planned'
 import { ConfirmPlannedDialog } from '#/features/planned/components/ConfirmPlannedDialog'
 import { PlannedCard } from '#/features/planned/components/PlannedCard'
@@ -53,6 +55,7 @@ import { SpendingTabCard } from './SpendingTabCard'
 
 const NO_ROWS: LocalTransaction[] = []
 const NO_DELTAS: Record<string, number> = {}
+const ALL_ACCOUNTS: Scope = { type: 'all' }
 
 export function TransactionsPage() {
   const user = useSessionStore((s) => s.user)
@@ -69,7 +72,13 @@ export function TransactionsPage() {
     goals,
   } = useTransactions()
   const dateFormat = usePreferencesStore((s) => s.dateFormat)
-  const editor = useTxEditor(editorWallets, base, inputs.rates)
+  const editor = useTxEditor(
+    editorWallets,
+    base,
+    inputs.rates,
+    archivedWalletIds,
+  )
+  const entryDefaults = useEntryDefaults(wallets)
   const adjustment = useAdjustmentEditor()
   const { imports: pendingImports, count: pendingCount } = usePendingImports()
   const deepLinkedToReview =
@@ -83,7 +92,8 @@ export function TransactionsPage() {
   const originColor = useOriginColors()
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const plannedActions = usePlannedRowActions(setConfirmId)
-  const [chosenScope, setScope] = useState<Scope>({ type: 'all' })
+  const chosenScope = useEntrySession((s) => s.scope) ?? ALL_ACCOUNTS
+  const setScope = useEntrySession((s) => s.rememberScope)
   const [calOpen, setCalOpen] = useState(false)
 
   const today = startOfToday()
@@ -140,7 +150,8 @@ export function TransactionsPage() {
       })
   }
 
-  const activeWallet = wallets.length > 0 ? wallets[0] : null
+  const activeWallet =
+    wallets.find((w) => w.id === entryDefaults.walletId) ?? null
   const activeCurrency: CurrencyCode = activeWallet?.currency ?? base
   const { activity, budgets, recurring } = views
   const busy =

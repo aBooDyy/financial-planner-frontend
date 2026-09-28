@@ -26,7 +26,12 @@ function QuickAddEditor() {
     archivedWalletIds,
     goals,
   } = useTransactions()
-  const editor = useTxEditor(editorWallets, base, inputs.rates)
+  const editor = useTxEditor(
+    editorWallets,
+    base,
+    inputs.rates,
+    archivedWalletIds,
+  )
   const started = useRef(false)
 
   useEffect(() => {
