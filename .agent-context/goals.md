@@ -107,10 +107,11 @@ whether the plan is feasible. Domain terms: root
 - Kinds & frequencies are lowercase in the domain, mapped to the backend's UPPER_SNAKE wire in
   `api/types.ts` (`toWireKind`/`toWireFreq` etc.); `constants.ts` holds `FREQUENCIES`, `KINDS`,
   `GOAL_COLORS`, and fixed `STATUS_COLORS`.
-- **Custom frequencies (goals only).** A goal's `frequency` is an `ObligationFrequency` — a
-  preset `GoalFrequency` or `'custom'` with `customInterval` (1–365) + `customUnit`
-  (`day | week | month`); income and Spending schedules stay on the presets. **Every goal-side
-  cadence read goes through `data/cadence.ts`**: `frequencyMetaOf(goal)` returns the preset's
+- **Custom frequencies (goals and Spending schedules).** A goal's `frequency` is an
+  `ObligationFrequency` — a preset `GoalFrequency` or `'custom'` with `customInterval` (1–365) +
+  `customUnit` (`day | week | month`); a recurring schedule carries the same three fields
+  (see [transactions.md](transactions.md)); income stays on the presets. **Every cadence read
+  goes through `data/cadence.ts`**: `frequencyMetaOf(goal)` returns the preset's
   `FreqMeta` or one built by `customFrequencyMeta` ("Every 28 days", `/28d`, `perYear`
   365/28), each carrying a `cadence` (`{unit, every}`); `stepDue(anchor, cadence, n)` steps
   dues from the anchor (months keep its day, no drift) and `approxCyclesBetween` seeds the
@@ -122,9 +123,12 @@ whether the plan is feasible. Domain terms: root
   missing as null.
 - **Editor.** `FrequencyChips` takes an optional `custom` prop (goals pass it) adding a
   "Custom" chip; the draft keeps the preset in `frequency` plus `customRepeat` /
-  `customInterval` (string) / `customUnit`, so income code never sees `'custom'`.
-  `CustomIntervalField` reads "Every [28] [days ▾]" with an "About 13 times a year" hint;
-  `goalSaveBlocker` holds the save (the footer hint) while the interval is out of range.
+  `customInterval` (string) / `customUnit` — the shared `RepeatDraft` in `cadence.ts` — so
+  income code never sees `'custom'`. `repeatDraftOf(stored, fallback)` opens a stored repeat
+  as that draft and `repeatOfDraft` turns it back into what is saved; the recurring editor
+  uses the same pair. `CustomIntervalField` reads "Every [28] [days ▾]" with an "About 13
+  times a year" hint; `repeatBlock` (via `goalSaveBlocker`) holds the save (the footer hint)
+  while the interval is out of range.
   Set-asides show only when `cycleMonthsOf(draftFrequencyMeta(draft)) > 1`.
 
 ## Progress: set-asides vs payments (`data/progress.ts`)

@@ -1,15 +1,23 @@
 import { fromWireCurrency } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
 import type {
-  GoalFrequency,
-  GoalFrequencyWire,
+  IntervalUnit,
+  IntervalUnitWire,
+  ObligationFrequency,
+  ObligationFrequencyWire,
 } from '#/features/goals/api/types'
-import { fromWireFreq, toWireFreq } from '#/features/goals/api/types'
+import {
+  fromWireObligationFreq,
+  fromWireUnit,
+  toWireObligationFreq,
+  toWireUnit,
+} from '#/features/goals/api/types'
 
 /**
  * Internal representation stays lowercase (nice for UI/logic); the wire is the backend's
  * PersistedEnum UPPER_SNAKE name. Translate only at the wire boundary (mappers below).
- * Recurring cadence reuses the Goals `GoalFrequency` (same backend `Frequency` enum).
+ * Recurring cadence reuses the Goals `ObligationFrequency` (same backend `Frequency` enum),
+ * custom "every N units" included.
  */
 export type TxType = 'spend' | 'income'
 export type TxTypeWire = 'SPEND' | 'INCOME'
@@ -162,7 +170,10 @@ export type Recurring = {
   goalId: string | null
   /** Who each occurrence pays (or is paid by); copied onto what it posts. */
   merchantId: string | null
-  frequency: GoalFrequency
+  frequency: ObligationFrequency
+  /** "Every `customInterval` `customUnit`s" — set only when `frequency` is 'custom'. */
+  customInterval: number | null
+  customUnit: IntervalUnit | null
   nextDue: string
   /** The last date an occurrence may fall on; null repeats forever. */
   endsOn: string | null
@@ -219,7 +230,9 @@ export type RecurringWire = {
   wallet_id: string
   goal_id: string | null
   merchant_id: string | null
-  frequency: GoalFrequencyWire
+  frequency: ObligationFrequencyWire
+  custom_interval: number | null
+  custom_unit: IntervalUnitWire | null
   next_due: string
   ends_on: string | null
   autopost: boolean
@@ -396,7 +409,9 @@ export type CreateRecurringWire = {
   wallet_id: string
   goal_id: string | null
   merchant_id: string | null
-  frequency: GoalFrequencyWire
+  frequency: ObligationFrequencyWire
+  custom_interval: number | null
+  custom_unit: IntervalUnitWire | null
   next_due: string
   ends_on: string | null
   autopost: boolean
@@ -497,7 +512,9 @@ export const toRecurring = (w: RecurringWire): Recurring => ({
   walletId: w.wallet_id,
   goalId: w.goal_id,
   merchantId: w.merchant_id ?? null,
-  frequency: fromWireFreq(w.frequency),
+  frequency: fromWireObligationFreq(w.frequency),
+  customInterval: w.custom_interval ?? null,
+  customUnit: w.custom_unit ? fromWireUnit(w.custom_unit) : null,
   nextDue: w.next_due,
   endsOn: w.ends_on ?? null,
   autopost: w.autopost,
@@ -507,4 +524,4 @@ export const toRecurring = (w: RecurringWire): Recurring => ({
   version: w.version,
 })
 
-export { toWireFreq, fromWireFreq }
+export { toWireObligationFreq, toWireUnit }

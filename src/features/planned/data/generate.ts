@@ -8,13 +8,13 @@ import type {
   LocalPlanned,
   LocalRecurring,
 } from '#/db/types'
-import type { GoalFrequency } from '#/features/goals/api/types'
 import {
   approxCyclesBetween,
   cycleMonthsOf,
   frequencyMetaOf,
   stepDue,
 } from '#/features/goals/data/cadence'
+import type { Repeat } from '#/features/goals/data/cadence'
 import { clampSetAsideDay, datedSchedule } from '#/features/goals/data/planning'
 import { paydaysOf } from '#/features/goals/data/paydays'
 import type { GoalPlanEntry, GoalsPlan } from '#/features/goals/data/selectors'
@@ -107,7 +107,7 @@ const paysEachCycle = (goal: LocalGoal): boolean => goal.kind === 'recurring'
 /** Occurrences of a schedule anchored on `first`, stepping as the Spending schedules do. */
 function occurrencesFrom(
   first: string,
-  frequency: GoalFrequency,
+  repeat: Repeat,
   from: string,
   to: string,
 ): string[] {
@@ -115,12 +115,12 @@ function occurrencesFrom(
   let at = first
   let guard = 0
   while (at < from && guard < 5_000) {
-    at = advanceDue(at, frequency)
+    at = advanceDue(at, repeat)
     guard += 1
   }
   while (at <= to && out.length < MAX_CATCH_UP) {
     out.push(at)
-    at = advanceDue(at, frequency)
+    at = advanceDue(at, repeat)
   }
   return out
 }
@@ -247,7 +247,7 @@ function recurringRows(
     ? '0000-01-01'
     : addDaysISO(today, -MANUAL_LOOKBACK_DAYS)
   const to = r.endsOn && r.endsOn < until ? r.endsOn : until
-  return occurrencesFrom(r.nextDue, r.frequency, from, to).map((date) => ({
+  return occurrencesFrom(r.nextDue, r, from, to).map((date) => ({
     origin: 'recurring',
     originId: r.id,
     role: r.type === 'income' ? 'income' : 'payment',

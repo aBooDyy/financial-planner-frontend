@@ -252,7 +252,10 @@ export type LocalRecurring = {
   goalId: string | null
   /** Who each occurrence pays (or is paid by); copied onto what it posts. */
   merchantId: string | null
-  frequency: GoalFrequency
+  frequency: ObligationFrequency
+  /** "Every `customInterval` `customUnit`s" — set only when `frequency` is 'custom'. */
+  customInterval: number | null
+  customUnit: IntervalUnit | null
   nextDue: string
   /** The last date an occurrence may fall on; null repeats forever. */
   endsOn: string | null

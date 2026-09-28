@@ -9,7 +9,10 @@ import type {
   OutboxEntity,
 } from '#/db/types'
 import type { CurrencyCode } from '#/lib/currency'
-import type { GoalFrequency } from '#/features/goals/api/types'
+import type {
+  IntervalUnit,
+  ObligationFrequency,
+} from '#/features/goals/api/types'
 import { closeCovered, reopenUnderSettled } from '#/features/planned/data/rows'
 import type {
   AdjustmentType,
@@ -437,7 +440,9 @@ export type RecurringDraft = {
   walletId: string
   goalId: string | null
   merchantId: string | null
-  frequency: GoalFrequency
+  frequency: ObligationFrequency
+  customInterval: number | null
+  customUnit: IntervalUnit | null
   nextDue: string
   endsOn: string | null
   autopost: boolean

@@ -13,11 +13,12 @@ import type {
   UpdateTransferWire,
 } from '#/features/transactions/api/types'
 import {
-  toWireFreq,
+  toWireObligationFreq,
   toWirePeriod,
   toWireScope,
   toWireTransactionType,
   toWireTxType,
+  toWireUnit,
 } from '#/features/transactions/api/types'
 
 // --- Transactions --------------------------------------------------------------------
@@ -149,6 +150,18 @@ export const serverRecurringToLocal = (r: Recurring): LocalRecurring => ({
   deleted: 0,
 })
 
+// Rows stored before custom frequencies carry no interval fields at all.
+const recurringRepeatWire = (
+  l: LocalRecurring,
+): Pick<
+  CreateRecurringWire,
+  'frequency' | 'custom_interval' | 'custom_unit'
+> => ({
+  frequency: toWireObligationFreq(l.frequency),
+  custom_interval: l.customInterval ?? null,
+  custom_unit: l.customUnit ? toWireUnit(l.customUnit) : null,
+})
+
 export const localRecurringToCreateWire = (
   l: LocalRecurring,
 ): CreateRecurringWire => ({
@@ -161,7 +174,7 @@ export const localRecurringToCreateWire = (
   wallet_id: l.walletId,
   goal_id: l.goalId,
   merchant_id: l.merchantId ?? null,
-  frequency: toWireFreq(l.frequency),
+  ...recurringRepeatWire(l),
   next_due: l.nextDue,
   ends_on: l.endsOn ?? null,
   autopost: l.autopost,
@@ -180,7 +193,7 @@ export const localRecurringToUpdateWire = (
   wallet_id: l.walletId,
   goal_id: l.goalId,
   merchant_id: l.merchantId ?? null,
-  frequency: toWireFreq(l.frequency),
+  ...recurringRepeatWire(l),
   next_due: l.nextDue,
   ends_on: l.endsOn ?? null,
   autopost: l.autopost,

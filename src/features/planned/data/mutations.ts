@@ -76,7 +76,7 @@ async function advanceSchedulePast(item: LocalPlanned): Promise<void> {
   const r = await db.recurrings.get(item.recurringId)
   if (!r || r.deleted !== 0 || r.nextDue > item.occurrence) return
   let next = r.nextDue
-  while (next <= item.occurrence) next = advanceDue(next, r.frequency)
+  while (next <= item.occurrence) next = advanceDue(next, r)
   await advanceRecurring(r.id, next)
 }
 

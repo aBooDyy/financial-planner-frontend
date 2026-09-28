@@ -3,9 +3,9 @@
  * so the selectors stay pure and testable. Wire dates are ISO `YYYY-MM-DD` strings; these
  * helpers convert at the edge. Ported from the design's date helpers.
  */
-import { FREQUENCIES } from '#/features/goals/constants'
-import type { GoalFrequency } from '#/features/goals/api/types'
 import type { RangeMode } from '#/features/transactions/constants'
+import { frequencyMetaOf, stepDue } from '#/features/goals/data/cadence'
+import type { Repeat } from '#/features/goals/data/cadence'
 import { toMajor } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
 
@@ -147,18 +147,9 @@ export const relFuture = (iso: string, today: Date): string => {
 }
 
 /** Advance a recurring schedule one cadence forward from its current next-due. */
-export const advanceDue = (iso: string, freq: GoalFrequency): string => {
-  const d = parseISO(iso)
-  const step: Record<GoalFrequency, () => Date> = {
-    weekly: () => addDays(d, 7),
-    monthly: () => new Date(d.getFullYear(), d.getMonth() + 1, d.getDate()),
-    quarterly: () => new Date(d.getFullYear(), d.getMonth() + 3, d.getDate()),
-    semi: () => new Date(d.getFullYear(), d.getMonth() + 6, d.getDate()),
-    annual: () => new Date(d.getFullYear() + 1, d.getMonth(), d.getDate()),
-  }
-  return ymd(step[freq]())
-}
+export const advanceDue = (iso: string, repeat: Repeat): string =>
+  ymd(stepDue(parseISO(iso), frequencyMetaOf(repeat, 'monthly').cadence, 1))
 
 /** Normalize a recurring amount to a per-month figure using its cadence. */
-export const monthlyFactor = (freq: GoalFrequency): number =>
-  FREQUENCIES[freq].perYear / 12
+export const monthlyFactor = (repeat: Repeat): number =>
+  frequencyMetaOf(repeat, 'monthly').perYear / 12

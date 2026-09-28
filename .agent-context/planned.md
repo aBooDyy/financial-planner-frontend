@@ -73,8 +73,8 @@ builds the rows the origins call for today:
   functions of the stream, so every device derives the same dates and ids. Editing the
   anchor, frequency or day re-dates the future open unpinned unsettled paydays on the next
   `fill` (old occurrences removed, new ones created — paydays have no stored plan).
-- **Spending schedules** (ADR-6): PAYMENT or INCOME by type, iterating `advanceDue` from
-  `nextDue` (the old auto-poster's exact dates, so its markers match). Auto-post schedules catch
+- **Spending schedules** (ADR-6): PAYMENT or INCOME by type, iterating `advanceDue` (custom
+  intervals included) from `nextDue` (the old auto-poster's exact dates, so its markers match). Auto-post schedules catch
   up from `nextDue`; hand-confirmed ones surface only the last 31 days. Nothing is generated
   after `endsOn` (inclusive); `nextDue` may still advance past it, which is how a schedule ends.
 

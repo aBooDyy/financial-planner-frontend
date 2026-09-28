@@ -8,6 +8,7 @@ import type { LocalGoal, LocalMerchant } from '#/db/types'
 import type { TransferWallet } from '#/features/wallets/data/transferDialog'
 import { CategoryOptions } from '#/features/categories/components/CategoryOptions'
 import { useCategoryCatalog } from '#/features/categories/hooks/useCategoryCatalog'
+import { repeatBlock } from '#/features/goals/data/cadence'
 import { MerchantOptions } from '#/features/merchants/components/MerchantOptions'
 import { useMerchantName } from '#/features/merchants/hooks/useMerchantName'
 import {
@@ -110,7 +111,10 @@ export function RecurringEditor({
   const amountMinor = parseAmountToMinor(draft.amount, currency)
   const merchantName = useMerchantName(draft.merchantId, draft.merchantName)
   const endBlock = recurringEndBlock(draft.date, draft.endsOn)
-  const hint = cashflowBlock(amountMinor, wallet !== null) ?? endBlock
+  const hint =
+    cashflowBlock(amountMinor, wallet !== null) ??
+    repeatBlock(draft) ??
+    endBlock
   const amountMissing = attempted && (amountMinor ?? 0) <= 0
   const walletMissing = attempted && wallet === null
 
@@ -252,14 +256,20 @@ export function RecurringEditor({
           ) : null}
 
           <RecurringScheduleFields
-            frequency={draft.frequency}
+            repeat={draft}
             date={draft.date}
             endsOn={draft.endsOn}
             endInvalid={endBlock !== null}
             autopost={draft.autopost}
             tint={tint}
             dateFormat={dateFormat}
-            onFrequency={(f) => onField('frequency', f)}
+            onFrequency={(f) => {
+              onField('frequency', f)
+              onField('customRepeat', false)
+            }}
+            onCustom={() => onField('customRepeat', true)}
+            onCustomInterval={(v) => onField('customInterval', v)}
+            onCustomUnit={(u) => onField('customUnit', u)}
             onDate={(iso) => onField('date', iso)}
             onEndsOn={(endsOn) => onField('endsOn', endsOn)}
             onAutopost={(on) => onField('autopost', on)}

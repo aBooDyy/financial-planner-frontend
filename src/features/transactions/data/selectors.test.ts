@@ -304,6 +304,8 @@ describe('buildRecurringView', () => {
     endsOn: null,
     note: null,
     frequency: 'monthly',
+    customInterval: null,
+    customUnit: null,
     nextDue: '2026-06-25',
     autopost: true,
     createdAt: '',

@@ -69,7 +69,10 @@ belongs to [planned.md](planned.md#the-planned-tab-and-the-confirm-dialog-compon
   `goalId` → Saved, skipped by budgets) is gone. Its only special treatment left is the "Goal"
   pill.
 - **planning.ts** — date math (`windowOf`, `budgetWindow`, calendar grid, `advanceDue`,
-  `relFuture`), parameterized by `today` for testability. **`fmtK` takes minor units and a
+  `relFuture`), parameterized by `today` for testability. `advanceDue` and `monthlyFactor` take
+  a schedule's whole repeat (`frequency` + `customInterval` + `customUnit`) and read it through
+  the Goals `cadence.ts` (`frequencyMetaOf` + `stepDue`), so a custom "every 28 days"
+  schedule steps, totals and labels ("Every 28 days") the same way a custom goal does. **`fmtK` takes minor units and a
   currency code** — every caller holds minor units, so the major conversion lives there.
 
 ### The calendar — one cell shape, two grids
@@ -222,7 +225,9 @@ tx/budget/recurring editor state machine. Components are dumb (`components/`): p
   Spend | Income `PillSwitch`, "What is it? optional", `AmountWell` "How much each time?" with the
   `TxAccountPill` (currency follows the wallet), category chips, a note copied onto every
   occurrence, "Where?" (`TxMerchantField` opening the `MerchantOptions` pane, as in the transaction
-  dialog), `RecurringGoalSelect` (spend only), `RecurringScheduleFields` (Repeats chips, Next due
+  dialog), `RecurringGoalSelect` (spend only), `RecurringScheduleFields` (Repeats chips — the
+  five presets plus **Custom**, which opens the goal dialog's `CustomIntervalField` and holds the
+  save through `repeatBlock` while out of range; migration `0036` on the backend — Next due
   `DateField` with its "in 22d" hint, `RecurringEndField` — Ends: Never | On a date, defaulting a
   year after next due, blocked by `recurringEndBlock` when before it — and the Auto-post
   `ToggleCard`). A schedule whose `nextDue` has passed its `endsOn` has **ended**: the Recurring

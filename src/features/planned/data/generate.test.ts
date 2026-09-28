@@ -389,6 +389,28 @@ describe('desiredPlanned — Spending schedules', () => {
     expect(out.map((r) => r.occurrence)).toEqual(['2026-09-05', '2026-10-05'])
   })
 
+  it('steps a custom schedule by its own interval', () => {
+    const out = generate({
+      recurrings: [
+        recurring({
+          id: 'every-4-weeks',
+          autopost: true,
+          nextDue: '2026-09-05',
+          endsOn: '2026-11-30',
+          frequency: 'custom',
+          customInterval: 4,
+          customUnit: 'week',
+        }),
+      ],
+    })
+    expect(out.map((r) => r.occurrence)).toEqual([
+      '2026-09-05',
+      '2026-10-03',
+      '2026-10-31',
+      '2026-11-28',
+    ])
+  })
+
   it('schedules nothing once a schedule is past its end date', () => {
     const out = generate({
       recurrings: [

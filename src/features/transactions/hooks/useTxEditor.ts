@@ -8,7 +8,16 @@ import type {
 } from '#/db/types'
 import type { CategoryPrediction } from '#/features/merchants/hooks/useMerchantMatch'
 import { predictionFor } from '#/features/merchants/hooks/useMerchantMatch'
-import type { GoalFrequency } from '#/features/goals/api/types'
+import type { GoalFrequency, IntervalUnit } from '#/features/goals/api/types'
+import {
+  DEFAULT_CUSTOM_INTERVAL,
+  DEFAULT_CUSTOM_UNIT,
+} from '#/features/goals/constants'
+import {
+  repeatBlock,
+  repeatDraftOf,
+  repeatOfDraft,
+} from '#/features/goals/data/cadence'
 import type {
   BudgetPeriod,
   BudgetScope,
@@ -78,6 +87,10 @@ export type TxEditorDraft = {
   // recurring
   name: string
   frequency: GoalFrequency
+  /** Repeat every `customInterval` `customUnit`s instead of `frequency`. */
+  customRepeat: boolean
+  customInterval: string
+  customUnit: IntervalUnit
   autopost: boolean
   /** The last date an occurrence may fall on; null repeats forever. */
   endsOn: string | null
@@ -179,6 +192,9 @@ export function useTxEditor(
     toAmountEdited: false,
     name: '',
     frequency: 'monthly',
+    customRepeat: false,
+    customInterval: String(DEFAULT_CUSTOM_INTERVAL),
+    customUnit: DEFAULT_CUSTOM_UNIT,
     autopost: false,
     endsOn: null,
     scopeType: 'category',
@@ -283,7 +299,7 @@ export function useTxEditor(
         walletId: r.walletId,
         goalId: r.goalId,
         merchantId: r.merchantId ?? null,
-        frequency: r.frequency,
+        ...repeatDraftOf(r, 'monthly'),
         autopost: r.autopost,
         date: r.nextDue,
         endsOn: r.endsOn ?? null,
@@ -521,7 +537,7 @@ export function useTxEditor(
     if (!draft.walletId) return
     const currency = walletCurrency(draft.walletId)
     const amount = parseAmountToMinor(draft.amount, currency) ?? 0
-    if (amount <= 0) return
+    if (amount <= 0 || repeatBlock(draft)) return
     const payload = {
       name: draft.name.trim() || 'Recurring',
       type: draft.type,
@@ -531,7 +547,7 @@ export function useTxEditor(
       walletId: draft.walletId,
       goalId: draft.type === 'spend' ? draft.goalId : null,
       merchantId: draft.merchantId,
-      frequency: draft.frequency,
+      ...repeatOfDraft(draft),
       nextDue: draft.date,
       endsOn: draft.endsOn,
       autopost: draft.autopost,

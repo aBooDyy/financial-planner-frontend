@@ -245,6 +245,8 @@ const RECURRINGS: LocalRecurring[] = [
     endsOn: null,
     note: null,
     frequency: 'monthly',
+    customInterval: null,
+    customUnit: null,
     nextDue: '2026-10-01',
     autopost: true,
     ...meta,

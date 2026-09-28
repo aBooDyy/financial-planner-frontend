@@ -85,6 +85,8 @@ export const recurring = (
   endsOn: null,
   note: null,
   frequency: 'monthly',
+  customInterval: null,
+  customUnit: null,
   nextDue: '2026-10-05',
   autopost: false,
   createdAt: '',

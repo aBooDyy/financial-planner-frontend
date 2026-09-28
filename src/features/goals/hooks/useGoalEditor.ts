@@ -7,7 +7,6 @@ import type {
   ObligationFrequency,
 } from '#/features/goals/api/types'
 import {
-  CUSTOM_INTERVAL_MAX,
   DEFAULT_CUSTOM_INTERVAL,
   DEFAULT_CUSTOM_UNIT,
   GOAL_COLORS,
@@ -18,7 +17,11 @@ import {
   customFrequencyMeta,
   frequencyMetaOf,
   isValidInterval,
+  repeatBlock,
+  repeatDraftOf,
+  repeatOfDraft,
 } from '#/features/goals/data/cadence'
+import type { RepeatDraft } from '#/features/goals/data/cadence'
 import {
   addMonths,
   nextDueDefault,
@@ -81,11 +84,6 @@ export const isEditorDirty = ({ draft, initial }: EditorState): boolean =>
     (key) => draft[key] !== initial[key],
   )
 
-type RepeatDraft = Pick<
-  EditorDraft,
-  'frequency' | 'customRepeat' | 'customInterval' | 'customUnit'
->
-
 /** The repeat a draft would save, if the custom interval it holds is usable. */
 export const draftFrequencyMeta = (draft: RepeatDraft): FreqMeta => {
   const every = Number(draft.customInterval)
@@ -103,11 +101,7 @@ const defaultDueFor = (kind: GoalKind, draft: RepeatDraft): string => {
 
 /** Why the draft can't be saved yet, or null when it can. */
 export const goalSaveBlocker = (draft: EditorDraft): string | null =>
-  RECURRING_KINDS.includes(draft.kind) &&
-  draft.customRepeat &&
-  !isValidInterval(Number(draft.customInterval))
-    ? `Repeat every 1 to ${CUSTOM_INTERVAL_MAX} days, weeks or months`
-    : null
+  RECURRING_KINDS.includes(draft.kind) ? repeatBlock(draft) : null
 
 type PaydayDraft = Pick<
   EditorDraft,
@@ -153,21 +147,6 @@ export const parseSetAsideDay = (value: string): number | null => {
   return Number.isFinite(day) && day >= 1 && day <= 28 ? day : null
 }
 
-/** A stored goal's repeat as the editor holds it: a preset, or the custom chip and its interval. */
-function repeatDraftOf(
-  frequency: ObligationFrequency | null,
-  customInterval: number | null | undefined,
-  customUnit: IntervalUnit | null | undefined,
-): Partial<EditorDraft> {
-  if (frequency !== 'custom') return { frequency: frequency ?? 'annual' }
-  return {
-    frequency: 'monthly',
-    customRepeat: true,
-    customInterval: String(customInterval ?? DEFAULT_CUSTOM_INTERVAL),
-    customUnit: customUnit ?? DEFAULT_CUSTOM_UNIT,
-  }
-}
-
 /** The repeat a goal of `kind` saves from the draft. */
 function repeatOf(
   kind: GoalKind,
@@ -179,17 +158,7 @@ function repeatOf(
 } {
   if (!RECURRING_KINDS.includes(kind))
     return { frequency: null, customInterval: null, customUnit: null }
-  if (!draft.customRepeat)
-    return {
-      frequency: draft.frequency,
-      customInterval: null,
-      customUnit: null,
-    }
-  return {
-    frequency: 'custom',
-    customInterval: Number(draft.customInterval),
-    customUnit: draft.customUnit,
-  }
+  return repeatOfDraft(draft)
 }
 
 export function useGoalEditor(defaultCurrency: CurrencyCode) {
@@ -266,7 +235,7 @@ export function useGoalEditor(defaultCurrency: CurrencyCode) {
               : '',
         currency: g.currency,
         color: g.color,
-        ...repeatDraftOf(g.frequency, g.customInterval, g.customUnit),
+        ...repeatDraftOf(g, 'annual'),
         kind: g.kind,
         saved: g.saved ? minorToInputValue(g.saved, g.currency) : '',
         dueISO: (g.kind === 'onetime' ? g.dueDate : g.nextDue) ?? '',

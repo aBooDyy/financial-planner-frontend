@@ -341,6 +341,8 @@ const recurring = (id: string, categoryId: string): LocalRecurring => ({
   endsOn: null,
   note: null,
   frequency: 'monthly',
+  customInterval: null,
+  customUnit: null,
   nextDue: '2026-10-01',
   autopost: false,
   createdAt: '2026-06-12T00:00:00Z',

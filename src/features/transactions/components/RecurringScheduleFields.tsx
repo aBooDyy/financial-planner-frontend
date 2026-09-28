@@ -2,14 +2,16 @@ import { Chip, ChipRow } from '#/components/dialog/Chip'
 import { ToggleCard } from '#/components/dialog/ToggleCard'
 import { DateField } from '#/components/DateField'
 import { FieldLabel } from '#/components/FieldLabel'
-import { FREQUENCIES } from '#/features/goals/constants'
-import type { GoalFrequency } from '#/features/goals/api/types'
+import { CustomIntervalField } from '#/features/goals/components/CustomIntervalField'
+import { FREQUENCIES, FREQUENCY_OPTIONS } from '#/features/goals/constants'
+import type { GoalFrequency, IntervalUnit } from '#/features/goals/api/types'
+import type { RepeatDraft } from '#/features/goals/data/cadence'
 import type { DateFormat } from '#/lib/date'
 import { RecurringEndField } from './RecurringEndField'
 import { TxSection } from './TxSection'
 
 type Props = {
-  frequency: GoalFrequency
+  repeat: RepeatDraft
   date: string
   endsOn: string | null
   /** Marks the end date as falling before the next due date. */
@@ -19,16 +21,17 @@ type Props = {
   tint: string
   dateFormat: DateFormat
   onFrequency: (f: GoalFrequency) => void
+  onCustom: () => void
+  onCustomInterval: (value: string) => void
+  onCustomUnit: (unit: IntervalUnit) => void
   onDate: (iso: string) => void
   onEndsOn: (endsOn: string | null) => void
   onAutopost: (on: boolean) => void
 }
 
-const FREQUENCY_KEYS = Object.keys(FREQUENCIES) as GoalFrequency[]
-
-/** When a recurring entry comes round: how often, the next due date, when it stops, and whether it posts itself. */
+/** When a recurring entry comes round: how often (a preset or every N days / weeks / months), the next due date, when it stops, and whether it posts itself. */
 export function RecurringScheduleFields({
-  frequency,
+  repeat,
   date,
   endsOn,
   endInvalid,
@@ -36,6 +39,9 @@ export function RecurringScheduleFields({
   tint,
   dateFormat,
   onFrequency,
+  onCustom,
+  onCustomInterval,
+  onCustomUnit,
   onDate,
   onEndsOn,
   onAutopost,
@@ -44,10 +50,10 @@ export function RecurringScheduleFields({
     <>
       <TxSection label="Repeats">
         <ChipRow label="Frequency">
-          {FREQUENCY_KEYS.map((f) => (
+          {FREQUENCY_OPTIONS.map((f) => (
             <Chip
               key={f}
-              active={frequency === f}
+              active={!repeat.customRepeat && repeat.frequency === f}
               color={tint}
               size="sm"
               onClick={() => onFrequency(f)}
@@ -55,7 +61,25 @@ export function RecurringScheduleFields({
               {FREQUENCIES[f].label}
             </Chip>
           ))}
+          <Chip
+            active={repeat.customRepeat}
+            color={tint}
+            size="sm"
+            onClick={onCustom}
+          >
+            Custom
+          </Chip>
         </ChipRow>
+        {repeat.customRepeat ? (
+          <div className="mt-3">
+            <CustomIntervalField
+              interval={repeat.customInterval}
+              unit={repeat.customUnit}
+              onInterval={onCustomInterval}
+              onUnit={onCustomUnit}
+            />
+          </div>
+        ) : null}
       </TxSection>
 
       <div>

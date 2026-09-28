@@ -1,16 +1,34 @@
 /**
- * A goal's repeat rule as one shape: a preset frequency or a custom "every N days / weeks /
- * months". Every due-date step and every cadence string for a goal reads from here.
+ * A repeat rule as one shape: a preset frequency or a custom "every N days / weeks /
+ * months". Every due-date step and every cadence string for a goal or a recurring schedule
+ * reads from here.
  */
 import type { LocalGoal } from '#/db/types'
-import type { GoalFrequency, IntervalUnit } from '#/features/goals/api/types'
-import { CUSTOM_INTERVAL_MAX, FREQUENCIES } from '#/features/goals/constants'
+import type {
+  GoalFrequency,
+  IntervalUnit,
+  ObligationFrequency,
+} from '#/features/goals/api/types'
+import {
+  CUSTOM_INTERVAL_MAX,
+  DEFAULT_CUSTOM_INTERVAL,
+  DEFAULT_CUSTOM_UNIT,
+  FREQUENCIES,
+} from '#/features/goals/constants'
 import type { Cadence, FreqMeta } from '#/features/goals/constants'
 
-export type GoalRepeat = Pick<
+export type Repeat = Pick<
   LocalGoal,
   'frequency' | 'customInterval' | 'customUnit'
 >
+
+/** A repeat as an editor holds it: the preset chip, or the custom chip and its interval as typed. */
+export type RepeatDraft = {
+  frequency: GoalFrequency
+  customRepeat: boolean
+  customInterval: string
+  customUnit: IntervalUnit
+}
 
 const UNIT_WORDS: Record<
   IntervalUnit,
@@ -50,9 +68,9 @@ export function customFrequencyMeta(
   }
 }
 
-/** The goal's frequency metadata; `fallback` stands in for a missing frequency. */
+/** The repeat's frequency metadata; `fallback` stands in for a missing frequency. */
 export function frequencyMetaOf(
-  g: GoalRepeat,
+  g: Repeat,
   fallback: GoalFrequency = 'annual',
 ): FreqMeta {
   if (g.frequency !== 'custom') return FREQUENCIES[g.frequency ?? fallback]
@@ -60,6 +78,47 @@ export function frequencyMetaOf(
     ? customFrequencyMeta(g.customInterval, g.customUnit)
     : FREQUENCIES[fallback]
 }
+
+/** A stored repeat as an editor holds it; `fallback` stands in for a missing frequency. */
+export function repeatDraftOf(r: Repeat, fallback: GoalFrequency): RepeatDraft {
+  if (r.frequency !== 'custom')
+    return {
+      frequency: r.frequency ?? fallback,
+      customRepeat: false,
+      customInterval: String(DEFAULT_CUSTOM_INTERVAL),
+      customUnit: DEFAULT_CUSTOM_UNIT,
+    }
+  return {
+    frequency: 'monthly',
+    customRepeat: true,
+    customInterval: String(r.customInterval ?? DEFAULT_CUSTOM_INTERVAL),
+    customUnit: r.customUnit ?? DEFAULT_CUSTOM_UNIT,
+  }
+}
+
+/** The repeat a draft saves: its preset, or its custom interval. */
+export const repeatOfDraft = (
+  draft: RepeatDraft,
+): {
+  frequency: ObligationFrequency
+  customInterval: number | null
+  customUnit: IntervalUnit | null
+} =>
+  draft.customRepeat
+    ? {
+        frequency: 'custom',
+        customInterval: Number(draft.customInterval),
+        customUnit: draft.customUnit,
+      }
+    : { frequency: draft.frequency, customInterval: null, customUnit: null }
+
+/** Why a draft's repeat can't be saved yet, or null when it can. */
+export const repeatBlock = (
+  draft: Pick<RepeatDraft, 'customRepeat' | 'customInterval'>,
+): string | null =>
+  draft.customRepeat && !isValidInterval(Number(draft.customInterval))
+    ? `Repeat every 1 to ${CUSTOM_INTERVAL_MAX} days, weeks or months`
+    : null
 
 /** Whole months between dues, at least one — the planner's month-granular view of a cycle. */
 export const cycleMonthsOf = (meta: FreqMeta): number =>

@@ -11,7 +11,7 @@ import type {
   LocalRecurring,
   LocalTransaction,
 } from '#/db/types'
-import { FREQUENCIES } from '#/features/goals/constants'
+import { frequencyMetaOf } from '#/features/goals/data/cadence'
 import type { AdjustmentType, TxType } from '#/features/transactions/api/types'
 import { isAdjustment, isCashflow } from '#/features/transactions/api/types'
 import { AMBER, AT_RISK_RATIO, RED } from '#/features/transactions/constants'
@@ -1444,7 +1444,7 @@ export function buildRecurringView(
     (s, r) =>
       s +
       convertMinor(r.amount, r.currency, data.base, data.rates) *
-        monthlyFactor(r.frequency),
+        monthlyFactor(r),
     0,
   )
 
@@ -1478,7 +1478,7 @@ export function buildRecurringView(
       catName: cat.name,
       walletName: wallet?.name ?? '',
       walletColor: wallet?.color ?? 'var(--fp-border-strong)',
-      cadenceLabel: FREQUENCIES[r.frequency].label,
+      cadenceLabel: frequencyMetaOf(r).label,
       autopost: r.autopost,
       isIncome: r.type === 'income',
       amountStr: `${r.type === 'income' ? '+' : '−'}${formatMoneyRounded(
@@ -1527,7 +1527,7 @@ export function buildRecurringView(
     segments: spend.map((r) => {
       const perMonth =
         convertMinor(r.amount, r.currency, data.base, data.rates) *
-        monthlyFactor(r.frequency)
+        monthlyFactor(r)
       const pct = (perMonth / denom) * 100
       return {
         key: r.id,
