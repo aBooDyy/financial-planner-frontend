@@ -15,8 +15,7 @@ import { frequencyMetaOf } from '#/features/goals/data/cadence'
 import type { AdjustmentType, TxType } from '#/features/transactions/api/types'
 import { isAdjustment, isCashflow } from '#/features/transactions/api/types'
 import { AMBER, AT_RISK_RATIO, RED } from '#/features/transactions/constants'
-import type { RangeMode } from '#/features/transactions/constants'
-import type { DateWindow } from './planning'
+import type { DateWindow, Period } from './planning'
 import { DELETED_CATEGORY_ID } from '#/features/categories/data/catalog'
 import type { CategoryCatalog } from '#/features/categories/data/catalog'
 import { liveBalancesFrom } from './ledger'
@@ -25,8 +24,10 @@ import { GROUP_ICON, WALLET_ICON, iconIdOr } from '#/lib/icons/fallbacks'
 import type { IconId } from '#/lib/icons/catalog.gen'
 import {
   addDays,
+  addMonths,
   budgetWindow,
   dayKey,
+  daysIn,
   fmtK,
   fmtMonth,
   fmtMonthShort,
@@ -40,28 +41,32 @@ import {
   sameDay,
   sameMonth,
   startOfWeek,
-  windowOf,
 } from './planning'
 
-/** The header caption for a range: "2026", "June 2026", "Jun 1 – Jun 7" or a single date. */
-function rangeLabel(
-  anchor: Date,
-  mode: RangeMode,
-  win: DateWindow,
-  dateFormat: DateFormat,
-): string {
-  if (mode === 'day') return formatDate(anchor, dateFormat)
-  if (mode === 'week') return `${fmtShort(win.start)} – ${fmtShort(win.end)}`
-  if (mode === 'year') return String(anchor.getFullYear())
-  return fmtMonth(anchor)
+/** "Jun 3 – Jul 14, 2026", or with both years when the span crosses one. */
+function customLabel(win: DateWindow, dateFormat: DateFormat): string {
+  const { start, end } = win
+  if (sameDay(start, end)) return formatDate(start, dateFormat)
+  if (start.getFullYear() === end.getFullYear())
+    return `${fmtShort(start)} – ${fmtShort(end)}, ${end.getFullYear()}`
+  return `${fmtShort(start)}, ${start.getFullYear()} – ${fmtShort(end)}, ${end.getFullYear()}`
 }
 
-/** The caption for the period on screen, as the hero and the donut head it. */
-export const periodCaption = (
-  anchor: Date,
-  mode: RangeMode,
+/**
+ * The caption for the period on screen, as the header, the hero and the donut head it:
+ * "2026", "June 2026", "Jun 1 – Jun 7", a single date, or a custom span.
+ */
+export function periodCaption(
+  period: Period,
   dateFormat: DateFormat = DEFAULT_DATE_FORMAT,
-): string => rangeLabel(anchor, mode, windowOf(anchor, mode), dateFormat)
+): string {
+  const { mode, start, end } = period
+  if (mode === 'day') return formatDate(start, dateFormat)
+  if (mode === 'week') return `${fmtShort(start)} – ${fmtShort(end)}`
+  if (mode === 'year') return String(start.getFullYear())
+  if (mode === 'month') return fmtMonth(start)
+  return customLabel(period, dateFormat)
+}
 
 type RatesMap = Partial<Record<string, number>>
 
@@ -374,11 +379,9 @@ export function buildCashflow(
   data: SpendingData,
   catalog: CategoryCatalog,
   scope: Scope,
-  anchor: Date,
-  mode: RangeMode,
+  win: Period,
   dateFormat: DateFormat = DEFAULT_DATE_FORMAT,
 ): CashflowView {
-  const win = windowOf(anchor, mode)
   const txns = flowTxns(data, scope).filter((t) => inWindow(t.date, win))
 
   let income = 0
@@ -413,11 +416,9 @@ export function buildCashflow(
         ]
       : []
 
-  const periodLabel = rangeLabel(anchor, mode, win, dateFormat)
-
   return {
     title: 'Cashflow',
-    sub: periodLabel,
+    sub: periodCaption(win, dateFormat),
     incomeStr: formatMoneyRounded(income, data.base),
     spentStr: formatMoneyRounded(spent, data.base),
     savedStr: formatMoneyRounded(saved, data.base),
@@ -465,11 +466,9 @@ export function buildBreakdown(
   data: SpendingData,
   catalog: CategoryCatalog,
   scope: Scope,
-  anchor: Date,
-  mode: RangeMode,
+  win: Period,
   dateFormat: DateFormat = DEFAULT_DATE_FORMAT,
 ): BreakdownView {
-  const win = windowOf(anchor, mode)
   const txns = flowTxns(data, scope).filter(
     (t) => inWindow(t.date, win) && t.type === 'spend',
   )
@@ -495,10 +494,8 @@ export function buildBreakdown(
   }
   if (stops.length === 0) stops.push('var(--fp-surface-2) 0% 100%')
 
-  const periodLabel = rangeLabel(anchor, mode, win, dateFormat)
-
   return {
-    sub: periodLabel,
+    sub: periodCaption(win, dateFormat),
     hasData: sorted.length > 0,
     centerStr: fmtK(outflow, data.base),
     gradient: `conic-gradient(${stops.join(',')})`,
@@ -822,12 +819,10 @@ export function buildActivityList(
   data: SpendingData,
   catalog: CategoryCatalog,
   scope: Scope,
-  anchor: Date,
-  mode: RangeMode,
+  win: Period,
   today: Date,
   dateFormat: DateFormat = DEFAULT_DATE_FORMAT,
 ): ActivityListView {
-  const win = windowOf(anchor, mode)
   const ctx: ActivityContext = {
     data,
     catalog,
@@ -890,11 +885,11 @@ export function buildActivityList(
 
   const count = groups.reduce((n, g) => n + g.rows.length, 0)
   const countStr =
-    mode === 'week'
+    win.mode === 'week'
       ? `${count} this week`
-      : mode === 'day'
-        ? `${count} on ${fmtShort(anchor)}`
-        : `${count} in ${rangeLabel(anchor, mode, win, DEFAULT_DATE_FORMAT)}`
+      : win.mode === 'day'
+        ? `${count} on ${fmtShort(win.start)}`
+        : `${count} in ${periodCaption(win, dateFormat)}`
 
   const accounts = scope.type === 'accounts' ? 'these accounts' : 'this account'
   const emptyTitle =
@@ -1042,42 +1037,89 @@ function monthWeeks(anchor: Date): { first: Date; last: Date } {
   }
 }
 
+/** The longest custom span still drawn as days; a longer one is drawn as months. */
+export const CUSTOM_DAY_GRID_MAX_DAYS = 62
+
+/** A year, or a custom span too long for days, is drawn as a grid of months. */
+export const calendarGridOf = (period: Period): CalendarView['grid'] =>
+  period.mode === 'year' ||
+  (period.mode === 'custom' && daysIn(period) > CUSTOM_DAY_GRID_MAX_DAYS)
+    ? 'months'
+    : 'days'
+
 /**
- * Every day the calendar can show for this anchor: the year, or the whole weeks of the
- * anchor's month — which hold any week the day grid pins open, as it lies in that month.
+ * Every day the calendar can show for a period: the whole of a month grid; for a range mode,
+ * the whole weeks of the anchor's month — which hold any week the day grid pins open, as it
+ * lies in that month; for a custom span, the whole weeks it touches.
  */
-export function calendarSpan(anchor: Date, mode: RangeMode): DateWindow {
-  if (mode === 'year') return windowOf(anchor, 'year')
-  const { first, last } = monthWeeks(anchor)
+export function calendarSpan(period: Period): DateWindow {
+  if (calendarGridOf(period) === 'months') return period
+  if (period.mode === 'custom')
+    return {
+      start: startOfWeek(period.start),
+      end: addDays(startOfWeek(period.end), 6),
+    }
+  const { first, last } = monthWeeks(period.start)
   return { start: first, end: addDays(last, 6) }
+}
+
+/**
+ * What a day grid lays out: its first and last week, the week held open when folded, the
+ * days its shades scale against, and what unfolding it shows.
+ */
+type DayFrame = {
+  first: Date
+  last: Date
+  pivot: Date
+  scalesWith: (d: Date) => boolean
+  whole: string
+}
+
+// A range mode scales against the anchor's month, so a day keeps its shade as you move
+// between month, week and day view; a custom span scales against itself.
+function dayFrame(
+  period: Period,
+  today: Date,
+  dateFormat: DateFormat,
+): DayFrame {
+  if (period.mode === 'custom') {
+    const first = startOfWeek(period.start)
+    return {
+      first,
+      last: startOfWeek(period.end),
+      pivot: inWindow(dayKey(today), period) ? startOfWeek(today) : first,
+      scalesWith: (d) => inWindow(dayKey(d), period),
+      whole: periodCaption(period, dateFormat),
+    }
+  }
+  const anchor = period.start
+  const { first, last } = monthWeeks(anchor)
+  const pivot =
+    period.mode === 'month'
+      ? startOfWeek(sameMonth(anchor, today) ? today : anchor)
+      : startOfWeek(anchor)
+  return {
+    first,
+    last,
+    pivot,
+    scalesWith: (d) => sameMonth(d, anchor),
+    whole: fmtMonth(anchor),
+  }
 }
 
 function buildDayGrid(
   data: SpendingData,
   txns: FlowTxn[],
-  anchor: Date,
-  mode: RangeMode,
+  period: Period,
   calOpen: boolean,
   today: Date,
   dateFormat: DateFormat,
 ): DayGridView {
   const { spend: perDaySpend, inc: perDayInc } = perDayTotals(txns, data)
-
-  const calY = anchor.getFullYear()
-  const calM = anchor.getMonth()
-  const curMonth = sameMonth(anchor, today)
-  const weekStart =
-    mode === 'month'
-      ? startOfWeek(curMonth ? today : new Date(calY, calM, 1))
-      : startOfWeek(anchor)
-
-  // Shades scale against the anchor's month in every mode, so a day keeps its shade as you
-  // move between month, week and day view.
-  const peaks = netPeaks(perDayInc, perDaySpend, (k) => {
-    const d = parseISO(k)
-    return d.getFullYear() === calY && d.getMonth() === calM
-  })
-  const selected = windowOf(anchor, mode)
+  const frame = dayFrame(period, today, dateFormat)
+  const peaks = netPeaks(perDayInc, perDaySpend, (k) =>
+    frame.scalesWith(parseISO(k)),
+  )
 
   const cellFor = (d: Date): PeriodCell => {
     const k = dayKey(d)
@@ -1085,9 +1127,9 @@ function buildDayGrid(
       {
         key: k,
         label: String(d.getDate()),
-        outside: !inWindow(k, selected),
+        outside: !inWindow(k, period),
         isCurrent: sameDay(d, today),
-        isActive: mode === 'day' && dayKey(anchor) === k,
+        isActive: period.mode === 'day' && sameDay(period.start, d),
       },
       perDayInc.get(k) ?? 0,
       perDaySpend.get(k) ?? 0,
@@ -1099,70 +1141,84 @@ function buildDayGrid(
   const weekOf = (start: Date) =>
     [0, 1, 2, 3, 4, 5, 6].map((i) => cellFor(addDays(start, i)))
 
-  const { first: gridStart, last: lastWeekStart } = monthWeeks(anchor)
   const weekIndex = (start: Date) =>
-    Math.round((midnight(start) - midnight(gridStart)) / (7 * 86_400_000))
-  const weekCount = weekIndex(lastWeekStart) + 1
-  const pivotIndex = weekIndex(weekStart)
+    Math.round((midnight(start) - midnight(frame.first)) / (7 * 86_400_000))
+  const weekCount = weekIndex(frame.last) + 1
+  const pivotIndex = weekIndex(frame.pivot)
 
   const rowsBefore: PeriodCell[][] = []
   const rowsAfter: PeriodCell[][] = []
   for (let w = 0; w < weekCount; w += 1) {
     if (w === pivotIndex) continue
-    const days = weekOf(addDays(gridStart, w * 7))
+    const days = weekOf(addDays(frame.first, w * 7))
     if (w < pivotIndex) rowsBefore.push(days)
     else rowsAfter.push(days)
   }
 
-  const weekSpan = `${fmtShort(weekStart)} – ${fmtShort(addDays(weekStart, 6))}`
-  const folded = `Week of ${weekSpan} — unfold for ${fmtMonth(anchor)}.`
+  const weekSpan = `${fmtShort(frame.pivot)} – ${fmtShort(addDays(frame.pivot, 6))}`
   let caption: string
   if (calOpen) {
-    caption = `${fmtMonth(anchor)} — tap any day to focus.`
-  } else if (mode === 'day') {
-    caption = `Focused on ${formatDate(anchor, dateFormat)} — tap another day, or unfold the month.`
-  } else if (mode === 'week') {
+    caption = `${frame.whole} — tap any day to focus.`
+  } else if (period.mode === 'day') {
+    caption = `Focused on ${formatDate(period.start, dateFormat)} — tap another day, or unfold the month.`
+  } else if (period.mode === 'week') {
     caption = `Week of ${weekSpan} — tap a day to focus it.`
   } else {
-    caption = folded
+    caption = `Week of ${weekSpan} — unfold for ${frame.whole}.`
   }
 
   return {
     grid: 'days',
     weekdayLabels: WEEKDAYS,
-    pivotRow: weekOf(weekStart),
+    pivotRow: weekOf(frame.pivot),
     rowsBefore,
     rowsAfter,
     caption,
   }
 }
 
+/** The first of every month the period touches, in order. */
+function monthsOf(period: Period): Date[] {
+  const months: Date[] = []
+  for (
+    let d = new Date(period.start.getFullYear(), period.start.getMonth(), 1);
+    d <= period.end;
+    d = addMonths(d, 1)
+  )
+    months.push(d)
+  return months
+}
+
 function buildMonthGrid(
   data: SpendingData,
   txns: FlowTxn[],
-  anchor: Date,
+  period: Period,
   calOpen: boolean,
   today: Date,
+  dateFormat: DateFormat,
 ): MonthGridView {
-  const year = anchor.getFullYear()
   const perMonthSpend = new Map<string, number>()
   const perMonthInc = new Map<string, number>()
   for (const t of txns) {
-    const d = parseISO(t.date)
-    if (d.getFullYear() !== year) continue
-    const k = monthKey(d)
+    if (!inWindow(t.date, period)) continue
+    const k = monthKey(parseISO(t.date))
     const bucket = t.type === 'income' ? perMonthInc : perMonthSpend
     bucket.set(k, (bucket.get(k) ?? 0) + toBase(t, data))
   }
   const peaks = netPeaks(perMonthInc, perMonthSpend, () => true)
 
-  const months = [...Array(12).keys()].map((m) => {
-    const d = new Date(year, m, 1)
+  const firsts = monthsOf(period)
+  const oneYear = period.start.getFullYear() === period.end.getFullYear()
+  const labelOf = (d: Date) =>
+    oneYear
+      ? fmtMonthShort(d)
+      : `${fmtMonthShort(d)} ’${String(d.getFullYear()).slice(-2)}`
+  const months = firsts.map((d) => {
     const k = monthKey(d)
     return cellOf(
       {
         key: k,
-        label: fmtMonthShort(d),
+        label: labelOf(d),
         outside: false,
         isCurrent: sameMonth(d, today),
         isActive: false,
@@ -1174,33 +1230,46 @@ function buildMonthGrid(
     )
   })
 
-  // Fold shut around the running month when we're looking at the current year.
-  const focus = year === today.getFullYear() ? today.getMonth() : 0
+  // Folds shut around the running month when the period holds it, else its first month.
+  const focus = Math.max(
+    0,
+    firsts.findIndex((d) => sameMonth(d, today)),
+  )
   const rows = foldAround(months, MONTHS_PER_ROW, focus)
   const span = `${rows.pivotRow[0]?.label} – ${rows.pivotRow[rows.pivotRow.length - 1]?.label}`
 
+  if (period.mode === 'year') {
+    const year = period.start.getFullYear()
+    return {
+      grid: 'months',
+      ...rows,
+      caption: calOpen
+        ? `${year} — tap a month to open it.`
+        : `${span} ${year} — unfold for the full year.`,
+    }
+  }
+  const whole = periodCaption(period, dateFormat)
   return {
     grid: 'months',
     ...rows,
     caption: calOpen
-      ? `${year} — tap a month to open it.`
-      : `${span} ${year} — unfold for the full year.`,
+      ? `${whole} — tap a month to open it.`
+      : `${span} — unfold for ${whole}.`,
   }
 }
 
 export function buildCalendar(
   data: SpendingData,
   scope: Scope,
-  anchor: Date,
-  mode: RangeMode,
+  period: Period,
   calOpen: boolean,
   today: Date,
   dateFormat: DateFormat = DEFAULT_DATE_FORMAT,
 ): CalendarView {
   const txns = flowTxns(data, scope)
-  return mode === 'year'
-    ? buildMonthGrid(data, txns, anchor, calOpen, today)
-    : buildDayGrid(data, txns, anchor, mode, calOpen, today, dateFormat)
+  return calendarGridOf(period) === 'months'
+    ? buildMonthGrid(data, txns, period, calOpen, today, dateFormat)
+    : buildDayGrid(data, txns, period, calOpen, today, dateFormat)
 }
 
 // --- Budgets -------------------------------------------------------------------------

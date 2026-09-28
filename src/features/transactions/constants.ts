@@ -6,6 +6,9 @@ export const AMBER = '#D9882B'
 
 export type RangeMode = 'year' | 'month' | 'week' | 'day'
 
+/** How the Spending page's period was chosen: a range mode, or a span the user picked. */
+export type PeriodMode = RangeMode | 'custom'
+
 /** The Spending page's tabs, in order; each is a `/transactions/<view>` route. */
 export const SPENDING_VIEWS = [
   'activity',

@@ -8,9 +8,12 @@ import {
 import { useDragControls } from 'motion/react'
 import { useCalendarSlide } from '#/features/transactions/hooks/useCalendarSlide'
 import type { RangeMode } from '#/features/transactions/constants'
+import type { IsoSpan } from '#/features/transactions/data/customRange'
 import type { CalendarView } from '#/features/transactions/data/selectors'
+import type { PeriodOnScreen } from '#/features/transactions/hooks/useSpendingViews'
 import { DayGrid } from './DayGrid'
 import { MonthGrid } from './MonthGrid'
+import { PeriodModeSwitch } from './PeriodModeSwitch'
 import { PeriodSlide } from './PeriodSlide'
 import { WeekdayLabels } from './WeekdayLabels'
 
@@ -18,28 +21,17 @@ type Props = {
   calendar: CalendarView
   /** The period's figures are still loading: the grid draws its days, not their values. */
   loading: boolean
-  mode: RangeMode
-  periodLabel: string
+  period: PeriodOnScreen
   calOpen: boolean
   onSetMode: (m: RangeMode) => void
+  onPickCustom: (span: IsoSpan) => void
   onPrev: () => void
   onNext: () => void
-  /** Where today sits relative to the period in view; `null` while it's inside it. */
-  todayIs: 'ahead' | 'behind' | null
   onToday: () => void
   onToggleCal: () => void
   onPickDay: (key: string) => void
   onPickMonth: (key: string) => void
 }
-
-const MODES: RangeMode[] = ['year', 'month', 'week', 'day']
-
-const seg = (active: boolean) =>
-  `rounded-[8px] px-3 py-[6px] text-[12.5px] ${
-    active
-      ? 'bg-fp-surface font-bold text-fp-text shadow-[0_1px_2px_rgba(0,0,0,0.06)]'
-      : 'bg-transparent font-semibold text-fp-text-2'
-  }`
 
 const STEP =
   'flex h-8 w-8 items-center justify-center rounded-[9px] border border-fp-border-strong bg-fp-surface-2 text-fp-text-2 hover:text-fp-text'
@@ -47,21 +39,22 @@ const STEP =
 export function DaysCard({
   calendar,
   loading,
-  mode,
-  periodLabel,
+  period,
   calOpen,
   onSetMode,
+  onPickCustom,
   onPrev,
   onNext,
-  todayIs,
   onToday,
   onToggleCal,
   onPickDay,
   onPickMonth,
 }: Props) {
   const dragControls = useDragControls()
+  const { mode, todayIs } = period
   const slide = useCalendarSlide(calendar, mode)
-  const unit = calendar.grid === 'months' ? 'year' : 'month'
+  const unit =
+    mode === 'custom' ? 'range' : calendar.grid === 'months' ? 'year' : 'month'
   const expandTitle = calOpen
     ? `Fold the ${unit} back`
     : `Unfold the full ${unit}`
@@ -71,31 +64,27 @@ export function DaysCard({
       onPointerDown={(e) => {
         if (e.pointerType === 'touch') dragControls.start(e)
       }}
-      className="touch-pan-y rounded-[18px] border border-fp-border bg-fp-surface p-[14px] shadow-fp"
+      className="@container touch-pan-y rounded-[18px] border border-fp-border bg-fp-surface p-[14px] shadow-fp"
     >
       <div className="flex flex-wrap items-center gap-[10px]">
-        <div className="inline-flex rounded-[11px] border border-fp-border bg-fp-surface-2 p-[3px]">
-          {MODES.map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => onSetMode(m)}
-              className={seg(mode === m)}
-            >
-              {m[0].toUpperCase() + m.slice(1)}
-            </button>
-          ))}
-        </div>
-        <div className="min-w-[8px] flex-1" />
-        <div className="flex items-center gap-1">
-          {todayIs ? (
-            <TodayButton direction={todayIs} onClick={onToday} />
-          ) : null}
+        <PeriodModeSwitch
+          mode={mode}
+          shown={period}
+          onSetMode={onSetMode}
+          onPickCustom={onPickCustom}
+        />
+        <div className="hidden min-w-[8px] flex-1 @xl:block" />
+        <div className="flex w-full items-center gap-1 @xl:w-auto">
           <button type="button" onClick={onPrev} className={STEP}>
             <ChevronLeft size={16} strokeWidth={2.2} />
           </button>
-          <div className="min-w-[132px] text-center text-[14px] font-bold">
-            {periodLabel}
+          <div className="flex flex-1 items-center justify-center @xl:contents">
+            {todayIs ? (
+              <TodayButton direction={todayIs} onClick={onToday} />
+            ) : null}
+            <div className="min-w-[132px] text-center text-[14px] font-bold">
+              {period.label}
+            </div>
           </div>
           <button type="button" onClick={onNext} className={STEP}>
             <ChevronRight size={16} strokeWidth={2.2} />
@@ -162,7 +151,7 @@ function TodayButton({
       type="button"
       onClick={onClick}
       title="Jump to today"
-      className="me-1 inline-flex h-8 animate-in items-center gap-[5px] rounded-full border border-fp-accent/40 bg-fp-accent-soft px-3 text-[12.5px] font-bold text-fp-accent-ink duration-200 fade-in zoom-in-95 hover:border-fp-accent"
+      className="me-1 inline-flex h-8 animate-in @xl:-order-1 items-center gap-[5px] rounded-full border border-fp-accent/40 bg-fp-accent-soft px-3 text-[12.5px] font-bold text-fp-accent-ink duration-200 fade-in zoom-in-95 hover:border-fp-accent"
     >
       {direction === 'behind' ? (
         <ArrowLeft size={14} strokeWidth={2.4} />

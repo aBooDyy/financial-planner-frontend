@@ -1,7 +1,6 @@
 import type { LocalBudget } from '#/db/types'
-import type { RangeMode } from '#/features/transactions/constants'
-import { budgetWindow, windowOf, ymd } from './planning'
-import type { DateWindow } from './planning'
+import { budgetWindow, ymd } from './planning'
+import type { DateWindow, Period } from './planning'
 import { calendarSpan } from './selectors'
 
 /** An inclusive span of ISO `YYYY-MM-DD` dates — the shape the `date` index is queried by. */
@@ -26,14 +25,13 @@ export function mergeRanges(ranges: ReadonlyArray<IsoRange>): IsoRange[] {
  * period is on screen.
  */
 export function ledgerRanges(
-  anchor: Date,
-  mode: RangeMode,
+  period: Period,
   today: Date,
   budgets: ReadonlyArray<LocalBudget>,
 ): IsoRange[] {
   const windows: DateWindow[] = [
-    windowOf(anchor, mode),
-    calendarSpan(anchor, mode),
+    period,
+    calendarSpan(period),
     ...budgets
       .filter((b) => b.deleted === 0)
       .map((b) => budgetWindow(b.period, b.customDays, today)),

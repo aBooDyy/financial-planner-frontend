@@ -1,12 +1,18 @@
 import { useMemo } from 'react'
 import type { CategoryCatalog } from '#/features/categories/data/catalog'
-import type { RangeMode, SpendingView } from '#/features/transactions/constants'
+import type {
+  PeriodMode,
+  SpendingView,
+} from '#/features/transactions/constants'
+import type { IsoSpan } from '#/features/transactions/data/customRange'
 import type { LedgerWindow } from '#/features/transactions/data/ledgerReads'
 import {
+  fromIsoPeriod,
   parseISO,
   todayRelativeTo,
-  windowOf,
+  ymd,
 } from '#/features/transactions/data/planning'
+import type { IsoPeriod, Period } from '#/features/transactions/data/planning'
 import {
   buildActivityList,
   buildBreakdown,
@@ -29,8 +35,7 @@ import type { DateFormat } from '#/lib/date'
 type Args = {
   view: SpendingView
   /** The period the page asks for — shown until the first rows for it land. */
-  anchor: string
-  mode: RangeMode
+  period: IsoPeriod
   /** `null` while the non-ledger inputs are still loading. */
   inputs: SpendingInputs | null
   ledger: LedgerWindow | undefined
@@ -41,10 +46,17 @@ type Args = {
   dateFormat: DateFormat
 }
 
+/** The period on screen, as its header draws it. */
+export type PeriodOnScreen = IsoSpan & {
+  mode: PeriodMode
+  label: string
+  /** Where today sits relative to the period; `null` while it's inside it. */
+  todayIs: 'ahead' | 'behind' | null
+}
+
 /** The period on screen and, once they have landed, the rows read for it. */
 type Shown = {
-  anchor: Date
-  mode: RangeMode
+  period: Period
   today: Date
   data: SpendingData | null
 }
@@ -68,8 +80,7 @@ const NO_DATA: SpendingData = {
  */
 export function useSpendingViews({
   view,
-  anchor,
-  mode,
+  period: asked,
   inputs,
   ledger,
   catalog,
@@ -86,8 +97,7 @@ export function useSpendingViews({
     (): Shown | null =>
       inputs && ledger
         ? {
-            anchor: parseISO(ledger.anchor),
-            mode: ledger.mode,
+            period: fromIsoPeriod(ledger.period),
             today: parseISO(ledger.today),
             data: { ...inputs, budgets: ledger.budgets, txns: ledger.rows },
           }
@@ -96,20 +106,25 @@ export function useSpendingViews({
   )
   const requested = useMemo(
     (): Shown => ({
-      anchor: parseISO(anchor),
-      mode,
+      period: fromIsoPeriod({
+        mode: asked.mode,
+        start: asked.start,
+        end: asked.end,
+      }),
       today: parseISO(today),
       data: null,
     }),
-    [anchor, mode, today],
+    [asked.mode, asked.start, asked.end, today],
   )
   const shown = loaded ?? requested
 
   const period = useMemo(
-    () => ({
-      mode: shown.mode,
-      label: periodCaption(shown.anchor, shown.mode, dateFormat),
-      todayIs: todayRelativeTo(windowOf(shown.anchor, shown.mode), shown.today),
+    (): PeriodOnScreen => ({
+      mode: shown.period.mode,
+      start: ymd(shown.period.start),
+      end: ymd(shown.period.end),
+      label: periodCaption(shown.period, dateFormat),
+      todayIs: todayRelativeTo(shown.period, shown.today),
     }),
     [shown, dateFormat],
   )
@@ -123,8 +138,7 @@ export function useSpendingViews({
         ? buildCalendar(
             shown.data ?? NO_DATA,
             scope,
-            shown.anchor,
-            shown.mode,
+            shown.period,
             calOpen,
             shown.today,
             dateFormat,
@@ -135,14 +149,7 @@ export function useSpendingViews({
   const cashflow = useMemo(
     () =>
       activity &&
-      buildCashflow(
-        activity,
-        catalog,
-        scope,
-        shown.anchor,
-        shown.mode,
-        dateFormat,
-      ),
+      buildCashflow(activity, catalog, scope, shown.period, dateFormat),
     [activity, shown, catalog, scope, dateFormat],
   )
   const list = useMemo(
@@ -152,8 +159,7 @@ export function useSpendingViews({
         activity,
         catalog,
         scope,
-        shown.anchor,
-        shown.mode,
+        shown.period,
         shown.today,
         dateFormat,
       ),
@@ -162,14 +168,7 @@ export function useSpendingViews({
   const breakdown = useMemo(
     () =>
       activity &&
-      buildBreakdown(
-        activity,
-        catalog,
-        scope,
-        shown.anchor,
-        shown.mode,
-        dateFormat,
-      ),
+      buildBreakdown(activity, catalog, scope, shown.period, dateFormat),
     [activity, shown, catalog, scope, dateFormat],
   )
 

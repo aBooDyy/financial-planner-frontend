@@ -3,8 +3,9 @@ import { renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LocalBudget, LocalTransaction } from '#/db/types'
 import { defaultCatalog } from '#/features/categories/__fixtures__/categories'
-import type { RangeMode, SpendingView } from '#/features/transactions/constants'
+import type { SpendingView } from '#/features/transactions/constants'
 import type { LedgerWindow } from '#/features/transactions/data/ledgerReads'
+import type { IsoPeriod } from '#/features/transactions/data/planning'
 import * as selectors from '#/features/transactions/data/selectors'
 import type {
   Scope,
@@ -52,9 +53,13 @@ const INPUTS: SpendingInputs = {
   goals: [],
 }
 const ROWS: LocalTransaction[] = []
-const LEDGER: LedgerWindow = {
-  anchor: '2026-09-01',
+const SEPTEMBER: IsoPeriod = {
   mode: 'month',
+  start: '2026-09-01',
+  end: '2026-09-30',
+}
+const LEDGER: LedgerWindow = {
+  period: SEPTEMBER,
   today: '2026-09-26',
   budgets: [],
   rows: ROWS,
@@ -63,8 +68,7 @@ const CATALOG = defaultCatalog()
 
 type Props = {
   view: SpendingView
-  anchor: string
-  mode: RangeMode
+  period: IsoPeriod
   ledger: LedgerWindow | undefined
   calOpen: boolean
   scope: Scope
@@ -85,8 +89,7 @@ const render = (initial: Props) =>
 
 const ACTIVITY: Props = {
   view: 'activity',
-  anchor: '2026-09-01',
-  mode: 'month',
+  period: SEPTEMBER,
   ledger: LEDGER,
   calOpen: false,
   scope: { type: 'all' },
@@ -164,7 +167,7 @@ describe('useSpendingViews', () => {
   it('while the ledger loads, lays out the asked-for period with no figures; schedules do not wait', () => {
     const { result } = render({
       ...ACTIVITY,
-      anchor: '2025-03-01',
+      period: { mode: 'month', start: '2025-03-01', end: '2025-03-31' },
       ledger: undefined,
     })
     expect(result.current.activity).toMatchObject({
@@ -175,6 +178,8 @@ describe('useSpendingViews', () => {
     expect(result.current.activity?.calendar.grid).toBe('days')
     expect(result.current.period).toEqual({
       mode: 'month',
+      start: '2025-03-01',
+      end: '2025-03-31',
       label: 'March 2025',
       todayIs: 'ahead',
     })
@@ -190,7 +195,10 @@ describe('useSpendingViews', () => {
     const { result, rerender } = render(ACTIVITY)
     const shown = result.current.activity
     vi.clearAllMocks()
-    rerender({ ...ACTIVITY, anchor: '2026-10-01' })
+    rerender({
+      ...ACTIVITY,
+      period: { mode: 'month', start: '2026-10-01', end: '2026-10-31' },
+    })
     expect(result.current.period.label).toBe('September 2026')
     expect(result.current.activity?.list).toBe(shown?.list)
     expect(calls()).toMatchObject({ buildCashflow: 0, buildCalendar: 0 })

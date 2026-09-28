@@ -77,25 +77,38 @@ belongs to [planned.md](planned.md#the-planned-tab-and-the-confirm-dialog-compon
 
 ### The calendar — one cell shape, two grids
 
-`RangeMode` is `year | month | week | day`. `buildCalendar` returns a **discriminated union**
-on `grid`, because a year is not a grid of days:
+**The period.** Every period-reading builder takes one `Period` (`data/planning.ts`):
+`{ mode: PeriodMode, start, end }`, where `PeriodMode` is a `RangeMode` (`year | month | week |
+day`) or `custom`. A range mode's period is `periodOf(anchor, mode)` — `windowOf`'s span, so
+**`start` is the anchor**; a custom one is any inclusive span the user picked. State, live-query
+deps and the `LedgerWindow` tag hold it as wire ISO (`IsoPeriod`, `toIsoPeriod`/`fromIsoPeriod`).
+`periodCaption(period)` heads the header, hero and donut; a custom span reads "Jun 3 – Jul 14,
+2026" (both years when it crosses one; a single day as a date).
+
+`buildCalendar` returns a **discriminated union** on `grid`, because a year is not a grid of
+days (`calendarGridOf(period)` picks it):
 
 Both variants carry the same `FoldingRows` shape — `pivotRow` (always visible) plus
 `rowsBefore`/`rowsAfter` (folded away until the toggle opens) — so `FoldingGrid` renders and
 animates both, and the toggle means the same thing in all four views.
 
-- `grid: 'days'` (month/week/day) — rows of 7. The month around the pivot week is built in
-  **all three** modes, so the unfold works everywhere, not just in month mode.
-- `grid: 'months'` (year) — rows of four. Folded shut it shows the row
-  holding the running month (January's row for any other year); open it shows all twelve.
+- `grid: 'days'` (month/week/day, and a custom span of up to `CUSTOM_DAY_GRID_MAX_DAYS` = 62)
+  — rows of 7. The month around the pivot week is built in **all three** range modes, so the
+  unfold works everywhere, not just in month mode. A custom span lays out the whole weeks it
+  touches instead, folded on today's week when it holds today, else its first week.
+- `grid: 'months'` (year, and a longer custom span) — rows of four, one cell per month the period
+  touches (labelled `Nov ’25` once the span crosses a year). Folded shut it shows the row
+  holding the running month (the first row when the period misses it); open it shows them all.
+  A month cell totals only the period's days, so a custom span's partial end months still sum
+  to the hero.
 
 Both emit the same `PeriodCell`, so `CalendarCell` styles a day and a month identically, and
 the year grid always shows the income/spend split (days show it only when a day has both).
 Cell colouring lives only in `CalendarCell` and is **net-driven, with no accent fill**:
 
-- **Outside the selected period** (`outside` = not in `windowOf(anchor, mode)` — so in day view
-  every other day, in week view the rest of the unfolded month) → a diagonal hatch, muted
-  figures. Never true in the year grid.
+- **Outside the selected period** (`outside` = not in the period — so in day view every other
+  day, in week view the rest of the unfolded month, for a custom span the days either side of
+  it in its first and last weeks) → a diagonal hatch, muted figures. Never true in a month grid.
 - **Even** (`tone: 'zero'` — no activity, or income = spend) → flat `surface-2`.
 - **Net positive / negative** → a green / red wash (`color-mix` of the accent / `RED` into
   `surface`), 12–38% by `intensity`. Figures use the ink tokens (`--fp-accent-ink`,
@@ -106,11 +119,19 @@ Cell colouring lives only in `CalendarCell` and is **net-driven, with no accent 
 **Anchoring.** The anchor for a mode is always `windowOf(date, mode).start`. Switching mode
 re-anchors on today when the period being left covers it; the **Today** pill in `DaysCard`
 (shown only while today is outside the period, arrow pointing toward it) re-anchors on today
-in the current mode.
+in the current mode — a custom span keeps its length and ends today (`periodHoldingToday`).
+Prev/next (and the swipe) step a custom span by its own length (`steppedPeriod`). Tapping a
+day or month in a custom grid focuses it in day / month mode, like the other views.
+
+**Custom range.** `PeriodModeSwitch` is the Year / Month / Week / Day / **Custom** segment row;
+Custom always opens `CustomRangeDialog` (From / To `DateField`s plus Last 7 / 30 / 90 days and
+Year to date chips, `data/customRange.ts`), prefilled with the span on screen, so it both picks
+a new span and edits the current one. It is page state only — not remembered across visits.
 
 `intensity` is `sqrt(|net| / peak)`, where the peak is the biggest net **of the same sign** in
-the scaling period — the anchor month for a day grid (in every mode, so a day keeps its shade
-as you switch views), the anchor year for a month grid. Per-sign peaks stop one big payday from
+the scaling period — the anchor month for a day grid (in every range mode, so a day keeps its
+shade as you switch views), the span itself for a custom day grid, the grid's months for a month
+grid. Per-sign peaks stop one big payday from
 flattening every red day; the square root keeps small days distinguishable from mid ones.
 
 - **Auto-post moved onto planned rows** (ADR-6). `autopost.ts` and its Spending-page mount
@@ -347,16 +368,16 @@ without bound, and every builder only ever looks at a few dates. **What each con
 
 | Consumer                                               | Dates it reads                                                                                                                                                 |
 | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `buildCashflow`, `buildBreakdown`, `buildActivityList` | `windowOf(anchor, mode)` — a transfer's partner leg only counts when it is in that window too                                                                  |
-| `buildCalendar`                                        | the anchor month's whole-week grid (`calendarSpan`), which spills into the neighbouring months; the year in year mode                                         |
+| `buildCashflow`, `buildBreakdown`, `buildActivityList` | the period — a transfer's partner leg only counts when it is in that window too                                                                                |
+| `buildCalendar`                                        | `calendarSpan(period)`: the anchor month's whole-week grid, which spills into the neighbouring months; a custom day grid's whole weeks; a month grid's period  |
 | `buildBudgetsView`                                     | each live budget's `budgetWindow(period, customDays, today)` — **relative to today, not the anchor**, so browsing an old month still reads this month's budget span |
 | `buildRecurringView`                                   | none — schedules only; that tab never waits for the ledger                                                                                                     |
 | `scopeSections`, the `ConnectedTxEditor` accounts      | **every row**: a balance is opening + the whole ledger                                                                                                         |
 | opening a transfer row                                 | both legs by the `transferId` index (`readTransferLegs`) — a leg can sit on another date                                                                      |
 
-- **`data/ledgerRange.ts` — `ledgerRanges(anchor, mode, today, budgets)`** is the union of the
+- **`data/ledgerRange.ts` — `ledgerRanges(period, today, budgets)`** is the union of the
   first three rows as merged, sorted, inclusive ISO spans (`mergeRanges`). Pure, tested alone.
-- **`data/ledgerReads.ts` — `readLedgerWindow(anchor, mode, today)`** reads the budgets, computes
+- **`data/ledgerReads.ts` — `readLedgerWindow(isoPeriod, today)`** reads the budgets, computes
   the ranges and queries `transactions.where('date').inAnyRange(ranges, { includeUppers: true })`.
   Reading the budgets **inside** the live query makes a budget edit that widens its span re-run
   it. The answer (`LedgerWindow`) is tagged with the period it was read for **and carries the
@@ -405,15 +426,16 @@ without bound, and every builder only ever looks at a few dates. **What each con
     `undefined`, when there is no row, so "none" is not "still loading".
   - `components/loadingCards.test.tsx` pins it: with a `null` view each card shows its chrome,
     skeletons in place of figures, and no digit (bar the calendar's day numbers).
-- `hooks/useSpendingPeriod` owns the range mode and anchor (step, re-anchor on a mode change,
-  pick a month/day); `hooks/useActivityRowClick` opens a row's editor.
+- `hooks/useSpendingPeriod` owns the period as an `IsoPeriod` (step, re-anchor on a mode
+  change, pick a custom span, pick a month/day); `hooks/useActivityRowClick` opens a row's editor.
 - **The equivalence test.** `data/ledgerReads.test.ts` seeds fake-indexeddb with 2½ years of
   spends, incomes, split-date and one-legged transfers, adjustments, deleted rows and
   weekly/monthly/custom budgets, and asserts every builder gives **identical** output from the
   window and from the full ledger (in primary-key order, with random ids so that is not date
-  order) — 15 period/today combinations (year mode, week and year edges, past months while
-  budgets stay relative to today, and a month of equal category totals whose date order is the
-  reverse of their id order) × 4 scopes.
+  order) — 18 period/today combinations (year mode, week and year edges, past months while
+  budgets stay relative to today, a month of equal category totals whose date order is the
+  reverse of their id order, and custom spans drawn as days and as months across a year edge)
+  × 4 scopes.
   `hooks/useSpendingViews.test.ts` counts builder calls per tab and per re-render.
 
 ## Transfers between wallets

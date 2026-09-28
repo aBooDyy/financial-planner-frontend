@@ -1,7 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import type { RangeMode } from '#/features/transactions/constants'
 import { readLedgerWindow } from '#/features/transactions/data/ledgerReads'
 import type { LedgerWindow } from '#/features/transactions/data/ledgerReads'
+import type { IsoPeriod } from '#/features/transactions/data/planning'
 
 /**
  * The ledger rows the Spending views need for one period. While a new period loads, the
@@ -9,12 +9,12 @@ import type { LedgerWindow } from '#/features/transactions/data/ledgerReads'
  * from it keeps showing that period rather than the new one computed over the wrong rows.
  */
 export function useLedgerWindow(
-  anchor: string,
-  mode: RangeMode,
+  period: IsoPeriod,
   today: string,
 ): LedgerWindow | undefined {
+  const { mode, start, end } = period
   return useLiveQuery(
-    () => readLedgerWindow(anchor, mode, today),
-    [anchor, mode, today],
+    () => readLedgerWindow({ mode, start, end }, today),
+    [mode, start, end, today],
   )
 }

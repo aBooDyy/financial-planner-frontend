@@ -17,11 +17,15 @@ import {
   buildCalendar,
   buildCashflow,
   buildRecurringView,
+  calendarGridOf,
+  CUSTOM_DAY_GRID_MAX_DAYS,
+  periodCaption,
   txTagOf,
 } from './selectors'
 import type {
   ActivityRow,
   AdjustmentRow,
+  CalendarView,
   MonthGridView,
   Scope,
   SetAsideRow,
@@ -29,7 +33,8 @@ import type {
   TransferRow,
   TxRow,
 } from './selectors'
-import { ymd } from './planning'
+import { addDays, fmtK, parseISO, periodOf, ymd } from './planning'
+import type { Period } from './planning'
 
 const TODAY = new Date(2026, 5, 12)
 const ANCHOR = new Date(2026, 5, 1) // June 2026
@@ -177,8 +182,7 @@ describe('buildCashflow', () => {
       data({ txns, allocations }),
       CATALOG,
       ALL,
-      ANCHOR,
-      'month',
+      periodOf(ANCHOR, 'month'),
     )
     expect(view.incomeStr).toBe('SR 12,000')
     expect(view.spentStr).toBe('SR 2,400')
@@ -203,7 +207,12 @@ describe('buildCashflow', () => {
         goalId: 'rent',
       }),
     ]
-    const view = buildCashflow(data({ txns }), CATALOG, ALL, ANCHOR, 'month')
+    const view = buildCashflow(
+      data({ txns }),
+      CATALOG,
+      ALL,
+      periodOf(ANCHOR, 'month'),
+    )
     expect(view.spentStr).toBe('SR 3,500')
     expect(view.hasSaved).toBe(false)
     expect(view.netStr).toBe('−SR 3,500')
@@ -215,8 +224,7 @@ describe('buildCashflow', () => {
       data({ allocations }),
       CATALOG,
       { type: 'wallet', id: 'elsewhere' },
-      ANCHOR,
-      'month',
+      periodOf(ANCHOR, 'month'),
     )
     expect(scoped.hasSaved).toBe(false)
   })
@@ -226,7 +234,12 @@ describe('buildCashflow', () => {
       tx({ type: 'spend', amount: 100_000, date: '2026-06-10' }),
       tx({ type: 'spend', amount: 999_000, date: '2026-05-30' }), // outside June
     ]
-    const view = buildCashflow(data({ txns }), CATALOG, ALL, ANCHOR, 'month')
+    const view = buildCashflow(
+      data({ txns }),
+      CATALOG,
+      ALL,
+      periodOf(ANCHOR, 'month'),
+    )
     expect(view.spentStr).toBe('SR 1,000')
     expect(view.txCount).toBe(1)
   })
@@ -371,7 +384,13 @@ describe('buildRecurringView', () => {
 
 describe('buildCalendar — day grid', () => {
   const dayGrid = (anchor: Date, mode: 'month' | 'week' | 'day') => {
-    const view = buildCalendar(data({}), ALL, anchor, mode, false, TODAY)
+    const view = buildCalendar(
+      data({}),
+      ALL,
+      periodOf(anchor, mode),
+      false,
+      TODAY,
+    )
     if (view.grid !== 'days') throw new Error('expected a day grid')
     return view
   }
@@ -422,9 +441,101 @@ describe('buildCalendar — day grid', () => {
   })
 })
 
+describe('custom periods', () => {
+  const custom = (start: string, end: string): Period => ({
+    mode: 'custom',
+    start: parseISO(start),
+    end: parseISO(end),
+  })
+  const JUN3_JUL14 = custom('2026-06-03', '2026-07-14')
+  const cellsOf = (g: CalendarView) =>
+    [...g.rowsBefore, g.pivotRow, ...g.rowsAfter].flat()
+
+  it('captions a span with its year, both years across a year edge, a lone day as a date', () => {
+    expect(periodCaption(JUN3_JUL14)).toBe('Jun 3 – Jul 14, 2026')
+    expect(periodCaption(custom('2025-12-20', '2026-01-05'))).toBe(
+      'Dec 20, 2025 – Jan 5, 2026',
+    )
+    expect(periodCaption(custom('2026-06-03', '2026-06-03'), 'ymd')).toBe(
+      '2026-06-03',
+    )
+  })
+
+  it('totals only the days inside the span, both ends included', () => {
+    const txns = ['2026-06-02', '2026-06-03', '2026-07-14', '2026-07-15'].map(
+      (date) => tx({ date, amount: 100_00 }),
+    )
+    const view = buildCashflow(data({ txns }), CATALOG, ALL, JUN3_JUL14)
+    expect(view.spentStr).toBe('SR 200')
+    expect(view.sub).toBe('Jun 3 – Jul 14, 2026')
+  })
+
+  it('draws a span of up to two months as the whole weeks it touches, folded on today', () => {
+    const g = buildCalendar(data({}), ALL, JUN3_JUL14, false, TODAY)
+    if (g.grid !== 'days') throw new Error('expected a day grid')
+    const cells = cellsOf(g)
+    expect(cells).toHaveLength(7 * 7) // Sun May 31 … Sat Jul 18
+    expect(cells.filter((c) => !c.outside)).toHaveLength(42)
+    expect(cells.some((c) => c.isActive)).toBe(false)
+    expect(g.pivotRow[0].key).toBe('2026-06-07')
+    expect(g.caption).toBe(
+      'Week of Jun 7 – Jun 13 — unfold for Jun 3 – Jul 14, 2026.',
+    )
+  })
+
+  it('folds a span that misses today on its first week', () => {
+    const g = buildCalendar(
+      data({}),
+      ALL,
+      custom('2026-08-05', '2026-08-20'),
+      false,
+      TODAY,
+    )
+    expect(g.pivotRow[0].key).toBe('2026-08-02')
+  })
+
+  it('draws a longer span as its months, labelled with years across a year edge', () => {
+    const txns = [
+      tx({ date: '2025-11-10', amount: 50_00 }),
+      tx({ date: '2025-11-20', amount: 70_00 }),
+    ]
+    const span = custom('2025-11-15', '2026-02-10')
+    const g = buildCalendar(data({ txns }), ALL, span, true, TODAY)
+    if (g.grid !== 'months') throw new Error('expected a month grid')
+    const months = cellsOf(g)
+    expect(months.map((m) => m.label)).toEqual([
+      'Nov ’25',
+      'Dec ’25',
+      'Jan ’26',
+      'Feb ’26',
+    ])
+    expect(months[0].spendStr).toBe(`−${fmtK(70_00, 'SAR')}`)
+    expect(g.caption).toBe(
+      'Nov 15, 2025 – Feb 10, 2026 — tap a month to open it.',
+    )
+  })
+
+  it('switches from days to months past the day-grid limit', () => {
+    const start = parseISO('2026-01-01')
+    const spanOf = (days: number): Period => ({
+      mode: 'custom',
+      start,
+      end: addDays(start, days - 1),
+    })
+    expect(calendarGridOf(spanOf(CUSTOM_DAY_GRID_MAX_DAYS))).toBe('days')
+    expect(calendarGridOf(spanOf(CUSTOM_DAY_GRID_MAX_DAYS + 1))).toBe('months')
+  })
+})
+
 describe('buildCalendar — year grid', () => {
   const yearGrid = (txns: LocalTransaction[] = [], open = false) => {
-    const view = buildCalendar(data({ txns }), ALL, ANCHOR, 'year', open, TODAY)
+    const view = buildCalendar(
+      data({ txns }),
+      ALL,
+      periodOf(ANCHOR, 'year'),
+      open,
+      TODAY,
+    )
     if (view.grid !== 'months') throw new Error('expected a month grid')
     return view
   }
@@ -466,8 +577,7 @@ describe('buildCalendar — year grid', () => {
     const view = buildCalendar(
       data({}),
       ALL,
-      new Date(2030, 7, 1),
-      'year',
+      periodOf(new Date(2030, 7, 1), 'year'),
       false,
       TODAY,
     )
@@ -507,7 +617,13 @@ describe('buildCalendar — year grid', () => {
 
 describe('resolving through the catalog', () => {
   const list = (txns: LocalTransaction[]) =>
-    buildActivityList(data({ txns }), CATALOG, ALL, ANCHOR, 'month', TODAY)
+    buildActivityList(
+      data({ txns }),
+      CATALOG,
+      ALL,
+      periodOf(ANCHOR, 'month'),
+      TODAY,
+    )
 
   it('rolls a subcategory into its parent’s donut segment and its parent’s budget', () => {
     const txns = [
@@ -515,7 +631,12 @@ describe('resolving through the catalog', () => {
       tx({ categoryId: 'cat-dining', amount: 60_000 }),
     ]
 
-    const donut = buildBreakdown(data({ txns }), CATALOG, ALL, ANCHOR, 'month')
+    const donut = buildBreakdown(
+      data({ txns }),
+      CATALOG,
+      ALL,
+      periodOf(ANCHOR, 'month'),
+    )
     expect(donut.items).toHaveLength(1)
     expect(donut.items[0].name).toBe('Dining')
     expect(donut.items[0].pctStr).toBe('100%')
@@ -655,7 +776,7 @@ describe('transfers', () => {
     data({ nodes, txns: scopeTxns })
 
   const activity = (d: SpendingData, scope: Scope = ALL) =>
-    buildActivityList(d, CATALOG, scope, ANCHOR, 'month', TODAY)
+    buildActivityList(d, CATALOG, scope, periodOf(ANCHOR, 'month'), TODAY)
   const transferRows = (d: SpendingData, scope: Scope = ALL) =>
     activity(d, scope).groups.flatMap((g) =>
       g.rows.filter((r): r is TransferRow => r.kind === 'transfer'),
@@ -674,7 +795,12 @@ describe('transfers', () => {
   })
 
   it('leaves the cashflow hero to spend and income', () => {
-    const view = buildCashflow(withTransfer(), CATALOG, ALL, ANCHOR, 'month')
+    const view = buildCashflow(
+      withTransfer(),
+      CATALOG,
+      ALL,
+      periodOf(ANCHOR, 'month'),
+    )
     expect(view.spentStr).toBe('SR 100')
     expect(view.incomeStr).toBe('SR 0')
     expect(view.txCount).toBe(1)
@@ -686,8 +812,7 @@ describe('transfers', () => {
       withTransfer(legs('tr1')),
       CATALOG,
       ALL,
-      ANCHOR,
-      'month',
+      periodOf(ANCHOR, 'month'),
     )
     expect(view.hasData).toBe(false)
   })
@@ -721,8 +846,7 @@ describe('transfers', () => {
     const view = buildCalendar(
       withTransfer(legs('tr1')),
       ALL,
-      ANCHOR,
-      'month',
+      periodOf(ANCHOR, 'month'),
       true,
       TODAY,
     )
@@ -863,14 +987,19 @@ describe('balance adjustments', () => {
     data({ nodes: [wallet, other], txns })
 
   const activity = (d: SpendingData, scope: Scope = ALL) =>
-    buildActivityList(d, CATALOG, scope, ANCHOR, 'month', TODAY)
+    buildActivityList(d, CATALOG, scope, periodOf(ANCHOR, 'month'), TODAY)
   const adjustmentRows = (d: SpendingData, scope: Scope = ALL) =>
     activity(d, scope).groups.flatMap((g) =>
       g.rows.filter((r): r is AdjustmentRow => r.kind === 'adjustment'),
     )
 
   it('leaves the cashflow hero to spend and income', () => {
-    const view = buildCashflow(withAdjustments(), CATALOG, ALL, ANCHOR, 'month')
+    const view = buildCashflow(
+      withAdjustments(),
+      CATALOG,
+      ALL,
+      periodOf(ANCHOR, 'month'),
+    )
     expect(view.spentStr).toBe('SR 100')
     expect(view.incomeStr).toBe('SR 0')
     expect(view.txCount).toBe(1)
@@ -881,8 +1010,7 @@ describe('balance adjustments', () => {
       withAdjustments([up, down]),
       CATALOG,
       ALL,
-      ANCHOR,
-      'month',
+      periodOf(ANCHOR, 'month'),
     )
     expect(view.hasData).toBe(false)
   })
@@ -916,8 +1044,7 @@ describe('balance adjustments', () => {
     const view = buildCalendar(
       withAdjustments([up, down]),
       ALL,
-      ANCHOR,
-      'month',
+      periodOf(ANCHOR, 'month'),
       true,
       TODAY,
     )
@@ -991,8 +1118,7 @@ describe('confirmed planned items in Activity', () => {
       data({ goals: [umrah], ...over }),
       CATALOG,
       scope,
-      ANCHOR,
-      'month',
+      periodOf(ANCHOR, 'month'),
       TODAY,
     )
 
@@ -1018,9 +1144,15 @@ describe('confirmed planned items in Activity', () => {
       goals: [umrah],
       allocations: [allocation({ date: '2026-06-03' })],
     })
-    const view = buildActivityList(d, CATALOG, ALL, ANCHOR, 'month', TODAY)
+    const view = buildActivityList(
+      d,
+      CATALOG,
+      ALL,
+      periodOf(ANCHOR, 'month'),
+      TODAY,
+    )
     expect(view.groups[0].totalStr).toBe('—')
-    const hero = buildCashflow(d, CATALOG, ALL, ANCHOR, 'month')
+    const hero = buildCashflow(d, CATALOG, ALL, periodOf(ANCHOR, 'month'))
     expect(hero.spentStr).toBe('SR 0')
     expect(hero.txCount).toBe(0)
     expect(hero.savedStr).toBe('SR 1,500')

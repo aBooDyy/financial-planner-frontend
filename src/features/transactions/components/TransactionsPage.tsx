@@ -89,7 +89,7 @@ export function TransactionsPage() {
   const today = startOfToday()
   const todayKey = ymd(today)
   const period = useSpendingPeriod(today)
-  const ledger = useLedgerWindow(period.anchor, period.mode, todayKey)
+  const ledger = useLedgerWindow(period.selected, todayKey)
 
   // Laid out from the accounts alone; the balances in it wait for `deltas`.
   const sections = useMemo(
@@ -103,8 +103,7 @@ export function TransactionsPage() {
   )
   const views = useSpendingViews({
     view,
-    anchor: period.anchor,
-    mode: period.mode,
+    period: period.selected,
     inputs: loading ? null : inputs,
     ledger,
     catalog,
@@ -206,13 +205,12 @@ export function TransactionsPage() {
                     <DaysCard
                       calendar={activity.calendar}
                       loading={!activity.cashflow}
-                      mode={views.period.mode}
-                      periodLabel={views.period.label}
+                      period={views.period}
                       calOpen={calOpen}
                       onSetMode={period.changeMode}
+                      onPickCustom={period.pickCustom}
                       onPrev={() => period.step(-1)}
                       onNext={() => period.step(1)}
-                      todayIs={views.period.todayIs}
                       onToday={period.goToToday}
                       onToggleCal={() => setCalOpen((o) => !o)}
                       onPickMonth={period.pickMonth}

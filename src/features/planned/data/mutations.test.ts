@@ -20,6 +20,7 @@ import {
   buildBudgetsView,
   buildCashflow,
 } from '#/features/transactions/data/selectors'
+import { periodOf } from '#/features/transactions/data/planning'
 import {
   goal,
   m,
@@ -457,8 +458,7 @@ describe('planned rows never touch the ledger’s totals', () => {
         data,
         catalog,
         { type: 'all' },
-        new Date(2026, 8, 1),
-        'month',
+        periodOf(new Date(2026, 8, 1), 'month'),
       )
       const budgets = buildBudgetsView(
         data,

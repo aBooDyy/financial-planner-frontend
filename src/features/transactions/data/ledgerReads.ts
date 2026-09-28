@@ -1,19 +1,18 @@
 import { db } from '#/db/db'
 import type { LocalBudget, LocalTransaction } from '#/db/types'
-import type { RangeMode } from '#/features/transactions/constants'
 import type { RatesMap } from '#/lib/config/rates'
 import type { CurrencyCode } from '#/lib/currency'
 import { walletDeltas } from './ledger'
 import { ledgerRanges } from './ledgerRange'
-import { parseISO } from './planning'
+import { fromIsoPeriod, parseISO } from './planning'
+import type { IsoPeriod } from './planning'
 
 /**
  * The rows one period of the Spending page reads, tagged with the period they answer and the
  * budgets whose windows they were read for — so the two can never disagree.
  */
 export type LedgerWindow = {
-  anchor: string
-  mode: RangeMode
+  period: IsoPeriod
   today: string
   budgets: LocalBudget[]
   rows: LocalTransaction[]
@@ -25,17 +24,16 @@ const byId = (a: LocalTransaction, b: LocalTransaction): number =>
   a.id < b.id ? -1 : a.id > b.id ? 1 : 0
 
 export async function readLedgerWindow(
-  anchor: string,
-  mode: RangeMode,
+  period: IsoPeriod,
   today: string,
 ): Promise<LedgerWindow> {
   const budgets = await db.budgets.toArray()
-  const ranges = ledgerRanges(parseISO(anchor), mode, parseISO(today), budgets)
+  const ranges = ledgerRanges(fromIsoPeriod(period), parseISO(today), budgets)
   const rows = await db.transactions
     .where('date')
     .inAnyRange(ranges, { includeUppers: true })
     .toArray()
-  return { anchor, mode, today, budgets, rows: rows.sort(byId) }
+  return { period, today, budgets, rows: rows.sort(byId) }
 }
 
 // A balance sums every row, so no window can serve these reads; each reduces the ledger

@@ -11,7 +11,7 @@ import type {
   LocalTransaction,
 } from '#/db/types'
 import { buildCatalog } from '#/features/categories/data/catalog'
-import type { RangeMode } from '#/features/transactions/constants'
+import type { PeriodMode } from '#/features/transactions/constants'
 import type { TransactionType } from '#/features/transactions/api/types'
 import { walletDeltas } from './ledger'
 import {
@@ -19,7 +19,8 @@ import {
   readTransferLegs,
   readWalletDeltas,
 } from './ledgerReads'
-import { addDays, parseISO, ymd } from './planning'
+import { addDays, parseISO, periodOf, toIsoPeriod, ymd } from './planning'
+import type { Period } from './planning'
 import {
   buildActivityList,
   buildBreakdown,
@@ -313,7 +314,13 @@ const SCOPES: Scope[] = [
 ]
 
 /** Today, anchors the page can reach, and deliberately awkward ones (year edges, a Wednesday week). */
-const CASES: Array<{ today: string; anchor: string; mode: RangeMode }> = [
+const CASES: Array<{
+  today: string
+  anchor: string
+  mode: PeriodMode
+  /** A custom span's last day; a range mode's follows from its anchor. */
+  end?: string
+}> = [
   { today: '2026-09-26', anchor: '2026-09-01', mode: 'month' },
   { today: '2026-09-26', anchor: '2025-03-01', mode: 'month' },
   { today: '2026-09-26', anchor: '2024-10-01', mode: 'month' },
@@ -329,7 +336,32 @@ const CASES: Array<{ today: string; anchor: string; mode: RangeMode }> = [
   { today: '2027-01-02', anchor: '2026-12-27', mode: 'week' },
   { today: '2027-01-02', anchor: '2027-01-01', mode: 'month' },
   { today: '2026-09-26', anchor: '2027-06-01', mode: 'month' },
+  // Custom spans: a day grid across months holding today, a month grid across a year edge,
+  // and a long one ending today.
+  {
+    today: '2026-09-26',
+    anchor: '2026-08-20',
+    mode: 'custom',
+    end: '2026-10-05',
+  },
+  {
+    today: '2026-09-26',
+    anchor: '2025-11-15',
+    mode: 'custom',
+    end: '2026-02-10',
+  },
+  {
+    today: '2026-09-26',
+    anchor: '2024-06-01',
+    mode: 'custom',
+    end: '2026-09-26',
+  },
 ]
+
+const periodOfCase = ({ anchor, mode, end }: (typeof CASES)[number]): Period =>
+  mode === 'custom'
+    ? { mode, start: parseISO(anchor), end: parseISO(end ?? anchor) }
+    : periodOf(parseISO(anchor), mode)
 
 beforeAll(async () => {
   await db.transactions.bulkPut(TXNS)
@@ -343,14 +375,20 @@ describe('readLedgerWindow', () => {
     const inRead = (d: string) =>
       (d >= '2025-02-23' && d <= '2025-04-05') ||
       (d >= '2025-08-23' && d <= '2026-09-30')
-    const { rows } = await readLedgerWindow('2025-03-01', 'month', '2026-09-26')
+    const { rows } = await readLedgerWindow(
+      toIsoPeriod(periodOf(parseISO('2025-03-01'), 'month')),
+      '2026-09-26',
+    )
     expect(rows.length).toBe(TXNS.filter((t) => inRead(t.date)).length)
     expect(rows.every((t) => inRead(t.date))).toBe(true)
     expect(rows.length).toBeLessThan(TXNS.length)
   })
 
   it('hands rows over in primary-key order, with the budgets it read the ranges from', async () => {
-    const win = await readLedgerWindow('2026-09-01', 'month', '2026-09-26')
+    const win = await readLedgerWindow(
+      toIsoPeriod(periodOf(parseISO('2026-09-01'), 'month')),
+      '2026-09-26',
+    )
     expect(win.rows).toEqual([...win.rows].sort(byId))
     const ids = (budgets: LocalBudget[]) => budgets.map((b) => b.id).sort()
     expect(ids(win.budgets)).toEqual(ids(BUDGETS))
@@ -358,20 +396,21 @@ describe('readLedgerWindow', () => {
 
   it.each(CASES)(
     'every selector agrees with the full ledger — $mode $anchor, today $today',
-    async ({ today, anchor, mode }) => {
-      const win = await readLedgerWindow(anchor, mode, today)
-      expect(win).toMatchObject({ anchor, mode, today })
+    async (c) => {
+      const p = periodOfCase(c)
+      const period = toIsoPeriod(p)
+      const win = await readLedgerWindow(period, c.today)
+      expect(win).toMatchObject({ period, today: c.today })
       const part: SpendingData = { ...inputs, txns: win.rows }
-      const a = parseISO(anchor)
-      const t = parseISO(today)
+      const t = parseISO(c.today)
       for (const scope of SCOPES) {
         const both = <TResult>(build: (data: SpendingData) => TResult) =>
           expect(build(part)).toEqual(build(FULL))
-        both((d) => buildCashflow(d, CATALOG, scope, a, mode))
-        both((d) => buildBreakdown(d, CATALOG, scope, a, mode))
-        both((d) => buildActivityList(d, CATALOG, scope, a, mode, t))
-        both((d) => buildCalendar(d, scope, a, mode, false, t))
-        both((d) => buildCalendar(d, scope, a, mode, true, t))
+        both((d) => buildCashflow(d, CATALOG, scope, p))
+        both((d) => buildBreakdown(d, CATALOG, scope, p))
+        both((d) => buildActivityList(d, CATALOG, scope, p, t))
+        both((d) => buildCalendar(d, scope, p, false, t))
+        both((d) => buildCalendar(d, scope, p, true, t))
         both((d) => buildBudgetsView(d, CATALOG, scope, t))
         both((d) => buildRecurringView(d, CATALOG, scope, t))
       }

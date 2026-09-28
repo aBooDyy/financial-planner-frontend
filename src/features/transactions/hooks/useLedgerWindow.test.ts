@@ -4,7 +4,7 @@ import { renderHook, waitFor } from '@testing-library/react'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { db } from '#/db/db'
 import type { LocalTransaction } from '#/db/types'
-import type { RangeMode } from '#/features/transactions/constants'
+import type { IsoPeriod } from '#/features/transactions/data/planning'
 import { useLedgerWindow } from './useLedgerWindow'
 import { catId } from '#/features/categories/__fixtures__/categories'
 
@@ -29,7 +29,16 @@ const row = (id: string, date: string): LocalTransaction => ({
   deleted: 0,
 })
 
-type Period = { anchor: string; mode: RangeMode }
+const JUNE: IsoPeriod = {
+  mode: 'month',
+  start: '2025-06-01',
+  end: '2025-06-30',
+}
+const JULY: IsoPeriod = {
+  mode: 'month',
+  start: '2025-07-01',
+  end: '2025-07-31',
+}
 
 beforeAll(async () => {
   await db.transactions.bulkPut([
@@ -41,17 +50,17 @@ beforeAll(async () => {
 describe('useLedgerWindow', () => {
   it('keeps the last period on hand while the next one loads, then swaps', async () => {
     const { result, rerender } = renderHook(
-      (p: Period) => useLedgerWindow(p.anchor, p.mode, '2026-09-26'),
-      { initialProps: { anchor: '2025-06-01', mode: 'month' } },
+      (p: IsoPeriod) => useLedgerWindow(p, '2026-09-26'),
+      { initialProps: JUNE },
     )
     await waitFor(() => expect(result.current).toBeDefined())
     expect(result.current?.rows.map((t) => t.id)).toEqual(['june'])
 
-    rerender({ anchor: '2025-07-01', mode: 'month' })
+    rerender(JULY)
     // Never back to "nothing loaded": the June answer stands, still labelled June.
-    expect(result.current?.anchor).toBe('2025-06-01')
+    expect(result.current?.period).toEqual(JUNE)
 
-    await waitFor(() => expect(result.current?.anchor).toBe('2025-07-01'))
+    await waitFor(() => expect(result.current?.period).toEqual(JULY))
     expect(result.current?.rows.map((t) => t.id)).toEqual(['july'])
   })
 })

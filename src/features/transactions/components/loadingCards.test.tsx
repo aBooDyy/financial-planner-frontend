@@ -2,6 +2,7 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { ReactElement } from 'react'
+import { periodOf } from '#/features/transactions/data/planning'
 import { buildCalendar } from '#/features/transactions/data/selectors'
 import { BreakdownCard } from './BreakdownCard'
 import { BudgetHealthCard, BudgetsCard } from './BudgetsCard'
@@ -92,8 +93,7 @@ describe('loading cards', () => {
         rates: {},
       },
       { type: 'all' },
-      new Date(2025, 2, 1),
-      'month',
+      periodOf(new Date(2025, 2, 1), 'month'),
       false,
       new Date(2026, 8, 26),
     )
@@ -101,20 +101,25 @@ describe('loading cards', () => {
       <DaysCard
         calendar={calendar}
         loading
-        mode="month"
-        periodLabel="March 2025"
+        period={{
+          mode: 'month',
+          start: '2025-03-01',
+          end: '2025-03-31',
+          label: 'March 2025',
+          todayIs: 'ahead',
+        }}
         calOpen={false}
         onSetMode={noop}
+        onPickCustom={noop}
         onPrev={noop}
         onNext={noop}
-        todayIs="ahead"
         onToday={noop}
         onToggleCal={noop}
         onPickDay={noop}
         onPickMonth={noop}
       />,
     )
-    for (const mode of ['Year', 'Month', 'Week', 'Day'])
+    for (const mode of ['Year', 'Month', 'Week', 'Day', 'Custom'])
       expect(screen.getByRole('button', { name: mode })).toBeTruthy()
     expect(screen.getByText('March 2025')).toBeTruthy()
     expect(screen.getByRole('button', { name: /today/i })).toBeTruthy()

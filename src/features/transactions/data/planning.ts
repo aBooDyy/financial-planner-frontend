@@ -3,9 +3,9 @@
  * so the selectors stay pure and testable. Wire dates are ISO `YYYY-MM-DD` strings; these
  * helpers convert at the edge. Ported from the design's date helpers.
  */
-import type { RangeMode } from '#/features/transactions/constants'
 import { frequencyMetaOf, stepDue } from '#/features/goals/data/cadence'
 import type { Repeat } from '#/features/goals/data/cadence'
+import type { PeriodMode, RangeMode } from '#/features/transactions/constants'
 import { toMajor } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
 
@@ -101,6 +101,33 @@ export const windowOf = (anchor: Date, mode: RangeMode): DateWindow => {
     end: new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0),
   }
 }
+
+/** The span the Spending page shows; a range mode's always starts where `windowOf` does. */
+export type Period = DateWindow & { mode: PeriodMode }
+
+/** A `Period` as wire ISO dates, the shape state and query keys hold. */
+export type IsoPeriod = { mode: PeriodMode; start: string; end: string }
+
+export const periodOf = (anchor: Date, mode: RangeMode): Period => ({
+  mode,
+  ...windowOf(anchor, mode),
+})
+
+export const toIsoPeriod = (p: Period): IsoPeriod => ({
+  mode: p.mode,
+  start: ymd(p.start),
+  end: ymd(p.end),
+})
+
+export const fromIsoPeriod = (p: IsoPeriod): Period => ({
+  mode: p.mode,
+  start: parseISO(p.start),
+  end: parseISO(p.end),
+})
+
+/** Days in a window, both ends included. */
+export const daysIn = (win: DateWindow): number =>
+  Math.round((midnight(win.end) - midnight(win.start)) / 86_400_000) + 1
 
 export const inWindow = (iso: string, win: DateWindow): boolean => {
   const x = midnight(parseISO(iso))
