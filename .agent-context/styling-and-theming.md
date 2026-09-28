@@ -318,6 +318,14 @@ an unfiltered handler opens then instantly closes), a tap toggles, and a `pointe
 placeholder option use a sentinel (convention: `const NONE = '__none__'`) and map it back to
 `''`/`null` in the change handler.
 
+**Scrollable popovers are `modal`.** Radix Dialog (and vaul's Drawer, which is built on it) puts
+its scroll lock on the overlay, and only the dialog content is exempt from it. A `PopoverContent`
+portals to `<body>`, so inside a dialog every touch-scroll (and wheel) in it gets cancelled. The
+list can't be scrolled on a phone. Any popover that holds a scrolling list (`CategoryPicker`,
+`CurrencyPicker`, the import `TargetPicker`) is `<Popover modal>`, which gives it a scroll lock of its own
+on top. `Select` and `DropdownMenu` are modal already. Leave small info popovers
+(`OfflineIndicator`, `SyncFailureBadge`) non-modal.
+
 **Radix floor: `radix-ui` >= 1.6.2 — below it, dismissing a menu inside a modal closes the
 modal too.** While a `Select`/`DropdownMenu`/`Popover` is open it becomes the top dismissable
 layer, so Radix gives the dialog underneath `pointer-events: none`; a click aimed at the dialog's

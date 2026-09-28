@@ -275,7 +275,8 @@ export function TargetPicker({
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    // Modal: a dialog's scroll lock cancels touch-scrolling in a popover portalled outside it.
+    <Popover modal open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         id={id}
         disabled={disabled}
