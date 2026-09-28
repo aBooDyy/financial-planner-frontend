@@ -56,7 +56,12 @@ which dialog is open and why the editor was opened (`EditorIntent`: `fresh` / `f
   last sync), **Sync now**, edit, and a ⋯ menu (Sync now, Sync older emails → 7/30/90/180 days
   or _From a date…_,
   Add a rule, Disconnect). The row owns its own `useManualScan`, so the menu's backfill and the
-  button share one result line (`ScanResultLine`). On a phone the button hides and the menu has it.
+  button share one state. While it runs the status dot turns into a spinner; progress and the
+  outcome show in `ScanToast` (portalled, bottom-centre like the update toast): "Checking for new
+  emails…" / "Reading the last 30 days…" / "Catching up…", then the summary with _Review n now_,
+  or the error with _Try again_ (re-runs the same request, backfill included). `useScanToast`
+  fades a result with nothing to act on after 5s and keeps a failure or a review until closed; a
+  dismissal holds only for the state it was made on. On a phone the button hides and the menu has it.
 - **Connecting** (`ConnectInboxDialog`) picks the provider and leaves via `beginInboxConnect`.
   The callback URL is fixed (the provider apps whitelist it), so the return path travels
   through sessionStorage; `takeConnectReturnPath()` reads it once (same-origin only). Back in

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { MoreVertical, Pencil } from 'lucide-react'
+import { Loader2, MoreVertical, Pencil } from 'lucide-react'
 import { Button } from '#/components/ui/button'
 import {
   DropdownMenu,
@@ -15,11 +15,13 @@ import type { LocalEmailConnection } from '#/db/types'
 import { describeInbox, inboxHealth } from '#/features/email-sync/data/describe'
 import type { InboxHealth } from '#/features/email-sync/data/describe'
 import { windowLabel, windowOptions } from '#/features/email-sync/data/windows'
+import type { ScanOptions } from '#/features/email-sync/api/types'
 import { useManualScan } from '#/features/email-sync/hooks/useManualScan'
+import { useScanToast } from '#/features/email-sync/hooks/useScanToast'
 import { useConfigLimits } from '#/lib/config/appConfig'
 import { useDirectionStore } from '#/stores/direction'
 import { CustomWindowDialog } from './CustomWindowDialog'
-import { ScanResultLine } from './ScanResultLine'
+import { ScanToast } from './ScanToast'
 import { SyncNowButton } from './SyncNowButton'
 
 const DOT: Record<InboxHealth, string> = {
@@ -52,19 +54,35 @@ export function InboxRow({
   const maxLookbackDays = useConfigLimits().emailSyncMaxLookbackDays
   const { state, summary, scan } = useManualScan()
   const health = inboxHealth(connection)
+  const toast = useScanToast(state, summary)
   const running = state.status === 'scanning' || state.status === 'busy'
-  const sync = () => void scan({ connectionId: connection.id })
+  const [request, setRequest] = useState<ScanOptions>({})
+  const run = (options: ScanOptions) => {
+    if (running) return
+    setRequest(options)
+    void scan(options)
+  }
+  const sync = () => run({ connectionId: connection.id })
   const backfill = (days: number) =>
-    void scan({ connectionId: connection.id, lookbackDays: days })
+    run({ connectionId: connection.id, lookbackDays: days })
   const [customOpen, setCustomOpen] = useState(false)
 
   return (
     <li className="flex flex-col gap-2 border-b border-fp-border px-[18px] py-[13px] last:border-b-0">
       <div className="flex items-center gap-3">
-        <span
-          aria-hidden
-          className={`h-[9px] w-[9px] shrink-0 rounded-full ${DOT[health]}`}
-        />
+        {running ? (
+          <Loader2
+            aria-hidden
+            size={13}
+            strokeWidth={2.4}
+            className="-mx-0.5 shrink-0 animate-spin text-fp-accent"
+          />
+        ) : (
+          <span
+            aria-hidden
+            className={`h-[9px] w-[9px] shrink-0 rounded-full ${DOT[health]}`}
+          />
+        )}
         <div className="min-w-0 flex-1">
           <div className="truncate text-[14.5px] font-semibold">
             <bdi>{connection.email}</bdi>
@@ -153,9 +171,15 @@ export function InboxRow({
           Nothing is read from this inbox until it has a rule.
         </p>
       ) : null}
-      <div className="ps-[21px]">
-        <ScanResultLine state={state} summary={summary} onRetry={sync} />
-      </div>
+      <ScanToast
+        open={toast.open}
+        state={state}
+        summary={summary}
+        inbox={connection.email}
+        lookbackDays={request.lookbackDays}
+        onRetry={() => run(request)}
+        onDismiss={toast.dismiss}
+      />
       {customOpen ? (
         <CustomWindowDialog
           onClose={() => setCustomOpen(false)}

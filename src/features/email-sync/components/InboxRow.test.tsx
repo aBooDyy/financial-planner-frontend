@@ -88,6 +88,52 @@ describe('InboxRow', () => {
     expect(
       await screen.findByText('No new emails to scan — you’re up to date.'),
     ).toBeTruthy()
+    expect(screen.getByText('Sync complete')).toBeTruthy()
+  })
+
+  it('shows progress while a sync runs', async () => {
+    let finish: (value: unknown) => void = () => {}
+    runEmailSync.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finish = resolve
+      }),
+    )
+    renderRow(inbox())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sync now' }))
+    expect(await screen.findByText('Checking for new emails…')).toBeTruthy()
+
+    finish({
+      syncedConnections: 1,
+      scannedMessages: 3,
+      newImports: 2,
+      autoConfirmed: 0,
+      ignored: 1,
+      failures: [],
+      connections: [],
+    })
+    expect(await screen.findByText('Review 2 now')).toBeTruthy()
+  })
+
+  it('says when a sync fails and retries it', async () => {
+    runEmailSync.mockRejectedValueOnce({ code: 'network' })
+    renderRow(inbox())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sync now' }))
+    expect(await screen.findByText('Sync failed')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    await waitFor(() => expect(runEmailSync).toHaveBeenCalledTimes(2))
+    expect(await screen.findByText('Sync complete')).toBeTruthy()
+  })
+
+  it('can be dismissed', async () => {
+    renderRow(inbox())
+    fireEvent.click(screen.getByRole('button', { name: 'Sync now' }))
+    await screen.findByText('Sync complete')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+    expect(screen.queryByText('Sync complete')).toBeNull()
   })
 
   it('asks for a first rule when the inbox has none', () => {
