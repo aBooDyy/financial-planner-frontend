@@ -191,6 +191,14 @@ body,
   min-height: 100%;
 }
 
+/* An app, not a page: the root never rubber-bands (dragging the chrome along with it) and a
+   double tap never zooms. Scroll areas inside still scroll and bounce on their own. */
+html,
+body {
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}
+
 /* `viewport-fit=cover` lets the page run under a landscape notch; the side insets are
    physical, so they stay physical padding in RTL too. The top and bottom insets belong to
    the chrome that owns those edges (top bar, tab bar, sheets). */

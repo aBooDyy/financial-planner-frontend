@@ -199,6 +199,12 @@ the outbox and works offline.
   `h-screen` shell sinks its bottom strip — the tab bar — behind Safari's URL bar. `dvh` tracks
   the visible area, so no device detection is needed; in standalone PWA mode it is the full
   screen and the tab bar's safe-area padding clears the home indicator.
+- **No page zoom, no page bounce.** The viewport sets `maximum-scale=1`, because iOS zooms
+  into any focused field under 16px (most of ours) and never zooms back. `theme.css` gives
+  `html, body` `overscroll-behavior: none` (the root never rubber-bands and drags the top bar
+  and tab bar along with it) and `touch-action: manipulation` (no double-tap zoom). Inner scroll
+  areas still scroll and bounce on their own. Don't bump inputs to 16px to fix the zoom; the
+  viewport already does it.
 - No desktop-style chrome on mobile.
 - Native-feeling interactions: momentum scrolling, large tap targets, sheets/drawers instead
   of modals where appropriate, snappy transitions, optimistic UI (already free via
