@@ -50,6 +50,19 @@ those without a coordinated backend + Dexie migration.
 walletDeltas?, reservations?)` builds the flattened tree (honoring collapse), grand total,
   counts, and top-level bars. `groupParentOptions` powers the "Place inside"
   picker (excludes self + descendants). Unit-tested in `selectors.test.ts` / `currency.test.ts`.
+- **Wallet pickers show groups as headings.** A dropdown where only wallets can be picked
+  lists them under their group's name (`Parent › Child` for nested groups). The group is a
+  label, never an option, and wallets outside any group come first with no heading. Build it
+  from `walletGroupOptions` and don't hand-roll a flat list:
+  - `useWalletGroups()` gives the live tree as groups, for a picker that is handed only its
+    wallets.
+  - `sectionByGroup(groups, rows)` (`data/walletSections.ts`) lays that picker's own rows out
+    under their groups, keeping its filter.
+  - `walletSections(groups)` is for a picker that lists every wallet.
+  - Render with `WalletSelectSections` inside a `Select`, or `WalletMenuSections` inside a
+    `DropdownMenu`. Both use the shared `MENU_LABEL` heading style.
+  - Pickers where a group *is* a pick (Spending's scope filter, "Place inside",
+    `TxAccountPill`) keep their own sections.
 - **Icons resolve in the selector, not the row.** A node carries `icon: string | null` — never
   `undefined`, because an update wire is built from the row and a dropped key reads as "clear
   it" ([categories.md](categories.md#local-rows--sync)). `buildWalletsView` hands every row a

@@ -7,6 +7,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select'
+import { WalletSelectSections } from '#/features/wallets/components/WalletSelectSections'
+import { sectionByGroup } from '#/features/wallets/data/walletSections'
+import type { WalletSection } from '#/features/wallets/data/walletSections'
+import { useWalletGroups } from '#/features/wallets/hooks/useWalletGroups'
 
 type Props = {
   wallets: LocalBalanceNode[]
@@ -23,12 +27,14 @@ const DELETED = '__deleted__'
 
 function WalletSelect({
   wallets,
+  sections,
   value,
   onChange,
   label,
   invalid,
 }: {
   wallets: LocalBalanceNode[]
+  sections: WalletSection<LocalBalanceNode>[]
   value: string
   onChange: (id: string) => void
   label: string
@@ -55,15 +61,18 @@ function WalletSelect({
           <SelectItem value={NONE}>Choose an account</SelectItem>
         ) : null}
         {gone ? <SelectItem value={DELETED}>Deleted account</SelectItem> : null}
-        {wallets.map((w) => (
-          <SelectItem key={w.id} value={w.id}>
-            <span
-              className="h-[8px] w-[8px] flex-none rounded-[2px]"
-              style={{ background: w.color }}
-            />
-            {w.name}
-          </SelectItem>
-        ))}
+        <WalletSelectSections
+          sections={sections}
+          renderItem={(w) => (
+            <SelectItem key={w.id} value={w.id}>
+              <span
+                className="h-[8px] w-[8px] flex-none rounded-[2px]"
+                style={{ background: w.color }}
+              />
+              {w.name}
+            </SelectItem>
+          )}
+        />
       </SelectContent>
     </Select>
   )
@@ -79,9 +88,11 @@ export function TransferAccountsRow({
   onSwap,
   invalid,
 }: Props) {
+  const sections = sectionByGroup(useWalletGroups(), wallets)
   const side = (which: 'from' | 'to') => (
     <WalletSelect
       wallets={wallets}
+      sections={sections}
       value={which === 'from' ? fromId : toId}
       onChange={which === 'from' ? onFrom : onTo}
       label={`${which === 'from' ? 'From' : 'To'} account`}

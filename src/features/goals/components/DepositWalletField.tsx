@@ -1,12 +1,12 @@
 import type { LocalBalanceNode } from '#/db/types'
 import { walletGroupOptions } from '#/features/wallets/data/selectors'
+import { walletSections } from '#/features/wallets/data/walletSections'
+import { WalletSelectSections } from '#/features/wallets/components/WalletSelectSections'
 import { FieldLabel } from '#/components/FieldLabel'
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select'
@@ -37,17 +37,15 @@ export function DepositWalletField({ value, nodes, onChange }: Props) {
         </SelectTrigger>
         <SelectContent>
           <SelectItem value={NONE}>Choose when it arrives</SelectItem>
-          {groups.map((g, gi) => (
-            <SelectGroup key={gi}>
-              <SelectLabel>{g.label ?? 'Wallets'}</SelectLabel>
-              {g.wallets.map((w) => (
-                <SelectItem key={w.id} value={w.id}>
-                  <WalletDot color={w.color} />
-                  {w.name}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          ))}
+          <WalletSelectSections
+            sections={walletSections(groups)}
+            renderItem={(w) => (
+              <SelectItem key={w.id} value={w.id}>
+                <WalletDot color={w.color} />
+                {w.name}
+              </SelectItem>
+            )}
+          />
         </SelectContent>
       </Select>
     </div>

@@ -1,5 +1,8 @@
 import { CurrencyPicker } from '#/components/CurrencyPicker'
+import { WalletSelectSections } from '#/features/wallets/components/WalletSelectSections'
 import { setBaseCurrency } from '#/features/wallets/data/mutations'
+import { sectionByGroup } from '#/features/wallets/data/walletSections'
+import { useWalletGroups } from '#/features/wallets/hooks/useWalletGroups'
 import { useWallets } from '#/features/wallets/hooks/useWallets'
 import type { CurrencyCode } from '#/lib/currency'
 import { DATE_FORMAT_OPTIONS } from '#/lib/date'
@@ -30,6 +33,7 @@ export function PreferencesSection() {
   const preference = useThemeStore((s) => s.preference)
   const setPreference = useThemeStore((s) => s.setPreference)
   const p = usePreferencesStore()
+  const walletGroups = useWalletGroups()
 
   const wallets = nodes.filter((n) => n.kind === 'wallet')
   const onBaseChange = (code: CurrencyCode) => void setBaseCurrency(code)
@@ -124,11 +128,14 @@ export function PreferencesSection() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={DEFAULT_ACCOUNT_NONE}>None</SelectItem>
-              {wallets.map((w) => (
-                <SelectItem key={w.id} value={w.id}>
-                  {w.name}
-                </SelectItem>
-              ))}
+              <WalletSelectSections
+                sections={sectionByGroup(walletGroups, wallets)}
+                renderItem={(w) => (
+                  <SelectItem key={w.id} value={w.id}>
+                    {w.name}
+                  </SelectItem>
+                )}
+              />
             </SelectContent>
           </Select>
         </SettingRow>

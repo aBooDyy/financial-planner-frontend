@@ -7,7 +7,10 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu'
+import { WalletMenuSections } from '#/features/wallets/components/WalletMenuSections'
 import type { TransferWallet } from '#/features/wallets/data/transferDialog'
+import { sectionByGroup } from '#/features/wallets/data/walletSections'
+import { useWalletGroups } from '#/features/wallets/hooks/useWalletGroups'
 import { formatMoney } from '#/lib/currency'
 import { cn } from '#/lib/utils'
 
@@ -83,6 +86,7 @@ export function TransferSideCard({
   invalid,
 }: Props) {
   const name = label === 'FROM' ? 'From account' : 'To account'
+  const groups = useWalletGroups()
   if (locked) {
     return (
       <div
@@ -120,19 +124,22 @@ export function TransferSideCard({
         className="w-(--radix-dropdown-menu-trigger-width)"
       >
         <DropdownMenuRadioGroup value={wallet?.id ?? ''} onValueChange={onPick}>
-          {options.map((w) => (
-            <DropdownMenuRadioItem key={w.id} value={w.id} className="gap-2">
-              <span
-                aria-hidden
-                className="size-[8px] flex-none rounded-[2px]"
-                style={{ background: w.color }}
-              />
-              <span className="min-w-0 flex-1 truncate">{w.name}</span>
-              <span className="flex-none text-fp-text-3 tabular-nums">
-                {formatMoney(w.balance, w.currency)}
-              </span>
-            </DropdownMenuRadioItem>
-          ))}
+          <WalletMenuSections
+            sections={sectionByGroup(groups, options)}
+            renderItem={(w) => (
+              <DropdownMenuRadioItem key={w.id} value={w.id} className="gap-2">
+                <span
+                  aria-hidden
+                  className="size-[8px] flex-none rounded-[2px]"
+                  style={{ background: w.color }}
+                />
+                <span className="min-w-0 flex-1 truncate">{w.name}</span>
+                <span className="flex-none text-fp-text-3 tabular-nums">
+                  {formatMoney(w.balance, w.currency)}
+                </span>
+              </DropdownMenuRadioItem>
+            )}
+          />
         </DropdownMenuRadioGroup>
       </DropdownMenuContent>
     </DropdownMenu>

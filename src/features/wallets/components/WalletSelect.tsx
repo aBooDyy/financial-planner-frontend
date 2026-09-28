@@ -1,13 +1,13 @@
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select'
 import type { WalletGroupOption } from '#/features/wallets/data/selectors'
+import { walletSections } from '#/features/wallets/data/walletSections'
+import { WalletSelectSections } from './WalletSelectSections'
 
 const NONE = '__none__'
 
@@ -42,24 +42,14 @@ export function WalletSelect({
       </SelectTrigger>
       <SelectContent>
         <SelectItem value={NONE}>{noneLabel}</SelectItem>
-        {walletGroups.map((g, i) =>
-          g.label === null ? (
-            g.wallets.map((w) => (
-              <SelectItem key={w.id} value={w.id}>
-                {w.name}
-              </SelectItem>
-            ))
-          ) : (
-            <SelectGroup key={`${g.label}-${i}`}>
-              <SelectLabel>{g.label}</SelectLabel>
-              {g.wallets.map((w) => (
-                <SelectItem key={w.id} value={w.id}>
-                  {w.name}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          ),
-        )}
+        <WalletSelectSections
+          sections={walletSections(walletGroups)}
+          renderItem={(w) => (
+            <SelectItem key={w.id} value={w.id}>
+              {w.name}
+            </SelectItem>
+          )}
+        />
       </SelectContent>
     </Select>
   )

@@ -10,3 +10,7 @@ export const MENU_ITEM =
   'rounded-[10px] py-[9px] text-[13.5px] font-semibold text-fp-text outline-hidden select-none focus:bg-fp-surface-2'
 
 export const MENU_SEPARATOR = '-mx-[6px] my-[6px] h-px bg-fp-border'
+
+/** A heading over a run of rows, e.g. the group a set of wallets sits in. */
+export const MENU_LABEL =
+  'px-[10px] pt-2 pb-[2px] text-[11px] font-bold tracking-[0.06em] text-fp-text-3 uppercase'

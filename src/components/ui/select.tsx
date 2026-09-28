@@ -3,7 +3,12 @@ import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from 'lucide-react'
 import { Select as SelectPrimitive } from 'radix-ui'
 
 import { cn } from '@/lib/utils'
-import { MENU_ITEM, MENU_SEPARATOR, MENU_SURFACE } from './menu-surface'
+import {
+  MENU_ITEM,
+  MENU_LABEL,
+  MENU_SEPARATOR,
+  MENU_SURFACE,
+} from './menu-surface'
 import { FIELD_WELL } from './field-well'
 
 function Select({
@@ -98,10 +103,7 @@ function SelectLabel({
   return (
     <SelectPrimitive.Label
       data-slot="select-label"
-      className={cn(
-        'px-[10px] pt-2 pb-[2px] text-[11px] font-bold tracking-[0.06em] text-fp-text-3 uppercase',
-        className,
-      )}
+      className={cn(MENU_LABEL, className)}
       {...props}
     />
   )

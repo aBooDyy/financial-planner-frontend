@@ -8,6 +8,9 @@ import {
 } from '#/components/ui/select'
 import type { LocalBalanceNode } from '#/db/types'
 import { useCategoryCatalog } from '#/features/categories/hooks/useCategoryCatalog'
+import { WalletSelectSections } from '#/features/wallets/components/WalletSelectSections'
+import { sectionByGroup } from '#/features/wallets/data/walletSections'
+import { useWalletGroups } from '#/features/wallets/hooks/useWalletGroups'
 
 type Props = {
   id: string
@@ -29,6 +32,7 @@ export function BudgetTargetSelect({
   walletLabel,
 }: Props) {
   const catalog = useCategoryCatalog()
+  const walletGroups = useWalletGroups()
   return (
     <Select value={value || undefined} onValueChange={onChange}>
       <SelectTrigger id={id}>
@@ -37,8 +41,10 @@ export function BudgetTargetSelect({
         />
       </SelectTrigger>
       <SelectContent>
-        {scope === 'wallet'
-          ? wallets.map((w) => (
+        {scope === 'wallet' ? (
+          <WalletSelectSections
+            sections={sectionByGroup(walletGroups, wallets)}
+            renderItem={(w) => (
               <SelectItem key={w.id} value={w.id}>
                 <span
                   aria-hidden
@@ -47,19 +53,22 @@ export function BudgetTargetSelect({
                 />
                 {walletLabel(w)}
               </SelectItem>
-            ))
-          : catalog.byType('spend').map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                <IconChip
-                  id={c.icon}
-                  color={c.color}
-                  size={24}
-                  iconSize={13}
-                  className="rounded-[7px]"
-                />
-                {c.name}
-              </SelectItem>
-            ))}
+            )}
+          />
+        ) : (
+          catalog.byType('spend').map((c) => (
+            <SelectItem key={c.id} value={c.id}>
+              <IconChip
+                id={c.icon}
+                color={c.color}
+                size={24}
+                iconSize={13}
+                className="rounded-[7px]"
+              />
+              {c.name}
+            </SelectItem>
+          ))
+        )}
       </SelectContent>
     </Select>
   )

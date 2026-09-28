@@ -7,6 +7,9 @@ import {
 } from '#/components/ui/select'
 import type { LocalBalanceNode } from '#/db/types'
 import { EXTERNAL } from '#/features/planned/hooks/useConfirmForm'
+import { WalletSelectSections } from '#/features/wallets/components/WalletSelectSections'
+import { sectionByGroup } from '#/features/wallets/data/walletSections'
+import { useWalletGroups } from '#/features/wallets/hooks/useWalletGroups'
 
 type Props = {
   id: string
@@ -29,6 +32,8 @@ export function ConfirmWalletSelect({
   allowExternal,
   onChange,
 }: Props) {
+  const groups = useWalletGroups()
+
   return (
     <Select
       value={value || NONE}
@@ -41,16 +46,19 @@ export function ConfirmWalletSelect({
         {wallets.length === 0 ? (
           <SelectItem value={NONE}>No wallets yet</SelectItem>
         ) : null}
-        {wallets.map((w) => (
-          <SelectItem key={w.id} value={w.id}>
-            <span
-              aria-hidden
-              className="size-[10px] flex-none rounded-[3px]"
-              style={{ background: w.color }}
-            />
-            <span className="truncate">{w.name}</span>
-          </SelectItem>
-        ))}
+        <WalletSelectSections
+          sections={sectionByGroup(groups, wallets)}
+          renderItem={(w) => (
+            <SelectItem key={w.id} value={w.id}>
+              <span
+                aria-hidden
+                className="size-[10px] flex-none rounded-[3px]"
+                style={{ background: w.color }}
+              />
+              <span className="truncate">{w.name}</span>
+            </SelectItem>
+          )}
+        />
         {allowExternal ? (
           <SelectItem value={EXTERNAL}>External…</SelectItem>
         ) : null}

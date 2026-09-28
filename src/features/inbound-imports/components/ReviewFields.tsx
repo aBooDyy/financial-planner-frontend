@@ -14,6 +14,9 @@ import type { LocalBalanceNode } from '#/db/types'
 import { CategoryPicker } from '#/features/categories/components/CategoryPicker'
 import { bodyNoun } from '#/features/inbound-imports/data/sources'
 import type { ReviewCard } from '#/features/inbound-imports/hooks/useReviewQueue'
+import { WalletSelectSections } from '#/features/wallets/components/WalletSelectSections'
+import { sectionByGroup } from '#/features/wallets/data/walletSections'
+import { useWalletGroups } from '#/features/wallets/hooks/useWalletGroups'
 import { amountInputProps } from '#/lib/currency'
 import { cn } from '#/lib/utils'
 import { usePreferencesStore } from '#/stores/preferences'
@@ -30,6 +33,7 @@ export function ReviewFields({ card, wallets }: Props) {
   const { item, draft, setField } = card
   const id = `import-${item.id}`
   const dateFormat = usePreferencesStore((s) => s.dateFormat)
+  const groups = useWalletGroups()
   const tapHint = `Enter it, or tap it in the ${bodyNoun(item.bodyFormat)} below.`
 
   return (
@@ -102,16 +106,19 @@ export function ReviewFields({ card, wallets }: Props) {
               {wallets.length === 0 ? (
                 <SelectItem value={NONE}>No accounts</SelectItem>
               ) : null}
-              {wallets.map((w) => (
-                <SelectItem key={w.id} value={w.id}>
-                  <span
-                    aria-hidden
-                    className="size-[10px] flex-none rounded-[3px]"
-                    style={{ background: w.color }}
-                  />
-                  <span className="truncate">{w.name}</span>
-                </SelectItem>
-              ))}
+              <WalletSelectSections
+                sections={sectionByGroup(groups, wallets)}
+                renderItem={(w) => (
+                  <SelectItem key={w.id} value={w.id}>
+                    <span
+                      aria-hidden
+                      className="size-[10px] flex-none rounded-[3px]"
+                      style={{ background: w.color }}
+                    />
+                    <span className="truncate">{w.name}</span>
+                  </SelectItem>
+                )}
+              />
             </SelectContent>
           </Select>
         </div>

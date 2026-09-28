@@ -10,6 +10,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select'
+import { WalletSelectSections } from '#/features/wallets/components/WalletSelectSections'
+import { sectionByGroup } from '#/features/wallets/data/walletSections'
+import { useWalletGroups } from '#/features/wallets/hooks/useWalletGroups'
 import { usePreferencesStore } from '#/stores/preferences'
 import { WalletDot } from '../WalletDot'
 
@@ -18,6 +21,7 @@ const NONE = '__none__'
 /** 1b's source and date, plus where external money is held. */
 export function ContributionFields({ f }: { f: ContributionForm }) {
   const dateFormat = usePreferencesStore((s) => s.dateFormat)
+  const groups = useWalletGroups()
 
   return (
     <>
@@ -37,12 +41,15 @@ export function ContributionFields({ f }: { f: ContributionForm }) {
                   {f.wallets.length === 0 ? 'No wallets yet' : 'Decide later'}
                 </SelectItem>
               ) : null}
-              {f.wallets.map((w) => (
-                <SelectItem key={w.id} value={w.id}>
-                  <WalletDot color={w.color} />
-                  {w.name}
-                </SelectItem>
-              ))}
+              <WalletSelectSections
+                sections={sectionByGroup(groups, f.wallets)}
+                renderItem={(w) => (
+                  <SelectItem key={w.id} value={w.id}>
+                    <WalletDot color={w.color} />
+                    {w.name}
+                  </SelectItem>
+                )}
+              />
               {f.allowExternal ? (
                 <SelectItem value={EXTERNAL}>External…</SelectItem>
               ) : null}
