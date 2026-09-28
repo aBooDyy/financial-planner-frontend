@@ -739,9 +739,9 @@ describe('transfers', () => {
       fromName: 'Everyday · Main',
       toName: 'Everyday · Savings',
       direction: 'neutral',
-      amountStr: 'SR 500',
+      amountStr: 'SR 500.00',
     })
-    expect(view.groups[0].totalStr).toBe('−SR 100')
+    expect(view.groups[0].totalStr).toBe('−SR 100.00')
     expect(view.countStr).toBe('2 in June 2026')
   })
 
@@ -786,7 +786,7 @@ describe('transfers', () => {
     expect(row).toMatchObject({
       name: 'Transfer to Savings',
       direction: 'out',
-      amountStr: '−SR 500',
+      amountStr: '−SR 500.00',
     })
   })
 
@@ -798,7 +798,7 @@ describe('transfers', () => {
     expect(row).toMatchObject({
       name: 'Transfer from Main',
       direction: 'in',
-      amountStr: '+SR 500',
+      amountStr: '+SR 500.00',
     })
   })
 
@@ -829,7 +829,7 @@ describe('transfers', () => {
       name: 'Transfer to Deleted account',
       toName: 'Deleted account',
       direction: 'out',
-      amountStr: '−SR 500',
+      amountStr: '−SR 500.00',
     })
   })
 })
@@ -926,7 +926,7 @@ describe('balance adjustments', () => {
   it('lists each adjustment as its own signed row, out of the day total', () => {
     const view = activity(withAdjustments())
     expect(view.groups[0].rows).toHaveLength(3)
-    expect(view.groups[0].totalStr).toBe('−SR 100')
+    expect(view.groups[0].totalStr).toBe('−SR 100.00')
     expect(adjustmentRows(withAdjustments())).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -934,13 +934,13 @@ describe('balance adjustments', () => {
           name: 'Balance adjustment',
           walletName: 'Main',
           direction: 'in',
-          amountStr: '+SR 300',
+          amountStr: '+SR 300.00',
         }),
         expect.objectContaining({
           id: down.id,
           name: 'Matched statement',
           direction: 'out',
-          amountStr: '−SR 50',
+          amountStr: '−SR 50.00',
         }),
       ]),
     )
@@ -1001,12 +1001,12 @@ describe('confirmed planned items in Activity', () => {
     })
     expect(view.groups).toHaveLength(1)
     const [day] = view.groups
-    expect(day.totalStr).toBe('−SR 50')
+    expect(day.totalStr).toBe('−SR 50.00')
     const setAside = day.rows.find((r) => r.kind === 'set_aside') as SetAsideRow
     expect(setAside).toMatchObject({
       name: 'Umrah trip',
       sourceName: 'Main',
-      amountStr: 'SR 1,500',
+      amountStr: 'SR 1,500.00',
       goalId: 'umrah',
     })
   })

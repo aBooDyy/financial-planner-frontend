@@ -91,6 +91,8 @@ minimal non-stale comments).
   negative; transfer, spend and goal amounts can't). The caret stays where the user typed.
   An amount field *shows* its value grouped (`18,420.50`, via `groupThousands`) while state
   keeps the plain `18420.50`; `minorToInputValue` prefills with the currency's full decimals.
+- **Ledger rows show exact money.** Activity rows and day totals use `formatMoney`
+  (`SR 1,234.50`); `formatMoneyRounded` is for planning/summary figures only.
 
 ## Comments
 

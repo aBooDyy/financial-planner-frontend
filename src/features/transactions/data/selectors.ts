@@ -1,4 +1,4 @@
-import { convertMinor, formatMoneyRounded } from '#/lib/currency'
+import { convertMinor, formatMoney, formatMoneyRounded } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
 import { formatShare } from '#/lib/percent'
 import { DEFAULT_DATE_FORMAT, formatDate } from '#/lib/date'
@@ -661,7 +661,7 @@ function txRowOf(t: FlowTxn, ctx: ActivityContext): TxRow {
     walletColor: wallet?.color ?? NO_WALLET_COLOR,
     isIncome: isInc,
     tag: txTagOf(t),
-    amountStr: `${isInc ? '+' : '−'}${formatMoneyRounded(toBase(t, ctx.data), ctx.data.base)}`,
+    amountStr: `${isInc ? '+' : '−'}${formatMoney(toBase(t, ctx.data), ctx.data.base)}`,
   }
 }
 
@@ -678,7 +678,7 @@ function adjustmentRowOf(
     walletName: walletLabelOf(wallet, ctx, DELETED_ACCOUNT),
     walletColor: wallet?.color ?? NO_WALLET_COLOR,
     direction,
-    amountStr: `${direction === 'in' ? '+' : '−'}${formatMoneyRounded(toBase(t, ctx.data), ctx.data.base)}`,
+    amountStr: `${direction === 'in' ? '+' : '−'}${formatMoney(toBase(t, ctx.data), ctx.data.base)}`,
   }
 }
 
@@ -706,9 +706,7 @@ function transferRowOf(
   const to = side(inn)
   const direction = outIn && inIn ? 'neutral' : outIn ? 'out' : 'in'
   const shown = direction === 'in' ? inn : out
-  const money = shown
-    ? formatMoneyRounded(toBase(shown, ctx.data), ctx.data.base)
-    : ''
+  const money = shown ? formatMoney(toBase(shown, ctx.data), ctx.data.base) : ''
   const note = (out ?? inn)?.note
 
   return {
@@ -748,7 +746,7 @@ function setAsideRowOf(
         ? (a.externalLabel ?? 'External')
         : walletLabelOf(wallet, ctx, DELETED_ACCOUNT),
     sourceColor: wallet?.color ?? NO_WALLET_COLOR,
-    amountStr: formatMoneyRounded(
+    amountStr: formatMoney(
       convertMinor(a.amount, a.currency, ctx.data.base, ctx.data.rates),
       ctx.data.base,
     ),
@@ -879,9 +877,9 @@ export function buildActivityList(
         ? 'Yesterday · '
         : ''
     const totalStr =
-      (spent > 0 ? `−${formatMoneyRounded(spent, data.base)}` : '') +
+      (spent > 0 ? `−${formatMoney(spent, data.base)}` : '') +
         (income > 0
-          ? `${spent > 0 ? '  ' : ''}+${formatMoneyRounded(income, data.base)}`
+          ? `${spent > 0 ? '  ' : ''}+${formatMoney(income, data.base)}`
           : '') || NO_DAY_TOTAL
     return {
       dateLabel: prefix + formatDate(d, dateFormat),
