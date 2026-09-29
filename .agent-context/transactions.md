@@ -425,15 +425,17 @@ rows per merchant, currencies in use — reads a small derived table instead of 
   and how a write moves the totals, is pure: `data/ledgerTotals.ts` (`contributionsOf`,
   `totalsDiff`, `applyTotalsDiff`).
 - **Sums stay per row currency; conversion happens on read**, so a rate edit moves balances
-  with no rewrite. Converting a currency's **sum** once, rather than each row, rounds once:
-  a wallet holding foreign-currency rows can differ from the old per-row sum by a minor unit
-  or so. Same-currency wallets are exact.
+  with no rewrite. Converting a currency's **sum** once rounds once, where converting each row
+  rounded every row: the old per-row figure drifted by up to half a minor unit per
+  foreign-currency row (measured: 79 minor units on a wallet with ~2,900 USD rows). The summed
+  figure is the more accurate one. Same-currency wallets are exact either way.
 - **Maintained by `db/ledgerTotalsMiddleware.ts`**, never by feature code — see
   [data-layer-and-sync.md](data-layer-and-sync.md#running-totals-maintained-in-the-database).
 - **Self-check.** `db/ledgerTotalsCheck.ts` recounts the ledger in pages once per page load,
-  when idle after the first pull (`scheduleLedgerTotalsCheck` in `startSync`); on any
-  disagreement it rebuilds the table in one transaction with the ledger. A rebuild is
-  harmless, so a write landing between pages only costs one.
+  when idle after the first pull (`scheduleLedgerTotalsCheck` in `startSync`). A write landing
+  between pages makes the paged recount disagree with totals that are right, so a
+  disagreement is only confirmed by `rebuildLedgerTotals`, which recounts in one transaction
+  with the ledger and rewrites (and reports drift) only when the totals really differ.
 - **Readers**: `readWalletDeltas` / `readLedgerSummary` (Spending, Wallets, Settings › Archived,
   search's account balances) and `hooks/useLedgerCounts(kind)` (Settings › Categories and
   › Merchants).

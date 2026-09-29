@@ -10,8 +10,9 @@ const PAGE_SIZE = 2000
 
 const yieldToMain = () => new Promise((resolve) => setTimeout(resolve, 0))
 
-// Paged so the recount never holds the main thread for long. Writes landing between pages can
-// make it disagree with the stored totals; a disagreement only ever costs a rebuild.
+// Paged so the recount never holds the main thread for long. A write landing between pages
+// can make it disagree with totals that are right, so a disagreement is only a reason to look
+// again atomically.
 async function recountTotals(): Promise<LocalLedgerTotal[]> {
   const totals = new Map<string, LocalLedgerTotal>()
   let after: string | undefined
@@ -30,21 +31,25 @@ async function recountTotals(): Promise<LocalLedgerTotal[]> {
   }
 }
 
-/** Recomputes the totals from the whole ledger, atomically with it. */
-export async function rebuildLedgerTotals(): Promise<void> {
-  await db.transaction('rw', db.transactions, db.ledgerTotals, async () => {
-    const rows = await db.transactions.toArray()
+/**
+ * Recomputes the totals from the whole ledger in one transaction with it, and rewrites them
+ * only if they differ; true when they did.
+ */
+export async function rebuildLedgerTotals(): Promise<boolean> {
+  return db.transaction('rw', db.transactions, db.ledgerTotals, async () => {
+    const rebuilt = totalsOf(await db.transactions.toArray())
+    if (sameTotals(rebuilt, await db.ledgerTotals.toArray())) return false
     await db.ledgerTotals.clear()
-    await db.ledgerTotals.bulkPut(totalsOf(rows))
+    await db.ledgerTotals.bulkPut(rebuilt)
+    return true
   })
 }
 
-/** Rebuilds the totals if they disagree with the ledger; true when it had to. */
+/** Rebuilds the totals if they disagree with the ledger; true when they did. */
 export async function checkLedgerTotals(): Promise<boolean> {
   const recounted = await recountTotals()
   if (sameTotals(recounted, await db.ledgerTotals.toArray())) return false
-  await rebuildLedgerTotals()
-  return true
+  return rebuildLedgerTotals()
 }
 
 let checked = false

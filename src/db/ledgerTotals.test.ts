@@ -200,4 +200,15 @@ describe('checkLedgerTotals', () => {
     await expectInStep(db)
     await db.transactions.clear()
   })
+
+  it('confirms a disagreement atomically, so a write racing the paged recount is no drift', async () => {
+    const { db } = await import('./db')
+    const { rebuildLedgerTotals } = await import('./ledgerTotalsCheck')
+    await db.transactions.bulkPut([tx({ amount: 5 }), tx({ merchantId: 'm1' })])
+    const before = await db.ledgerTotals.toArray()
+
+    expect(await rebuildLedgerTotals()).toBe(false)
+    expect(await db.ledgerTotals.toArray()).toEqual(before)
+    await db.transactions.clear()
+  })
 })
