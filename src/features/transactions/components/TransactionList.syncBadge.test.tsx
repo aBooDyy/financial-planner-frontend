@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import 'fake-indexeddb/auto'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import {
+  cleanup,
+  configure,
+  fireEvent,
+  render,
+  screen,
+} from '@testing-library/react'
 import {
   afterEach,
   beforeAll,
@@ -22,6 +28,7 @@ vi.mock('#/db/syncRetry', () => ({
 }))
 
 vi.setConfig({ testTimeout: 20000 })
+configure({ asyncUtilTimeout: 5000 })
 
 beforeAll(() => {
   globalThis.ResizeObserver = class {

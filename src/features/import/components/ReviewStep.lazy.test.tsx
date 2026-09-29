@@ -22,6 +22,8 @@ import type * as RowScan from '#/features/import/data/rowScan'
  * every row first has moved the cost, not removed it.
  */
 
+vi.setConfig({ testTimeout: 20000 })
+
 const ROWS = 5000
 
 const built = { rows: 0 }

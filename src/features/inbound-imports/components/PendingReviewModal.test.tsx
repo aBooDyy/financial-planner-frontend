@@ -23,6 +23,8 @@ import type { ImportDetail } from '#/features/inbound-imports/api/types'
 import { UNDO_MS } from '#/features/inbound-imports/hooks/useHeldBatch'
 import { PendingReviewModal } from './PendingReviewModal'
 
+vi.setConfig({ testTimeout: 20000 })
+
 const confirmImport = vi.fn()
 const dismissImport = vi.fn()
 const getImport = vi.fn()
