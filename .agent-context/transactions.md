@@ -178,7 +178,8 @@ flattening every red day; the square root keeps small days distinguishable from 
 `hooks/useTransactions` bundles every input **except the ledger rows** into `SpendingInputs`
 (`SpendingData` minus `txns`), memoized on its source rows, **and returns the live `catalog`
 beside it** (the selectors' explicit signature won over folding it into `SpendingData`), plus
-`deltas` — each wallet's `walletDeltas` over the whole ledger. The page reads its rows for the
+`deltas` — each wallet's delta over the whole ledger, read from the stored running totals
+([Running totals](#running-totals-ledgertotals)). The page reads its rows for the
 period on screen ([How the page reads the ledger](#how-the-page-reads-the-ledger)).
 `TransactionsPage` threads both into every builder. `hooks/useTxEditor` is the
 tx/budget/recurring editor state machine. Components are dumb (`components/`): page composition
@@ -389,7 +390,7 @@ without bound, and every builder only ever looks at a few dates. **What each con
 | `buildCalendar`                                        | `calendarSpan(period)`: the anchor month's whole-week grid, which spills into the neighbouring months; a custom day grid's whole weeks; a month grid's period  |
 | `buildBudgetsView`                                     | each live budget's `budgetWindow(period, customDays, today)` — **relative to today, not the anchor**, so browsing an old month still reads this month's budget span |
 | `buildRecurringView`                                   | none — schedules only; that tab never waits for the ledger                                                                                                     |
-| `scopeSections`, the `ConnectedTxEditor` accounts      | **every row**: a balance is opening + the whole ledger                                                                                                         |
+| `scopeSections`, the `ConnectedTxEditor` accounts      | none — a balance is opening + the whole ledger, read from the running totals (`readWalletDeltas`)                                                              |
 | opening a transfer row                                 | both legs by the `transferId` index (`readTransferLegs`) — a leg can sit on another date                                                                      |
 
 - **`data/ledgerRange.ts` — `ledgerRanges(period, today, budgets)`** is the union of the
@@ -405,11 +406,38 @@ without bound, and every builder only ever looks at a few dates. **What each con
   builders' stable sorts (`buildCashflow`, `buildBreakdown`) break equal totals by arrival —
   so date order could swap the "Top: …" category. It relies on dates being wire ISO
   `YYYY-MM-DD`, where string order is date order.
-- **The one full read is `readWalletDeltas(rates)`.** It reduces inside the live query, so only
-  the per-wallet map reaches React. It cannot be windowed without stored aggregates, which were
-  declined. It waits for the rates to load (so a mount costs one full read, not two), and only
-  the account filter's balances and the editors wait for it — the filter lists its accounts at
-  once (`scopeSections` over empty deltas) with skeleton balances until then.
+- **Balances read the running totals, not the ledger.** `readWalletDeltas(rates)` reads the
+  `wallet` rows of `ledgerTotals` and converts each currency's sum into the wallet's currency
+  (`walletDeltasFromTotals`); `readLedgerSummary` adds the `currency` rows and the goal-linked
+  rows by the `goalId` index. It waits for the rates to load, and only the account filter's
+  balances and the editors wait for it — the filter lists its accounts at once (`scopeSections`
+  over empty deltas) with skeleton balances until then.
+
+### Running totals (`ledgerTotals`)
+
+Every screen that needs a figure over the **whole** ledger — wallet balances, rows per category,
+rows per merchant, currencies in use — reads a small derived table instead of the ledger.
+
+- **Rows** (`LocalLedgerTotal`, `id, kind` indexed): `wallet:<id>:<currency>` holds the signed
+  minor-unit `sum` and `count` of a wallet's live rows **in that row currency**;
+  `category:<id>` / `merchant:<id>` count live rows; `currency:<code>` counts every row,
+  deleted ones included. A total whose count reaches 0 is removed. What a row contributes,
+  and how a write moves the totals, is pure: `data/ledgerTotals.ts` (`contributionsOf`,
+  `totalsDiff`, `applyTotalsDiff`).
+- **Sums stay per row currency; conversion happens on read**, so a rate edit moves balances
+  with no rewrite. Converting a currency's **sum** once, rather than each row, rounds once:
+  a wallet holding foreign-currency rows can differ from the old per-row sum by a minor unit
+  or so. Same-currency wallets are exact.
+- **Maintained by `db/ledgerTotalsMiddleware.ts`**, never by feature code — see
+  [data-layer-and-sync.md](data-layer-and-sync.md#running-totals-maintained-in-the-database).
+- **Self-check.** `db/ledgerTotalsCheck.ts` recounts the ledger in pages once per page load,
+  when idle after the first pull (`scheduleLedgerTotalsCheck` in `startSync`); on any
+  disagreement it rebuilds the table in one transaction with the ledger. A rebuild is
+  harmless, so a write landing between pages only costs one.
+- **Readers**: `readWalletDeltas` / `readLedgerSummary` (Spending, Wallets, Settings › Archived,
+  search's account balances) and `hooks/useLedgerCounts(kind)` (Settings › Categories and
+  › Merchants).
+
 - **Stepping periods never flashes.** `useLedgerWindow` wraps `useLiveQuery`, which
   (dexie-react-hooks 4) keeps the previous answer across a deps change, and `useSpendingViews`
   builds the ledger views for the period **the rows were read for**, not the one in state — so the

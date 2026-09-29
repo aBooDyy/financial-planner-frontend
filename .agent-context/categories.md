@@ -318,7 +318,9 @@ Recorded as a sync pattern in
 
 - **`useCategoryTree(initialType)`** is the list's view model: the catalog filtered to one
   type, with live `txCount` / `recurringCount` / `plannedCount` per row, tallied by
-  `categoryId`. A **parent's counts roll up its children's** — its delete takes them along, so
+  `categoryId`. `txCount` comes from the stored `category` ledger totals
+  (`useLedgerCounts('category')`), never a scan of `transactions`; recurrings and planned rows
+  are small tables and are tallied directly. A **parent's counts roll up its children's** — its delete takes them along, so
   that is the number a user deleting it needs to see; a child counts only rows filed under its
   own id.
 - **`CategoryTree` / `CategoryTreeRow`** render the two levels with one row anatomy.

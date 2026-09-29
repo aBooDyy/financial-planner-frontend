@@ -20,8 +20,9 @@ src/features/merchants/
 
 Dexie declares `merchants: 'id, dirty, deleted'` and
 `merchantAliases: 'id, merchantId, normalizedKey, dirty, deleted'`, and `transactions` carries
-a `merchantId` index (the adopt branch repoints rows by merchant, and the
-merchant list counts them). Both tables are wiped by `clearLocalDb()`. `OutboxEntity` carries
+a `merchantId` index (the adopt branch repoints rows by merchant). The merchant list's
+`txCount` comes from the stored `merchant` ledger totals (`useLedgerCounts('merchant')`), not a
+scan of `transactions`. Both tables are wiped by `clearLocalDb()`. `OutboxEntity` carries
 `'merchant'` and `'merchantAlias'`.
 
 ## `normalizeKey` — one algorithm, two languages

@@ -45,6 +45,7 @@ import {
 import { configLimits } from '#/lib/config/appConfig'
 import { ApiError } from '#/lib/apiError'
 import { db } from './db'
+import { scheduleLedgerTotalsCheck } from './ledgerTotalsCheck'
 import { recordPlannerInputsPulled } from './plannerInputs'
 import { trackSync } from './syncActivity'
 import {
@@ -610,6 +611,7 @@ export function startSync(): () => void {
   if (stopRunningSync) return () => {}
 
   void pullAll().then(() => {
+    scheduleLedgerTotalsCheck()
     void (async () => {
       if ((await db.outbox.count()) > 0) schedulePush()
     })()

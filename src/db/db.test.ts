@@ -9,11 +9,11 @@ import { describe, expect, it } from 'vitest'
  */
 
 describe('the local database', () => {
-  it('opens at version 2 with every table the app reads', async () => {
+  it('opens at version 3 with every table the app reads', async () => {
     const { db } = await import('./db')
     await db.open()
 
-    expect(db.verno).toBe(2)
+    expect(db.verno).toBe(3)
     expect(db.tables.map((t) => t.name).sort()).toEqual([
       'appConfig',
       'balanceNodes',
@@ -30,6 +30,7 @@ describe('the local database', () => {
       'inboundImports',
       'incomeStreams',
       'integrationKeys',
+      'ledgerTotals',
       'merchantAliases',
       'merchants',
       'outbox',
@@ -175,7 +176,7 @@ describe('the local database', () => {
     const upgraded = new AppDatabase(name)
     await upgraded.open()
 
-    expect(upgraded.verno).toBe(2)
+    expect(upgraded.verno).toBe(3)
     expect(await upgraded.categories.count()).toBe(0)
     expect(await upgraded.transactions.count()).toBe(0)
     expect(await upgraded.syncState.count()).toBe(0)

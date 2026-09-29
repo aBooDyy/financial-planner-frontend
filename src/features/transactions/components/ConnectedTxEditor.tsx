@@ -16,7 +16,7 @@ type Props = {
   goals: LocalGoal[]
   base: CurrencyCode
   data: SpendingInputs
-  /** Each wallet's `walletDeltas` over the whole ledger. */
+  /** Each wallet's signed delta over the whole ledger, in its own currency. */
   deltas: Record<string, number>
 }
 

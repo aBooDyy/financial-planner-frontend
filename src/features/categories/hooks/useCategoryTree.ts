@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '#/db/db'
 import type { TxType } from '#/features/transactions/api/types'
+import { useLedgerCounts } from '#/features/transactions/hooks/useLedgerCounts'
 import type {
   ResolvedCategory,
   ResolvedSub,
@@ -53,12 +54,11 @@ export function useCategoryTree(initialType: TxType = 'spend'): CategoryTree {
   const [type, setType] = useState<TxType>(initialType)
   const catalog = useCategoryCatalog()
   const rows = useLiveQuery(() => db.categories.toArray())
-  const txns = useLiveQuery(() => db.transactions.toArray())
+  const tx = useLedgerCounts('category')
   const recurrings = useLiveQuery(() => db.recurrings.toArray())
   const planned = useLiveQuery(() => db.plannedTransactions.toArray())
 
   const categories = useMemo(() => {
-    const tx = tally(txns)
     const rec = tally(recurrings)
     const plan = tally(planned)
     const countsOf = (ids: ReadonlyArray<string>): FiledCounts => ({
@@ -71,7 +71,7 @@ export function useCategoryTree(initialType: TxType = 'spend'): CategoryTree {
       ...countsOf([c.id, ...c.subs.map((s) => s.id)]),
       subs: c.subs.map((s) => ({ ...s, ...countsOf([s.id]) })),
     }))
-  }, [catalog, type, txns, recurrings, planned])
+  }, [catalog, type, tx, recurrings, planned])
 
   return { loading: rows === undefined, type, setType, categories }
 }

@@ -1,6 +1,8 @@
 import Dexie from 'dexie'
 import { removeCachedUser } from '#/stores/cachedUser'
+import { ledgerTotalsMiddleware } from './ledgerTotalsMiddleware'
 import { resetPullState } from './pullState'
+import { totalsOf } from '#/features/transactions/data/ledgerTotals'
 import type { EntityTable } from 'dexie'
 import type {
   LocalAppConfig,
@@ -18,6 +20,7 @@ import type {
   LocalInboundImport,
   LocalIncomeStream,
   LocalIntegrationKey,
+  LocalLedgerTotal,
   LocalMerchant,
   LocalMerchantAlias,
   LocalPlanned,
@@ -55,11 +58,11 @@ const SYNCED_TABLES = [
 ] as const
 
 /**
- * What a sign-out wipes: the synced tables and this device's import history. `appConfig` is
- * deliberately kept — it holds no user data, and keeping it means the next sign-in already
- * knows the currency table offline.
+ * What a sign-out wipes: the synced tables, what is derived from them, and this device's
+ * import history. `appConfig` is deliberately kept — it holds no user data, and keeping it
+ * means the next sign-in already knows the currency table offline.
  */
-const USER_TABLES = [...SYNCED_TABLES, 'importBatches'] as const
+const USER_TABLES = [...SYNCED_TABLES, 'ledgerTotals', 'importBatches'] as const
 
 /**
  * The local-first database. The UI's source of truth: reads come from here (reactively),
@@ -77,6 +80,7 @@ export class AppDatabase extends Dexie {
   goals!: EntityTable<LocalGoal, 'id'>
   goalAllocations!: EntityTable<LocalGoalAllocation, 'id'>
   transactions!: EntityTable<LocalTransaction, 'id'>
+  ledgerTotals!: EntityTable<LocalLedgerTotal, 'id'>
   merchants!: EntityTable<LocalMerchant, 'id'>
   merchantAliases!: EntityTable<LocalMerchantAlias, 'id'>
   budgets!: EntityTable<LocalBudget, 'id'>
@@ -92,8 +96,8 @@ export class AppDatabase extends Dexie {
 
   constructor(dbName = 'means-app') {
     super(dbName)
-    // The whole schema, declared once at its current shape. Dexie diffs it against whatever
-    // is installed, so older versions need no declaration of their own.
+    // The whole schema as of version 2, and each later version's change on top of it. Dexie
+    // diffs them against whatever is installed, so older versions need no declaration.
     //
     // Version 2: rows reference categories by id instead of a slug pair. Local rows and
     // queued payloads in the old shape cannot be translated without the server's ids, so
@@ -129,6 +133,14 @@ export class AppDatabase extends Dexie {
       .upgrade(async (tx) => {
         await Promise.all(SYNCED_TABLES.map((name) => tx.table(name).clear()))
       })
+    // Version 3: running totals over the ledger, built from the rows already on the device.
+    this.version(3)
+      .stores({ ledgerTotals: 'id, kind' })
+      .upgrade(async (tx) => {
+        const rows = await tx.table<LocalTransaction>('transactions').toArray()
+        await tx.table('ledgerTotals').bulkPut(totalsOf(rows))
+      })
+    this.use(ledgerTotalsMiddleware)
   }
 }
 

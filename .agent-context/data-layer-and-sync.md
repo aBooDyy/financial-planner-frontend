@@ -25,10 +25,15 @@ Alternatives considered (record if we ever switch):
 
 ## Tables
 
-**The whole schema is declared once, at its current version** (`this.version(2).stores({...})`
-in `db/db.ts`). Dexie diffs the declaration against whatever is installed, so older versions
-need no declaration of their own; adding a table or an index means editing that one
-declaration and, when installed data cannot follow, bumping the version with an `.upgrade()`.
+**The schema is declared as of version 2, plus each later version's change on top**
+(`this.version(2).stores({...})`, then `this.version(3).stores({ ledgerTotals })` in
+`db/db.ts`). Dexie diffs the declarations against whatever is installed, so versions before 2
+need no declaration of their own. Adding a table or an index means a new version with just
+that change, and an `.upgrade()` when installed data has to follow.
+
+- **Version 3 adds `ledgerTotals`** and builds it from the rows already on the device. It is
+  derived data: never synced, not in `SYNCED_TABLES`, but wiped on sign-out with the rest
+  (`USER_TABLES`). See [Running totals](#running-totals-maintained-in-the-database).
 
 - **Version 2 (category ids) is a one-off wipe.** Rows stopped naming categories by slug pair
   and now carry a `categoryId` ([categories.md](categories.md)); a local row or a queued
@@ -66,6 +71,33 @@ declaration and, when installed data cannot follow, bumping the version with an 
   synced table with one extra duty: `useCustomCurrencies` mirrors it into the app-config
   store, because every currency helper (`decimalsFor`, `fromWireCurrency`) is synchronous and
   reads that store. See [app-config.md](app-config.md#currencies-the-user-defines).
+
+## Running totals, maintained in the database
+
+`ledgerTotals` ([transactions.md](transactions.md#running-totals-ledgertotals)) must equal a
+recount of `transactions` at all times, and a ledger row is written from many places —
+mutations, transfers, sync pulls and reconciles, imports, the review queue. So no feature
+updates it: **`db/ledgerTotalsMiddleware.ts`, a Dexie DBCore middleware registered in the
+`AppDatabase` constructor**, does it inside the very IndexedDB transaction of each write.
+
+- **Callers never list the table.** The middleware widens every read-write transaction that
+  includes `transactions` to include `ledgerTotals` too, so an explicit
+  `db.transaction('rw', db.transactions, db.outbox, …)` needs no change, and an abort rolls
+  both back together.
+- **It sees every write shape**: `add`/`put` (incl. `update`, `modify`, `bulk*`) read the old
+  rows first and diff; `delete` reads what it removes; `clear()` empties the totals. Failed
+  items of a bulk write are left out.
+- **Writes inside one transaction are applied in turn**, so parallel `put`s in a
+  `Promise.all` never read the same stored total and lose an update.
+- **Gotcha — no `async`/`await` inside a DBCore middleware.** Dexie's lower layers (the hooks
+  middleware) read the current transaction from Dexie's zone, which only Dexie's own promises
+  carry; a native `await` drops it and the next call fails with `Cannot read properties of
+  undefined (reading 'table')`. Chain `.then` on the promises the layer below returns, and
+  start chains from `Dexie.Promise.resolve()`.
+- **A live query on `ledgerTotals` wakes only when a total moves** — a note edit or a `dirty`
+  flip rewrites no total, so it does not re-run readers.
+- `db/ledgerTotals.test.ts` pins every write path against a from-scratch recount, the racing
+  writes, the abort, the version-3 build and the self-check.
 
 ## Reads
 

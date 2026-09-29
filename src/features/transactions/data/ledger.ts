@@ -19,7 +19,9 @@ const CREDITS: ReadonlySet<TransactionType> = new Set([
   'adjustment_in',
 ])
 
-const signOf = (t: LocalTransaction): number => (CREDITS.has(t.type) ? 1 : -1)
+/** +1 for a row that adds to its wallet, -1 for one that takes from it. */
+export const signOf = (t: LocalTransaction): number =>
+  CREDITS.has(t.type) ? 1 : -1
 
 const walletCurrencies = (
   nodes: LocalBalanceNode[],

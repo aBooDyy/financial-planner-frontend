@@ -2,6 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '#/db/db'
 import type { LocalMerchant, LocalMerchantAlias } from '#/db/types'
 import type { MerchantIndex } from '#/features/merchants/data/matching'
+import { useLedgerCounts } from '#/features/transactions/hooks/useLedgerCounts'
 
 export type MerchantView = LocalMerchant & {
   aliases: LocalMerchantAlias[]
@@ -28,7 +29,7 @@ export function useMerchants(): {
 } {
   const merchantRows = useLiveQuery(() => db.merchants.toArray())
   const aliasRows = useLiveQuery(() => db.merchantAliases.toArray())
-  const txRows = useLiveQuery(() => db.transactions.toArray())
+  const counts = useLedgerCounts('merchant')
 
   const loading = merchantRows === undefined || aliasRows === undefined
 
@@ -37,12 +38,6 @@ export function useMerchants(): {
     const list = aliasesByMerchant.get(alias.merchantId)
     if (list) list.push(alias)
     else aliasesByMerchant.set(alias.merchantId, [alias])
-  }
-
-  const counts = new Map<string, number>()
-  for (const tx of txRows ?? []) {
-    if (tx.deleted === 1 || !tx.merchantId) continue
-    counts.set(tx.merchantId, (counts.get(tx.merchantId) ?? 0) + 1)
   }
 
   const merchants = live(merchantRows)

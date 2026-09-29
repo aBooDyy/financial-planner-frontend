@@ -2,7 +2,7 @@ import { db } from '#/db/db'
 import type { LocalBudget, LocalTransaction } from '#/db/types'
 import type { RatesMap } from '#/lib/config/rates'
 import type { CurrencyCode } from '#/lib/currency'
-import { walletDeltas } from './ledger'
+import { walletDeltasFromTotals } from './ledgerTotals'
 import { ledgerRanges } from './ledgerRange'
 import { fromIsoPeriod, parseISO } from './planning'
 import type { IsoPeriod } from './planning'
@@ -36,20 +36,20 @@ export async function readLedgerWindow(
   return { period, today, budgets, rows: rows.sort(byId) }
 }
 
-// A balance sums every row, so no window can serve these reads; each reduces the ledger
-// inside its query so only what it derives reaches React.
-async function readWholeLedger() {
+// Balances sum every row, so no window serves them: they come from the running totals the
+// database keeps alongside the ledger.
+async function readWalletTotals() {
   const nodes = await db.balanceNodes.toArray()
-  const txns = await db.transactions.toArray()
-  return { nodes: nodes.filter((n) => n.deleted === 0), txns }
+  const totals = await db.ledgerTotals.where('kind').equals('wallet').toArray()
+  return { nodes: nodes.filter((n) => n.deleted === 0), totals }
 }
 
 /** Each wallet's signed delta over the whole ledger (`walletDeltas`). */
 export async function readWalletDeltas(
   rates: RatesMap,
 ): Promise<Record<string, number>> {
-  const { nodes, txns } = await readWholeLedger()
-  return walletDeltas(nodes, txns, rates)
+  const { nodes, totals } = await readWalletTotals()
+  return walletDeltasFromTotals(nodes, totals, rates)
 }
 
 /** What the Wallets page derives from the whole ledger. */
@@ -64,11 +64,17 @@ export type LedgerSummary = {
 export async function readLedgerSummary(
   rates: RatesMap,
 ): Promise<LedgerSummary> {
-  const { nodes, txns } = await readWholeLedger()
+  const { nodes, totals } = await readWalletTotals()
+  const currencies = await db.ledgerTotals
+    .where('kind')
+    .equals('currency')
+    .toArray()
+  // A null `goalId` is not a valid index key, so the index holds exactly the linked rows.
+  const goalLinked = await db.transactions.orderBy('goalId').toArray()
   return {
-    deltas: walletDeltas(nodes, txns, rates),
-    currencies: [...new Set(txns.map((t) => t.currency))],
-    goalLinked: txns.filter((t) => t.goalId !== null),
+    deltas: walletDeltasFromTotals(nodes, totals, rates),
+    currencies: currencies.map((t) => t.ref),
+    goalLinked: goalLinked.sort(byId),
   }
 }
 

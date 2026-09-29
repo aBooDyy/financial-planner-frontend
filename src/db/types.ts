@@ -222,6 +222,24 @@ export type LocalTransaction = {
   deleted: Flag
 }
 
+export type LedgerTotalKind = 'wallet' | 'category' | 'merchant' | 'currency'
+
+/**
+ * A running aggregate over `transactions`, derived and device-local: never synced, rebuilt
+ * from the ledger whenever it is in doubt.
+ */
+export type LocalLedgerTotal = {
+  id: string
+  kind: LedgerTotalKind
+  /** The wallet, category or merchant id, or the currency code. */
+  ref: string
+  /** On a wallet total, the currency its rows are in; null on every other kind. */
+  currency: CurrencyCode | null
+  /** Signed minor units in `currency`; 0 on every kind but wallet. */
+  sum: number
+  count: number
+}
+
 export type LocalBudget = {
   id: string
   scopeType: BudgetScope

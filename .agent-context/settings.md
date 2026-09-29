@@ -54,7 +54,8 @@ Notifications, Archived, Data & privacy. Each pane is its own route — see
   [merchants.md](merchants.md).
 - **Archived** (`ArchivedSection` + `ArchivedRow` + balances' `DeleteNodeDialog` with `archived`): every archived
   wallet/group, newest first, from `useArchivedNodes` → pure `buildArchivedList`
-  (`features/wallets/data/archivedList.ts`): balance (a group's in base currency), wallet
+  (`features/wallets/data/archivedList.ts`): balance (a group's in base currency; wallet
+  deltas from the stored ledger totals via `readWalletDeltas`), wallet
   count, archive date (honours `dateFormat`), former group, and a "stranded" note when that
   group is archived too. **Restore** is one tap (`restoreNode`); **Delete** confirms first,
   because it is the ordinary `deleteNode` and takes the ledger with it. See

@@ -13,7 +13,7 @@ import type {
 import { buildCatalog } from '#/features/categories/data/catalog'
 import type { PeriodMode } from '#/features/transactions/constants'
 import type { TransactionType } from '#/features/transactions/api/types'
-import { walletDeltas } from './ledger'
+import { totalsOf, walletDeltasFromTotals } from './ledgerTotals'
 import {
   readLedgerWindow,
   readTransferLegs,
@@ -419,11 +419,16 @@ describe('readLedgerWindow', () => {
 })
 
 describe('readWalletDeltas', () => {
-  it('sums the whole ledger, as the balances in the account filter need', async () => {
+  it('reads the running totals, which agree with totals built from the whole ledger', async () => {
     const deltas = await readWalletDeltas(RATES)
-    expect(deltas).toEqual(walletDeltas(LIVE_NODES, TXNS, RATES))
+    expect(deltas).toEqual(
+      walletDeltasFromTotals(LIVE_NODES, totalsOf(TXNS), RATES),
+    )
     expect(scopeSections(inputs, deltas)).toEqual(
-      scopeSections(FULL, walletDeltas(FULL.nodes, FULL.txns, FULL.rates)),
+      scopeSections(
+        FULL,
+        walletDeltasFromTotals(FULL.nodes, totalsOf(FULL.txns), FULL.rates),
+      ),
     )
   })
 })
