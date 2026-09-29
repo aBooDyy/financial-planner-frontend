@@ -1,6 +1,4 @@
 import { Link } from '@tanstack/react-router'
-import { MoonStar, Sun } from 'lucide-react'
-import { useThemeStore } from '#/stores/theme'
 import { SearchTrigger } from '#/features/search/components/SearchTrigger'
 import type { User } from '#/features/auth/api/types'
 import { AccountMenu } from './AccountMenu'
@@ -25,10 +23,6 @@ const initialsOf = (name: string): string =>
     .map((part) => part.charAt(0).toUpperCase())
     .join('') || '·'
 
-const prefersDark = () =>
-  typeof window !== 'undefined' &&
-  window.matchMedia('(prefers-color-scheme: dark)').matches
-
 const ACTIVE =
   'rounded-[10px] px-[14px] py-2 text-[14px] bg-fp-accent-soft font-semibold text-fp-accent-ink'
 const LINK =
@@ -37,11 +31,6 @@ const DISABLED =
   'rounded-[10px] px-[14px] py-2 text-[14px] font-medium text-fp-text-3 opacity-60 cursor-not-allowed'
 
 export function TopNav({ user, active, onSignOut }: Props) {
-  const preference = useThemeStore((s) => s.preference)
-  const setPreference = useThemeStore((s) => s.setPreference)
-  const isDark =
-    preference === 'dark' || (preference === 'system' && prefersDark())
-
   return (
     // iOS softens a strip just past the status bar in home-screen apps; the extra
     // padding keeps the bar's controls below it.
@@ -81,20 +70,11 @@ export function TopNav({ user, active, onSignOut }: Props) {
         <div className="flex-1" />
 
         <div className="flex items-center gap-[9px]">
-          <SearchTrigger />
           <SyncIndicator />
           <OfflineIndicator />
+          <SearchTrigger />
 
           <PrivacyToggle />
-
-          <button
-            type="button"
-            onClick={() => setPreference(isDark ? 'light' : 'dark')}
-            title="Toggle theme"
-            className="flex h-[34px] w-[34px] items-center justify-center rounded-[10px] border border-fp-border bg-fp-surface text-fp-text-2 hover:text-fp-text"
-          >
-            {isDark ? <Sun size={18} /> : <MoonStar size={18} />}
-          </button>
 
           <AccountMenu
             user={user}

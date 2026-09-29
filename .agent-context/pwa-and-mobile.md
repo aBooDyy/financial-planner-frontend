@@ -33,7 +33,7 @@ because pnpm does not hoist it and the plugin's virtual register module imports 
     repo, so if the mark changes, regenerate every variant together.
   - `index.html` links the favicons + apple-touch-icon, sets `apple-mobile-web-app-title`
     (iOS otherwise labels the home-screen icon with the long `<title>`), and sets
-    `theme-color` per OS scheme (these follow the OS, not the in-app theme toggle).
+    `theme-color` per OS scheme (these follow the OS, not the in-app Appearance setting).
 
 ### Service worker (`dist/sw.js`)
 

@@ -16,7 +16,8 @@ Notifications, Archived, Data & privacy. Each pane is its own route — see
   real name/email form. `useProfile` saves via `authApi.updateProfile` (`PATCH /auth/me`) — a
   direct online call (identity isn't local-first), refreshing the session store on success.
   Offline, Save is disabled and the footer shows an `OfflineNotice`.
-- **Preferences**: Appearance → `useThemeStore`; Base currency → `setBaseCurrency` (synced
+- **Preferences**: Appearance → `useThemeStore` — the only theme control (TopNav toggle
+  removed 2026-09-29); Base currency → `setBaseCurrency` (synced
   balance settings) — the **only** place to change it; `TopNav` carried a base switch until
   2026-09-27, removed as too prominent for a set-once choice. Number format, **date format**, week start, default account,
   hide-empty-wallets → `stores/preferences.ts` (`usePreferencesStore`, persisted to

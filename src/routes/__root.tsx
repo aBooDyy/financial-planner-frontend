@@ -12,7 +12,7 @@ import { useAppConfig } from '#/lib/config/useAppConfig'
 import { loadIconPaths } from '#/lib/icons/paths'
 import { useCustomCurrencies } from '#/lib/config/useCustomCurrencies'
 import { applyStoredDirection, useDirectionStore } from '#/stores/direction'
-import { applyStoredTheme } from '#/stores/theme'
+import { applyStoredTheme, followSystemTheme } from '#/stores/theme'
 import { TooltipProvider } from '#/components/ui/tooltip'
 import { Devtools } from '#/components/dev/Devtools'
 
@@ -36,6 +36,7 @@ function RootLayout() {
     applyStoredDirection()
     // Started here so the icon chunk flies alongside the first local-DB reads.
     void loadIconPaths()
+    return followSystemTheme()
   }, [])
 
   return (

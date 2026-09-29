@@ -49,6 +49,9 @@ duplicates the base rule and will drift.
   tokens.
 - Theme choice (system/light/dark) is stored in a global Zustand store, persisted, and
   applied by toggling a class/attribute on `<html>` in the root layout.
+- The theme is changed **only** in Settings › Preferences › Appearance (default `system`).
+  `TopNav` carried a sun/moon toggle until 2026-09-29, removed so the app feels native:
+  it follows the device unless the user overrides it in Settings.
 
 ## Privacy mode — `.fp-sensitive`
 
@@ -156,7 +159,8 @@ in both modes; out ↔ in are never adjacent in that bar.
 for a sub-view of the dialog (the transaction dialog's in-place pickers).
 
 - Theme is a Zustand store (`src/stores/theme.ts`, `light|dark|system`, persisted) that
-  toggles `.dark` on `<html>`. Direction is `src/stores/direction.ts` (`en→ltr`, `ar→rtl`,
+  toggles `.dark` on `<html>`; `followSystemTheme()` re-applies it when the OS scheme flips
+  while `system` is selected. Direction is `src/stores/direction.ts` (`en→ltr`, `ar→rtl`,
   persisted) setting `dir`/`lang` on `<html>` **and** feeding Radix's `Direction.Provider`. Both
   are applied on app start from `__root.tsx`.
 - Auth screens use logical utilities (`ps-/pe-`, `end-0`) so they work LTR + RTL. The font
