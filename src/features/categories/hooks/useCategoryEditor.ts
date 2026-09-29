@@ -13,7 +13,7 @@ export type CategoryEditorDraft = {
   name: string
   color: string
   icon: IconId | null
-  /** Writable on create only — a category never moves between parents (ADR-5). */
+  /** Where it sits; a change on edit moves it. */
   parentId: string | null
 }
 
@@ -33,7 +33,7 @@ export type CategoryEditor = {
     field: TKey,
     value: CategoryEditorDraft[TKey],
   ) => void
-  /** Picking a parent on create adopts its type; `null` returns to the top level. */
+  /** Picking a parent adopts its type (only ever its own on edit); `null` is the top level. */
   setParent: (parent: { id: string; type: TxType } | null) => void
   setType: (type: TxType) => void
   save: () => void
@@ -113,6 +113,7 @@ export function useCategoryEditor(
         name,
         color: draft.color,
         icon: draft.icon,
+        parentId: draft.parentId,
       })
     } else {
       void createCategory({

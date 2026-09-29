@@ -32,6 +32,8 @@ export type CategoryPatch = Partial<{
   /** `null` clears the icon back to the default for the row's type. */
   icon: string | null
   position: number
+  /** `null` moves it to the top level; see `moveRules` for where it may go. */
+  parentId: string | null
 }>
 
 const liveCategories = async (): Promise<LocalCategory[]> =>
@@ -149,12 +151,18 @@ export async function updateCategory(
 ): Promise<void> {
   const existing = await db.categories.get(id)
   if (!existing) return
+  const parentId =
+    patch.parentId !== undefined ? patch.parentId : existing.parentId
+  const moved = parentId !== existing.parentId
   const category: LocalCategory = {
     ...existing,
     name: patch.name !== undefined ? patch.name.trim() : existing.name,
     color: patch.color ?? existing.color,
     icon: patch.icon !== undefined ? patch.icon : existing.icon,
-    position: patch.position ?? existing.position,
+    parentId,
+    position:
+      patch.position ??
+      (moved ? await nextPosition(parentId) : existing.position),
     updatedAt: now(),
     dirty: 1,
   }

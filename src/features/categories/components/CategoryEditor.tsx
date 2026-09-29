@@ -10,8 +10,8 @@ import { IconChip } from '#/components/icons/IconChip'
 import { IconPicker } from '#/components/icons/IconPicker'
 import { CAT_COLORS } from '#/features/categories/constants'
 import type {
+  CatalogEntry,
   CategoryCatalog,
-  ResolvedCategory,
 } from '#/features/categories/data/catalog'
 import type {
   CategoryEditor as Editor,
@@ -20,6 +20,7 @@ import type {
 import type { TxType } from '#/features/transactions/api/types'
 import { CATEGORY_ICON_FALLBACK, iconIdOr } from '#/lib/icons/fallbacks'
 import { LockedField } from './LockedField'
+import { MoveParentSelect } from './MoveParentSelect'
 import { ParentCategorySelect } from './ParentCategorySelect'
 
 const TYPE_NAME = { spend: 'Spending', income: 'Income' } as const
@@ -34,7 +35,7 @@ type Props = {
   catalog: CategoryCatalog
 }
 
-/** Name, colour and icon for a category or a subcategory; parent and type only on create. */
+/** Name, colour, icon and parent for a category or a subcategory; type only on create. */
 export function CategoryEditor({ editor, catalog }: Props) {
   if (editor.editing === null) return null
   return (
@@ -46,14 +47,25 @@ export function CategoryEditor({ editor, catalog }: Props) {
   )
 }
 
-/** Why Type and In can't change, said once under the pair. */
-function lockedReason(isCreate: boolean, hasParent: boolean): string | null {
-  if (isCreate) {
-    return hasParent ? 'A subcategory takes its type from its parent.' : null
+/** Said once under Type and In: why Type is fixed, or what a move does to the totals. */
+function pairHelp(
+  catalog: CategoryCatalog,
+  saved: CatalogEntry | null,
+  parentId: string | null,
+): string | null {
+  if (saved === null) {
+    return parentId ? 'A subcategory takes its type from its parent.' : null
   }
-  return hasParent
-    ? 'Type is set when it’s created, and a subcategory can’t be moved — delete it and add it where you want it.'
-    : 'Type is set when the category is created.'
+  if (parentId === saved.parentId) {
+    return 'Type is set when the category is created.'
+  }
+  const moved = 'Its transactions come with it and'
+  if (parentId !== null) {
+    return `${moved} now count toward ${catalog.get(parentId).name}, past months too.`
+  }
+  return saved.parentId
+    ? `${moved} no longer count toward ${catalog.get(saved.parentId).name}, past months too.`
+    : null
 }
 
 function CategoryEditorForm({
@@ -67,6 +79,10 @@ function CategoryEditorForm({
   const { mode, type, draft } = editing
   const parent = catalog.all.find((c) => c.id === draft.parentId) ?? null
   const isCreate = mode === 'create'
+  const saved =
+    editing.id !== null && catalog.has(editing.id)
+      ? catalog.get(editing.id)
+      : null
   const preview = iconIdOr(
     draft.icon,
     parent?.icon ?? CATEGORY_ICON_FALLBACK[type],
@@ -158,10 +174,8 @@ function CategoryEditorForm({
             )}
           </div>
           <div className="min-w-0">
-            <FieldLabel htmlFor={isCreate ? 'category-parent' : undefined}>
-              In
-            </FieldLabel>
-            {isCreate ? (
+            <FieldLabel htmlFor="category-parent">In</FieldLabel>
+            {editing.id === null ? (
               <ParentCategorySelect
                 id="category-parent"
                 value={draft.parentId}
@@ -170,11 +184,18 @@ function CategoryEditorForm({
                 onChange={editor.setParent}
               />
             ) : (
-              <LockedParent parent={parent} />
+              <MoveParentSelect
+                id="category-parent"
+                categoryId={editing.id}
+                value={draft.parentId}
+                catalog={catalog}
+                noneLabel={TOP_LEVEL}
+                onChange={editor.setParent}
+              />
             )}
           </div>
         </div>
-        <FieldMessage help={lockedReason(isCreate, parent !== null)} />
+        <FieldMessage help={pairHelp(catalog, saved, draft.parentId)} />
       </div>
 
       <IconPicker
@@ -185,26 +206,5 @@ function CategoryEditorForm({
         onSelect={(id) => editor.setField('icon', id)}
       />
     </ResponsiveDialog>
-  )
-}
-
-function LockedParent({ parent }: { parent: ResolvedCategory | null }) {
-  return (
-    <LockedField
-      label="In"
-      leading={
-        parent ? (
-          <IconChip
-            id={parent.icon}
-            color={parent.color}
-            size={22}
-            iconSize={13}
-            className="rounded-[7px]"
-          />
-        ) : undefined
-      }
-    >
-      {parent ? parent.name : TOP_LEVEL}
-    </LockedField>
   )
 }

@@ -26,8 +26,9 @@ has, and one table means one model, one outbox entity, one sync handler.
   no row stores one.
 - **`type` is inherited and immutable.** A child's type is copied from its parent on create,
   whatever the request said; after creation it never changes at either level.
-- **`parentId` is immutable.** It is absent from the update contract. To move a subcategory,
-  delete it and create it where you want it — and the editor says so in the locked "In" row.
+- **`parentId` can change: a category can move** (see [Moving](#moving--the-in-select)).
+  Rows store its id, so nothing filed under it is rewritten. Its spend rolls up to the new
+  root from then on, past months included.
 - **Rows reference a category by id — one leaf id.** Every row filed under a category stores
   a single `categoryId` (wire `category_id`, a server FK to `t_categories`): the child's id
   when a subcategory was chosen, else the root's; the root is found through the catalog
@@ -62,7 +63,12 @@ version and retries once, `404` drops the local row, network errors bubble. Spec
   ([data-layer-and-sync.md](data-layer-and-sync.md#incremental-pull-the-delta-streams)).
   Local edits win until pushed: a row that is `dirty` or `deleted` is left alone.
 - **`icon` is replace-on-PATCH.** `UpdateCategoryWire` always carries the current value,
-  because a PATCH that omits it clears it. The wire has no `parent_id` at all.
+  because a PATCH that omits it clears it.
+- **`parent: { id }` rides on every update**, with `id: null` for the top level. It is an
+  object because the server reads a bare top-level `null` as "absent". An omitted `parent`
+  means "leave it", which keeps updates queued by older builds from moving anything. A
+  refused move is a `422` (`settings.category.has_budget`, `…slug_taken`, …), so the engine
+  flags it and keeps it like any failed push.
 - **A create refused with `409` adopts the server's row — and remaps onto it**
   (`adoptServerCategory`). It lists the categories: when the server already holds **this id**
   (a retried create) that row is stored as-is. Otherwise the slug was taken — another device
@@ -326,15 +332,42 @@ Recorded as a sync pattern in
   beside the **Name** well, the shared `ColorSwatches` over `CAT_COLORS`
   (`features/categories/constants.ts`), and a **Type | In** pair that is a control only on
   create: **Type** is a `PillSwitch` (Spending | Income) when creating at top level and a
-  `LockedField` (lock glyph in the field well) otherwise; **In** is a `ParentCategorySelect`
-  (the roots of that type with their icon chips, plus "Top level") on create and a locked well
-  afterwards. The reason for the locks is one help line under the pair. Choosing a parent
+  `LockedField` (lock glyph in the field well) otherwise. **In** is a `ParentCategorySelect`
+  (the roots of that type with their icon chips, plus "Top level"): as-is on create, and
+  wrapped by `MoveParentSelect` on edit (below). One help line under the pair explains the
+  Type lock, or — once In differs from the saved parent — which root its transactions now
+  count toward. Choosing a parent
   adopts its type and its colour. The footer is `DialogActions` (**Add category / Add
   subcategory / Save**); an empty name keeps the primary looking unready and pressing it shows
   "Give it a name." The form (`CategoryEditorForm`) mounts per opening, so that state resets.
   Editing loads from Dexie and narrows a stored-but-unknown icon id to `null`.
   **The `IconPicker` is a child of that dialog, not a sibling** — see
   [icons.md](icons.md#a-nested-picker-goes-inside-the-parent-dialogs-children).
+
+### Moving — the In select
+
+`data/moveRules.ts` `parentChoices(catalog, moving, hasBudget)` is a pure mirror of the
+server's refusals, so the editor never offers a move its push would bounce:
+
+- **`options`**: the roots of its type, never itself.
+- **`locked`**: set only when the category is a root that would become a subcategory and it
+  can't. A built-in root (`isRequiredCategory`) stays at the top level. So does a root with
+  subcategories (only two levels are allowed) or with a live budget (budgets are root-only).
+  The whole select is disabled.
+- **`blocked`**: a map from a destination (a root id, or `null` for the top level) to why it
+  is off. The only case is a sibling there holding the same **slug**: root slugs are unique
+  across both types, and child slugs are unique per parent. The reason names the sibling,
+  since after a rename the two names can differ.
+
+`hooks/useParentChoices` adds the live budget count, and `MoveParentSelect` feeds the result
+to `ParentCategorySelect` (`locked`, `blocked`). Both states explain themselves through the
+shared `components/ReasonTooltip`, which opens on hover, focus and tap (touch has no hover).
+A disabled trigger gets no events, so a locked select sits in a focusable wrapper that
+carries the tooltip. A blocked item keeps `pointer-events` (Radix still refuses to pick it)
+so its tooltip can open.
+
+`updateCategory(id, { parentId })` gives a moved row the next `position` among its new
+siblings. A still-queued create has its payload rewritten instead, as for any edit.
 - **`ParentCategorySelect`** is shared with the import wizard's `CreateCategoryDialog`; only the
   top-level option's wording differs (`noneLabel`).
 - **`DeleteCategoryDialog`** is a `ConfirmDialog` (trash icon, danger tone). It names the

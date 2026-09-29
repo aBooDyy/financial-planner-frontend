@@ -46,4 +46,5 @@ export const localCategoryToUpdateWire = (
   color: l.color,
   icon: l.icon,
   position: l.position,
+  parent: { id: l.parentId },
 })

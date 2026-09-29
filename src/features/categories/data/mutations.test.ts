@@ -221,6 +221,109 @@ describe('updateCategory', () => {
     const [entry] = await outbox().toArray()
     expect((entry.payload as UpdateCategoryWire).icon).toBe('fork-knife')
   })
+
+  it('always tells the server where it sits, so an unmoved row stays put', async () => {
+    const dining = await createCategory({
+      name: 'Dining',
+      type: 'spend',
+      color: '',
+    })
+    const cafes = await createCategory({
+      name: 'Cafés',
+      type: 'spend',
+      color: '',
+      parentId: dining,
+    })
+    await markSynced(dining, cafes)
+
+    await updateCategory(cafes, { name: 'Coffee' })
+
+    const [entry] = await outbox().toArray()
+    expect((entry.payload as UpdateCategoryWire).parent).toEqual({ id: dining })
+  })
+
+  it('moves it to the end of its new siblings and queues the move', async () => {
+    const dining = await createCategory({
+      name: 'Dining',
+      type: 'spend',
+      color: '',
+    })
+    const groceries = await createCategory({
+      name: 'Groceries',
+      type: 'spend',
+      color: '',
+    })
+    const cafes = await createCategory({
+      name: 'Cafés',
+      type: 'spend',
+      color: '',
+      parentId: dining,
+    })
+    for (const name of ['Bakery', 'Butcher']) {
+      await createCategory({
+        name,
+        type: 'spend',
+        color: '',
+        parentId: groceries,
+      })
+    }
+    await markSynced(dining, groceries, cafes)
+
+    await updateCategory(cafes, { parentId: groceries })
+
+    expect(await db.categories.get(cafes)).toMatchObject({
+      parentId: groceries,
+      position: 2,
+    })
+    const [entry] = await outbox().toArray()
+    expect(entry.payload).toMatchObject({
+      parent: { id: groceries },
+      position: 2,
+    })
+  })
+
+  it('moves a subcategory to the top level', async () => {
+    const dining = await createCategory({
+      name: 'Dining',
+      type: 'spend',
+      color: '',
+    })
+    const cafes = await createCategory({
+      name: 'Cafés',
+      type: 'spend',
+      color: '',
+      parentId: dining,
+    })
+    await markSynced(dining, cafes)
+
+    await updateCategory(cafes, { parentId: null })
+
+    expect((await db.categories.get(cafes))?.parentId).toBeNull()
+    const [entry] = await outbox().toArray()
+    expect((entry.payload as UpdateCategoryWire).parent).toEqual({ id: null })
+  })
+
+  it('rewrites a still-queued create instead of queueing a move', async () => {
+    const dining = await createCategory({
+      name: 'Dining',
+      type: 'spend',
+      color: '',
+    })
+    const cafes = await createCategory({
+      name: 'Cafés',
+      type: 'spend',
+      color: '',
+    })
+
+    await updateCategory(cafes, { parentId: dining })
+
+    const entries = await outbox()
+      .filter((e) => e.id === cafes)
+      .toArray()
+    expect(entries).toHaveLength(1)
+    expect(entries[0].op).toBe('create')
+    expect((entries[0].payload as CreateCategoryWire).parent_id).toBe(dining)
+  })
 })
 
 describe('deleteCategory', () => {

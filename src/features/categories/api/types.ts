@@ -45,13 +45,14 @@ export type CreateCategoryWire = {
   position: number
 }
 
-/** No `parent_id`: a category never moves between parents. */
+/** `parent.id` is null for the top level; a different one moves it. */
 export type UpdateCategoryWire = {
   version: string
   name: string
   color: string
   icon: string | null
   position: number
+  parent: { id: string | null }
 }
 
 /** Present when the deleted category's rows (and budgets, merchants, rules) move to another one. */

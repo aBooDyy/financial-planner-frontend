@@ -25,6 +25,17 @@ const MESSAGES: Record<string, string> = {
     'Something is filed under this category — pick where it moves first.',
   'settings.category.required':
     'Savings and the two “Other” categories can’t be deleted.',
+  'settings.category.parent_invalid': 'That category is no longer there.',
+  'settings.category.parent_not_root':
+    'A subcategory can’t have subcategories of its own.',
+  'settings.category.parent_type_mismatch':
+    'A category can only move under one of the same kind — spending or income.',
+  'settings.category.has_subcategories':
+    'It has subcategories — move or delete them before it can become one.',
+  'settings.category.has_budget':
+    'It has a budget, and budgets are set on top-level categories only.',
+  'settings.category.required_top_level':
+    'Savings and the two “Other” categories stay at the top level.',
   'balances.rate.value_invalid': 'Enter a valid exchange rate.',
   'spending.transaction.amount_invalid': 'Enter a valid amount.',
   'spending.transaction.currency_invalid': 'Choose a supported currency.',
