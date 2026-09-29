@@ -103,6 +103,23 @@ export const amountInputProps = (
   }
 }
 
+// Building an Intl.NumberFormat costs far more than formatting with one, and lists format
+// thousands of amounts, so each distinct locale + options pair is built once.
+const numberFormats = new Map<string, Intl.NumberFormat>()
+
+export const numberFormat = (
+  locale: string,
+  options: Intl.NumberFormatOptions,
+): Intl.NumberFormat => {
+  const key = `${locale}|${JSON.stringify(options)}`
+  let format = numberFormats.get(key)
+  if (!format) {
+    format = new Intl.NumberFormat(locale, options)
+    numberFormats.set(key, format)
+  }
+  return format
+}
+
 /** Format minor units as a display string, e.g. "SR 18,420.50". */
 export const formatMoney = (
   amountMinor: number,
@@ -110,7 +127,7 @@ export const formatMoney = (
   locale = 'en-US',
 ): string => {
   const decimals = decimalsFor(code)
-  const formatted = new Intl.NumberFormat(locale, {
+  const formatted = numberFormat(locale, {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   }).format(toMajor(amountMinor, code))
@@ -126,7 +143,7 @@ export const formatMoneyRounded = (
   code: CurrencyCode,
   locale = 'en-US',
 ): string => {
-  const formatted = new Intl.NumberFormat(locale, {
+  const formatted = numberFormat(locale, {
     maximumFractionDigits: 0,
   }).format(Math.round(toMajor(amountMinor, code)))
   return `${prefixFor(code)}${formatted}`
@@ -138,7 +155,7 @@ export const formatMoneyCompact = (
   code: CurrencyCode,
   locale = 'en-US',
 ): string => {
-  const formatted = new Intl.NumberFormat(locale, {
+  const formatted = numberFormat(locale, {
     notation: 'compact',
     maximumFractionDigits: 1,
   }).format(toMajor(amountMinor, code))

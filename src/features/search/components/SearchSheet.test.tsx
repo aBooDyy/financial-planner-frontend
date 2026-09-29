@@ -281,6 +281,14 @@ describe('SearchSheet', () => {
     expect(useSearchStore.getState().wide).toBe(true)
   })
 
+  it('holds placeholder rows while the results load', () => {
+    searchView.mockImplementation(() => ({ loading: true, view: null }))
+    const dialog = openSheet()
+    expect(
+      dialog.querySelectorAll('[data-slot="skeleton"]').length,
+    ).toBeGreaterThan(0)
+  })
+
   it('says so when nothing matches', () => {
     searchView.mockImplementation(() => ({
       loading: false,

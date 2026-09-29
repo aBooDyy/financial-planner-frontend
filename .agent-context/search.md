@@ -28,12 +28,19 @@ App-level search over the local DB, from the Means design "Transactions Tabs Opt
 
 ## Engine (`data/`)
 
+- **Nothing is read on open.** The idle view (`idleSearchView`) needs no data. The first
+  query or filter (`isSearchActive`) starts the reads, `SearchResultsSkeleton` stands in until
+  they land, and the data then stays loaded until the sheet closes.
 - `indexSearch(sources, dateFormat)` builds a `SearchItem` per row once per change to the
-  source tables: the display row, a lower-cased match text, and the facts the filters test
+  source tables. Each item holds a lower-cased match text and the facts the filters test
   (flow, date, leaf + root category, wallets, base-currency major amount).
-  `searchIndex(index, query)` filters it on every keystroke. `useSearchView` reads the
-  **whole** ledger (not Spending's date window), and only while the sheet is open. It defers
-  the query with `useDeferredValue`.
+- Its display row is a thunk (`row()`), drawn only for the rows a group shows. Formatting
+  money and dates for every row was the bulk of the index cost.
+- `searchIndex(index, query)` filters the index on every keystroke. `useSearchView` reads the
+  **whole** ledger, not Spending's date window, and defers the query with
+  `useDeferredValue`. Scaling this is tracked in `working.local/optimization-and-scale/`.
+- Accounts are valued from the stored ledger totals (`readWalletDeltas` → `SearchSources.deltas`
+  → `liveBalancesFrom`), not by summing the ledger rows the index already holds.
 - Groups, in order: Accounts, Transactions, Planned (open only), Budgets, Recurring. Each
   shows up to `SEARCH_ROW_CAP` rows, but its count covers every match.
 - Transfers collapse to one row per `transferId`. Adjustments get their own target.

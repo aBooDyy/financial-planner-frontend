@@ -57,7 +57,7 @@ function plannedItem(p: LocalPlanned, ctx: ItemContext): SearchItem {
   const cat = categoryFacts(p.categoryId, ctx)
   const incoming = p.role === 'income'
   return {
-    row: {
+    row: () => ({
       key: `planned:${p.id}`,
       target: { kind: 'planned', id: p.id },
       title: p.name,
@@ -66,7 +66,7 @@ function plannedItem(p: LocalPlanned, ctx: ItemContext): SearchItem {
       positive: incoming,
       color: cat?.color ?? NEUTRAL_COLOR,
       iconId: cat?.icon ?? null,
-    },
+    }),
     text: searchText([
       p.name,
       p.note,
@@ -110,7 +110,7 @@ function budgetItem(b: LocalBudget, ctx: ItemContext): SearchItem {
   const cat =
     b.scopeType === 'category' ? categoryFacts(b.categoryId, ctx) : null
   return {
-    row: {
+    row: () => ({
       key: `budget:${b.id}`,
       target: { kind: 'budget', id: b.id },
       title: identity.name,
@@ -119,7 +119,7 @@ function budgetItem(b: LocalBudget, ctx: ItemContext): SearchItem {
       positive: false,
       color: b.scopeType === 'overall' ? NEUTRAL_COLOR : identity.color,
       iconId: cat?.icon ?? nodeIcon(wallet),
-    },
+    }),
     text: searchText([
       identity.name,
       ...amountFields(b.limit, b.currency, ctx),
@@ -145,7 +145,7 @@ function recurringItem(r: LocalRecurring, ctx: ItemContext): SearchItem {
   const cat = categoryFacts(r.categoryId, ctx)
   const incoming = r.type === 'income'
   return {
-    row: {
+    row: () => ({
       key: `recurring:${r.id}`,
       target: { kind: 'recurring', id: r.id },
       title: r.name,
@@ -154,7 +154,7 @@ function recurringItem(r: LocalRecurring, ctx: ItemContext): SearchItem {
       positive: incoming,
       color: cat?.color ?? NEUTRAL_COLOR,
       iconId: cat?.icon ?? null,
-    },
+    }),
     text: searchText([
       r.name,
       r.note,

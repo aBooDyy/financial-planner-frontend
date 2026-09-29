@@ -8,7 +8,7 @@ import type {
 } from '#/db/types'
 import type { CategoryCatalog } from '#/features/categories/data/catalog'
 import type { SpendingView } from '#/features/transactions/constants'
-import { walletLiveBalances } from '#/features/transactions/data/ledger'
+import { liveBalancesFrom } from '#/features/transactions/data/ledger'
 import { walletMatcher } from '#/features/transactions/data/selectors'
 import type { RatesMap } from '#/lib/config/rates'
 import type { CurrencyCode } from '#/lib/currency'
@@ -62,6 +62,8 @@ export type SearchSources = {
   recurrings: LocalRecurring[]
   nodes: LocalBalanceNode[]
   merchants: LocalMerchant[]
+  /** Each wallet's signed delta over the whole ledger, in its own currency. */
+  deltas: Record<string, number>
   base: CurrencyCode
   rates: RatesMap
   catalog: CategoryCatalog
@@ -100,7 +102,7 @@ export function indexSearch(
       sources.merchants.filter((m) => m.deleted === 0).map((m) => [m.id, m]),
     ),
   }
-  const balances = walletLiveBalances(nodes, sources.txns, sources.rates)
+  const balances = liveBalancesFrom(nodes, sources.deltas)
   return {
     groups: {
       accounts: accountItems(nodes, balances, ctx),
@@ -129,7 +131,7 @@ const groupOf = (key: SearchGroupKey, items: SearchItem[]): SearchGroup => ({
   key,
   title: GROUP_TITLE[key],
   count: items.length,
-  rows: items.slice(0, SEARCH_ROW_CAP).map((item) => item.row),
+  rows: items.slice(0, SEARCH_ROW_CAP).map((item) => item.row()),
 })
 
 /** The one group the context's tab shows, cut to the context's accounts. */
@@ -146,23 +148,39 @@ function narrowGroup(
   return groupOf(key, items)
 }
 
+/** Whether there is anything to search for: a query, or a filter on its own. */
+export const isSearchActive = (
+  query: string,
+  filters: SearchFilters,
+): boolean => query.trim() !== '' || hasActiveFilters(filters)
+
+/** The view before anything is asked — it needs no index, so it draws before one exists. */
+export function idleSearchView(
+  q: Pick<SearchQuery, 'wide' | 'context' | 'filters'>,
+  dateFormat: DateFormat,
+): SearchView {
+  const narrow = q.wide ? null : q.context
+  return {
+    idleText: idleText(narrow),
+    scopeNote: scopeNote(narrow, q.filters, dateFormat),
+    idle: true,
+    groups: [],
+    total: 0,
+    empty: false,
+    headline: '',
+    moreElsewhere: 0,
+  }
+}
+
 export function searchIndex(index: SearchIndex, q: SearchQuery): SearchView {
   const narrow = q.wide ? null : q.context
   const trimmed = q.query.trim()
+  if (!isSearchActive(q.query, q.filters))
+    return idleSearchView(q, index.dateFormat)
   const base = {
     idleText: idleText(narrow),
     scopeNote: scopeNote(narrow, q.filters, index.dateFormat),
   }
-  if (trimmed === '' && !hasActiveFilters(q.filters))
-    return {
-      ...base,
-      idle: true,
-      groups: [],
-      total: 0,
-      empty: false,
-      headline: '',
-      moreElsewhere: 0,
-    }
 
   const passes = itemPredicate(trimmed, q.filters, q.today, index.catalog)
   const matched = new Map(

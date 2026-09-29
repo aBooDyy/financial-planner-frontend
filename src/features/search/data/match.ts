@@ -1,4 +1,4 @@
-import { decimalsFor, toMajor } from '#/lib/currency'
+import { decimalsFor, numberFormat, toMajor } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
 
 // No typed query holds a newline, so a match can never straddle two fields.
@@ -24,7 +24,7 @@ export const searchText = (
 export function amountTexts(amountMinor: number, code: CurrencyCode): string[] {
   const major = Math.abs(toMajor(amountMinor, code))
   const decimals = decimalsFor(code)
-  const grouped = new Intl.NumberFormat('en-US', {
+  const grouped = numberFormat('en-US', {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   }).format(major)

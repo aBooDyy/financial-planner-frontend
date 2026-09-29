@@ -12,7 +12,8 @@ import type { SearchResultRow } from './types'
 
 /** One searchable thing: the row it draws, and the facts the query and filters test. */
 export type SearchItem = {
-  row: SearchResultRow
+  /** Drawn only for the rows a group shows, so indexing never formats the rest. */
+  row: () => SearchResultRow
   /** Lower-cased fields the query is matched against (`searchText`). */
   text: string
   /** Spend or income; null for what is neither (a transfer, an adjustment, an account). */

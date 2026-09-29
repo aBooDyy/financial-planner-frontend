@@ -36,7 +36,7 @@ function cashflowItem(t: LocalTransaction, ctx: ItemContext): SearchItem {
   const merchant = merchantName(t.merchantId, ctx)
   const incoming = t.type === 'income'
   return {
-    row: {
+    row: () => ({
       key: `tx:${t.id}`,
       target: { kind: 'tx', id: t.id },
       title: t.note || merchant || leaf.name,
@@ -45,7 +45,7 @@ function cashflowItem(t: LocalTransaction, ctx: ItemContext): SearchItem {
       positive: incoming,
       color: root?.color ?? NEUTRAL_COLOR,
       iconId: leafId ? leaf.icon : null,
-    },
+    }),
     text: searchText([
       t.note,
       merchant,
@@ -67,7 +67,7 @@ function adjustmentItem(t: LocalTransaction, ctx: ItemContext): SearchItem {
   const walletName = walletNameOf(t.walletId, ctx)
   const incoming = t.type === 'adjustment_in'
   return {
-    row: {
+    row: () => ({
       key: `adjustment:${t.id}`,
       target: { kind: 'adjustment', id: t.id },
       title: t.note || ADJUSTMENT_LABEL,
@@ -76,7 +76,7 @@ function adjustmentItem(t: LocalTransaction, ctx: ItemContext): SearchItem {
       positive: incoming,
       color: ctx.nodeById.get(t.walletId)?.color ?? NEUTRAL_COLOR,
       iconId: null,
-    },
+    }),
     text: searchText([
       t.note,
       ADJUSTMENT_LABEL,
@@ -105,7 +105,7 @@ function transferItem(
   const from = walletNameOf(out?.walletId, ctx)
   const to = walletNameOf(inn?.walletId, ctx)
   return {
-    row: {
+    row: () => ({
       key: `transfer:${transferId}`,
       target: { kind: 'transfer', transferId },
       title: shown.note || TRANSFER_LABEL,
@@ -118,7 +118,7 @@ function transferItem(
       color: NEUTRAL_COLOR,
       iconId: null,
       transfer: true,
-    },
+    }),
     text: searchText([shown.note, from, to, ...amountFields(shown, ctx)]),
     flow: null,
     date: shown.date,

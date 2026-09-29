@@ -1,20 +1,26 @@
-import { useDeferredValue, useMemo } from 'react'
+import { useDeferredValue, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '#/db/db'
-import { indexSearch, searchIndex } from '#/features/search/data/search'
+import {
+  idleSearchView,
+  indexSearch,
+  isSearchActive,
+  searchIndex,
+} from '#/features/search/data/search'
 import type {
   SearchContext,
   SearchFilters,
   SearchView,
 } from '#/features/search/data/types'
+import { readWalletDeltas } from '#/features/transactions/data/ledgerReads'
 import { startOfToday, ymd } from '#/features/transactions/data/planning'
 import { useStableRates } from '#/hooks/useStableRates'
 import { useSearchBasics } from './useSearchBasics'
 
 const whenEnabled = async <T>(
   enabled: boolean,
-  read: () => Promise<T>,
-): Promise<T | undefined> => (enabled ? read() : undefined)
+  load: () => Promise<T>,
+): Promise<T | undefined> => (enabled ? load() : undefined)
 
 type Args = {
   query: string
@@ -28,9 +34,10 @@ type Args = {
 }
 
 /**
- * Search over the whole local dataset — every ledger row, not a page's window. The index is
- * rebuilt only when a source table writes; each keystroke just filters it, and the query is
- * deferred so typing never waits on that.
+ * Search over the whole local dataset — every ledger row, not a page's window. Nothing is read
+ * until there is something to search for, so opening costs nothing; from then on the data stays
+ * loaded while the sheet is open. The index is rebuilt only when a source table writes; each
+ * keystroke just filters it, and the query is deferred so typing never waits on that.
  */
 export function useSearchView({
   query,
@@ -39,35 +46,44 @@ export function useSearchView({
   context,
   enabled,
 }: Args): { loading: boolean; view: SearchView | null } {
-  const basics = useSearchBasics(enabled)
+  const active = isSearchActive(query, filters)
+  const [asked, setAsked] = useState(false)
+  if (enabled && active && !asked) setAsked(true)
+  const read = enabled && asked
+  const basics = useSearchBasics(read)
   const txns = useLiveQuery(
-    () => whenEnabled(enabled, () => db.transactions.toArray()),
-    [enabled],
+    () => whenEnabled(read, () => db.transactions.toArray()),
+    [read],
   )
   const planned = useLiveQuery(
     () =>
-      whenEnabled(enabled, () =>
+      whenEnabled(read, () =>
         db.plannedTransactions.where('status').equals('open').toArray(),
       ),
-    [enabled],
+    [read],
   )
   const budgets = useLiveQuery(
-    () => whenEnabled(enabled, () => db.budgets.toArray()),
-    [enabled],
+    () => whenEnabled(read, () => db.budgets.toArray()),
+    [read],
   )
   const recurrings = useLiveQuery(
-    () => whenEnabled(enabled, () => db.recurrings.toArray()),
-    [enabled],
+    () => whenEnabled(read, () => db.recurrings.toArray()),
+    [read],
   )
   const merchants = useLiveQuery(
-    () => whenEnabled(enabled, () => db.merchants.toArray()),
-    [enabled],
+    () => whenEnabled(read, () => db.merchants.toArray()),
+    [read],
   )
   const rateRows = useLiveQuery(
-    () => whenEnabled(enabled, () => db.exchangeRates.toArray()),
-    [enabled],
+    () => whenEnabled(read, () => db.exchangeRates.toArray()),
+    [read],
   )
   const rates = useStableRates(rateRows)
+  const ratesReady = rateRows !== undefined
+  const deltas = useLiveQuery(
+    () => whenEnabled(read && ratesReady, () => readWalletDeltas(rates)),
+    [read, ratesReady, rates],
+  )
   const { nodeRows, base, catalog, dateFormat } = basics
 
   const index = useMemo(() => {
@@ -78,7 +94,8 @@ export function useSearchView({
       !recurrings ||
       !merchants ||
       !nodeRows ||
-      !rateRows
+      !rateRows ||
+      !deltas
     )
       return null
     return indexSearch(
@@ -89,6 +106,7 @@ export function useSearchView({
         recurrings,
         nodes: nodeRows,
         merchants,
+        deltas,
         base,
         rates,
         catalog,
@@ -103,6 +121,7 @@ export function useSearchView({
     merchants,
     nodeRows,
     rateRows,
+    deltas,
     base,
     rates,
     catalog,
@@ -125,5 +144,11 @@ export function useSearchView({
     [index, basics.loading, deferredQuery, filters, wide, context, today],
   )
 
-  return { loading: enabled && view === null, view: enabled ? view : null }
+  if (!enabled) return { loading: false, view: null }
+  if (!active)
+    return {
+      loading: false,
+      view: idleSearchView({ wide, context, filters }, dateFormat),
+    }
+  return { loading: view === null, view }
 }

@@ -202,7 +202,7 @@ describe('buildSearchView — transactions', () => {
 
 describe('buildSearchView — the other groups', () => {
   it('lists accounts by name or group, valued at their live balance', () => {
-    const view = run({ txns: [tx({ amount: 2000 })] }, { query: 'personal' })
+    const view = run({ deltas: { [MAIN.id]: -2000 } }, { query: 'personal' })
     expect(view.groups.map((g) => g.key)).toEqual(['accounts'])
     expect(view.groups[0].rows.map((r) => r.title)).toEqual(['Main', 'Cash'])
     expect(view.groups[0].rows[0]).toMatchObject({

@@ -12,7 +12,7 @@ export function accountItems(
   ctx: ItemContext,
 ): SearchItem[] {
   return treeWallets(nodes).map(({ wallet, group }) => ({
-    row: {
+    row: () => ({
       key: `account:${wallet.id}`,
       target: { kind: 'account', id: wallet.id },
       title: wallet.name,
@@ -24,7 +24,7 @@ export function accountItems(
       positive: false,
       color: wallet.color,
       iconId: nodeIcon(wallet),
-    },
+    }),
     text: searchText([wallet.name, group?.name]),
     flow: null,
     date: null,

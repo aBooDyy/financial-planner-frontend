@@ -156,6 +156,7 @@ export const sources = (over: Partial<SearchSources> = {}): SearchSources => ({
   recurrings: [],
   nodes: NODES,
   merchants: [],
+  deltas: {},
   base: 'EUR',
   rates: { EUR: 1, USD: 0.5 },
   catalog,

@@ -8,6 +8,7 @@ import { SearchFilterPanel } from './SearchFilterPanel'
 import { SearchFiltersButton } from './SearchFiltersButton'
 import { SearchInputRow } from './SearchInputRow'
 import { SearchResults } from './SearchResults'
+import { SearchResultsSkeleton } from './SearchResultsSkeleton'
 import { SearchScopeChips } from './SearchScopeChips'
 
 /** The sheet's contents. Mounted only while it is open, so nothing is read while shut. */
@@ -26,7 +27,7 @@ export function SearchPanel() {
   const openTarget = useOpenSearchTarget()
 
   const everywhere = wide || context === null
-  const { view } = useSearchView({
+  const { loading, view } = useSearchView({
     query,
     filters,
     wide: everywhere,
@@ -64,6 +65,7 @@ export function SearchPanel() {
         {filtersOpen ? (
           <SearchFilterPanel options={options} total={total} />
         ) : null}
+        {loading ? <SearchResultsSkeleton /> : null}
         {view ? (
           <SearchResults
             view={view}
