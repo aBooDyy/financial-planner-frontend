@@ -87,12 +87,18 @@ The header counts drafts that still need details, so filling one in updates "1 n
 
 **The card** (`ReviewCard`): the header (`PendingImportHeader`: initial, who — the merchant
 title-cased by `displayName`, else the source — source · day, the amount or _Needs details_),
-the merchant hint (`MerchantHint`: "✦ Careem — you filed it under" + one `Chip` per category,
-the selected one active; tapping one picks it, switching Spend/Income with it), Spend/Income, then `ReviewFields` — amount and currency (red with "Enter it, or tap it
-in the email below." while missing), merchant, date, **category (the shared `CategoryPicker`:
-a category or a subcategory in one pick)**, account, note — **empty by default**: an email's subject is never the note (the backend no longer
+Spend/Income, then `ReviewFields` — the amount as the shared `AmountWell` (the add dialog's
+tinted lead, toned by type, asking `AMOUNT_QUESTION`) with the account beneath as a "Paid from /
+Paid into" pill (the review's own wallet `Select` wearing `TxAccountPill`'s `ACCOUNT_PILL` trigger;
+the modal has no scope sections to feed `TxAccountPill` itself). "Enter it, or tap it in the
+email below." shows while the amount (under the well) or currency (under its field) is missing. Then merchant,
+**category full-width (the shared `CategoryPicker`: a category or a subcategory in one pick)
+with the merchant hint under it** (`MerchantHint`: "✦ Careem — you filed it under" + one
+`Chip` per category, the selected one active; tapping one picks it, switching Spend/Income with
+it), currency · date, note — **empty by default**: an email's subject is never the note (the backend no longer
 falls back to it either); a webhook row's `subject` is the note its rule read, so it prefills. Then the
-body, then Ignore · Not a transaction · Confirm & add (disabled until `ready`).
+body — **folded to its sender/subject row** (a `Collapsible`; it starts open only when the card
+`needsDetails`, since that is when tapping the body is the fix) — then Ignore · Not a transaction · Confirm & add (disabled until `ready`).
 
 - **The body is not cached.** The card fetches `GET /inbound-imports/{id}` when it shows
   (`useImportDetail`); bodies are far larger than the row. Offline the hook doesn't ask. It

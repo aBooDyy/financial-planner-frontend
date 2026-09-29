@@ -10,7 +10,6 @@ import type { TxType } from '#/features/transactions/api/types'
 import { TYPE_TINT } from '#/features/transactions/data/txDialog'
 import { parseAmountToMinor } from '#/lib/currency'
 import { cn } from '#/lib/utils'
-import { MerchantHint } from './MerchantHint'
 import { PendingImportHeader } from './PendingImportHeader'
 import { ReviewEmail } from './ReviewEmail'
 import { ReviewFields } from './ReviewFields'
@@ -29,7 +28,7 @@ type Props = {
   busy: boolean
 }
 
-/** One staged import: the details first, the email it came from below, then what to do. */
+/** One staged import: the details first, the email it came from folded below, then what to do. */
 export function ReviewCard({ card, wallets, catalog, busy }: Props) {
   const { item, draft } = card
   const detail = useImportDetail({ kind: 'import', id: item.id }, true)
@@ -52,15 +51,6 @@ export function ReviewCard({ card, wallets, catalog, busy }: Props) {
         currency={draft.currency}
       />
 
-      {card.merchant ? (
-        <MerchantHint
-          merchant={card.merchant}
-          catalog={catalog}
-          selectedId={draft.categoryId}
-          onPick={card.pickCategory}
-        />
-      ) : null}
-
       <PillSwitch<TxType>
         label="Type"
         options={TYPES}
@@ -69,7 +59,7 @@ export function ReviewCard({ card, wallets, catalog, busy }: Props) {
         color={TYPE_TINT[draft.type].ink}
       />
 
-      <ReviewFields card={card} wallets={wallets} />
+      <ReviewFields card={card} wallets={wallets} catalog={catalog} />
 
       <ReviewEmail
         item={item}
@@ -84,6 +74,7 @@ export function ReviewCard({ card, wallets, catalog, busy }: Props) {
         target={card.target}
         onTarget={card.setTarget}
         onUse={card.use}
+        defaultOpen={card.needsDetails}
       />
 
       {card.error ? (

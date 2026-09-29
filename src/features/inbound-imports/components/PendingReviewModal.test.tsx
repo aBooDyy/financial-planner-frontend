@@ -175,6 +175,10 @@ describe('PendingReviewModal', () => {
   it('highlights what was read in the email, with a link to fix the rule', async () => {
     renderQueue([READY])
 
+    const email = screen.getByRole('button', { name: /Card purchase/ })
+    expect(email.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(email)
+
     await screen.findByRole('button', { name: 'Use “12,300.10” as the amount' })
     const tags = screen.getAllByText(/^(Amount|Currency|Merchant)$/, {
       selector: 'span span',
@@ -196,7 +200,10 @@ describe('PendingReviewModal', () => {
       await screen.findByRole('button', { name: 'Use “212.40” as the amount' }),
     )
 
-    expect(screen.getByLabelText('Amount')).toHaveProperty('value', '212.40')
+    expect(screen.getByLabelText('How much did you spend?')).toHaveProperty(
+      'value',
+      '212.40',
+    )
     expect(
       screen.getByRole('button', { name: 'Confirm & add' }),
     ).toHaveProperty('disabled', false)

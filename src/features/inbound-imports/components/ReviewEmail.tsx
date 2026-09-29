@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { ChevronDown } from 'lucide-react'
 import type { LocalInboundImport } from '#/db/types'
 import {
   READ_FIELDS,
@@ -14,6 +15,11 @@ import type {
   Segment,
 } from '#/features/inbound-imports/data/bodyReads'
 import { bodyNoun } from '#/features/inbound-imports/data/sources'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '#/components/ui/collapsible'
 import type { ImportDetail } from '#/features/inbound-imports/api/types'
 import { cn } from '#/lib/utils'
 import { FixRuleLink } from './FixRuleLink'
@@ -28,6 +34,8 @@ type Props = {
   target: ReadField
   onTarget: (field: ReadField) => void
   onUse: (field: ReadField, text: string) => void
+  /** Open from the start, when the form still needs something only the body can give. */
+  defaultOpen?: boolean
 }
 
 const LABEL: Record<ReadField, string> = {
@@ -148,8 +156,9 @@ function Notice({ children, danger }: { children: string; danger?: boolean }) {
 }
 
 /**
- * The stored email or payload under the form, with what was read highlighted in place. Pick a
- * field, then tap the text that belongs to it; numbers and currency codes fill their own field.
+ * The stored email or payload under the form, folded to its sender and subject, with what was
+ * read highlighted in place. Pick a field, then tap the text that belongs to it; numbers and
+ * currency codes fill their own field.
  */
 export function ReviewEmail({
   item,
@@ -160,6 +169,7 @@ export function ReviewEmail({
   target,
   onTarget,
   onUse,
+  defaultOpen,
 }: Props) {
   const noun = bodyNoun(item.bodyFormat)
   const lines = useMemo(
@@ -173,66 +183,79 @@ export function ReviewEmail({
   const inbox = item.source === 'inbox'
 
   return (
-    <div className="overflow-hidden rounded-[14px] border-[1.5px] border-fp-border">
+    <Collapsible
+      defaultOpen={defaultOpen}
+      className="group/email overflow-hidden rounded-[14px] border-[1.5px] border-fp-border"
+    >
       <div className="flex items-center gap-[10px] bg-fp-surface-2 px-3 py-[10px] text-[12.5px]">
-        <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center gap-[5px] font-bold">
-            {inbox ? null : <SourceChip source={item.source} />}
-            <bdi className="truncate">
-              {inbox
-                ? (item.sourceRef ?? item.sourceLabel)
-                : (item.sourceLabel ?? 'Webhook')}
-            </bdi>
+        <CollapsibleTrigger className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-start">
+          <ChevronDown
+            aria-hidden
+            size={16}
+            strokeWidth={2.2}
+            className="shrink-0 text-fp-text-3 transition-transform group-data-[state=open]/email:rotate-180"
+          />
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-center gap-[5px] font-bold">
+              {inbox ? null : <SourceChip source={item.source} />}
+              <bdi className="truncate">
+                {inbox
+                  ? (item.sourceRef ?? item.sourceLabel)
+                  : (item.sourceLabel ?? 'Webhook')}
+              </bdi>
+            </div>
+            <div className="truncate text-fp-text-2">
+              <bdi>
+                {inbox ? item.subject || '(no subject)' : 'Webhook payload'}
+              </bdi>
+            </div>
           </div>
-          <div className="truncate text-fp-text-2">
-            <bdi>
-              {inbox ? item.subject || '(no subject)' : 'Webhook payload'}
-            </bdi>
-          </div>
-        </div>
+        </CollapsibleTrigger>
         <FixRuleLink item={item} />
       </div>
 
-      {loading ? (
-        <Notice>{`Loading the ${noun}…`}</Notice>
-      ) : error ? (
-        <Notice danger>{error}</Notice>
-      ) : !item.hasBody || lines.length === 0 ? (
-        <Notice>{`This import was logged before ${noun}s were kept, so its content isn’t stored.`}</Notice>
-      ) : (
-        <>
-          <div className="flex flex-col gap-2 px-3 pt-[10px] pb-1">
-            <div className="text-[12px] font-bold text-fp-text-2">
-              Wrong? Pick a field, then tap its text
+      <CollapsibleContent>
+        {loading ? (
+          <Notice>{`Loading the ${noun}…`}</Notice>
+        ) : error ? (
+          <Notice danger>{error}</Notice>
+        ) : !item.hasBody || lines.length === 0 ? (
+          <Notice>{`This import was logged before ${noun}s were kept, so its content isn’t stored.`}</Notice>
+        ) : (
+          <>
+            <div className="flex flex-col gap-2 px-3 pt-[10px] pb-1">
+              <div className="text-[12px] font-bold text-fp-text-2">
+                Wrong? Pick a field, then tap its text
+              </div>
+              <FieldChips values={values} target={target} onTarget={onTarget} />
             </div>
-            <FieldChips values={values} target={target} onTarget={onTarget} />
-          </div>
-          <div className="flex max-h-[320px] flex-col gap-0.5 overflow-auto px-2 pt-1.5 pb-[10px]">
-            {lines.map((text, index) => {
-              const { segments, tokens } = lineSegments(
-                text,
-                reads.get(index) ?? [],
-              )
-              return (
-                <Line
-                  key={index}
-                  text={text}
-                  segments={segments}
-                  target={target}
-                  onTap={(token, field) =>
-                    onUse(field, tappedText(text, tokens, token, field))
-                  }
-                />
-              )
-            })}
-          </div>
-          {detail?.bodyTruncated ? (
-            <p className="px-3 pb-2.5 text-[11.5px] text-fp-text-3">
-              {`Long ${noun} — only the first part was kept.`}
-            </p>
-          ) : null}
-        </>
-      )}
-    </div>
+            <div className="flex max-h-[320px] flex-col gap-0.5 overflow-auto px-2 pt-1.5 pb-[10px]">
+              {lines.map((text, index) => {
+                const { segments, tokens } = lineSegments(
+                  text,
+                  reads.get(index) ?? [],
+                )
+                return (
+                  <Line
+                    key={index}
+                    text={text}
+                    segments={segments}
+                    target={target}
+                    onTap={(token, field) =>
+                      onUse(field, tappedText(text, tokens, token, field))
+                    }
+                  />
+                )
+              })}
+            </div>
+            {detail?.bodyTruncated ? (
+              <p className="px-3 pb-2.5 text-[11.5px] text-fp-text-3">
+                {`Long ${noun} — only the first part was kept.`}
+              </p>
+            ) : null}
+          </>
+        )}
+      </CollapsibleContent>
+    </Collapsible>
   )
 }

@@ -17,6 +17,10 @@ type Props = {
 
 const WALLET = 'wallet:'
 
+/** The account select's trigger, worn as a pill under an amount well. */
+export const ACCOUNT_PILL =
+  'w-max max-w-full gap-[7px] rounded-full border-fp-border bg-fp-surface py-[5px] ps-[6px] pe-3 text-[13px] font-bold disabled:opacity-100'
+
 /** The account under the amount; it also decides the amount's currency. */
 export function TxAccountPill({
   label,
@@ -37,7 +41,7 @@ export function TxAccountPill({
       <SelectTrigger
         aria-label={label}
         aria-invalid={invalid || undefined}
-        className="w-max max-w-full gap-[7px] rounded-full border-fp-border bg-fp-surface py-[5px] ps-[6px] pe-3 text-[13px] font-bold disabled:opacity-100"
+        className={ACCOUNT_PILL}
       >
         {chosen ? (
           <IconChip
