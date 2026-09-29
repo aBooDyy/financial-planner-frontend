@@ -24,6 +24,9 @@ minimal non-stale comments).
 - App-level wrappers in `src/components/` (`Button`, `TextField`, `PasswordField`, `Checkbox`,
   `Divider`) and settings `Toggle`/`Segmented` are thin layers over the shadcn primitives that
   keep their existing public APIs — prefer them where they already exist.
+- **A one-choice dropdown that isn't a form field uses `MenuSelect`** (`#/components/MenuSelect`):
+  a pill trigger (`prominent` / `quiet`) over the shadcn `DropdownMenu` radio items. Form fields
+  keep the `Select` well.
 - **Empty lists/sections use `EmptyState`** (`#/components/EmptyState`): accent icon tile,
   a bold title in `fp-text`, supporting copy in `fp-text-2`, optional add `action`. Never a
   lone gray (`fp-text-3`) sentence — it reads like a caption. `size="md"` when it fills a

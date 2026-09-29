@@ -24,6 +24,7 @@ pattern changes. Index: [`.agent-context/README.md`](.agent-context/README.md).
 - [planned.md](.agent-context/planned.md) — Planned transactions: generator + reconciler, the app-level planner, deterministic ids, confirm/skip/recalc, the hooks the Planned tab and goal detail read.
 - [onboarding.md](.agent-context/onboarding.md) — the `/setup` first-run wizard, `SessionGate`, starter packs, the sessionStorage draft.
 - [settings.md](.agent-context/settings.md) — the Settings page and its routed panes, local preferences.
+- [reports.md](.agent-context/reports.md) — Reports: the period presets + comparison in the URL, the windowed read, the pure report builders.
 - [search.md](.agent-context/search.md) — Search: the top-bar sheet, Everywhere vs. current-tab scope, the on-device index + filters, the `?open=` hand-off to Spending's editors.
 - [categories.md](.agent-context/categories.md) — Categories: the two-level synced tree, `buildCatalog` and the `CategoryCatalog` every surface reads, the Settings editor, the subtree delete.
 - [email-sync.md](.agent-context/email-sync.md) — Email sync: the connect/map wizard, on-demand scans, feeding the review queue.

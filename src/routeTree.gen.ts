@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WalletsRouteImport } from './routes/wallets'
 import { Route as SetupRouteImport } from './routes/setup'
+import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as ImportRouteImport } from './routes/import'
 import { Route as TransactionsRouteRouteImport } from './routes/transactions/route'
 import { Route as SettingsRouteRouteImport } from './routes/settings/route'
@@ -45,6 +46,11 @@ const WalletsRoute = WalletsRouteImport.update({
 const SetupRoute = SetupRouteImport.update({
   id: '/setup',
   path: '/setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsRoute = ReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ImportRoute = ImportRouteImport.update({
@@ -180,6 +186,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRouteRouteWithChildren
   '/transactions': typeof TransactionsRouteRouteWithChildren
   '/import': typeof ImportRoute
+  '/reports': typeof ReportsRoute
   '/setup': typeof SetupRoute
   '/wallets': typeof WalletsRoute
   '/auth/login': typeof AuthLoginRoute
@@ -206,6 +213,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/import': typeof ImportRoute
+  '/reports': typeof ReportsRoute
   '/setup': typeof SetupRoute
   '/wallets': typeof WalletsRoute
   '/auth/login': typeof AuthLoginRoute
@@ -236,6 +244,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRouteRouteWithChildren
   '/transactions': typeof TransactionsRouteRouteWithChildren
   '/import': typeof ImportRoute
+  '/reports': typeof ReportsRoute
   '/setup': typeof SetupRoute
   '/wallets': typeof WalletsRoute
   '/auth/login': typeof AuthLoginRoute
@@ -267,6 +276,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/transactions'
     | '/import'
+    | '/reports'
     | '/setup'
     | '/wallets'
     | '/auth/login'
@@ -293,6 +303,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/import'
+    | '/reports'
     | '/setup'
     | '/wallets'
     | '/auth/login'
@@ -322,6 +333,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/transactions'
     | '/import'
+    | '/reports'
     | '/setup'
     | '/wallets'
     | '/auth/login'
@@ -352,6 +364,7 @@ export interface RootRouteChildren {
   SettingsRouteRoute: typeof SettingsRouteRouteWithChildren
   TransactionsRouteRoute: typeof TransactionsRouteRouteWithChildren
   ImportRoute: typeof ImportRoute
+  ReportsRoute: typeof ReportsRoute
   SetupRoute: typeof SetupRoute
   WalletsRoute: typeof WalletsRoute
   AuthLoginRoute: typeof AuthLoginRoute
@@ -374,6 +387,13 @@ declare module '@tanstack/react-router' {
       path: '/setup'
       fullPath: '/setup'
       preLoaderRoute: typeof SetupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports': {
+      id: '/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof ReportsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/import': {
@@ -621,6 +641,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRouteRoute: SettingsRouteRouteWithChildren,
   TransactionsRouteRoute: TransactionsRouteRouteWithChildren,
   ImportRoute: ImportRoute,
+  ReportsRoute: ReportsRoute,
   SetupRoute: SetupRoute,
   WalletsRoute: WalletsRoute,
   AuthLoginRoute: AuthLoginRoute,

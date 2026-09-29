@@ -26,6 +26,9 @@ root product [`.agent-context/`](../../.agent-context/). Keep
   deterministic UUIDv5 ids, the generator and reconciler, the app-level planner (fill /
   recalc + undo, auto-post), settlement mutations, the id-taken sync branch, the hooks the
   Planned tab and goal detail read, and the Planned tab + confirm dialog components.
+- [reports.md](reports.md) — Reports: the URL-held period/comparison/accounts, the preset
+  periods and comparison windows, the windowed read + pre-period balance, and the pure builders
+  (summary, balance strip, trend buckets, category breakdown, largest expenses).
 - [search.md](search.md) — app-level search: the top-bar trigger + shortcut, the sheet, the
   Everywhere / current-tab scope, the on-device index and filters, and the `?open=` hand-off.
 - [categories.md](categories.md) — Categories: the two-level model, the synced tree and its

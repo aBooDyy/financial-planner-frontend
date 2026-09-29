@@ -103,6 +103,13 @@ the page mounted across tab switches, since TanStack only remounts a route's com
 param change when `remountDeps` asks it to. Tabs are `<Link>`s; the pages read the tab with
 `useParams` and navigate with `to: '/goals/$section'` / `'/transactions/$view'`.
 
+## Reports (`/reports`)
+
+`routes/reports.tsx` renders `features/reports/components/ReportsPage` behind `SessionGate`, the
+4th `NAV_SECTIONS` entry (`active="reports"`). Its controls are typed search params
+(`ReportsSearch`, validated by `parseReportsSearch`) — `?range=&from=&to=&compare=&accounts=`,
+defaults omitted, written with `replace` — see [reports.md](reports.md).
+
 ## Import wizard (`/import`)
 
 `routes/import.tsx` renders `features/import/components/ImportPage` — the CSV wizard only,

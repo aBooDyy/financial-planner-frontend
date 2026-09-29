@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { PieChart, Plus, Target, Wallet } from 'lucide-react'
+import { ChartColumn, PieChart, Plus, Target, Wallet } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useQuickAddStore } from '#/features/transactions/stores/quickAdd'
 import { NAV_SECTIONS } from './sections'
@@ -9,6 +9,7 @@ const ICONS: Record<AppSection, LucideIcon> = {
   wallets: Wallet,
   goals: Target,
   budget: PieChart,
+  reports: ChartColumn,
 }
 
 type Props = {
