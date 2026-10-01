@@ -145,6 +145,15 @@ last-synced version; rewriting clears a flagged failure) and `enqueueDelete` (dr
 queued entries; queue a delete only if the server has seen it). The bills, set-asides, goals
 and income mutations use it; older slices still carry their own copies of the same logic.
 
+**Actions on a row** — a bill's or goal's close and reopen, a goal's pause and resume — are
+outbox ops of their own (`OutboxOp` `close | reopen | pause | resume`), not PATCHes: the
+server applies them atomically with their side effects. They queue behind the row's earlier
+entries like any write (the same-row hold applies), carry no version in their payload, and are
+pushed by `db/itemAction.ts`'s `pushItemAction`, which reads the row's last-synced version when
+the action goes out, treats the server's "already in that state" refusal as success and adopts
+the server's copy, retries a `common.conflict` once on the fresh version, and treats `404` as
+gone. See [bills.md](bills.md#actions--dataactionsts).
+
 ## Sync engine
 
 - **Push**: drain the outbox to the backend, in `seq` order, a **page of one full wave**

@@ -1,7 +1,13 @@
 import { db } from '#/db/db'
+import { pushItemAction } from '#/db/itemAction'
 import type { OutboxEntry } from '#/db/types'
 import { billsApi } from '#/features/bills/api/billsApi'
 import type { CreateBillWire, UpdateBillWire } from '#/features/bills/api/types'
+import type { CloseWire } from '#/features/setAsides/api/types'
+import {
+  resyncSetAsides,
+  storeServerSetAsides,
+} from '#/features/setAsides/data/sync'
 import { ApiError } from '#/lib/apiError'
 import { localBillToUpdateWire, serverBillToLocal } from './mappers'
 
@@ -94,10 +100,64 @@ async function pushBillDelete(entry: OutboxEntry): Promise<void> {
   })
 }
 
+// --- Actions -------------------------------------------------------------------------
+
+const serverVersionOf = async (id: string): Promise<string | undefined> =>
+  (await billsApi.list()).find((b) => b.id === id)?.version
+
+/** Take the server's copy of the bill, or drop it when the server no longer has it. */
+async function adoptServerBill(id: string): Promise<void> {
+  const fresh = (await billsApi.list()).find((b) => b.id === id)
+  if (fresh) await db.bills.put(serverBillToLocal(fresh))
+  else await db.bills.delete(id)
+}
+
+async function pushBillClose(entry: OutboxEntry): Promise<void> {
+  const payload = entry.payload as CloseWire
+  await pushItemAction(entry, {
+    localVersion: async () => (await db.bills.get(entry.id))?.version,
+    freshVersion: () => serverVersionOf(entry.id),
+    send: (version) => billsApi.close(entry.id, { ...payload, version }),
+    store: async ({ bill, released, created }) => {
+      await db.bills.put(serverBillToLocal(bill))
+      await storeServerSetAsides([...released, ...created])
+    },
+    adopt: async () => {
+      const own = await db.setAsides
+        .where('billId')
+        .equals(entry.id)
+        .primaryKeys()
+      await adoptServerBill(entry.id)
+      await resyncSetAsides([
+        ...own,
+        ...Object.values(payload.move_to?.new_ids ?? {}),
+      ])
+    },
+    gone: () => db.bills.delete(entry.id),
+    doneCodes: ['planning.bill.already_closed'],
+  })
+}
+
+async function pushBillReopen(entry: OutboxEntry): Promise<void> {
+  await pushItemAction(entry, {
+    localVersion: async () => (await db.bills.get(entry.id))?.version,
+    freshVersion: () => serverVersionOf(entry.id),
+    send: (version) => billsApi.reopen(entry.id, { version }),
+    store: async (bill) => {
+      await db.bills.put(serverBillToLocal(bill))
+    },
+    adopt: () => adoptServerBill(entry.id),
+    gone: () => db.bills.delete(entry.id),
+    doneCodes: ['planning.bill.not_closed'],
+  })
+}
+
 /** Push one `bill` outbox entry. Throws on network/unexpected errors. */
 export async function pushBillsEntry(entry: OutboxEntry): Promise<void> {
   if (entry.op === 'create') return pushBillCreate(entry)
   if (entry.op === 'update') return pushBillUpdate(entry)
+  if (entry.op === 'close') return pushBillClose(entry)
+  if (entry.op === 'reopen') return pushBillReopen(entry)
   return pushBillDelete(entry)
 }
 

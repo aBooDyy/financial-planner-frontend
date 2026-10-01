@@ -40,6 +40,36 @@ row; anything else is flagged by the engine.
   payments keep their rows with `billId` cleared (`unlinkLedgerFrom`, queued payloads rewritten
   too). Its planned rows are resolved by the planner's orphan pass.
 
+## Actions — `data/actions.ts`
+
+Close and reopen are **actions, not edits**: applied on this device at once and queued as their
+own outbox entry (`op: 'close' | 'reopen'`), which the server applies atomically
+(`POST /bills/{id}/close`, `/reopen`). A closed bill stays editable — its PATCH never carries
+`closed_at`, and the server keeps it.
+
+- `closeBill(id, {closedAt?, leftover?})` — "Mark as done" / "End this bill". `queueClose`
+  (`setAsides/data/leftover.ts`, shared with goals) does in **one Dexie transaction** what the
+  server's close does: stamps `closedAt`; releases every **live** set-aside on the close date
+  (`leftover: {kind: 'free'}`, the default) or also writes each again for another open bill or
+  goal (`{kind: 'move', to: {goalId} | {billId, occurrence?}}` — same wallet/label, amount,
+  note, position; dated the close date; no planned link; a bill target's occurrence defaults to
+  its `nextDue`); deletes the item's **open, unsettled planned rows dated after the close date**
+  with their queued writes (`dropOpenPlannedAfter` — the server deletes and tombstones them);
+  queues `{closed_at, leftover: 'FREE' | 'MOVE', move_to?: {goal_id | bill_id, occurrence?,
+  new_ids}}`. The moved copies get ids minted here and sent as `new_ids`, so the server's rows
+  are the local ones. The touched set-asides are marked dirty with no entries of their own; the
+  close carries them. Closing a closed bill is a no-op.
+- `reopenBill(id)` — clears `closedAt`; what the close released stays released; the planner
+  plans the bill again.
+- **Pushing an action** goes through `db/itemAction.ts` (`pushItemAction`): the payload holds no
+  version — the row's last-synced one is read when it goes out. `409
+  planning.bill.already_closed` (close) / `not_closed` (reopen) means the row is already in the
+  asked state: the entry settles and the server's copy is adopted (for a close, the touched
+  set-asides are cleaned and re-pulled — `resyncSetAsides` — so a moved copy the server never
+  wrote disappears). `409 common.conflict` retries once on the fresh version, then adopts. `404`
+  drops the row. A successful close stores the bill and the `released` + `created` set-asides
+  it answers with (`storeServerSetAsides`).
+
 ## Elsewhere
 
 - Ledger rows carry `billId` (wire `bill_id`; never with `goalId`, never on transfer legs or
@@ -53,4 +83,4 @@ row; anything else is flagged by the engine.
 
 ## Tests
 
-`data/{mutations,sync}.test.ts`.
+`data/{mutations,sync,actions}.test.ts`.

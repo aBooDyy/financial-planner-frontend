@@ -1,5 +1,8 @@
 import { http } from '#/lib/http'
+import type { CloseWire } from '#/features/setAsides/api/types'
 import type {
+  CloseGoalResult,
+  CloseGoalResultWire,
   CreateGoalWire,
   CreateIncomeWire,
   Goal,
@@ -9,7 +12,7 @@ import type {
   UpdateGoalWire,
   UpdateIncomeWire,
 } from './types'
-import { toGoal, toIncome } from './types'
+import { toCloseGoalResult, toGoal, toIncome } from './types'
 
 /**
  * Remote calls for the Goals planning entities (income streams + goals). The sync engine owns
@@ -46,4 +49,25 @@ export const goalsApi = {
 
   deleteGoal: (id: string): Promise<void> =>
     http.del<void>(`/goals/${id}`).then(() => undefined),
+
+  closeGoal: (
+    id: string,
+    payload: CloseWire & { version: string },
+  ): Promise<CloseGoalResult> =>
+    http
+      .post<CloseGoalResultWire>(`/goals/${id}/close`, payload)
+      .then(toCloseGoalResult),
+
+  reopenGoal: (id: string, payload: { version: string }): Promise<Goal> =>
+    http.post<GoalWire>(`/goals/${id}/reopen`, payload).then(toGoal),
+
+  /** `paused_at` defaults to today (UTC) server-side. */
+  pauseGoal: (
+    id: string,
+    payload: { version: string; paused_at: string },
+  ): Promise<Goal> =>
+    http.post<GoalWire>(`/goals/${id}/pause`, payload).then(toGoal),
+
+  resumeGoal: (id: string, payload: { version: string }): Promise<Goal> =>
+    http.post<GoalWire>(`/goals/${id}/resume`, payload).then(toGoal),
 }

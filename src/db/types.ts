@@ -596,7 +596,18 @@ export type LocalSyncWatermark = {
   updatedAt: string
 }
 
-export type OutboxOp = 'create' | 'update' | 'delete'
+/**
+ * `create` / `update` / `delete` write a row; the rest are actions on one row (a bill's or
+ * goal's close and reopen, a goal's pause and resume) that the server applies atomically.
+ */
+export type OutboxOp =
+  | 'create'
+  | 'update'
+  | 'delete'
+  | 'close'
+  | 'reopen'
+  | 'pause'
+  | 'resume'
 export type OutboxEntity =
   | 'node'
   | 'settings'

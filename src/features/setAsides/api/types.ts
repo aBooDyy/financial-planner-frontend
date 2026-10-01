@@ -129,3 +129,30 @@ export const toSetAside = (w: SetAsideWire): SetAside => ({
   updatedAt: w.updated_at,
   version: w.version,
 })
+
+// --- Closing a bill or goal (`POST /bills/{id}/close`, `POST /goals/{id}/close`) -------
+
+/** Where a closed item's live set-asides go: freed, or moved to another open bill or goal. */
+export type LeftoverWire = 'FREE' | 'MOVE'
+
+export type LeftoverTargetWire = {
+  goal_id?: string
+  bill_id?: string
+  /** A bill target only; defaults to its `next_due`. */
+  occurrence?: string
+  /** Source set-aside id → the id its moved copy takes, minted here so it exists offline. */
+  new_ids?: Record<string, string>
+}
+
+/** Carries no `version`: the push adds the row's last-synced one when it goes out. */
+export type CloseWire = {
+  closed_at: string
+  leftover: LeftoverWire
+  move_to?: LeftoverTargetWire
+}
+
+/** What a close released and (with MOVE) wrote again for the target. */
+export type CloseEffectWire = {
+  released: SetAsideWire[]
+  created: SetAsideWire[]
+}

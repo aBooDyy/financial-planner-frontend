@@ -164,3 +164,31 @@ export async function closeCovered(
   for (const item of covered) await savePlanned({ ...item, status: 'done' })
   return covered.length
 }
+
+/**
+ * A closed bill or goal stops planning: its open, unsettled rows dated after `after` go, as
+ * the server deletes (and tombstones) them in the same close. Their queued writes go too; no
+ * delete is queued — the close itself removes them server-side.
+ */
+export async function dropOpenPlannedAfter(
+  link: 'billId' | 'goalId',
+  ownerId: string,
+  after: string,
+): Promise<string[]> {
+  const rows = (
+    await db.plannedTransactions.where(link).equals(ownerId).toArray()
+  ).filter((p) => p.deleted === 0 && p.status === 'open' && p.date > after)
+  if (rows.length === 0) return []
+  const { txns, setAsides } = await settlementsOf(rows.map((p) => p.id))
+  const index = indexSettlements(txns, setAsides)
+  const drop = rows
+    .filter((p) => (index.get(p.id) ?? []).length === 0)
+    .map((p) => p.id)
+  await db.transaction('rw', db.plannedTransactions, db.outbox, async () => {
+    for (const id of drop) {
+      await pendingPlanned(id).delete()
+      await db.plannedTransactions.delete(id)
+    }
+  })
+  return drop
+}

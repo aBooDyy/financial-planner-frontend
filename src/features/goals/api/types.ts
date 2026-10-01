@@ -1,4 +1,6 @@
 import { fromWireCurrency } from '#/lib/currency'
+import { toSetAside } from '#/features/setAsides/api/types'
+import type { CloseEffectWire, SetAside } from '#/features/setAsides/api/types'
 import type { CurrencyCode } from '#/lib/currency'
 
 /**
@@ -279,4 +281,18 @@ export const toGoal = (w: GoalWire): Goal => ({
   createdAt: w.created_at,
   updatedAt: w.updated_at,
   version: w.version,
+})
+
+export type CloseGoalResultWire = CloseEffectWire & { goal: GoalWire }
+
+export type CloseGoalResult = {
+  goal: Goal
+  released: SetAside[]
+  created: SetAside[]
+}
+
+export const toCloseGoalResult = (w: CloseGoalResultWire): CloseGoalResult => ({
+  goal: toGoal(w.goal),
+  released: w.released.map(toSetAside),
+  created: w.created.map(toSetAside),
 })

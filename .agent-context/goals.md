@@ -44,6 +44,15 @@ Local row + outbox entry in one Dexie transaction (`db/enqueue.ts`), then `sched
   (`dropSetAsidesOf`), and spending from it keeps its rows with `goalId` cleared
   (`unlinkLedgerFrom`, which also rewrites queued payloads). Its planned rows are left to the
   planner's orphan pass, as before.
+- **Actions (`data/actions.ts`)** — the bills' pattern ([bills.md](bills.md#actions--dataactionsts)):
+  `closeGoal(id, {closedAt?, leftover?})` (also ends a pause; "I spent it" is a spend with the
+  goal and its `useCategoryId`, then a close with the default free leftover — not atomic, and
+  harmless if the close fails), `reopenGoal(id)` (clears `closedAt` and `pausedAt`),
+  `pauseGoal(id, pausedAt?)` (no-op on a closed or paused goal) and `resumeGoal(id)`. Each writes
+  the goal and queues `op: 'close' | 'reopen' | 'pause' | 'resume'`; the "already done" codes are
+  `goals.goal.already_closed`, `not_closed`, `already_paused` (and `already_closed` for a
+  pause), `not_paused`. A paused goal plans no set-asides (`isPlannable`), so the planner's next
+  fill removes its future unsettled ones; resume plans it again from today.
 
 ## Derivations
 
@@ -70,5 +79,5 @@ Local row + outbox entry in one Dexie transaction (`db/enqueue.ts`), then `sched
 
 ## Tests
 
-`data/{mutations,progress,paydays,cadence}.test.ts`; the funding plan is exercised through
+`data/{mutations,actions,progress,paydays,cadence}.test.ts`; the funding plan is exercised through
 `planned/data/generate.test.ts` and `runner.test.ts`.

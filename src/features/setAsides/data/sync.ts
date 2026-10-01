@@ -17,6 +17,17 @@ import { localSetAsideToUpdateWire, serverSetAsideToLocal } from './mappers'
 
 const statusOf = (e: unknown): number => (e instanceof ApiError ? e.status : -1)
 
+/**
+ * Store rows an action answered with (a close, a release, a move) as the server now holds them.
+ * They are the rows that action wrote, so they replace whatever this device held for them.
+ */
+export async function storeServerSetAsides(
+  rows: ReadonlyArray<SetAside>,
+): Promise<void> {
+  if (rows.length === 0) return
+  await db.setAsides.bulkPut(rows.map(serverSetAsideToLocal))
+}
+
 async function storeAndSettle(
   entry: OutboxEntry,
   row: SetAside,
@@ -122,4 +133,25 @@ export async function pullSetAsides(): Promise<void> {
       if (l.dirty === 0 && !ids.has(l.id)) await db.setAsides.delete(l.id)
     }
   })
+}
+
+/**
+ * An action this device applied locally (a close's releases and moved copies) was settled by
+ * the server's own state instead — it was already closed, or the version could not be
+ * reconciled. The rows it marked hold no outbox entries of their own, so they are cleaned and
+ * the full pull replaces them with what the server holds (dropping copies it never wrote).
+ */
+export async function resyncSetAsides(
+  ids: ReadonlyArray<string>,
+): Promise<void> {
+  await db.transaction('rw', db.setAsides, db.outbox, async () => {
+    for (const id of ids) {
+      const queued = await db.outbox
+        .where('[entity+id]')
+        .equals(['setAside', id])
+        .count()
+      if (queued === 0) await db.setAsides.update(id, { dirty: 0 })
+    }
+  })
+  await pullSetAsides()
 }

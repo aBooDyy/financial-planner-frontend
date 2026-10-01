@@ -1,12 +1,19 @@
 import { db } from '#/db/db'
+import { pushItemAction } from '#/db/itemAction'
 import type { OutboxEntry } from '#/db/types'
 import { goalsApi } from '#/features/goals/api/goalsApi'
 import type {
   CreateGoalWire,
   CreateIncomeWire,
+  Goal,
   UpdateGoalWire,
   UpdateIncomeWire,
 } from '#/features/goals/api/types'
+import type { CloseWire } from '#/features/setAsides/api/types'
+import {
+  resyncSetAsides,
+  storeServerSetAsides,
+} from '#/features/setAsides/data/sync'
 import { ApiError } from '#/lib/apiError'
 import {
   localGoalToUpdateWire,
@@ -191,6 +198,87 @@ async function pushGoalDelete(entry: OutboxEntry): Promise<void> {
   })
 }
 
+// --- Goal actions --------------------------------------------------------------------
+
+const goalVersionOf = async (id: string): Promise<string | undefined> =>
+  (await goalsApi.listGoals()).find((g) => g.id === id)?.version
+
+/** Take the server's copy of the goal, or drop it when the server no longer has it. */
+async function adoptServerGoal(id: string): Promise<void> {
+  const fresh = (await goalsApi.listGoals()).find((g) => g.id === id)
+  if (fresh) await db.goals.put(serverGoalToLocal(fresh))
+  else await db.goals.delete(id)
+}
+
+/** The shared shape of the four goal actions; only the call and its "already done" codes vary. */
+async function pushGoalAction(
+  entry: OutboxEntry,
+  send: (version: string) => Promise<Goal>,
+  doneCodes: ReadonlyArray<string>,
+): Promise<void> {
+  await pushItemAction(entry, {
+    localVersion: async () => (await db.goals.get(entry.id))?.version,
+    freshVersion: () => goalVersionOf(entry.id),
+    send,
+    store: async (goal) => {
+      await db.goals.put(serverGoalToLocal(goal))
+    },
+    adopt: () => adoptServerGoal(entry.id),
+    gone: () => db.goals.delete(entry.id),
+    doneCodes,
+  })
+}
+
+async function pushGoalClose(entry: OutboxEntry): Promise<void> {
+  const payload = entry.payload as CloseWire
+  await pushItemAction(entry, {
+    localVersion: async () => (await db.goals.get(entry.id))?.version,
+    freshVersion: () => goalVersionOf(entry.id),
+    send: (version) => goalsApi.closeGoal(entry.id, { ...payload, version }),
+    store: async ({ goal, released, created }) => {
+      await db.goals.put(serverGoalToLocal(goal))
+      await storeServerSetAsides([...released, ...created])
+    },
+    adopt: async () => {
+      const own = await db.setAsides
+        .where('goalId')
+        .equals(entry.id)
+        .primaryKeys()
+      await adoptServerGoal(entry.id)
+      await resyncSetAsides([
+        ...own,
+        ...Object.values(payload.move_to?.new_ids ?? {}),
+      ])
+    },
+    gone: () => db.goals.delete(entry.id),
+    doneCodes: ['goals.goal.already_closed'],
+  })
+}
+
+function pushGoalOtherAction(entry: OutboxEntry): Promise<void> {
+  const id = entry.id
+  if (entry.op === 'reopen')
+    return pushGoalAction(
+      entry,
+      (version) => goalsApi.reopenGoal(id, { version }),
+      ['goals.goal.not_closed'],
+    )
+  if (entry.op === 'pause') {
+    const { paused_at } = entry.payload as { paused_at: string }
+    return pushGoalAction(
+      entry,
+      (version) => goalsApi.pauseGoal(id, { version, paused_at }),
+      // A closed goal cannot be paused: the server's copy is the answer either way.
+      ['goals.goal.already_paused', 'goals.goal.already_closed'],
+    )
+  }
+  return pushGoalAction(
+    entry,
+    (version) => goalsApi.resumeGoal(id, { version }),
+    ['goals.goal.not_paused'],
+  )
+}
+
 // --- Engine plug-ins -----------------------------------------------------------------
 
 /** Push one income/goal outbox entry. Throws on network/unexpected errors. */
@@ -202,7 +290,9 @@ export async function pushGoalsEntry(entry: OutboxEntry): Promise<void> {
   }
   if (entry.op === 'create') return pushGoalCreate(entry)
   if (entry.op === 'update') return pushGoalUpdate(entry)
-  return pushGoalDelete(entry)
+  if (entry.op === 'delete') return pushGoalDelete(entry)
+  if (entry.op === 'close') return pushGoalClose(entry)
+  return pushGoalOtherAction(entry)
 }
 
 export async function pullIncome(): Promise<void> {

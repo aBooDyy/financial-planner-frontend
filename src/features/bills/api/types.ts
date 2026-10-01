@@ -1,4 +1,6 @@
 import { fromWireCurrency } from '#/lib/currency'
+import { toSetAside } from '#/features/setAsides/api/types'
+import type { CloseEffectWire, SetAside } from '#/features/setAsides/api/types'
 import type { CurrencyCode } from '#/lib/currency'
 import {
   fromWireObligationFreq,
@@ -115,6 +117,14 @@ export type CreateBillWire = PlanWire & {
  */
 export type UpdateBillWire = Omit<CreateBillWire, 'id'> & { version: string }
 
+export type CloseBillResultWire = CloseEffectWire & { bill: BillWire }
+
+export type CloseBillResult = {
+  bill: Bill
+  released: SetAside[]
+  created: SetAside[]
+}
+
 // --- Mappers (wire → domain) ---------------------------------------------------------
 
 export const toBill = (w: BillWire): Bill => ({
@@ -145,4 +155,10 @@ export const toBill = (w: BillWire): Bill => ({
   createdAt: w.created_at,
   updatedAt: w.updated_at,
   version: w.version,
+})
+
+export const toCloseBillResult = (w: CloseBillResultWire): CloseBillResult => ({
+  bill: toBill(w.bill),
+  released: w.released.map(toSetAside),
+  created: w.created.map(toSetAside),
 })
