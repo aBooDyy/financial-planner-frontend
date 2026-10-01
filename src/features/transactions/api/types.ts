@@ -45,8 +45,9 @@ export type TransactionTypeWire =
 export type BudgetScope = 'category' | 'wallet' | 'overall'
 export type BudgetScopeWire = 'CATEGORY' | 'WALLET' | 'OVERALL'
 
-export type BudgetPeriod = 'weekly' | 'monthly' | 'custom'
-export type BudgetPeriodWire = 'WEEKLY' | 'MONTHLY' | 'CUSTOM'
+/** `paycheck` resets on each main payday (monthly until there is an income stream). */
+export type BudgetPeriod = 'weekly' | 'monthly' | 'custom' | 'paycheck'
+export type BudgetPeriodWire = 'WEEKLY' | 'MONTHLY' | 'CUSTOM' | 'PAYCHECK'
 
 const TX_TYPE_TO_WIRE: Record<TxType, TxTypeWire> = {
   spend: 'SPEND',
@@ -85,11 +86,13 @@ const PERIOD_TO_WIRE: Record<BudgetPeriod, BudgetPeriodWire> = {
   weekly: 'WEEKLY',
   monthly: 'MONTHLY',
   custom: 'CUSTOM',
+  paycheck: 'PAYCHECK',
 }
 const PERIOD_FROM_WIRE: Record<BudgetPeriodWire, BudgetPeriod> = {
   WEEKLY: 'weekly',
   MONTHLY: 'monthly',
   CUSTOM: 'custom',
+  PAYCHECK: 'paycheck',
 }
 
 export const toWireTxType = (t: TxType): TxTypeWire => TX_TYPE_TO_WIRE[t]
@@ -153,6 +156,8 @@ export type Budget = {
   customDays: number | null
   limit: number // minor units
   currency: CurrencyCode
+  /** "Leave out planned bills": payments for a bill (a `billId`) don't count against it. */
+  excludesBills: boolean
   createdAt: string
   updatedAt: string
   version: string
@@ -215,6 +220,7 @@ export type BudgetWire = {
   custom_days: number | null
   limit_amount: number
   currency: string
+  excludes_bills?: boolean
   created_at: string
   updated_at: string
   version: string
@@ -394,6 +400,7 @@ export type CreateBudgetWire = {
   custom_days: number | null
   limit_amount: number
   currency: string
+  excludes_bills: boolean
 }
 export type UpdateBudgetWire = Omit<CreateBudgetWire, 'id'> & {
   version: string
@@ -497,6 +504,7 @@ export const toBudget = (w: BudgetWire): Budget => ({
   customDays: w.custom_days,
   limit: w.limit_amount,
   currency: fromWireCurrency(w.currency),
+  excludesBills: w.excludes_bills ?? false,
   createdAt: w.created_at,
   updatedAt: w.updated_at,
   version: w.version,

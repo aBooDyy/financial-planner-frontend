@@ -129,6 +129,7 @@ export const localBudgetToCreateWire = (l: LocalBudget): CreateBudgetWire => ({
   custom_days: l.customDays,
   limit_amount: l.limit,
   currency: l.currency,
+  excludes_bills: l.excludesBills ?? false,
 })
 
 export const localBudgetToUpdateWire = (l: LocalBudget): UpdateBudgetWire => ({
@@ -140,6 +141,7 @@ export const localBudgetToUpdateWire = (l: LocalBudget): UpdateBudgetWire => ({
   custom_days: l.customDays,
   limit_amount: l.limit,
   currency: l.currency,
+  excludes_bills: l.excludesBills ?? false,
 })
 
 // --- Recurring -----------------------------------------------------------------------

@@ -27,6 +27,7 @@ export const BUDGET_PERIODS: Record<BudgetPeriod, { label: string }> = {
   weekly: { label: 'Weekly' },
   monthly: { label: 'Monthly' },
   custom: { label: 'Custom days' },
+  paycheck: { label: 'Per paycheck' },
 }
 
 export const AT_RISK_RATIO = 0.8

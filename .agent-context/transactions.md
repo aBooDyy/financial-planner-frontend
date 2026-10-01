@@ -68,6 +68,13 @@ belongs to [planned.md](planned.md#the-planned-tab-and-the-confirm-dialog-compon
   and calendar, and burns budgets like any spend — the old `isContribution` rule (spend with a
   `goalId` → Saved, skipped by budgets) is gone. Its only special treatment left is the "Goal"
   pill.
+- **Budget periods and "Leave out planned bills".** `BudgetPeriod` is `weekly | monthly |
+  custom | paycheck` (wire `PAYCHECK`). A per-paycheck budget resets on each main payday; until
+  that window is built, `budgetWindow` and the search suffix read it as the calendar month, and
+  the editor does not offer it yet. `excludesBills` (wire `excludes_bills`, default off) marks a
+  budget that skips payments for a bill (rows with a `billId`); it is stored and synced, and
+  `BudgetDraft.excludesBills` left undefined keeps the stored choice. It is optional on
+  `LocalBudget` because rows stored before it existed lack it (read as off).
 - **planning.ts** — date math (`windowOf`, `budgetWindow`, calendar grid, `advanceDue`,
   `relFuture`), parameterized by `today` for testability. `advanceDue` and `monthlyFactor` take
   a schedule's whole repeat (`frequency` + `customInterval` + `customUnit`) and read it through

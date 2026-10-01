@@ -257,6 +257,11 @@ export type LocalBudget = {
   customDays: number | null
   limit: number
   currency: CurrencyCode
+  /**
+   * "Leave out planned bills": payments for a bill don't count against it. Rows stored before
+   * the field existed lack it, which reads as off.
+   */
+  excludesBills?: boolean
   createdAt: string
   updatedAt: string
   version: string

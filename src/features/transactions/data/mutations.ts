@@ -362,9 +362,16 @@ export type BudgetDraft = {
   customDays: number | null
   limit: number
   currency: CurrencyCode
+  /** "Leave out planned bills"; undefined keeps the stored choice (a new budget: off). */
+  excludesBills?: boolean
 }
 
-const buildBudget = (id: string, d: BudgetDraft, ts: string): LocalBudget => ({
+const buildBudget = (
+  id: string,
+  d: BudgetDraft,
+  ts: string,
+  excludesBills = false,
+): LocalBudget => ({
   id,
   scopeType: d.scopeType,
   categoryId: d.scopeType === 'category' ? d.categoryId : null,
@@ -373,6 +380,7 @@ const buildBudget = (id: string, d: BudgetDraft, ts: string): LocalBudget => ({
   customDays: d.period === 'custom' ? d.customDays : null,
   limit: d.limit,
   currency: d.currency,
+  excludesBills: d.excludesBills ?? excludesBills,
   createdAt: ts,
   updatedAt: ts,
   version: '',
@@ -406,7 +414,12 @@ export async function updateBudget(
   const existing = await db.budgets.get(id)
   if (!existing) return
   const budget: LocalBudget = {
-    ...buildBudget(id, draft, existing.createdAt),
+    ...buildBudget(
+      id,
+      draft,
+      existing.createdAt,
+      existing.excludesBills ?? false,
+    ),
     createdAt: existing.createdAt,
     version: existing.version,
     updatedAt: now(),

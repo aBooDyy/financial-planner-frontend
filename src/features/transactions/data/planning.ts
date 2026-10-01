@@ -5,6 +5,7 @@
  */
 import { frequencyMetaOf, stepDue } from '#/features/goals/data/cadence'
 import type { Repeat } from '#/features/goals/data/cadence'
+import type { BudgetPeriod } from '#/features/transactions/api/types'
 import type { PeriodMode, RangeMode } from '#/features/transactions/constants'
 import { toMajor } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
@@ -141,9 +142,12 @@ export const todayRelativeTo = (
 ): 'ahead' | 'behind' | null =>
   inWindow(ymd(today), win) ? null : today > win.end ? 'ahead' : 'behind'
 
-/** A budget's measurement window, always ending today (weekly / monthly / custom-N-days). */
+/**
+ * A budget's measurement window, always ending today (weekly / monthly / custom-N-days). A
+ * per-paycheck budget reads as monthly here until the pay-period window is built.
+ */
 export const budgetWindow = (
-  period: 'weekly' | 'monthly' | 'custom',
+  period: BudgetPeriod,
   customDays: number | null,
   today: Date,
 ): DateWindow => {

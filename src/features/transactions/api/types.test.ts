@@ -5,6 +5,7 @@ import {
   isTransferLeg,
   toBudget,
   toTransaction,
+  toWirePeriod,
   toWireTransactionType,
 } from './types'
 import type { BudgetWire, TransactionType, TransactionWire } from './types'
@@ -56,6 +57,19 @@ describe('spending mappers', () => {
         wallet_id: 'w1',
       }),
     ).toMatchObject({ scopeType: 'wallet', categoryId: null, walletId: 'w1' })
+  })
+
+  it('maps the per-paycheck period and the leave-out-bills choice', () => {
+    expect(
+      toBudget({
+        ...aBudgetWire('SAR'),
+        period: 'PAYCHECK',
+        excludes_bills: true,
+      }),
+    ).toMatchObject({ period: 'paycheck', excludesBills: true })
+    expect(toWirePeriod('paycheck')).toBe('PAYCHECK')
+    // An older server leaves the field out: it reads as off.
+    expect(toBudget(aBudgetWire('SAR')).excludesBills).toBe(false)
   })
 
   it('accepts any ISO code the config lists', () => {

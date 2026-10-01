@@ -45,6 +45,12 @@ describe('budgetWindow', () => {
     expect(ymd(w.end)).toBe('2026-06-12')
     expect(ymd(w.start)).toBe('2026-05-30')
   })
+
+  it('reads a per-paycheck budget as the calendar month for now', () => {
+    const w = budgetWindow('paycheck', null, TODAY)
+    expect(ymd(w.start)).toBe('2026-06-01')
+    expect(ymd(w.end)).toBe('2026-06-30')
+  })
 })
 
 const preset = (frequency: GoalFrequency) => ({
