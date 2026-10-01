@@ -38,11 +38,6 @@ async function openIntent(
       if (b && b.deleted === 0) editor.openEditBudget(b)
       return
     }
-    case 'recurring': {
-      const r = inputs.recurrings.find((x) => x.id === intent.id)
-      if (r && r.deleted === 0) editor.openEditRecurring(r)
-      return
-    }
     case 'planned':
       openPlanned(intent.id)
   }

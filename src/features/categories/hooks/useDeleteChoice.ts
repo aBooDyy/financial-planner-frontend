@@ -15,7 +15,8 @@ export type DeleteTarget = {
   parentId: string | null
   subCount: number
   txCount: number
-  recurringCount: number
+  billCount: number
+  incomeCount: number
   plannedCount: number
 }
 
@@ -34,7 +35,7 @@ export type DeleteChoice = {
 type State = { forId: string | null; moveTo: string | null }
 
 export const filedCount = (t: DeleteTarget): number =>
-  t.txCount + t.recurringCount + t.plannedCount
+  t.txCount + t.billCount + t.incomeCount + t.plannedCount
 
 /**
  * The delete dialog's decision: where what the category files moves to. A category in use

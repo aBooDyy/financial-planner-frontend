@@ -42,7 +42,7 @@ export function useGoalPlan(goalId: string | null): UseGoalPlan {
       planned: data.inputs.planned,
       desired: data.state.desired,
       txns: data.inputs.txns,
-      allocations: data.inputs.allocations,
+      setAsides: data.inputs.setAsides,
       progress: data.state.progress[goal.id],
       nodes: data.nodes,
       index: data.state.index,

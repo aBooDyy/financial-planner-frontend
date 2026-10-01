@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { goal, income, m, planned } from '#/features/planned/testing/fixtures'
 import {
   goalOption,
-  isSavingGoal,
   rankGoalOptions,
   rankIncomeOptions,
   TOP_OPTIONS,
@@ -17,22 +16,8 @@ describe('goalOption', () => {
     expect(goalOption(g, 0).kind).toBe('goal')
   })
 
-  it('describes an obligation by its amount and next due', () => {
-    const rent = goal({
-      name: 'Rent',
-      kind: 'recurring',
-      amount: m(3500),
-      nextDue: '2026-10-01',
-    })
-    expect(goalOption(rent, 0)).toMatchObject({
-      kind: 'obligation',
-      sub: 'Obligation · SR 3,500 due Oct 1',
-    })
-    expect(isSavingGoal(rent)).toBe(false)
-  })
-
-  it('falls back to "saved" for an open-ended goal', () => {
-    const g = goal({ kind: 'openended', target: null })
+  it('falls back to "saved" for a goal without a target', () => {
+    const g = goal({ amount: m(300), target: null })
     expect(goalOption(g, m(250)).sub).toBe('Goal · SR 250 saved')
   })
 })
@@ -58,19 +43,9 @@ describe('rankGoalOptions', () => {
     expect(top.map((o) => o.id)).toEqual(['g6', 'g5', 'g0', 'g1', 'g2'])
   })
 
-  it('ranks a payment due soon over set-asides due sooner, then obligations over saving goals', () => {
-    const rent = goal({
-      id: 'rent',
-      kind: 'recurring',
-      amount: m(3500),
-      position: 7,
-    })
-    const gym = goal({
-      id: 'gym',
-      kind: 'recurring',
-      amount: m(200),
-      position: 8,
-    })
+  it('ranks a goal with a payment due soon over set-asides due sooner', () => {
+    const rent = goal({ id: 'rent', position: 7 })
+    const gym = goal({ id: 'gym', position: 8 })
     const { top, rest } = rankGoalOptions({
       goals: [...goals, rent, gym],
       planned: [
@@ -88,8 +63,8 @@ describe('rankGoalOptions', () => {
       savedOf: () => 0,
       selectedId: null,
     })
-    expect(top.map((o) => o.id)).toEqual(['rent', 'gym', 'g3', 'g0', 'g1'])
-    expect(rest.map((o) => o.id)).toEqual(['g2', 'g4', 'g5', 'g6'])
+    expect(top.map((o) => o.id)).toEqual(['rent', 'g3', 'g0', 'g1', 'g2'])
+    expect(rest.map((o) => o.id)).toEqual(['g4', 'g5', 'g6', 'gym'])
   })
 
   it('shows at most five, and always the chosen one', () => {

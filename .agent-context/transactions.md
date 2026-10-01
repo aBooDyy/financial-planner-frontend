@@ -1,10 +1,12 @@
 # Spending feature (the "Spending" page — `src/features/transactions/`)
 
-Third synced slice, local-first like Wallets/Goals. One page, four views (Activity /
-Planned / Budgets / Recurring) recreating the Means `TransactionsApp` design (the Planned tab
+Third synced slice, local-first like Wallets/Goals. One page, three views (Activity /
+Planned / Budgets) recreating the Means `TransactionsApp` design (the Planned tab
 belongs to [planned.md](planned.md#the-planned-tab-and-the-confirm-dialog-components)). Route `/transactions`
 (the nav's 3rd "Spending" slot, `active="budget"`). Dexie declares `transactions`,
-`budgets`, `recurrings`; `OutboxEntity` carries `transaction|transfer|budget|recurring`.
+`budgets`; `OutboxEntity` carries `transaction|transfer|budget`. The Recurring tab, its editor
+and `recurrings` went with the planning rebuild: a repeating payment is a **bill**
+([bills.md](bills.md)).
 
 ## Data layer (`data/`)
 
@@ -15,11 +17,11 @@ belongs to [planned.md](planned.md#the-planned-tab-and-the-confirm-dialog-compon
   server sha256 string (empty until first sync); enums map at the boundary (`api/types.ts`).
   **The ledger is the one table here that does not pull in full**: `pullSpendingAll` runs
   `pullTransactionsDelta` (a watermarked `GET /transactions/changes`) beside the ordinary
-  `pullBudgets` / `pullRecurrings` lists, because budgets and schedules are bounded and a ledger
+  `pullBudgets` list, because budgets are bounded and a ledger
   is not — see [data-layer-and-sync.md](data-layer-and-sync.md#incremental-pull-the-delta-streams).
   Rows also leave in bulk in both directions: `POST /transactions/bulk` for a run of queued
   creates, `POST /transactions/bulk-delete` for a run of queued deletes.
-- **The catalog is not here.** A transaction or recurring schedule stores one leaf
+- **The catalog is not here.** A transaction stores one leaf
   **`categoryId`** (the subcategory's id when one was picked, else the root's), and everything
   it means — name, colour, icon, its root — is resolved from the user's own synced two-level
   category tree in `features/categories/` ([categories.md](categories.md)). Nothing in this
@@ -31,9 +33,13 @@ belongs to [planned.md](planned.md#the-planned-tab-and-the-confirm-dialog-compon
   opening `amount` + Σ signed deltas (in the wallet's currency); `contributionsByGoal(...)` =
   Σ goal-linked txns per goal (in the goal's currency). **Threaded into the other features:**
   `useWallets` passes wallet deltas to `buildWalletsView` (4th arg) so balances reflect
-  spending. Goal progress no longer adds contributions on top of reservations: a goal-linked
-  spend is a _payment_ that consumes set-asides (`goals/data/progress.ts`, see
-  [goals.md](goals.md#progress-set-asides-vs-payments-dataprogressts)).
+  spending. A goal-linked spend is money **used** from the goal: goal progress = live set-asides
+  + used ([goals.md](goals.md#derivations)).
+- **Planning links.** A ledger row may carry `goalId` (money used from a goal) **or** `billId`
+  (a payment for a bill; wire `bill_id`, never both, never on a transfer leg or adjustment).
+  Both are always sent on create and PATCH (PATCH replaces). Rows stored before bills lack
+  `billId`; it reads as null. A deleted goal or bill clears the link locally and in queued
+  payloads (`unlinkLedgerFrom`), as the server does.
 - **Settlement links.** A transaction may carry `plannedId` — the planned item it settles
   ([planned.md](planned.md)); always sent on PATCH, never set on a transfer leg. Every write
   path here (`addTransactionWithId`/`createTransaction`, `updateTransaction`,
@@ -44,26 +50,26 @@ belongs to [planned.md](planned.md#the-planned-tab-and-the-confirm-dialog-compon
 - **selectors.ts** — pure view builders ported from the design's `renderVals`. Every builder
   that names a category takes **`catalog: CategoryCatalog` as its required second
   parameter** — `buildCashflow(data, catalog, …)`, and likewise `buildBreakdown`,
-  `buildActivityList`, `buildBudgetsView`, `buildRecurringView`. Deliberately **not**
+  `buildActivityList`, `buildBudgetsView`. Deliberately **not**
   optional with a default, unlike `dateFormat`: a wrong date format is cosmetic, a wrong
   catalog is a donut saying "Dining" while the editor two inches away says "Eating out", and
   making it required means the compiler enumerates every call site. `buildCalendar` takes no
   catalog — it counts money per period and never names a category. The builders:
   `buildCashflow` (income / spent / **saved** / net — net = income − spent − saved, i.e. the
-  period's free cash; **saved = Σ wallet-held goal reservations dated in the period and scope**,
+  period's free cash; **saved = Σ wallet-held set-asides dated in the period and scope**,
   hidden when 0, and drawn as a grey "Set aside" segment after the categories),
   `buildCalendar` (see below), `buildActivityList` (day groups), `buildBreakdown` (donut),
-  `buildBudgetsView` (burn vs cap, health rail), `buildRecurringView` (monthly-normalized total +
-  upcoming timeline). `Scope` = all | wallet | group (group matches descendant wallets).
+  `buildBudgetsView` (burn vs cap, health rail). `Scope` = all | wallet | group (group matches
+  descendant wallets).
   **Everything rolls up to the root:** the hero's segments and the donut group by
   `catalog.rootOf(t.categoryId).id`, and a category budget (its `categoryId` is a root) counts a
   spend when `rootOf(t.categoryId).id === b.categoryId` — a row filed under Dining › Cafés burns
   the Dining cap; a wallet budget matches `t.walletId === b.walletId`. Rows hand ids to the icon:
-  `TxRow.categoryId` / `RecurringRow.categoryId` are the leaf (so `CategoryIcon` draws the
+  `TxRow.categoryId` is the leaf (so `CategoryIcon` draws the
   child's glyph) while their colour and name come from the root; `BudgetRow.categoryId` is the
   capped root (null for wallet/overall caps). An id the catalog no longer holds resolves to the
   shared "Deleted category" entry ([categories.md](categories.md#the-resolver--datacatalogts)).
-  **A goal-linked spend is a payment, not saving** (ADR-3: setting aside is a reservation;
+  **A goal-linked spend is a payment, not saving** (setting aside labels money in place;
   ADR-7: a payment keeps its own category). It counts as Spent in the hero, day totals, donut
   and calendar, and burns budgets like any spend — the old `isContribution` rule (spend with a
   `goalId` → Saved, skipped by budgets) is gone. Its only special treatment left is the "Goal"
@@ -141,68 +147,22 @@ shade as you switch views), the span itself for a custom day grid, the grid's mo
 grid. Per-sign peaks stop one big payday from
 flattening every red day; the square root keeps small days distinguishable from mid ones.
 
-- **Auto-post moved onto planned rows** (ADR-6). `autopost.ts` and its Spending-page mount
-  effect are gone: recurring schedules generate planned rows, and the app-level planner confirms
-  the `autopost` ones on their date (same amount and wallet, the schedule's merchant, its note —
-  else its name — and the `recurring:<id>:<date>` source marker) and advances `next_due` — once per session instead of on page enter, with
-  deterministic ids instead of the per-device marker, so two devices no longer double-post. A
-  pre-existing marker counts as the settlement of its occurrence. See [planned.md](planned.md).
-
-## UI
-
-- **Tabs** (the Means "Transactions Tabs Options" 1b design). Desktop: `SpendingTabCard`, the
-  Goals-style carded underline tab row at the top of the **left column** (the rail starts level
-  with it), the account filter at its end. Mobile: `SpendingSubNav`, the Goals-style icon
-  sub-navbar under the top bar (outside the scroll area), the filter as a compact pill at its
-  end ("All" for everything). Both are `<Link>`s to `/transactions/<view>`, named and drawn from
-  `components/spendingViews.ts`; the Planned tab carries `DueCountBadge`.
-- **Account filter** (`ScopeSelect`, in the tab card / sub-nav; filters every tab). The trigger
-  is a **plain label** — the balance moved out of it onto the cashflow card (below). Built by the pure
-  `scopeSections`: "All accounts", then one section per top-level group — the group itself,
-  then its wallets and subgroups indented by depth, each with its `IconChip` and balance (a
-  group's in base currency) — then an "Not in a group" section of loose wallets (headed
-  "Wallets" when there are no groups). Archived accounts are left out; `offeredScope` drops a
-  pick once its account is archived or deleted (none left is `all`). Transactions on archived
-  wallets stay in the history under "All accounts".
-  **Multi-select**: a `DropdownMenu` of checkbox items (`ScopeMenuTree`), not a view — the
-  choice is kept for the session in `useEntrySession` (below), so leaving Spending and coming
-  back keeps it. "All accounts" clears the ticks and
-  closes; ticking an account keeps the menu open. `Scope` is `all`, one `AccountPick` (wallet or
-  group), or `{ type: 'accounts', picks }` for two or more (`scopeFromPicks` normalises); a
-  wallet matches when it or one of its ancestor groups is picked, so every tab filters through
-  the same `walletMatcher`. The pure rules live in `data/scopePicker.ts`: ticking a group folds
-  the picks beneath it into it, and those show ticked but disabled (`isCovered`) until the group
-  is unticked; the trigger reads "Main", "Main + Cash" or "3 accounts" (`scopeLabel`). A transfer
-  between two picked wallets is internal (neutral), as within one group.
-- **The chosen accounts' balance** heads `CashflowHeroCard` (its `header` slot,
-  `ScopeBalanceHeader`), from the pure `scopeBalance`: "All accounts" or the one pick's name with
-  its balance (a wallet in its own currency, a group in base); **two or more picks read "Total"**
-  — the sum of each pick's `baseMinor` in base currency — with a smaller line beneath listing each
-  pick and its own balance. `baseMinor` lives on `FilterOption` (`scopeSections`' options) only,
-  not on `ScopeOption`: the entry dialogs reuse the option shape and have no rates to fill it.
-  The names show at once; the amounts skeleton until the deltas land.
-
-`hooks/useTransactions` bundles every input **except the ledger rows** into `SpendingInputs`
-(`SpendingData` minus `txns`), memoized on its source rows, **and returns the live `catalog`
-beside it** (the selectors' explicit signature won over folding it into `SpendingData`), plus
 `deltas` — each wallet's delta over the whole ledger, read from the stored running totals
 ([Running totals](#running-totals-ledgertotals)). The page reads its rows for the
 period on screen ([How the page reads the ledger](#how-the-page-reads-the-ledger)).
 `TransactionsPage` threads both into every builder. `hooks/useTxEditor` is the
-tx/budget/recurring editor state machine. Components are dumb (`components/`): page composition
+tx/budget editor state machine. Components are dumb (`components/`): page composition
 
 - `CashflowHeroCard` — its stacked bar is the shared `SegmentedBar`, so every category chunk
   reveals its name, its base-currency amount and its share of outflow on hover/focus/tap
   ([styling-and-theming.md](styling-and-theming.md#shadcnui-integration)). That is why a
   `CashflowSegment` carries `label`/`valueStr`/`pctStr` and not just a colour and a width:
   the builder holds the catalog and the base currency, the bar holds neither.
-  `buildRecurringView` fills the same shape per recurring item (name, monthly equivalent).
 - `DaysCard` (period header + toggle; a sideways swipe anywhere on it steps the period like the
   arrows) with `DayGrid`/`MonthGrid` and the
   shared `CalendarCell`, `TransactionList`, `QuickAddCard` (single-line desktop;
   mobile uses the tab bar's add button — see _App-wide add_ below), `BreakdownCard`,
-  `BudgetsCard`/`BudgetHealthCard`, `RecurringCard`/`UpcomingCard`, `TransactionDialog`,
-  `BudgetEditor` / `RecurringEditor` (below). `fp-` tokens +
+  `BudgetsCard`/`BudgetHealthCard`, `TransactionDialog`, `BudgetEditor` (below). `fp-` tokens +
   logical RTL utilities.
 - **App-wide add.** Every signed-in page can add a transaction: `QuickAddFab` floats bottom-end
   on desktop, and `MobileTabBar` carries a raised add button dead centre (sections split evenly
@@ -211,7 +171,7 @@ tx/budget/recurring editor state machine. Components are dumb (`components/`): p
   local reads so the blank draft gets a real default wallet, calls `openAddTx`, and hides the
   store once the editor closes. `ConnectedTxEditor` is the one place a `useTxEditor` instance is
   wired to an editor — `TransactionDialog` for a transaction or transfer, `BudgetEditor` for a
-  budget, `RecurringEditor` for a recurring schedule (routed by `editing.kind`) — and the Spending page and the sheet both render through it. It
+  budget (routed by `editing.kind`) — and the Spending page and the sheet both render through it. It
   takes the page's `SpendingInputs` and its whole-ledger `deltas` to hand the dialog its
   accounts with live balances (`transferWallets` and `scopeSections` over those deltas); both
   callers render it only once `deltas` has landed.
@@ -256,10 +216,9 @@ tx/budget/recurring editor state machine. Components are dumb (`components/`): p
   **Gotcha:** `CategoryOptions` resets its highlight whenever its `categories` array changes
   identity, so the array passed in must be memoised — a fresh `catalog.byType()` per render is a
   render loop that freezes the tab.
-- **Budget / recurring / adjustment editors** (the "Dialogs & side panes" design, S1–S3). Each
+- **Budget / adjustment editors** (the "Dialogs & side panes" design, S1–S3). Each
   sits in `EditorDialog` — `ResponsiveDialog` + `DialogActions` + a P3 `ConfirmDialog` for Delete
-  (copy in the pure `data/scheduleEditor.ts`: `budgetDeleteCopy`, `recurringDeleteCopy`,
-  `adjustmentDeleteCopy`) and an optional picker `pane`. Saving follows the transaction dialog's
+  (copy in the pure `data/scheduleEditor.ts`: `budgetDeleteCopy`, `adjustmentDeleteCopy`) and an optional picker `pane`. Saving follows the transaction dialog's
   pattern: a hint above the buttons while not ready (`budgetBlock` / `cashflowBlock`), the submit
   muted but pressable, pressing it reveals field errors. `BudgetEditor`: "What does it cover?"
   `OptionTiles` (Category / Account / Overall, Overall hides the picker). The draft has no
@@ -267,17 +226,8 @@ tx/budget/recurring editor state machine. Components are dumb (`components/`): p
   `setScopeType` and save normalise it with `rootOf`) and a wallet budget reads
   `draft.walletId`; save sends `BudgetDraft { categoryId, walletId }` with the other one null, `AmountWell` on the spend tint with `CurrencyPill` (the `CurrencyPicker` flattened into a
   "Currency SAR ▾" pill), "Which category/account?" `BudgetTargetSelect`, `BudgetPeriodFields`
-  (Weekly / Monthly / Custom days chips + "Period length __ days", at least 1). `RecurringEditor`:
-  Spend | Income `PillSwitch`, "What is it? optional", `AmountWell` "How much each time?" with the
-  `TxAccountPill` (currency follows the wallet), category chips, a note copied onto every
-  occurrence, "Where?" (`TxMerchantField` opening the `MerchantOptions` pane, as in the transaction
-  dialog), `RecurringGoalSelect` (spend only), `RecurringScheduleFields` (Repeats chips — the
-  five presets plus **Custom**, which opens the goal dialog's `CustomIntervalField` and holds the
-  save through `repeatBlock` while out of range; migration `0036` on the backend — Next due
-  `DateField` with its "in 22d" hint, `RecurringEndField` — Ends: Never | On a date, defaulting a
-  year after next due, blocked by `recurringEndBlock` when before it — and the Auto-post
-  `ToggleCard`). A schedule whose `nextDue` has passed its `endsOn` has **ended**: the Recurring
-  tab still lists it (dimmed, last, "ended") but leaves it out of the totals, "next" and upcoming.
+  (Weekly / Monthly / Custom days chips + "Period length __ days", at least 1; the editor does
+  not offer Per paycheck yet).
 - **Ledger row title** is the note, else the **leaf** category's own name ("Cafés", not
   "Dining"); the line under it reads "Dining · Cafés | Everyday · Main". Whenever the scope spans
   more than one wallet (All accounts, a group) every activity row names a wallet with its
@@ -286,9 +236,10 @@ tx/budget/recurring editor state machine. Components are dumb (`components/`): p
 - **Counts toward (1e).** The dialog shows one `CountsTowardRow` ("Counts toward · Nothing ·
   Regular spending ›"); it opens `CountsTowardOptions`: "Nothing", **Suggested** — the top five
   of `data/countsToward.ts#rankGoalOptions` (in tiers: an open planned **payment** within ±30
-  days of the entry's date, nearest first → other obligations → saving goals with a set-aside
-  within ±30 days, nearest first → the rest; ties by goal position. A spend only settles
-  payments, so a near set-aside must not bury the rent. The chosen one always shows) — and
+  days of the entry's date, nearest first → goals with a set-aside within ±30 days, nearest
+  first → the rest; ties by goal position. A spend only settles payments, so a near set-aside
+  must not bury a payment. The chosen one always shows; bills are not offered as options yet,
+  but an auto-match links a bill's payment) — and
   "More…" for the rest; typing searches **names only** across all of them (`commandFilter`; a
   sub-line's figures would match everything). Income lists **income streams** instead
   (`rankIncomeOptions`); a stream is only a way to find its planned payday (a transaction has no
@@ -298,26 +249,26 @@ tx/budget/recurring editor state machine. Components are dumb (`components/`): p
     the open remainder, same settle rules as QuickAdd). The banner reads "Matches planned Rent
     (Sep 30)" / "Expected SR 4,500.00 · marks it as paid", **Link on by default**; switched off
     it strikes through and reads "Saves as regular spending. Rent stays planned." — per item. A
-    spend's auto link also carries the payment's goal (`goalIdForMatch`) and shows it in the
-    row; an income auto-match hides the row and offers "Choose another stream".
+    spend's auto link also carries the payment's bill (`billIdForMatch`) or goal
+    (`goalIdForMatch`); an income auto-match hides the row and offers "Choose another stream".
   - **Picked.** Once the user picks (even "Nothing"), auto-matching stops for that type. A
     picked goal / stream goes through `usePlannedMatch` (the origin's oldest open item in
     `MATCH_WINDOW`): "Settles the planned Oct 1 payment (Rent)." with the same Link switch.
   - An entry **already linked** keeps its link (it is not re-matched, since its item is now
     done) and shows it the same way.
-  - `link` = `{ plannedId, goalId }` goes to `useTxEditor.save(link)` (`SaveLink`; `goalId`
-    overrides the draft's for a spend). A **spend only matches planned payments**: a saving
-    goal's set-aside is a reservation (ADR-3), so a saving goal shows "Counts as spending this
-    goal's money. To put money aside, use Add contribution on the goal." and saves unlinked. An
-    income stream with no payday near shows "No planned payday near this date — it saves as
-    regular income." A recurring schedule's editor keeps the old "Toward a goal" select.
-    Changing the type drops the link.
+  - `link` = `{ plannedId, goalId, billId }` goes to `useTxEditor.save(link)` (`SaveLink`;
+    `goalId` overrides the draft's for a spend, `billId` is written as given). A **spend only
+    matches planned payments**: a goal's set-aside labels money in place, so a picked goal with
+    no payment near shows "Counts as spending this goal's money. To put money aside, use Add
+    contribution on the goal." and saves unlinked. An income stream with no payday near shows "No
+    planned payday near this date — it saves as regular income." Changing the type drops the
+    link.
 - **QuickAdd match hint (1e).** `QuickAddCard` has no picker, but when the typed amount and
   type are unmistakably an open planned item it says so under the input — "Matches planned
   Salary (Sep 27)" with a **Link it** switch, on by default (`QuickAddMatchHint`). The pure
   rule is `data/quickAddMatch.ts#findQuickAddMatch` (`findAmountMatch` with no tolerance): income settles `income`-role items
-  (paydays, income schedules); spend settles `payment`-role items of `recurring` or `goal`
-  origin (Spending schedules, obligation payments) — never set-asides or MANUAL items; the
+  (paydays); spend settles `payment`-role items of `bill` origin — never set-asides or MANUAL
+  items; the
   typed amount, converted to the item's currency, must **equal its open remainder**; the item's
   date is within **±3 days of today**; several matches → the oldest. `hooks/useQuickAddMatch`
   feeds it from `usePlannedData`; turning the link off holds for that item only. Saving goes
@@ -325,7 +276,8 @@ tx/budget/recurring editor state machine. Components are dumb (`components/`): p
   item). A linked entry is written to the **item's planned wallet** when it names a live one
   (`plannedWalletOf`; the hint says "→ Main Checking"), even over the account QuickAdd is
   scoped to, with the typed amount converted into that wallet's currency (`quickAddTarget`);
-  no planned wallet, or unlinked → QuickAdd's own account. It also carries the payment's goal (`goalIdForMatch`, directly or via its schedule) and uses
+  no planned wallet, or unlinked → QuickAdd's own account. It also carries the payment's bill
+  (`billIdForMatch`) or goal (`goalIdForMatch`) and uses
   the item's name as the note when none was typed. The category stays the user's pick.
   Desktop only — the app-wide add opens the transaction dialog, which has "Counts toward".
 
@@ -333,8 +285,7 @@ tx/budget/recurring editor state machine. Components are dumb (`components/`): p
 
 The transaction dialog offers the frequent categories as chips and opens the full two-level
 list (`features/categories/components/CategoryOptions`, the body of `CategoryPicker`) as a pane
-inside itself; `RecurringEditor` does the same (`useQuickChips(type, 4)` chips + "All categories ›"
-opening `CategoryOptions` as a pane). `CategoryPicker`
+inside itself. `CategoryPicker`
 (documented in [categories.md](categories.md#the-picker--categorypicker)) is the popover form: one
 full-width trigger showing the chosen icon and "Parent › Sub".
 
@@ -396,7 +347,6 @@ without bound, and every builder only ever looks at a few dates. **What each con
 | `buildCashflow`, `buildBreakdown`, `buildActivityList` | the period — a transfer's partner leg only counts when it is in that window too                                                                                |
 | `buildCalendar`                                        | `calendarSpan(period)`: the anchor month's whole-week grid, which spills into the neighbouring months; a custom day grid's whole weeks; a month grid's period  |
 | `buildBudgetsView`                                     | each live budget's `budgetWindow(period, customDays, today)` — **relative to today, not the anchor**, so browsing an old month still reads this month's budget span |
-| `buildRecurringView`                                   | none — schedules only; that tab never waits for the ledger                                                                                                     |
 | `scopeSections`, the `ConnectedTxEditor` accounts      | none — a balance is opening + the whole ledger, read from the running totals (`readWalletDeltas`)                                                              |
 | opening a transfer row                                 | both legs by the `transferId` index (`readTransferLegs`) — a leg can sit on another date                                                                      |
 
@@ -457,7 +407,7 @@ rows per merchant, currencies in use — reads a small derived table instead of 
 - **Views are memoized and built per tab** (`hooks/useSpendingViews`): one `useMemo` per builder,
   keyed on its real inputs (`scopeToValue(scope)` rather than the scope object, ISO strings
   rather than `Date`s), each `null` unless its tab is showing — Activity builds
-  cashflow/calendar/list/breakdown, Budgets and Recurring one view each. Unfolding the calendar
+  cashflow/calendar/list/breakdown, Budgets one view. Unfolding the calendar
   rebuilds only the calendar. `useMergedRates` returns a new object every render, so
   `useTransactions` memoizes `mergeRates` on the config store's slices instead, keeping `rates`
   stable.
@@ -500,7 +450,7 @@ wallet and a `transfer_in` leg on the destination, each in its own wallet's curr
 wrote it (then both legs carry `csv:<batchId>`). There is no transfer table:
 the legs live in `transactions` and come back through the ordinary ledger delta.
 
-- **Types.** `TxType` stays `spend | income`. It is what categories, recurring schedules,
+- **Types.** `TxType` stays `spend | income`. It is what categories,
   merchants' learned type, imports and integrations mean by a type, and the server refuses
   transfer types in all of them. Only ledger rows use the wider `TransactionType`
   (`TxType | TransferLegType | AdjustmentType`), and `Transaction.categoryId` is
@@ -535,7 +485,7 @@ spending.transfer.id_taken` is a uniqueness answer, not a conflict: the legs are
 - **Totals exclude transfers by construction.** Every total in `selectors.ts` reads
   `flowTxns` / `isFlow` (`isCashflow` with a category — so adjustments are out too): the cashflow hero (and its
   `txCount`), the breakdown donut, the calendar shading, the activity day totals. Budgets already
-  count only `spend`; recurring schedules cannot be transfers.
+  count only `spend`.
 - **Activity rows.** `buildActivityList` returns `ActivityRow = TxRow | TransferRow |
 SetAsideRow | AdjustmentRow` (discriminated on `kind`; set-asides and adjustments below). A window row is kept when its own wallet is in scope, and a leg
   also pulls in its partner so the scope rules can see both sides. `dayRows` then collapses
@@ -609,16 +559,17 @@ refuses the links (`spending.transaction.adjustment_refs`), another currency
 
 ## Confirmed planned items in Activity
 
-Activity never lists planned rows — only what settled them. `useTransactions` adds the goal
-reservations (`allocations`) and `goals` to `SpendingInputs` (both optional, so the pure tests
-need not pass them).
+Activity never lists planned rows — only what settled them. `useTransactions` adds the
+`setAsides`, `goals` and `bills` to `SpendingInputs` (all optional, so the pure tests need not
+pass them).
 
-- **Tag pill.** `TxRow.tag` (`txTagOf`): a transaction with a `plannedId` reads "Income"
-  (income) or "Obligation" (spend); an unplanned spend with a `goalId` keeps "Goal". Drawn with
-  the shared `components/TagPill` before the category in the meta line.
-- **Set-asides.** Every live reservation dated in the window becomes a `SetAsideRow` (goal name,
-  "Set aside · <wallet or external label>", base-currency amount). A wallet's reservation shows
-  when its wallet is in scope; an external one only unscoped. `SetAsideActivityRow` draws it
+- **Tag pill.** `TxRow.tag` (`txTagOf`): a planned income reads "Income"; a spend with a
+  `billId` reads "Bill"; a spend with a `goalId` reads "Goal". Drawn with the shared
+  `components/TagPill` before the category in the meta line.
+- **Set-asides.** Every set-aside dated in the window becomes a `SetAsideRow` (`ownerId`, the
+  bill's or goal's name, "Set aside · <wallet or outside label>", base-currency amount) —
+  released ones too: the row records that money was set aside that day. A wallet's shows when
+  its wallet is in scope; one held outside only unscoped. `SetAsideActivityRow` draws it
   like a transfer (dashed neutral chip, grey amount, "not in totals"). They are **never** in a
   day total, Spent, the donut, the calendar or a budget — those read `txns` only — and a day
   holding only set-asides totals `—`. Wallet-held ones do feed the hero's **Saved**. Tapping one opens `/goals` (the route has no goal selector yet).
@@ -637,7 +588,8 @@ diverging ([data-layer-and-sync.md](data-layer-and-sync.md#failed-pushes-flag-ho
 - **`RowSyncBadge`** (feature wiring: `describeSyncFailure` with the names the row shows —
   `syncContextOf` in `data/syncFailures.ts`, "Deleted account" never used as a name — plus
   `useSyncRetry`) renders the shared `components/sync/SyncFailureBadge` next to the amount on
-  spend/income rows, transfers and adjustments. Set-asides are allocations and carry none yet.
+  spend/income rows, transfers and adjustments. Set-aside rows carry none yet (their entity is
+  `setAside`).
 - **`SyncFailureBadge`**: amber `CloudOff` (`fp-warn`) while unavailable, red `TriangleAlert`
   (`fp-danger`) once rejected; `aria-label` "Not synced: <title>". Hover or focus shows a
   tooltip (title, detail, hint); a press — the only path on touch — opens a popover with the same
@@ -657,23 +609,23 @@ diverging ([data-layer-and-sync.md](data-layer-and-sync.md#failed-pushes-flag-ho
 ## Tests
 
 `data/{planning,ledger,selectors}.test.ts` (vitest) cover the window/cadence math, the
-opening+txns balance and goal roll-up, and cashflow/budget/recurring numbers, plus transfer
+opening+txns balance and goal roll-up, and cashflow/budget numbers, plus transfer
 legs in the ledger, transfers excluded from every total, and the activity collapsing/scope
 rules, set-aside rows and tags, plus adjustments (credited/debited, in activity, out of every
 total). `data/adjustments.test.ts` drives `createAdjustment` / `updateAdjustment` / bulk writes
 against fake-indexeddb. `data/countsToward.test.ts` covers the 1e ranking;
 `data/quickAddMatch.test.ts` the exact and the 10% / ±7-day amount match, `data/txDialog.test.ts`
 the dialog's wording and readiness; `components/TransactionDialog.test.tsx` the auto-match and
-its switch, picked obligations, the in-dialog panes, the saving-goal hint, income paydays, the
+its switch (a bill's payment), picking a goal, the in-dialog panes, the saving-goal hint, income paydays, the
 blocked-save hints, the same-account transfer and edit mode against fake-indexeddb. `data/transfers.test.ts` drives the transfer mutations and push handlers against
 fake-indexeddb (both legs + one entry, coalescing, lone-leg PATCH, id-taken, 404, rebase).
 
 ## Written from outside this slice
 
-Transactions arrive from four places besides the editor, each marked by its `source`. Only the
+Transactions arrive from three places besides the editor, each marked by its `source`. Only the
 CSV import produces transfer legs and balance adjustments (a file's own transfer and adjustment
 rows — [import.md](import.md#transfers-and-balance-adjustments-in-a-file)):
-`recurring:<id>:<date>` (an auto-posted schedule, above), `email:<connection_id>` / `webhook:<key_id>` (a
+`email:<connection_id>` / `webhook:<key_id>` (a
 confirmed or auto-confirmed inbound import — [inbound-imports.md](inbound-imports.md)) and
 `csv:<batchId>` (a file import —
 [import.md](import.md)). The import path calls `bulkAddTransactions` /

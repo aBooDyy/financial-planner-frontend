@@ -38,7 +38,8 @@ describe('planAdoption', () => {
       tempId: TEMP,
       winnerId: WINNER,
       transactions: [{ id: 't1', merchantId: TEMP }],
-      recurrings: [],
+      bills: [],
+      streams: [],
       queued: [entry({ seq: 7 })],
       tempAliases: [],
       knownAliases: [],
@@ -50,31 +51,34 @@ describe('planAdoption', () => {
     expect(plan.patchTransactionIds).toEqual([])
   })
 
-  it('moves schedules too, keeping a queued one apart from a transaction of the same id', () => {
+  it('moves bills and income streams too, keeping a queued one apart from a transaction of the same id', () => {
     const plan = planAdoption({
       tempId: TEMP,
       winnerId: WINNER,
       transactions: [],
-      recurrings: [
+      bills: [
         { id: 't1', merchantId: TEMP },
-        { id: 'r2', merchantId: TEMP },
+        { id: 'b2', merchantId: TEMP },
       ],
+      streams: [{ id: 's1', merchantId: TEMP }],
       queued: [
         entry({ seq: 3 }),
         entry({
           seq: 4,
-          entity: 'recurring',
+          entity: 'bill',
           payload: { id: 't1', merchant_id: TEMP },
         }),
       ],
       tempAliases: [],
       knownAliases: [],
     })
-    expect(plan.repointRecurringIds).toEqual(['t1', 'r2'])
+    expect(plan.repointBillIds).toEqual(['t1', 'b2'])
     expect(plan.rewrites).toEqual([
       { seq: 4, payload: { id: 't1', merchant_id: WINNER } },
     ])
-    expect(plan.patchRecurringIds).toEqual(['r2'])
+    expect(plan.patchBillIds).toEqual(['b2'])
+    expect(plan.repointIncomeIds).toEqual(['s1'])
+    expect(plan.patchIncomeIds).toEqual(['s1'])
     expect(plan.patchTransactionIds).toEqual([])
   })
 
@@ -86,7 +90,8 @@ describe('planAdoption', () => {
         { id: 'queued', merchantId: TEMP },
         { id: 'pushed', merchantId: TEMP },
       ],
-      recurrings: [],
+      bills: [],
+      streams: [],
       queued: [entry({ seq: 1, id: 'queued' })],
       tempAliases: [],
       knownAliases: [],
@@ -103,7 +108,8 @@ describe('planAdoption', () => {
         { id: 't1', merchantId: 'someone-else' },
         { id: 't2', merchantId: null },
       ],
-      recurrings: [],
+      bills: [],
+      streams: [],
       queued: [],
       tempAliases: [],
       knownAliases: [],
@@ -117,7 +123,8 @@ describe('planAdoption', () => {
       tempId: TEMP,
       winnerId: WINNER,
       transactions: [{ id: 't1', merchantId: TEMP }],
-      recurrings: [],
+      bills: [],
+      streams: [],
       queued: [entry({ seq: 3, op: 'delete', payload: null })],
       tempAliases: [],
       knownAliases: [],
@@ -131,7 +138,8 @@ describe('planAdoption', () => {
       tempId: TEMP,
       winnerId: WINNER,
       transactions: [{ id: 't1', merchantId: TEMP }],
-      recurrings: [],
+      bills: [],
+      streams: [],
       queued: [entry({ seq: 4, entity: 'budget' })],
       tempAliases: [],
       knownAliases: [],
@@ -148,7 +156,8 @@ describe('planAdoption', () => {
       tempId: TEMP,
       winnerId: WINNER,
       transactions: [],
-      recurrings: [],
+      bills: [],
+      streams: [],
       queued: [],
       tempAliases: [mine, theirs, dupe],
       knownAliases: [
@@ -171,7 +180,8 @@ describe('planAdoption', () => {
       tempId: TEMP,
       winnerId: WINNER,
       transactions: [],
-      recurrings: [],
+      bills: [],
+      streams: [],
       queued: [],
       tempAliases: [colliding],
       knownAliases: [

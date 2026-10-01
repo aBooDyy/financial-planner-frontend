@@ -1,7 +1,7 @@
 /**
- * The planner: brings the stored planned rows in line with the goals, streams and schedules
- * they come from (`generate` → `reconcile` → writes), rewrites one goal's plan on request,
- * and auto-confirms the Spending schedules the user marked for auto-posting.
+ * The planner: brings the stored planned rows in line with the goals and streams they come
+ * from (`generate` → `reconcile` → writes), rewrites one goal's plan on request, and resolves
+ * open rows whose origin is gone.
  *
  * Every entry point runs through one queue, so a background fill, a Recalculate click and
  * an undo can never interleave their reads and writes.
@@ -15,7 +15,6 @@ import { setGoalPlanSnapshot } from '#/features/goals/data/mutations'
 import type { GoalPlanSnapshot } from '#/features/goals/data/mutations'
 import { useRecalcUndoStore } from '#/features/planned/stores/recalcUndo'
 import { isoOf } from './dates'
-import { confirmPlanned } from './mutations'
 import { takePlanRecalcRequests } from './recalcRequests'
 import { orphanedPlanned, reconcilePlanned } from './reconcile'
 import type { ReconcileContext, ReconcilePlan } from './reconcile'
@@ -26,7 +25,7 @@ import {
   removePlanned,
   savePlanned,
 } from './rows'
-import { hasSettlements, legacyMarkerOf, settledOf } from './settle'
+import { hasSettlements } from './settle'
 import { fitGoalPlanFrom } from './fit'
 import { linkedTransactions } from './linkedTransactions'
 import { snapshotFromGoal, snapshotOf } from './snapshot'
@@ -52,7 +51,6 @@ export type PlannerRunSummary = {
   updated: number
   removed: number
   rewritten: string[]
-  autoConfirmed: number
   /** Open rows whose origin is gone: skipped, or closed with the rest abandoned. */
   orphansResolved: number
 }
@@ -66,23 +64,23 @@ function serialized<T>(task: () => Promise<T>): Promise<T> {
 }
 
 export async function loadPlannerInputs(): Promise<PlannerInputs> {
-  const [goals, income, recurrings, planned, txns, allocations, settings] =
+  const [goals, income, bills, planned, txns, setAsides, settings] =
     await Promise.all([
       db.goals.toArray(),
       db.incomeStreams.toArray(),
-      db.recurrings.toArray(),
+      db.bills.toArray(),
       db.plannedTransactions.toArray(),
       linkedTransactions(),
-      db.goalAllocations.toArray(),
+      db.setAsides.toArray(),
       db.balanceSettings.get(SETTINGS_KEY),
     ])
   return liveInputs({
     goals,
     income,
-    recurrings,
+    bills,
     planned,
     txns,
-    allocations,
+    setAsides,
     base: settings?.baseCurrency ?? DEFAULT_BASE_CURRENCY,
     rates: await currentRates(),
   })
@@ -98,7 +96,7 @@ const contextFor = (
   goals: new Map(inputs.goals.map((g) => [g.id, g])),
   activeGoalIds: new Set(state.plan.entries.map((e) => e.goal.id)),
   incomeIds: new Set(inputs.income.map((s) => s.id)),
-  recurringIds: new Set(inputs.recurrings.map((r) => r.id)),
+  billIds: new Set(inputs.bills.map((b) => b.id)),
 })
 
 async function applyPlan(plan: ReconcilePlan): Promise<void> {
@@ -217,11 +215,6 @@ async function rewriteGoal(
   return { result, hadPlan }
 }
 
-/**
- * Spending schedules marked auto-post confirm themselves on their date, with the planned
- * amount and wallet, exactly as the old auto-poster posted them. An occurrence something
- * already settles (an entry the old auto-poster made) is just closed.
- */
 /** Rows read after this run's writes, so the fill's removals are already gone. */
 async function resolveOrphans(
   inputs: PlannerInputs,
@@ -236,7 +229,7 @@ async function resolveOrphans(
     {
       goalIds: new Set(inputs.goals.map((g) => g.id)),
       incomeIds: new Set(inputs.income.map((s) => s.id)),
-      recurringIds: new Set(inputs.recurrings.map((r) => r.id)),
+      billIds: new Set(inputs.bills.map((b) => b.id)),
     },
     (row) => hasSettlements(row, state.index),
   )
@@ -246,50 +239,6 @@ async function resolveOrphans(
   for (const id of plan.closeRest)
     await savePlanned({ ...(byId.get(id) as LocalPlanned), status: 'done' })
   return plan.skip.length + plan.closeRest.length
-}
-
-async function autoConfirm(
-  state: PlannerState,
-  today: string,
-): Promise<number> {
-  const recurrings = new Map(
-    (await db.recurrings.toArray())
-      .filter((r) => r.deleted === 0)
-      .map((r) => [r.id, r]),
-  )
-  const rates = await currentRates()
-  const due = (await db.plannedTransactions.toArray())
-    .filter(
-      (p) =>
-        p.deleted === 0 &&
-        p.status === 'open' &&
-        p.origin === 'recurring' &&
-        p.date <= today,
-    )
-    .sort((a, b) => a.date.localeCompare(b.date))
-  let confirmed = 0
-  for (const item of due) {
-    const r = item.recurringId ? recurrings.get(item.recurringId) : undefined
-    const settled = settledOf(item, state.index, rates)
-    if (settled > 0 && settled >= item.amount) {
-      await savePlanned({ ...item, status: 'done' })
-      continue
-    }
-    if (!r?.autopost) continue
-    try {
-      await confirmPlanned(item.id, {
-        amount: item.amount - settled,
-        walletId: item.walletId ?? r.walletId,
-        date: item.date,
-        categoryId: item.categoryId ?? r.categoryId,
-        source: legacyMarkerOf(r.id, item.occurrence),
-      })
-      confirmed += 1
-    } catch {
-      // Its wallet is gone or it cannot be posted as planned: it waits for the user instead.
-    }
-  }
-  return confirmed
 }
 
 async function runOnce(
@@ -314,7 +263,6 @@ async function runOnce(
     updated: 0,
     removed: 0,
     rewritten: [],
-    autoConfirmed: 0,
     orphansResolved: 0,
   }
   for (const id of rewrite) {
@@ -344,7 +292,6 @@ async function runOnce(
   summary.removed += fill.remove.length
 
   summary.orphansResolved = await resolveOrphans(inputs, state)
-  summary.autoConfirmed = await autoConfirm(state, today)
   schedulePush()
   return summary
 }

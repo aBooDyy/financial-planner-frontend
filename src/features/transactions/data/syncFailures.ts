@@ -14,7 +14,7 @@ export const syncEntityOf = (row: ActivityRow): OutboxEntity =>
   row.kind === 'transfer'
     ? 'transfer'
     : row.kind === 'set_aside'
-      ? 'allocation'
+      ? 'setAside'
       : 'transaction'
 
 const known = (name: string): string | null =>

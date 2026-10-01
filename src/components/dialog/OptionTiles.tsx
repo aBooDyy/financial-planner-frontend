@@ -16,7 +16,7 @@ type Props<T extends string> = {
   color?: string
 }
 
-/** Choices that each need a line of explanation ("Obligation — a recurring bill you must pay"). */
+/** Choices that each need a line of explanation ("Bill — something you have to pay"). */
 export function OptionTiles<T extends string>({
   label,
   options,

@@ -5,10 +5,9 @@ import { newId } from '#/lib/uuid'
 import type { LocalMerchant, LocalMerchantAlias } from '#/db/types'
 import { merchantsApi } from '#/features/merchants/api/merchantsApi'
 import type { AliasOrigin } from '#/features/merchants/api/types'
-import {
-  pullRecurrings,
-  pullTransactions,
-} from '#/features/transactions/data/sync'
+import { pullBills } from '#/features/bills/data/sync'
+import { pullIncome } from '#/features/goals/data/sync'
+import { pullTransactions } from '#/features/transactions/data/sync'
 import type { TxType } from '#/features/transactions/api/types'
 import { ApiError } from '#/lib/apiError'
 import {
@@ -244,7 +243,8 @@ export async function deleteMerchant(id: string): Promise<void> {
       db.merchants,
       db.merchantAliases,
       db.transactions,
-      db.recurrings,
+      db.bills,
+      db.incomeStreams,
       db.outbox,
     ],
     async () => {
@@ -259,8 +259,11 @@ export async function deleteMerchant(id: string): Promise<void> {
         .where('merchantId')
         .equals(id)
         .modify({ merchantId: null })
-      await db.recurrings
-        .filter((r) => r.merchantId === id)
+      await db.bills
+        .filter((b) => b.merchantId === id)
+        .modify({ merchantId: null })
+      await db.incomeStreams
+        .filter((s) => s.merchantId === id)
         .modify({ merchantId: null })
       if (!neverSynced) {
         await db.outbox.add({
@@ -371,5 +374,10 @@ export async function mergeMerchants(
     target_id: targetId,
     version: source.version,
   })
-  await Promise.all([pullMerchants(), pullTransactions(), pullRecurrings()])
+  await Promise.all([
+    pullMerchants(),
+    pullTransactions(),
+    pullBills(),
+    pullIncome(),
+  ])
 }

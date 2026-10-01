@@ -1,13 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { GoalFrequency, IntervalUnit } from '#/features/goals/api/types'
-import {
-  advanceDue,
-  budgetWindow,
-  monthlyFactor,
-  relFuture,
-  windowOf,
-  ymd,
-} from './planning'
+import { advanceDue, budgetWindow, windowOf, ymd } from './planning'
 
 const TODAY = new Date(2026, 5, 12) // Jun 12, 2026
 
@@ -77,24 +70,5 @@ describe('advanceDue', () => {
     expect(advanceDue('2026-06-20', every(28, 'day'))).toBe('2026-07-18')
     expect(advanceDue('2026-06-20', every(2, 'week'))).toBe('2026-07-04')
     expect(advanceDue('2026-06-20', every(2, 'month'))).toBe('2026-08-20')
-  })
-})
-
-describe('relFuture', () => {
-  it('describes upcoming dates relative to today', () => {
-    expect(relFuture('2026-06-12', TODAY)).toBe('today')
-    expect(relFuture('2026-06-13', TODAY)).toBe('tomorrow')
-    expect(relFuture('2026-06-10', TODAY)).toBe('overdue')
-    expect(relFuture('2026-06-15', TODAY)).toBe('in 3d')
-  })
-})
-
-describe('monthlyFactor', () => {
-  it('normalizes a cadence to a per-month factor', () => {
-    expect(monthlyFactor(preset('monthly'))).toBe(1)
-    expect(monthlyFactor(preset('annual'))).toBeCloseTo(1 / 12)
-    expect(monthlyFactor(preset('weekly'))).toBeCloseTo(52 / 12)
-    expect(monthlyFactor(every(2, 'month'))).toBeCloseTo(1 / 2)
-    expect(monthlyFactor(every(28, 'day'))).toBeCloseTo(365 / 28 / 12)
   })
 })

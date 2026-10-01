@@ -9,7 +9,7 @@ export function PlannedEmpty() {
     <EmptyState
       icon={CalendarClock}
       title="Nothing planned"
-      text="Income, obligations and goal set-asides show up here once you add them on the Goals page."
+      text="Income, bills and goal set-asides show up here once you add them on the Goals page."
     >
       <Button
         asChild

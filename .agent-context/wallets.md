@@ -45,7 +45,7 @@ those without a coordinated backend + Dexie migration.
   query (`useMergedRates` returns a new object every render). The server stores overrides only; an unpriced
   currency has no rate and `convertMinor` returns `0` for that pair.
 - `heldCurrencies(base, sources)` lists the currencies the user actually holds (wallets,
-  goals, transactions, allocations, overrides); anything that renders a rate list uses it.
+  goals, bills, transactions, set-asides, overrides); anything that renders a rate list uses it.
 - `src/features/wallets/data/selectors.ts` — pure `buildWalletsView(nodes, base, rates,
 walletDeltas?, reservations?)` builds the flattened tree (honoring collapse), grand total,
   counts, and top-level bars. `groupParentOptions` powers the "Place inside"
@@ -77,15 +77,16 @@ walletDeltas?, reservations?)` builds the flattened tree (honoring collapse), gr
   nothing else. Wallet/group/currency counts and the grand total are
   tallied over the whole synced tree (`tally` in `buildWalletsView`, separate from the row
   `walk`), so collapsing a group never changes a headline figure.
-- **Reserved vs available (goal earmarks).** The 5th arg, `reservations` (per-wallet reserve
-  lines from goals' `walletReservations` — see [goals.md](goals.md)), splits each wallet into
-  `reserved`/`available`, with a per-goal `reservations[]` breakdown; groups roll the figures up
-  in base currency, and the view exposes `reservedTotal` + `availableTotalStr`. `useWallets`
-  reads `goals`, `goalAllocations`, the ledger and planned rows to build them: a line is what a
-  goal **still** holds in that wallet after its payments consumed their share (ADR-3 — saved
-  13,000 then paid 13,000 leaves nothing reserved; the payment releases its own wallet first,
-  then the largest pot), one line per goal per wallet. Wallet money is **earmarked in
-  place** — the balance and grand total are unchanged; reserving only reclassifies part of a
+- **Reserved vs available (set-asides).** The 5th arg, `reservations` (per-wallet lines from
+  `walletSetAsides` in `features/setAsides/data/totals.ts` — see [set-asides.md](set-asides.md)),
+  splits each wallet into `reserved`/`available`, with a per-owner `reservations[]` breakdown
+  (`ownerId`, `owner: 'goal' | 'bill'`, `ownerName`); groups roll the figures up in base
+  currency, and the view exposes `reservedTotal` + `availableTotalStr`. `useWallets` reads
+  `goals`, `bills` and `setAsides` to build them: a line is the sum of one bill's or goal's
+  **live** wallet set-asides in that wallet (a released row no longer counts — release is
+  explicit, nothing is re-derived from payments), one line per owner per wallet. The rows still
+  say "reserved / available"; the Wallets rebuild renames them Set aside / Free to spend. Wallet
+  money is **earmarked in place** — the balance and grand total are unchanged; reserving only reclassifies part of a
   wallet as spoken-for. **Over-reserving is allowed**: reserved is _not_ capped at the balance,
   so `available` can go **negative** and the row carries `overReserved` (rendered red). Nothing
   checks before the money is reserved — no editor, contribution or confirm flow compares against
@@ -96,25 +97,24 @@ walletDeltas?, reservations?)` builds the flattened tree (honoring collapse), gr
 
 - **`useWallets` never holds the ledger's rows.** `readLedgerSummary(rates)`
   (`features/transactions/data/ledgerReads.ts`) reads the whole table inside one live query and
-  hands back only what the view derives from it: each wallet's `walletDeltas`, the
-  **goal-linked** rows (every one, deleted included — all `goalProgress` reads, since a payment
-  is `goalId === g.id && type === 'spend' && !deleted`), and the set of row **currencies**
+  hands back only what the view derives from it: each wallet's `walletDeltas` and the set of
+  row **currencies**
   (deleted rows included, as `heldCurrencies` always counted them). A balance sums every row, so
   the read itself stays whole; nothing it shows changed — `hooks/useWallets.test.ts` compares
   deltas, the full view and `held` against the old every-row derivation. It waits for the rates
   (so a mount costs one read, not two); a rate edit re-runs it.
 - **Two flags.** `loading` = the nodes are not known yet. `balancesLoading` = any input a figure
   derives from is still missing: the nodes, the settings (`null`, not `undefined`, when there is
-  no row), the rates, goals, allocations, planned rows or the ledger summary. The old flag
+  no row), the rates, goals, bills, set-asides or the ledger summary. The old flag
   ignored all but nodes and rates, so balances first drew as bare opening balances and then
-  jumped. While `balancesLoading`, the view is built with **no deltas and no reservations**, so
+  jumped. While `balancesLoading`, the view is built with **no deltas and no set-asides**, so
   the tree is right but its figures are not — and must not be shown.
 - **Skeletons for figures only.** The page renders every card, the tree (names, icons, child
   counts, actions), titles, labels, the base pill and the wallet/group/currency counts at once;
   each figure goes through the shared `ValueOrSkeleton` with `loading` passed down —
   `TotalHeroCard` (total, group-bar values, the bar itself), `GroupRow` (subtotal), `WalletRow`
   (balance; the foreign base line waits), and the editor's `BalanceNowStrip` (`currentBalance: null`). `ReservedWalletLines`/`PotRow`
-  need no flag: with no reservations while loading, no wallet has pots until the figures land.
+  need no flag: with no set-asides while loading, no wallet has pots until the figures land.
   The page grid is `aria-busy` with one `sr-only` `role="status"`.
   `components/walletsLoading.test.tsx` pins chrome present, no money figure, skeletons in place.
 

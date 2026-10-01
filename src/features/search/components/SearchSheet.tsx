@@ -35,7 +35,7 @@ export function SearchSheet() {
         <DialogPrimitive.Content className={SHEET}>
           <DialogTitle className="sr-only">Search</DialogTitle>
           <DialogDescription className="sr-only">
-            Search transactions, budgets, recurring items and accounts.
+            Search transactions, budgets, planned items and accounts.
           </DialogDescription>
           <SearchPanel />
         </DialogPrimitive.Content>

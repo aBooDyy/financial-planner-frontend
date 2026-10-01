@@ -14,6 +14,7 @@ import {
   pullCategories,
   pushCategoryEntry,
 } from '#/features/categories/data/sync'
+import { pullBills, pushBillsEntry } from '#/features/bills/data/sync'
 import { pullGoalsAll, pushGoalsEntry } from '#/features/goals/data/sync'
 import {
   pullImportTemplates,
@@ -39,6 +40,10 @@ import {
   pushTransferDeletes,
   pushTransferEntry,
 } from '#/features/transactions/data/transferSync'
+import {
+  pullSetAsides,
+  pushSetAsidesEntry,
+} from '#/features/setAsides/data/sync'
 import {
   pullPlannedDelta,
   pushPlannedCreates,
@@ -83,7 +88,7 @@ const VISIBILITY_PULL_MIN_MS = 60_000
  *
  * Only these are batched, and only within one entity and op. No kind references another
  * row of its own run — ledger rows and transfers point at wallets, categories and merchants
- * queued *before* them, planned rows at goals, streams and schedules — so a batch cannot race
+ * queued *before* them, planned rows at goals, streams and bills — so a batch cannot race
  * its own prerequisite, which a batch of `node` creates (child before parent) could. Splitting the
  * run at every change of op is what keeps a create and the delete that follows it on the same
  * row in their queued order. How many rows one batch carries is the server's own cap.
@@ -369,18 +374,12 @@ async function pushEntry(entry: OutboxEntry): Promise<boolean> {
 
 async function dispatch(entry: OutboxEntry): Promise<void> {
   if (entry.entity === 'settings') return pushSettings(entry)
-  if (
-    entry.entity === 'income' ||
-    entry.entity === 'goal' ||
-    entry.entity === 'allocation'
-  ) {
+  if (entry.entity === 'income' || entry.entity === 'goal') {
     return pushGoalsEntry(entry)
   }
-  if (
-    entry.entity === 'transaction' ||
-    entry.entity === 'budget' ||
-    entry.entity === 'recurring'
-  ) {
+  if (entry.entity === 'bill') return pushBillsEntry(entry)
+  if (entry.entity === 'setAside') return pushSetAsidesEntry(entry)
+  if (entry.entity === 'transaction' || entry.entity === 'budget') {
     return pushSpendingEntry(entry)
   }
   if (entry.entity === 'transfer') return pushTransferEntry(entry)
@@ -533,6 +532,8 @@ export async function pullAll(): Promise<void> {
         // Everything the planner generates from, so it only ever runs over the server's rows.
         Promise.all([
           pullGoalsAll(),
+          pullBills(),
+          pullSetAsides(),
           pullSpendingAll(),
           pullPlannedDelta(),
         ]).then(recordPlannerInputsPulled),

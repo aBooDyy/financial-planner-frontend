@@ -2,17 +2,8 @@ import { db } from '#/db/db'
 import { requeued } from '#/db/syncFailure'
 import { schedulePush } from '#/db/sync'
 import { newId } from '#/lib/uuid'
-import type {
-  LocalBudget,
-  LocalRecurring,
-  LocalTransaction,
-  OutboxEntity,
-} from '#/db/types'
+import type { LocalBudget, LocalTransaction, OutboxEntity } from '#/db/types'
 import type { CurrencyCode } from '#/lib/currency'
-import type {
-  IntervalUnit,
-  ObligationFrequency,
-} from '#/features/goals/api/types'
 import { closeCovered, reopenUnderSettled } from '#/features/planned/data/rows'
 import type {
   AdjustmentType,
@@ -24,8 +15,6 @@ import { isAdjustment } from '#/features/transactions/api/types'
 import {
   localBudgetToCreateWire,
   localBudgetToUpdateWire,
-  localRecurringToCreateWire,
-  localRecurringToUpdateWire,
   localTransactionToCreateWire,
   localTransactionToUpdateWire,
 } from './mappers'
@@ -75,7 +64,10 @@ export type TransactionDraft = {
   /** The leaf category: a subcategory's id when one was picked, else the root's. */
   categoryId: string
   walletId: string
+  /** Money used from this goal. */
   goalId: string | null
+  /** A payment for this bill. Undefined on update leaves the link alone. */
+  billId?: string | null
   /** Undefined on update means "leave it alone"; null clears the link. */
   merchantId?: string | null
   date: string
@@ -105,14 +97,17 @@ export type LedgerDraft = TransactionDraft | AdjustmentDraft
 const isAdjustmentDraft = (d: LedgerDraft): d is AdjustmentDraft =>
   isAdjustment(d.type)
 
-type Links = Pick<
-  LocalTransaction,
-  'categoryId' | 'goalId' | 'merchantId' | 'plannedId'
+type Links = Required<
+  Pick<
+    LocalTransaction,
+    'categoryId' | 'goalId' | 'billId' | 'merchantId' | 'plannedId'
+  >
 >
 
 const NO_LINKS: Links = {
   categoryId: null,
   goalId: null,
+  billId: null,
   merchantId: null,
   plannedId: null,
 }
@@ -123,6 +118,7 @@ const linksOf = (draft: LedgerDraft): Links =>
     : {
         categoryId: draft.categoryId,
         goalId: draft.goalId,
+        billId: draft.billId ?? null,
         merchantId: draft.merchantId ?? null,
         plannedId: draft.plannedId ?? null,
       }
@@ -194,6 +190,8 @@ export async function updateTransaction(
     categoryId: draft.categoryId,
     walletId: draft.walletId,
     goalId: draft.goalId,
+    billId:
+      draft.billId !== undefined ? draft.billId : (existing.billId ?? null),
     merchantId:
       draft.merchantId !== undefined ? draft.merchantId : existing.merchantId,
     date: draft.date,
@@ -441,107 +439,34 @@ export async function deleteBudget(id: string): Promise<void> {
   await deleteRecord('budget', id, db.budgets)
 }
 
-// --- Recurring -----------------------------------------------------------------------
-
-export type RecurringDraft = {
-  name: string
-  type: TxType
-  amount: number
-  currency: CurrencyCode
-  /** The leaf category: a subcategory's id when one was picked, else the root's. */
-  categoryId: string
-  walletId: string
-  goalId: string | null
-  merchantId: string | null
-  frequency: ObligationFrequency
-  customInterval: number | null
-  customUnit: IntervalUnit | null
-  nextDue: string
-  endsOn: string | null
-  autopost: boolean
-  note: string | null
-}
-
-const buildRecurring = (
+/**
+ * A deleted goal or bill leaves its ledger rows standing with the link cleared, as the server
+ * does on delete. Local rows change here; a queued payload naming it is rewritten so its push
+ * is not refused. Nothing new is queued: the server makes the same change itself.
+ */
+export async function unlinkLedgerFrom(
+  link: 'goalId' | 'billId',
   id: string,
-  d: RecurringDraft,
-  ts: string,
-): LocalRecurring => ({
-  id,
-  ...d,
-  createdAt: ts,
-  updatedAt: ts,
-  version: '',
-  dirty: 1,
-  deleted: 0,
-})
-
-export async function createRecurring(draft: RecurringDraft): Promise<string> {
-  const id = newId()
-  const ts = now()
-  const recurring = buildRecurring(id, draft, ts)
-  await db.transaction('rw', db.recurrings, db.outbox, async () => {
-    await db.recurrings.put(recurring)
-    await db.outbox.add({
-      op: 'create',
-      entity: 'recurring',
-      id,
-      payload: localRecurringToCreateWire(recurring),
-      baseVersion: null,
-      createdAt: ts,
-    })
+): Promise<void> {
+  const wire = link === 'goalId' ? 'goal_id' : 'bill_id'
+  await db.transaction('rw', db.transactions, db.outbox, async () => {
+    await db.transactions
+      .where(link)
+      .equals(id)
+      .modify((t) => {
+        t[link] = null
+      })
+    await db.outbox
+      .filter(
+        (e) =>
+          e.entity === 'transaction' &&
+          !!e.payload &&
+          (e.payload as Record<string, unknown>)[wire] === id,
+      )
+      .modify((e) => {
+        e.payload = { ...(e.payload as object), [wire]: null }
+      })
   })
-  schedulePush()
-  return id
-}
-
-export async function updateRecurring(
-  id: string,
-  draft: RecurringDraft,
-): Promise<void> {
-  await persistRecurring(id, (existing) => ({
-    ...existing,
-    ...draft,
-    updatedAt: now(),
-    dirty: 1,
-  }))
-}
-
-/** Move a recurring's next-due forward (used by the auto-poster after it posts an occurrence). */
-export async function advanceRecurring(
-  id: string,
-  nextDue: string,
-): Promise<void> {
-  await persistRecurring(id, (existing) => ({
-    ...existing,
-    nextDue,
-    updatedAt: now(),
-    dirty: 1,
-  }))
-}
-
-export async function deleteRecurring(id: string): Promise<void> {
-  await deleteRecord('recurring', id, db.recurrings)
-}
-
-async function persistRecurring(
-  id: string,
-  apply: (existing: LocalRecurring) => LocalRecurring,
-): Promise<void> {
-  const existing = await db.recurrings.get(id)
-  if (!existing) return
-  const recurring = apply(existing)
-  await db.transaction('rw', db.recurrings, db.outbox, async () => {
-    await db.recurrings.put(recurring)
-    await enqueueUpsert(
-      'recurring',
-      id,
-      recurring.version,
-      localRecurringToCreateWire(recurring),
-      localRecurringToUpdateWire(recurring),
-    )
-  })
-  schedulePush()
 }
 
 // --- Shared --------------------------------------------------------------------------
@@ -549,7 +474,7 @@ async function persistRecurring(
 async function deleteRecord(
   entity: OutboxEntity,
   id: string,
-  table: typeof db.transactions | typeof db.budgets | typeof db.recurrings,
+  table: typeof db.transactions | typeof db.budgets,
 ): Promise<void> {
   const entries = await pending(entity, id).toArray()
   const neverSynced = entries.some((e) => e.op === 'create')

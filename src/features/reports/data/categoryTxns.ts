@@ -79,7 +79,7 @@ export function buildCategoryTxns(args: Inputs): CategoryTxnsView {
   )
   const count = txns.length
   const list = buildActivityList(
-    { ...inputs, txns, allocations: [] },
+    { ...inputs, txns, setAsides: [] },
     catalog,
     scope,
     { mode: 'custom', start: period.start, end: period.dataEnd },

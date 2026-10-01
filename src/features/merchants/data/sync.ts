@@ -2,6 +2,8 @@ import { db } from '#/db/db'
 import { pullDelta } from '#/db/delta'
 import { requeued } from '#/db/syncFailure'
 import type { OutboxEntry } from '#/db/types'
+import { localBillToUpdateWire } from '#/features/bills/data/mappers'
+import { localIncomeToUpdateWire } from '#/features/goals/data/mappers'
 import { merchantsApi } from '#/features/merchants/api/merchantsApi'
 import type {
   AliasDraftWire,
@@ -10,10 +12,7 @@ import type {
   MerchantAlias,
   UpdateMerchantWire,
 } from '#/features/merchants/api/types'
-import {
-  localRecurringToUpdateWire,
-  localTransactionToUpdateWire,
-} from '#/features/transactions/data/mappers'
+import { localTransactionToUpdateWire } from '#/features/transactions/data/mappers'
 import { ApiError } from '#/lib/apiError'
 import { planAdoption } from './adopt'
 import {
@@ -250,11 +249,12 @@ async function adoptWinner(entry: OutboxEntry, error: ApiError): Promise<void> {
     return
   }
 
-  const [tempAliases, transactions, recurrings, queued, knownAliases] =
+  const [tempAliases, transactions, bills, streams, queued, knownAliases] =
     await Promise.all([
       db.merchantAliases.where('merchantId').equals(tempId).toArray(),
       db.transactions.where('merchantId').equals(tempId).toArray(),
-      db.recurrings.filter((r) => r.merchantId === tempId).toArray(),
+      db.bills.filter((b) => b.merchantId === tempId).toArray(),
+      db.incomeStreams.filter((s) => s.merchantId === tempId).toArray(),
       db.outbox.toArray(),
       db.merchantAliases.toArray(),
     ])
@@ -263,13 +263,15 @@ async function adoptWinner(entry: OutboxEntry, error: ApiError): Promise<void> {
     tempId,
     winnerId,
     transactions,
-    recurrings,
+    bills,
+    streams,
     queued,
     tempAliases,
     knownAliases,
   })
   const byId = new Map(transactions.map((t) => [t.id, t]))
-  const recurringById = new Map(recurrings.map((r) => [r.id, r]))
+  const billById = new Map(bills.map((b) => [b.id, b]))
+  const streamById = new Map(streams.map((s) => [s.id, s]))
 
   await db.transaction(
     'rw',
@@ -277,7 +279,8 @@ async function adoptWinner(entry: OutboxEntry, error: ApiError): Promise<void> {
       db.merchants,
       db.merchantAliases,
       db.transactions,
-      db.recurrings,
+      db.bills,
+      db.incomeStreams,
       db.outbox,
     ],
     async () => {
@@ -285,9 +288,13 @@ async function adoptWinner(entry: OutboxEntry, error: ApiError): Promise<void> {
         .where('id')
         .anyOf(plan.repointTransactionIds)
         .modify({ merchantId: winnerId })
-      await db.recurrings
+      await db.bills
         .where('id')
-        .anyOf(plan.repointRecurringIds)
+        .anyOf(plan.repointBillIds)
+        .modify({ merchantId: winnerId })
+      await db.incomeStreams
+        .where('id')
+        .anyOf(plan.repointIncomeIds)
         .modify({ merchantId: winnerId })
 
       for (const rewrite of plan.rewrites) {
@@ -315,18 +322,28 @@ async function adoptWinner(entry: OutboxEntry, error: ApiError): Promise<void> {
         })
       }
 
-      for (const id of plan.patchRecurringIds) {
-        const recurring = recurringById.get(id)
-        if (!recurring) continue
+      for (const id of plan.patchBillIds) {
+        const bill = billById.get(id)
+        if (!bill) continue
         await db.outbox.add({
           op: 'update',
-          entity: 'recurring',
+          entity: 'bill',
           id,
-          payload: localRecurringToUpdateWire({
-            ...recurring,
-            merchantId: winnerId,
-          }),
-          baseVersion: recurring.version,
+          payload: localBillToUpdateWire({ ...bill, merchantId: winnerId }),
+          baseVersion: bill.version,
+          createdAt: now(),
+        })
+      }
+
+      for (const id of plan.patchIncomeIds) {
+        const stream = streamById.get(id)
+        if (!stream) continue
+        await db.outbox.add({
+          op: 'update',
+          entity: 'income',
+          id,
+          payload: localIncomeToUpdateWire({ ...stream, merchantId: winnerId }),
+          baseVersion: stream.version,
           createdAt: now(),
         })
       }

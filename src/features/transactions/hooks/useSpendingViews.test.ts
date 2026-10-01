@@ -22,7 +22,6 @@ vi.mock('#/features/transactions/data/selectors', async (importOriginal) => {
     buildActivityList: vi.fn(real.buildActivityList),
     buildBreakdown: vi.fn(real.buildBreakdown),
     buildBudgetsView: vi.fn(real.buildBudgetsView),
-    buildRecurringView: vi.fn(real.buildRecurringView),
   }
 })
 
@@ -32,7 +31,6 @@ const BUILDERS = [
   'buildActivityList',
   'buildBreakdown',
   'buildBudgetsView',
-  'buildRecurringView',
 ] as const
 
 const calls = () =>
@@ -45,11 +43,10 @@ const calls = () =>
 
 const INPUTS: SpendingInputs = {
   budgets: [],
-  recurrings: [],
   nodes: [],
   base: 'SAR',
   rates: { SAR: 1 },
-  allocations: [],
+  setAsides: [],
   goals: [],
 }
 const ROWS: LocalTransaction[] = []
@@ -108,7 +105,6 @@ describe('useSpendingViews', () => {
       buildActivityList: 1,
       buildBreakdown: 1,
       buildBudgetsView: 0,
-      buildRecurringView: 0,
     })
     vi.clearAllMocks()
     render({ ...ACTIVITY, view: 'budgets' })
@@ -183,12 +179,6 @@ describe('useSpendingViews', () => {
       label: 'March 2025',
       todayIs: 'ahead',
     })
-    const recurring = render({
-      ...ACTIVITY,
-      view: 'recurring',
-      ledger: undefined,
-    })
-    expect(recurring.result.current.recurring).not.toBeNull()
   })
 
   it('keeps showing the loaded period while the page asks for the next one', () => {

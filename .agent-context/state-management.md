@@ -6,7 +6,7 @@ Query / server-cache layer** — see below.)
 
 ## 1. Persistent domain data → **Local DB (Dexie)**
 
-- Accounts, transactions, categories, budgets, obligations — anything synced and persisted.
+- Accounts, transactions, categories, budgets, bills, goals — anything synced and persisted.
 - The **source of truth for the UI**. Read reactively (`useLiveQuery`).
 - When many components on one screen need the same large read *and* an expensive derivation
   of it, share both instead of reading per component: a module-level store over Dexie

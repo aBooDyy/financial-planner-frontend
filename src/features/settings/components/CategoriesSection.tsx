@@ -33,7 +33,8 @@ export function CategoriesSection() {
           parentId: null,
           subCount: c.subs.length,
           txCount: c.txCount,
-          recurringCount: c.recurringCount,
+          billCount: c.billCount,
+          incomeCount: c.incomeCount,
           plannedCount: c.plannedCount,
         })
         return
@@ -47,7 +48,8 @@ export function CategoriesSection() {
           parentId: c.id,
           subCount: 0,
           txCount: child.txCount,
-          recurringCount: child.recurringCount,
+          billCount: child.billCount,
+          incomeCount: child.incomeCount,
           plannedCount: child.plannedCount,
         })
         return

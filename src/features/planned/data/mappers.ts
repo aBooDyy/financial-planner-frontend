@@ -24,7 +24,7 @@ export const localPlannedToCreateWire = (
   role: toWireRole(l.role),
   goal_id: l.goalId,
   income_stream_id: l.incomeStreamId,
-  recurring_id: l.recurringId,
+  bill_id: l.billId,
   wallet_id: l.walletId,
   name: l.name,
   amount: l.amount,
@@ -34,6 +34,7 @@ export const localPlannedToCreateWire = (
   date: l.date,
   status: toWirePlannedStatus(l.status),
   pinned: l.pinned,
+  review: l.review,
   note: l.note,
 })
 
@@ -46,6 +47,7 @@ export const localPlannedToUpdateWire = (
   wallet_id: l.walletId,
   status: toWirePlannedStatus(l.status),
   pinned: l.pinned,
+  review: l.review,
   note: l.note,
   name: l.name,
   category_id: l.categoryId,

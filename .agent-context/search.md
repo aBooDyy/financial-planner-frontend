@@ -41,10 +41,11 @@ App-level search over the local DB, from the Means design "Transactions Tabs Opt
   `useDeferredValue`. Scaling this is tracked in `working.local/optimization-and-scale/`.
 - Accounts are valued from the stored ledger totals (`readWalletDeltas` → `SearchSources.deltas`
   → `liveBalancesFrom`), not by summing the ledger rows the index already holds.
-- Groups, in order: Accounts, Transactions, Planned (open only), Budgets, Recurring. Each
+- Groups, in order: Accounts, Transactions, Planned (open only), Budgets. (The Recurring group
+  went with recurring schedules; bills are not searchable yet — their keys will be `bill:<id>`.) Each
   shows up to `SEARCH_ROW_CAP` rows, but its count covers every match.
 - Transfers collapse to one row per `transferId`. Adjustments get their own target.
-- Planned occurrences of one schedule share a `series` (a recurring, an income stream, or a
+- Planned occurrences of one origin share a `series` (a bill and role, an income stream, or a
   goal + role). Only the soonest occurrence that passes the filters is listed, so one monthly
   bill doesn't fill the group with a year of copies.
 - Amounts match as typed fragments of both the stored amount and its base-currency value.
@@ -70,5 +71,5 @@ the panel is closed, active ones show as removable chips.
 - an **account** sets Spending's scope to that wallet and goes to Activity;
 - anything else navigates to its tab with `?open=<kind>:<id>` (see [routing.md](routing.md)).
   On the Spending page, `useOpenFromSearch` consumes the param once the page has loaded, opens
-  the matching editor (tx, adjustment, transfer, budget or recurring) or the planned confirm
+  the matching editor (tx, adjustment, transfer or budget) or the planned confirm
   dialog, and strips the param with `replace`.

@@ -1,12 +1,10 @@
 /**
- * The budget and recurring editors' wording and readiness rules: pure, so the editors only
- * render them.
+ * The budget editor's wording and readiness rules: pure, so the editor only renders them.
  */
 import type {
   BudgetPeriod,
   BudgetScope,
 } from '#/features/transactions/api/types'
-import { parseISO, ymd } from './planning'
 
 export const BUDGET_SCOPES: ReadonlyArray<{
   value: BudgetScope
@@ -62,27 +60,6 @@ export function budgetDeleteCopy(label: string): DeleteCopy {
   }
 }
 
-export function recurringDeleteCopy(
-  name: string,
-  type: 'spend' | 'income',
-): DeleteCopy {
-  const shown = name.trim()
-  const subject = shown || 'this schedule'
-  return {
-    title: shown ? `Delete “${shown}”?` : 'Delete this recurring?',
-    bullets:
-      type === 'income'
-        ? [
-            `Future planned paydays for ${subject} are removed.`,
-            'Income already received stays in your history.',
-          ]
-        : [
-            `Future planned payments for ${subject} are removed.`,
-            'Payments already made stay in your history.',
-          ],
-  }
-}
-
 export function adjustmentDeleteCopy(walletName: string | null): DeleteCopy {
   return {
     title: 'Delete this adjustment?',
@@ -94,18 +71,3 @@ export function adjustmentDeleteCopy(walletName: string | null): DeleteCopy {
     ],
   }
 }
-
-/** Where "Ends on a date" starts: a year after the next occurrence. */
-export function defaultEndDate(nextDue: string): string {
-  const d = parseISO(nextDue)
-  return ymd(new Date(d.getFullYear() + 1, d.getMonth(), d.getDate()))
-}
-
-/** An end before the next occurrence would leave nothing to schedule. */
-export const recurringEndBlock = (
-  nextDue: string,
-  endsOn: string | null,
-): string | null =>
-  endsOn !== null && endsOn < nextDue
-    ? 'End date is before the next due date'
-    : null

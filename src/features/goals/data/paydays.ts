@@ -8,21 +8,30 @@
  *   day, clamped.
  * - **Without one**, weekly steps from `day` of January 2000 and the longer cadences fall in
  *   the calendar months divisible by their length (quarterly: Jan / Apr / Jul / Oct).
+ * - **Custom** ("every N days / weeks / months") steps from the anchor, or from `day` of
+ *   January 2000 without one; a month step keeps the anchor's day, clamped.
  */
-import type { GoalFrequency } from '#/features/goals/api/types'
+import type {
+  GoalFrequency,
+  IntervalUnit,
+  ObligationFrequency,
+} from '#/features/goals/api/types'
 import { FREQUENCIES } from '#/features/goals/constants'
 import { parseISO, ymd } from './planning'
 
 export type PaySchedule = {
   day: number
-  frequency: GoalFrequency
+  frequency: ObligationFrequency
   anchorDate?: string | null
+  /** Read only for a custom frequency. */
+  customInterval?: number | null
+  customUnit?: IntervalUnit | null
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 
 /** Whether a stream's dates come from a chosen payday rather than a day of the month. */
-export const usesPaydayAnchor = (frequency: GoalFrequency): boolean =>
+export const usesPaydayAnchor = (frequency: ObligationFrequency): boolean =>
   frequency !== 'monthly'
 
 const cycleMonths = (frequency: GoalFrequency): number =>
@@ -57,13 +66,18 @@ const daysFrom = (a: string, b: string): number => {
   )
 }
 
-function weeklyPaydays(anchor: string, from: string, to: string): string[] {
+function everyDays(
+  anchor: string,
+  step: number,
+  from: string,
+  to: string,
+): string[] {
   const out: string[] = []
-  let at = addDays(anchor, Math.ceil(daysFrom(anchor, from) / 7) * 7)
-  while (at < from) at = addDays(at, 7)
+  let at = addDays(anchor, Math.ceil(daysFrom(anchor, from) / step) * step)
+  while (at < from) at = addDays(at, step)
   while (at <= to) {
     out.push(at)
-    at = addDays(at, 7)
+    at = addDays(at, step)
   }
   return out
 }
@@ -84,6 +98,25 @@ function monthlyPaydays(
   return out
 }
 
+function customPaydays(
+  stream: PaySchedule,
+  anchor: string,
+  from: string,
+  to: string,
+): string[] {
+  const every = Math.max(1, Math.round(stream.customInterval ?? 1))
+  if (stream.customUnit === 'month')
+    return monthlyPaydays(
+      monthIndexOf(anchor),
+      every,
+      Number(anchor.slice(8, 10)),
+      from,
+      to,
+    )
+  const days = stream.customUnit === 'week' ? every * 7 : every
+  return everyDays(anchor, days, from, to)
+}
+
 /** Every payday of the stream from `from` to `to` (ISO dates, both inclusive). */
 export function paydaysOf(
   stream: PaySchedule,
@@ -94,8 +127,11 @@ export function paydaysOf(
   const anchor = usesPaydayAnchor(stream.frequency)
     ? validAnchor(stream.anchorDate)
     : null
+  const epoch = onDay(2000 * 12, stream.day)
+  if (stream.frequency === 'custom')
+    return customPaydays(stream, anchor ?? epoch, from, to)
   if (stream.frequency === 'weekly')
-    return weeklyPaydays(anchor ?? onDay(2000 * 12, stream.day), from, to)
+    return everyDays(anchor ?? epoch, 7, from, to)
   const step = cycleMonths(stream.frequency)
   if (!anchor) return monthlyPaydays(0, step, stream.day, from, to)
   return monthlyPaydays(

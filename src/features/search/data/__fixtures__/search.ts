@@ -6,7 +6,6 @@ import type {
   LocalBudget,
   LocalMerchant,
   LocalPlanned,
-  LocalRecurring,
   LocalTransaction,
 } from '#/db/types'
 import {
@@ -105,15 +104,6 @@ export const planned = (over: Partial<LocalPlanned> = {}): LocalPlanned =>
     ...over,
   })
 
-export const recurring = (over: Partial<LocalRecurring> = {}): LocalRecurring =>
-  rows.recurring({
-    name: 'Gym',
-    currency: 'EUR',
-    categoryId: GROCERIES,
-    walletId: MAIN.id,
-    ...over,
-  })
-
 let seq = 0
 export const budget = (over: Partial<LocalBudget> = {}): LocalBudget => ({
   id: `b${++seq}`,
@@ -153,7 +143,6 @@ export const sources = (over: Partial<SearchSources> = {}): SearchSources => ({
   txns: [],
   planned: [],
   budgets: [],
-  recurrings: [],
   nodes: NODES,
   merchants: [],
   deltas: {},

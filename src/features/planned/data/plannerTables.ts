@@ -11,12 +11,12 @@ import { SETTINGS_KEY } from '#/db/types'
 import type {
   LocalBalanceNode,
   LocalBalanceSettings,
+  LocalBill,
   LocalExchangeRate,
   LocalGoal,
-  LocalGoalAllocation,
   LocalIncomeStream,
   LocalPlanned,
-  LocalRecurring,
+  LocalSetAside,
   LocalTransaction,
 } from '#/db/types'
 import { linkedTransactions } from './linkedTransactions'
@@ -25,11 +25,11 @@ import { linkedTransactions } from './linkedTransactions'
 export type PlannerTables = {
   goals?: LocalGoal[]
   income?: LocalIncomeStream[]
-  recurrings?: LocalRecurring[]
+  bills?: LocalBill[]
   planned?: LocalPlanned[]
   /** Only the linked transactions, never the whole ledger. */
   txns?: LocalTransaction[]
-  allocations?: LocalGoalAllocation[]
+  setAsides?: LocalSetAside[]
   nodes?: LocalBalanceNode[]
   settings?: LocalBalanceSettings | null
   rateRows?: LocalExchangeRate[]
@@ -38,10 +38,10 @@ export type PlannerTables = {
 const QUERIES: Record<keyof PlannerTables, () => Promise<unknown>> = {
   goals: () => db.goals.toArray(),
   income: () => db.incomeStreams.toArray(),
-  recurrings: () => db.recurrings.toArray(),
+  bills: () => db.bills.toArray(),
   planned: () => db.plannedTransactions.toArray(),
   txns: linkedTransactions,
-  allocations: () => db.goalAllocations.toArray(),
+  setAsides: () => db.setAsides.toArray(),
   nodes: () => db.balanceNodes.toArray(),
   settings: async () => (await db.balanceSettings.get(SETTINGS_KEY)) ?? null,
   rateRows: () => db.exchangeRates.toArray(),

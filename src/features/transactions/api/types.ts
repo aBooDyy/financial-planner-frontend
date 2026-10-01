@@ -1,31 +1,17 @@
 import { fromWireCurrency } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
-import type {
-  IntervalUnit,
-  IntervalUnitWire,
-  ObligationFrequency,
-  ObligationFrequencyWire,
-} from '#/features/goals/api/types'
-import {
-  fromWireObligationFreq,
-  fromWireUnit,
-  toWireObligationFreq,
-  toWireUnit,
-} from '#/features/goals/api/types'
 
 /**
  * Internal representation stays lowercase (nice for UI/logic); the wire is the backend's
  * PersistedEnum UPPER_SNAKE name. Translate only at the wire boundary (mappers below).
- * Recurring cadence reuses the Goals `ObligationFrequency` (same backend `Frequency` enum),
- * custom "every N units" included.
  */
 export type TxType = 'spend' | 'income'
 export type TxTypeWire = 'SPEND' | 'INCOME'
 
 /**
  * A transfer is two ledger rows sharing a `transferId`: the OUT leg debits the source wallet,
- * the IN leg credits the destination. Only ledger rows carry these — categories, recurring
- * schedules and imports stay `TxType`.
+ * the IN leg credits the destination. Only ledger rows carry these — categories and imports
+ * stay `TxType`.
  */
 export type TransferLegType = 'transfer_out' | 'transfer_in'
 export type TransferLegTypeWire = 'TRANSFER_OUT' | 'TRANSFER_IN'
@@ -132,7 +118,10 @@ export type Transaction = {
    */
   categoryId: string | null
   walletId: string
+  /** Money used from this goal. Never with `billId`. */
   goalId: string | null
+  /** A payment for this bill. Never with `goalId`. */
+  billId: string | null
   merchantId: string | null
   date: string // ISO YYYY-MM-DD
   note: string | null
@@ -163,33 +152,6 @@ export type Budget = {
   version: string
 }
 
-export type Recurring = {
-  id: string
-  name: string
-  type: TxType
-  amount: number
-  currency: CurrencyCode
-  /** The leaf category: a subcategory's id when one was picked, else the root's. */
-  categoryId: string
-  walletId: string
-  goalId: string | null
-  /** Who each occurrence pays (or is paid by); copied onto what it posts. */
-  merchantId: string | null
-  frequency: ObligationFrequency
-  /** "Every `customInterval` `customUnit`s" — set only when `frequency` is 'custom'. */
-  customInterval: number | null
-  customUnit: IntervalUnit | null
-  nextDue: string
-  /** The last date an occurrence may fall on; null repeats forever. */
-  endsOn: string | null
-  autopost: boolean
-  /** Copied onto every occurrence it posts, in place of the name. */
-  note: string | null
-  createdAt: string
-  updatedAt: string
-  version: string
-}
-
 // --- Wire types (snake_case) ---------------------------------------------------------
 
 export type TransactionWire = {
@@ -200,6 +162,7 @@ export type TransactionWire = {
   category_id: string | null
   wallet_id: string
   goal_id: string | null
+  bill_id?: string | null
   merchant_id: string | null
   date: string
   note: string | null
@@ -226,28 +189,6 @@ export type BudgetWire = {
   version: string
 }
 
-export type RecurringWire = {
-  id: string
-  name: string
-  type: TxTypeWire
-  amount: number
-  currency: string
-  category_id: string
-  wallet_id: string
-  goal_id: string | null
-  merchant_id: string | null
-  frequency: ObligationFrequencyWire
-  custom_interval: number | null
-  custom_unit: IntervalUnitWire | null
-  next_due: string
-  ends_on: string | null
-  autopost: boolean
-  note: string | null
-  created_at: string
-  updated_at: string
-  version: string
-}
-
 /**
  * The server refuses transfer legs here (`spending.transaction.transfer_via_transfers`).
  * `category_id` is null exactly for an adjustment.
@@ -260,6 +201,7 @@ export type CreateTransactionWire = {
   category_id: string | null
   wallet_id: string
   goal_id: string | null
+  bill_id: string | null
   merchant_id: string | null
   date: string
   note: string | null
@@ -406,28 +348,6 @@ export type UpdateBudgetWire = Omit<CreateBudgetWire, 'id'> & {
   version: string
 }
 
-export type CreateRecurringWire = {
-  id: string
-  name: string
-  type: TxTypeWire
-  amount: number
-  currency: string
-  category_id: string
-  wallet_id: string
-  goal_id: string | null
-  merchant_id: string | null
-  frequency: ObligationFrequencyWire
-  custom_interval: number | null
-  custom_unit: IntervalUnitWire | null
-  next_due: string
-  ends_on: string | null
-  autopost: boolean
-  note: string | null
-}
-export type UpdateRecurringWire = Omit<CreateRecurringWire, 'id'> & {
-  version: string
-}
-
 // --- Mappers (wire → domain) ---------------------------------------------------------
 
 export const toTransaction = (w: TransactionWire): Transaction => ({
@@ -438,6 +358,7 @@ export const toTransaction = (w: TransactionWire): Transaction => ({
   categoryId: w.category_id,
   walletId: w.wallet_id,
   goalId: w.goal_id,
+  billId: w.bill_id ?? null,
   merchantId: w.merchant_id ?? null,
   date: w.date,
   note: w.note,
@@ -509,27 +430,3 @@ export const toBudget = (w: BudgetWire): Budget => ({
   updatedAt: w.updated_at,
   version: w.version,
 })
-
-export const toRecurring = (w: RecurringWire): Recurring => ({
-  id: w.id,
-  name: w.name,
-  type: fromWireTxType(w.type),
-  amount: w.amount,
-  currency: fromWireCurrency(w.currency),
-  categoryId: w.category_id,
-  walletId: w.wallet_id,
-  goalId: w.goal_id,
-  merchantId: w.merchant_id ?? null,
-  frequency: fromWireObligationFreq(w.frequency),
-  customInterval: w.custom_interval ?? null,
-  customUnit: w.custom_unit ? fromWireUnit(w.custom_unit) : null,
-  nextDue: w.next_due,
-  endsOn: w.ends_on ?? null,
-  autopost: w.autopost,
-  note: w.note ?? null,
-  createdAt: w.created_at,
-  updatedAt: w.updated_at,
-  version: w.version,
-})
-
-export { toWireObligationFreq, toWireUnit }

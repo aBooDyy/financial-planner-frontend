@@ -19,8 +19,10 @@ pattern changes. Index: [`.agent-context/README.md`](.agent-context/README.md).
 - [styling-and-theming.md](.agent-context/styling-and-theming.md) — Tailwind, the `fp-` design tokens, light/dark, **RTL/LTR** (incl. Radix's direction provider).
 - [pwa-and-mobile.md](.agent-context/pwa-and-mobile.md) — PWA setup, offline, native-like mobile UX, responsive nav.
 - [wallets.md](.agent-context/wallets.md) — Wallets: the first synced entity, money/derivation, the wallets/groups tree.
-- [goals.md](.agent-context/goals.md) — Goals: income streams + ranked goals, the client-side funding engine.
-- [transactions.md](.agent-context/transactions.md) — Spending: ledger + budgets + recurring, derived balances, settlement links, transfers between wallets, balance adjustments.
+- [goals.md](.agent-context/goals.md) — Goals & income: the kind-less goal, progress from set-asides, the interim funding plan, paydays.
+- [bills.md](.agent-context/bills.md) — Bills: once or repeating, must pay / nice to have; entity, sync, mutations, cascades.
+- [set-asides.md](.agent-context/set-asides.md) — Set-asides: labels on money in real wallets for a bill or goal; live vs released, totals.
+- [transactions.md](.agent-context/transactions.md) — Spending: ledger + budgets, derived balances, settlement links, transfers between wallets, balance adjustments.
 - [planned.md](.agent-context/planned.md) — Planned transactions: generator + reconciler, the app-level planner, deterministic ids, confirm/skip/recalc, the hooks the Planned tab and goal detail read.
 - [onboarding.md](.agent-context/onboarding.md) — the `/setup` first-run wizard, `SessionGate`, starter packs, the sessionStorage draft.
 - [settings.md](.agent-context/settings.md) — the Settings page and its routed panes, local preferences.

@@ -61,7 +61,7 @@ beforeEach(async () => {
 describe('batch markers', () => {
   it('round-trips a batch id through the source marker', () => {
     expect(batchIdFromSource(batchSource('abc'))).toBe('abc')
-    expect(batchIdFromSource('recurring:r1:2026-06-01')).toBeNull()
+    expect(batchIdFromSource('email:c1')).toBeNull()
     expect(batchIdFromSource(null)).toBeNull()
   })
 })

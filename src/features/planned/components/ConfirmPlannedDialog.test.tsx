@@ -101,7 +101,7 @@ describe('ConfirmPlannedDialog', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Confirm as paid' }))
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
-    const [reservation] = await db.goalAllocations.toArray()
+    const [reservation] = await db.setAsides.toArray()
     expect(reservation).toMatchObject({
       goalId: 'umrah',
       walletId: 'w1',

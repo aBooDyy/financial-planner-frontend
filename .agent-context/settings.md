@@ -28,7 +28,7 @@ Notifications, Archived, Data & privacy. Each pane is its own route — see
   `buildCalendar`) and `buildGoalsView` take `dateFormat` as a trailing param (default `dmy`),
   threaded reactively from the page/hook. Month-year, week-range, and weekday navigation labels
   stay textual (`fmtMonth`/`fmtShort`); provider email-alert dates are echoed raw, not reformatted.
-  Date _inputs_ use `components/DateField` (goal due/target date, tx/recurring date): a native
+  Date _inputs_ use `components/DateField` (goal due/target date, tx date): a native
   `<input type="date">` can't honor a custom format (it renders in the OS locale), so DateField
   overlays the transparent native picker on a styled box that shows `formatDate(value)` — the box
   follows the preference, the picker stays native. Pass `invalid` to flag it (e.g. a past due date).

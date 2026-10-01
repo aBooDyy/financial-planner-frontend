@@ -1,16 +1,12 @@
 /**
  * Local writes of planned rows and their outbox entries — the one place that knows how a
  * planned row is persisted. Deliberately free of any other feature's modules, so the
- * settlement slices (transactions, goal allocations) can call back into it without a cycle.
+ * settlement slices (transactions, set-asides) can call back into it without a cycle.
  * Nothing here schedules a push; callers push once for the whole change.
  */
 import { db } from '#/db/db'
 import { requeued } from '#/db/syncFailure'
-import type {
-  LocalGoalAllocation,
-  LocalPlanned,
-  LocalTransaction,
-} from '#/db/types'
+import type { LocalPlanned, LocalSetAside, LocalTransaction } from '#/db/types'
 import { mergeRates } from '#/lib/config/rates'
 import { localPlannedToCreateWire, localPlannedToUpdateWire } from './mappers'
 import { indexSettlements, settledOf } from './settle'
@@ -100,21 +96,21 @@ export async function removePlanned(ids: ReadonlyArray<string>): Promise<void> {
   })
 }
 
-/** The live transactions and reservations that point at any of `plannedIds`. */
+/** The live transactions and set-asides that point at any of `plannedIds`. */
 export async function settlementsOf(
   plannedIds: ReadonlyArray<string>,
 ): Promise<{
   txns: LocalTransaction[]
-  allocations: LocalGoalAllocation[]
+  setAsides: LocalSetAside[]
 }> {
   const ids = [...plannedIds]
-  const [txns, allocations] = await Promise.all([
+  const [txns, setAsides] = await Promise.all([
     db.transactions.where('plannedId').anyOf(ids).toArray(),
-    db.goalAllocations.where('plannedId').anyOf(ids).toArray(),
+    db.setAsides.where('plannedId').anyOf(ids).toArray(),
   ])
   return {
     txns: txns.filter((t) => t.deleted === 0),
-    allocations: allocations.filter((a) => a.deleted === 0),
+    setAsides: setAsides.filter((a) => a.deleted === 0),
   }
 }
 
@@ -135,8 +131,8 @@ export async function reopenUnderSettled(
     (p): p is LocalPlanned => !!p && p.status === 'done',
   )
   if (items.length === 0) return 0
-  const { txns, allocations } = await settlementsOf(items.map((p) => p.id))
-  const index = indexSettlements(txns, allocations)
+  const { txns, setAsides } = await settlementsOf(items.map((p) => p.id))
+  const index = indexSettlements(txns, setAsides)
   const rates = await currentRates()
   const reopen = items.filter(
     (item) => settledOf(item, index, rates) < item.amount,
@@ -159,8 +155,8 @@ export async function closeCovered(
     (p): p is LocalPlanned => !!p && p.status === 'open',
   )
   if (items.length === 0) return 0
-  const { txns, allocations } = await settlementsOf(items.map((p) => p.id))
-  const index = indexSettlements(txns, allocations)
+  const { txns, setAsides } = await settlementsOf(items.map((p) => p.id))
+  const index = indexSettlements(txns, setAsides)
   const rates = await currentRates()
   const covered = items.filter(
     (item) => settledOf(item, index, rates) >= item.amount,

@@ -100,7 +100,6 @@ vi.mock('#/features/transactions/api/transactionsApi', () => ({
     },
   },
   budgetsApi: { list: () => Promise.resolve([]) },
-  recurringsApi: { list: () => Promise.resolve([]) },
 }))
 
 vi.mock('#/features/wallets/api/walletsApi', () => ({

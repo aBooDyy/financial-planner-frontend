@@ -4,6 +4,40 @@ import { ymd } from './planning'
 
 const SEP_24 = new Date(2026, 8, 24)
 
+describe('paydaysOf — custom', () => {
+  it('steps every N days from the anchor, in both directions', () => {
+    expect(
+      paydaysOf(
+        {
+          day: 1,
+          frequency: 'custom',
+          customInterval: 14,
+          customUnit: 'day',
+          anchorDate: '2026-10-09',
+        },
+        '2026-09-20',
+        '2026-10-31',
+      ),
+    ).toEqual(['2026-09-25', '2026-10-09', '2026-10-23'])
+  })
+
+  it('steps every N months keeping the anchor’s day, clamped', () => {
+    expect(
+      paydaysOf(
+        {
+          day: 31,
+          frequency: 'custom',
+          customInterval: 2,
+          customUnit: 'month',
+          anchorDate: '2026-08-31',
+        },
+        '2026-08-01',
+        '2027-01-31',
+      ),
+    ).toEqual(['2026-08-31', '2026-10-31', '2026-12-31'])
+  })
+})
+
 describe('paydaysOf — anchored', () => {
   it('lands a quarterly payday in the anchor’s own months', () => {
     expect(

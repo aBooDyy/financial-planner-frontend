@@ -10,13 +10,13 @@ import {
 } from '#/features/planned'
 import type { PlannedRole } from '#/features/planned'
 import {
-  isSavingGoal,
   rankGoalOptions,
   rankIncomeOptions,
 } from '#/features/transactions/data/countsToward'
 import type { RankedOptions } from '#/features/transactions/data/countsToward'
 import {
   DIALOG_MATCH,
+  billIdForMatch,
   findAmountMatch,
   goalIdForMatch,
 } from '#/features/transactions/data/quickAddMatch'
@@ -53,13 +53,13 @@ export type CountsToward = ReturnType<typeof useCountsToward>
 
 /**
  * The transaction dialog's "Counts toward" (1e). Untouched, a new entry links itself to the
- * open planned bill or payday its amount and date match. Otherwise a spend picks a goal or
- * obligation (the draft's `goalId`) and an income entry an income stream — only a way to find
- * its payday — and the entry settles that origin's matching planned item. Every link can be
- * switched off, per item.
+ * open planned bill or payday its amount and date match. Otherwise a spend picks a goal (the
+ * draft's `goalId`: money used from it) and an income entry an income stream — only a way to
+ * find its payday — and the entry settles that origin's matching planned item. Every link can
+ * be switched off, per item.
  *
- * A spend only ever settles a planned *payment*: a goal's set-aside is a reservation, so money
- * put aside for a saving goal goes through the goal's "Add contribution", not a spend.
+ * A spend only ever settles a planned *payment*: a set-aside labels money in place, so money
+ * put aside for a goal goes through the goal's "Add contribution", not a spend.
  */
 export function useCountsToward(args: {
   type: EditorTxType
@@ -74,7 +74,7 @@ export function useCountsToward(args: {
 }) {
   const data = usePlannedData()
   const streams = useLiveQuery(() => db.incomeStreams.toArray())
-  const { planned, rates, recurrings } = data.inputs
+  const { planned, rates } = data.inputs
   const { index } = data.state
   const isIncome = args.type === 'income'
   const isTransfer = args.type === 'transfer'
@@ -131,8 +131,9 @@ export function useCountsToward(args: {
   const auto = item !== null && item === autoItem
   const [unlinkedId, setUnlinkedId] = useState<string | null>(null)
   const linked = item !== null && unlinkedId !== item.id
-  const autoGoalId =
-    auto && linked ? goalIdForMatch(item, 'spend', recurrings) : null
+  const autoGoalId = auto && linked ? goalIdForMatch(item, 'spend') : null
+  const billId =
+    !isIncome && item && linked ? billIdForMatch(item, 'spend') : null
   const selectedId = isIncome
     ? auto && linked
       ? item.incomeStreamId
@@ -152,8 +153,7 @@ export function useCountsToward(args: {
             goals: args.goals,
             planned,
             date: args.date,
-            savedOf: (g) =>
-              g.saved + (data.state.progress[g.id]?.progress ?? 0),
+            savedOf: (g) => data.state.progress[g.id]?.progress ?? 0,
             selectedId,
           }),
     [isIncome, streams, planned, args.date, args.goals, data.state, selectedId],
@@ -199,7 +199,7 @@ export function useCountsToward(args: {
     ? (args.goals.find((g) => g.id === args.goalId) ?? null)
     : null
   const infoHint: InfoHint =
-    !isIncome && goal && isSavingGoal(goal) && !item
+    !isIncome && goal && !item
       ? 'saving-goal'
       : isIncome && streamId && !item
         ? 'no-payday'
@@ -218,10 +218,11 @@ export function useCountsToward(args: {
       setPick({ type: args.type, id })
       setUnlinkedId(null)
     },
-    /** What the entry saves: the planned item it settles and, for a spend, the goal it pays. */
+    /** What the entry saves: the planned item it settles and, for a spend, its goal or bill. */
     link: {
       plannedId: linked ? item.id : null,
-      goalId: isIncome ? null : (autoGoalId ?? args.goalId),
+      goalId: isIncome || billId ? null : (autoGoalId ?? args.goalId),
+      billId,
     },
   }
 }

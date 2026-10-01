@@ -39,7 +39,7 @@ export function TxRowMeta({ row }: { row: TxRow }) {
             <SeparatedItem>
               <TagPill
                 label={TX_TAG_LABEL[row.tag]}
-                tone={row.tag === 'obligation' ? 'neutral' : 'accent'}
+                tone={row.tag === 'bill' ? 'neutral' : 'accent'}
               />
             </SeparatedItem>
           ) : null}

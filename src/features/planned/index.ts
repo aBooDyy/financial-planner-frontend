@@ -30,7 +30,6 @@ export {
   addContribution,
   closeRest,
   confirmPlanned,
-  contributionRoleOf,
   deleteManualPlanned,
   editPlannedAmount,
   movePlanned,

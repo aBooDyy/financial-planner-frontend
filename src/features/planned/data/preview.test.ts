@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '#/db/db'
 import { walletLiveBalances } from '#/features/transactions/data/ledger'
 import {
-  goal,
+  bill,
   m,
   planned,
   tx,
@@ -31,7 +31,9 @@ const SALARY = planned({
 })
 const RENT = planned({
   id: 'rent-sep',
-  goalId: 'rent',
+  origin: 'bill',
+  goalId: null,
+  billId: 'rent',
   role: 'payment',
   walletId: 'w1',
   amount: m(3000),
@@ -41,19 +43,12 @@ const RENT = planned({
 beforeEach(async () => {
   await Promise.all(db.tables.map((t) => t.clear()))
   await db.balanceNodes.put(MAIN)
-  await db.goals.put(
-    goal({
-      id: 'rent',
-      name: 'Rent',
-      kind: 'recurring',
-      amount: m(3000),
-      frequency: 'monthly',
-      nextDue: '2026-09-24',
-    }),
+  await db.bills.put(
+    bill({ id: 'rent', amount: m(3000), nextDue: '2026-09-24' }),
   )
   await db.plannedTransactions.bulkPut([SALARY, RENT])
   await db.transactions.bulkPut([
-    tx({ goalId: 'rent', plannedId: 'rent-aug', amount: m(3000) }),
+    tx({ billId: 'rent', plannedId: 'rent-aug', amount: m(3000) }),
     tx({ amount: m(35) }),
     tx({ type: 'income', amount: m(500) }),
     tx({ type: 'transfer_out', transferId: 'x1', amount: m(70) }),
@@ -115,7 +110,8 @@ describe('previewConfirm', () => {
 
     const payment = await fromLinkedRead(RENT)
     expect(payment.wallet).toEqual({ id: 'w1', balanceAfter: m(14440) })
-    expect(payment.goal).not.toBeNull()
+    // A bill's payment has no goal line.
+    expect(payment.goal).toBeNull()
     expect(payment).toEqual(await fromFullRead(RENT))
   })
 

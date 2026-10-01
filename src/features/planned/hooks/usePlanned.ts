@@ -31,7 +31,6 @@ export function usePlanned(): UsePlanned {
     () =>
       buildPlannedList({
         planned: data.inputs.planned,
-        goals: data.inputs.goals,
         nodes: data.nodes,
         index: data.state.index,
         rates: data.inputs.rates,

@@ -123,12 +123,19 @@ describe('buildWalletsView reservations', () => {
     const reservations = {
       w1: [
         {
-          goalId: 'car',
-          goalName: 'New car',
+          ownerId: 'car',
+          owner: 'goal' as const,
+          ownerName: 'New car',
           color: '#EC4899',
           amount: 300000,
         },
-        { goalId: 'rent', goalName: 'Rent', color: '#3B82F6', amount: 150000 },
+        {
+          ownerId: 'rent',
+          owner: 'goal' as const,
+          ownerName: 'Rent',
+          color: '#3B82F6',
+          amount: 150000,
+        },
       ],
     }
     const view = buildWalletsView(sampleTree(), 'SAR', rates, {}, reservations)
@@ -136,7 +143,7 @@ describe('buildWalletsView reservations', () => {
     expect(w1.reserved).toBe(450000)
     expect(w1.available).toBe(550000) // 10,000 − 4,500
     expect(w1.hasReserved).toBe(true)
-    expect(w1.reservations.map((r) => r.goalName)).toEqual(['New car', 'Rent'])
+    expect(w1.reservations.map((r) => r.ownerName)).toEqual(['New car', 'Rent'])
     // Untouched wallets carry no reserve.
     expect(view.rows.find((r) => r.id === 'w2')!.hasReserved).toBe(false)
   })
@@ -144,11 +151,23 @@ describe('buildWalletsView reservations', () => {
   it('rolls reserved up to the group and the view total (base currency)', () => {
     const reservations = {
       w1: [
-        { goalId: 'car', goalName: 'Car', color: '#EC4899', amount: 300000 },
+        {
+          ownerId: 'car',
+          owner: 'goal' as const,
+          ownerName: 'Car',
+          color: '#EC4899',
+          amount: 300000,
+        },
       ],
       // 100.00 USD reserved against the USD wallet → 375.00 SAR in base.
       w3: [
-        { goalId: 'trip', goalName: 'Trip', color: '#F59E0B', amount: 10000 },
+        {
+          ownerId: 'trip',
+          owner: 'goal' as const,
+          ownerName: 'Trip',
+          color: '#F59E0B',
+          amount: 10000,
+        },
       ],
     }
     const view = buildWalletsView(sampleTree(), 'SAR', rates, {}, reservations)
@@ -161,7 +180,15 @@ describe('buildWalletsView reservations', () => {
   it('allows over-reserving a wallet — available goes negative and is flagged', () => {
     const reservations = {
       // 6,000 reserved against a 5,000.00 balance.
-      w2: [{ goalId: 'x', goalName: 'X', color: '#000', amount: 600000 }],
+      w2: [
+        {
+          ownerId: 'x',
+          owner: 'goal' as const,
+          ownerName: 'X',
+          color: '#000',
+          amount: 600000,
+        },
+      ],
     }
     const view = buildWalletsView(sampleTree(), 'SAR', rates, {}, reservations)
     const w2 = view.rows.find((r) => r.id === 'w2')!

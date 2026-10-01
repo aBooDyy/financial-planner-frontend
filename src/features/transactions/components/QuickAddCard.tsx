@@ -97,6 +97,7 @@ export function QuickAddCard({
       ...target,
       categoryId,
       goalId: link?.goalId ?? null,
+      billId: link?.billId ?? null,
       plannedId: link?.plannedId ?? null,
       date: ymd(startOfToday()),
       note: note.trim() || link?.name || null,

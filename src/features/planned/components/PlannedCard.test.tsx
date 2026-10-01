@@ -10,13 +10,7 @@ import {
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { buildPlannedList } from '#/features/planned/data/views'
 import { indexSettlements } from '#/features/planned/data/settle'
-import {
-  goal,
-  m,
-  planned,
-  RATES,
-  wallet,
-} from '#/features/planned/testing/fixtures'
+import { m, planned, RATES, wallet } from '#/features/planned/testing/fixtures'
 import { PlannedCard } from './PlannedCard'
 
 vi.mock('@tanstack/react-router', () => ({
@@ -31,12 +25,10 @@ afterEach(cleanup)
 
 const TODAY = '2026-09-24'
 const MAIN = wallet({ id: 'w1', name: 'Main Checking' })
-const UMRAH = goal({ id: 'umrah', name: 'Umrah trip', target: m(13000) })
 
 const viewOf = (rows: ReturnType<typeof planned>[]) =>
   buildPlannedList({
     planned: rows,
-    goals: [UMRAH],
     nodes: [MAIN],
     index: indexSettlements([], []),
     rates: RATES,

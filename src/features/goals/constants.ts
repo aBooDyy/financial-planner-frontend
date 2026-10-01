@@ -1,9 +1,5 @@
 import type { CurrencyCode } from '#/lib/currency'
-import type {
-  GoalFrequency,
-  GoalKind,
-  IntervalUnit,
-} from '#/features/goals/api/types'
+import type { GoalFrequency, IntervalUnit } from '#/features/goals/api/types'
 
 export const DEFAULT_BASE_CURRENCY: CurrencyCode = 'SAR'
 
@@ -83,44 +79,4 @@ export const CUSTOM_INTERVAL_MAX = 365
 export const DEFAULT_CUSTOM_INTERVAL = 28
 export const DEFAULT_CUSTOM_UNIT: IntervalUnit = 'day'
 
-type KindMeta = { chip: string; title: string; desc: string }
-
-export const KINDS: Record<GoalKind, KindMeta> = {
-  onetime: {
-    chip: 'Goal',
-    title: 'One-time goal',
-    desc: 'Save toward a target by a date',
-  },
-  recurring: {
-    chip: 'Obligation',
-    title: 'Obligation',
-    desc: 'A recurring bill you must pay',
-  },
-  openended: {
-    chip: 'Fund',
-    title: 'Open-ended',
-    desc: 'Steady saving, no deadline',
-  },
-  sinking: {
-    chip: 'Sinking',
-    title: 'Sinking fund',
-    desc: 'Smooth a recurring future cost',
-  },
-}
-
-export const KIND_OPTIONS = Object.keys(KINDS) as GoalKind[]
-
-// Goals that come due on a frequency and carry a `nextDue` date.
-export const RECURRING_KINDS: GoalKind[] = ['recurring', 'sinking']
-
 export type FundingStatus = 'green' | 'amber' | 'red'
-
-// Status colors are fixed (independent of theme) so a funded goal always reads green, etc.
-export const STATUS_COLORS: Record<
-  FundingStatus,
-  { main: string; soft: string }
-> = {
-  green: { main: '#1F9D6B', soft: 'rgba(31,157,107,0.13)' },
-  amber: { main: '#D9882B', soft: 'rgba(217,136,43,0.15)' },
-  red: { main: '#E5484D', soft: 'rgba(229,72,77,0.13)' },
-}

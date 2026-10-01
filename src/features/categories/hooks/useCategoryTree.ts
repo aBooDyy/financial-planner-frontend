@@ -9,10 +9,11 @@ import type {
 } from '#/features/categories/data/catalog'
 import { useCategoryCatalog } from './useCategoryCatalog'
 
-/** How many ledger entries, recurring schedules and planned items are filed under a row. */
+/** How many ledger entries, bills, income streams and planned items are filed under a row. */
 type FiledCounts = {
   txCount: number
-  recurringCount: number
+  billCount: number
+  incomeCount: number
   plannedCount: number
 }
 
@@ -55,15 +56,18 @@ export function useCategoryTree(initialType: TxType = 'spend'): CategoryTree {
   const catalog = useCategoryCatalog()
   const rows = useLiveQuery(() => db.categories.toArray())
   const tx = useLedgerCounts('category')
-  const recurrings = useLiveQuery(() => db.recurrings.toArray())
+  const bills = useLiveQuery(() => db.bills.toArray())
+  const streams = useLiveQuery(() => db.incomeStreams.toArray())
   const planned = useLiveQuery(() => db.plannedTransactions.toArray())
 
   const categories = useMemo(() => {
-    const rec = tally(recurrings)
+    const bill = tally(bills)
+    const income = tally(streams)
     const plan = tally(planned)
     const countsOf = (ids: ReadonlyArray<string>): FiledCounts => ({
       txCount: sumOf(tx, ids),
-      recurringCount: sumOf(rec, ids),
+      billCount: sumOf(bill, ids),
+      incomeCount: sumOf(income, ids),
       plannedCount: sumOf(plan, ids),
     })
     return catalog.byType(type).map((c) => ({
@@ -71,7 +75,7 @@ export function useCategoryTree(initialType: TxType = 'spend'): CategoryTree {
       ...countsOf([c.id, ...c.subs.map((s) => s.id)]),
       subs: c.subs.map((s) => ({ ...s, ...countsOf([s.id]) })),
     }))
-  }, [catalog, type, tx, recurrings, planned])
+  }, [catalog, type, tx, bills, streams, planned])
 
   return { loading: rows === undefined, type, setType, categories }
 }

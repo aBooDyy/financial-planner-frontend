@@ -98,18 +98,20 @@ export async function exportJson(): Promise<void> {
     categories,
     transactions,
     budgets,
-    recurrings,
+    bills,
     goals,
     incomeStreams,
+    setAsides,
   ] = await Promise.all([
     db.balanceNodes.toArray(),
     db.exchangeRates.toArray(),
     db.categories.toArray(),
     db.transactions.toArray(),
     db.budgets.toArray(),
-    db.recurrings.toArray(),
+    db.bills.toArray(),
     db.goals.toArray(),
     db.incomeStreams.toArray(),
+    db.setAsides.toArray(),
   ])
   const payload = {
     exportedAt: new Date().toISOString(),
@@ -118,9 +120,10 @@ export async function exportJson(): Promise<void> {
     categories: live(categories),
     transactions: live(transactions),
     budgets: live(budgets),
-    recurrings: live(recurrings),
+    bills: live(bills),
     goals: live(goals),
     incomeStreams: live(incomeStreams),
+    setAsides: live(setAsides),
   }
   download(
     'means-backup.json',

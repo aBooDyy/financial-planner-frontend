@@ -49,20 +49,20 @@ const sharedInputs = memoLast(
   (
     goals: PlannerInputs['goals'],
     income: PlannerInputs['income'],
-    recurrings: PlannerInputs['recurrings'],
+    bills: PlannerInputs['bills'],
     planned: PlannerInputs['planned'],
     txns: PlannerInputs['txns'],
-    allocations: PlannerInputs['allocations'],
+    setAsides: PlannerInputs['setAsides'],
     base: CurrencyCode,
     ratesKey: string,
   ): PlannerInputs =>
     liveInputs({
       goals,
       income,
-      recurrings,
+      bills,
       planned,
       txns,
-      allocations,
+      setAsides,
       base,
       rates: JSON.parse(ratesKey) as RatesMap,
     }),
@@ -95,10 +95,10 @@ export function usePlannedData(): PlannedData {
   const inputs = sharedInputs(
     tables.goals ?? NONE,
     tables.income ?? NONE,
-    tables.recurrings ?? NONE,
+    tables.bills ?? NONE,
     tables.planned ?? NONE,
     tables.txns ?? NONE,
-    tables.allocations ?? NONE,
+    tables.setAsides ?? NONE,
     base,
     JSON.stringify(rates),
   )
@@ -108,7 +108,7 @@ export function usePlannedData(): PlannedData {
       tables.goals === undefined ||
       tables.planned === undefined ||
       tables.txns === undefined ||
-      tables.allocations === undefined,
+      tables.setAsides === undefined,
     userId,
     today,
     todayDate,

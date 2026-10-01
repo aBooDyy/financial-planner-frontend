@@ -14,12 +14,17 @@ const want = (row: LocalPlanned): DesiredPlanned => {
   return rest
 }
 
-const umrah = goal({ id: 'umrah', kind: 'onetime', plannedAt: '2026-06-12' })
-const fund = goal({ id: 'fund', kind: 'openended', plannedAt: '2026-06-12' })
-const rent = goal({ id: 'rent', kind: 'recurring', plannedAt: '2026-06-12' })
+const umrah = goal({
+  id: 'umrah',
+  target: m(13000),
+  dueDate: '2027-03-01',
+  plannedAt: '2026-06-12',
+})
+const fund = goal({ id: 'fund', amount: m(900), plannedAt: '2026-06-12' })
+const car = goal({ id: 'car', amount: m(500), plannedAt: '2026-06-12' })
 
 const ctx = (over: Partial<ReconcileContext> = {}): ReconcileContext => {
-  const goals: LocalGoal[] = [umrah, fund, rent]
+  const goals: LocalGoal[] = [umrah, fund, car]
   return {
     today: TODAY,
     mode: 'fill',
@@ -27,7 +32,7 @@ const ctx = (over: Partial<ReconcileContext> = {}): ReconcileContext => {
     goals: new Map(goals.map((g) => [g.id, g])),
     activeGoalIds: new Set(goals.map((g) => g.id)),
     incomeIds: new Set(['salary']),
-    recurringIds: new Set(['gym']),
+    billIds: new Set(['rent']),
     ...over,
   }
 }
@@ -108,14 +113,14 @@ describe('reconcilePlanned — fill', () => {
     ])
   })
 
-  it('follows a schedule’s new category on its future rows', () => {
+  it('follows a bill’s new category on its future rows', () => {
     const gym = (categoryId: string) =>
       planned({
         id: 'gym:2026-10-05',
-        origin: 'recurring',
+        origin: 'bill',
         role: 'payment',
         goalId: null,
-        recurringId: 'gym',
+        billId: 'rent',
         name: 'Gym',
         occurrence: '2026-10-05',
         categoryId,
@@ -138,7 +143,7 @@ describe('reconcilePlanned — fill', () => {
     const plan = reconcilePlanned(
       [],
       existing,
-      ctx({ activeGoalIds: new Set(['fund', 'rent']) }),
+      ctx({ activeGoalIds: new Set(['fund', 'car']) }),
     )
     expect(plan.remove).toEqual(['umrah:2026-10-01'])
   })
@@ -163,21 +168,21 @@ describe('reconcilePlanned — fill', () => {
     )
   })
 
-  it('removes a deleted stream’s and schedule’s future rows', () => {
+  it('removes a deleted stream’s and bill’s future rows', () => {
     const plan = reconcilePlanned(
       [],
       [
         payday('2026-10-27'),
         planned({
           id: 'gym:2026-10-05',
-          origin: 'recurring',
+          origin: 'bill',
           role: 'payment',
           goalId: null,
-          recurringId: 'gym',
+          billId: 'gym',
           occurrence: '2026-10-05',
         }),
       ],
-      ctx({ incomeIds: new Set(), recurringIds: new Set() }),
+      ctx({ incomeIds: new Set(), billIds: new Set() }),
     )
     expect(plan.remove.sort()).toEqual(['gym:2026-10-05', 'salary:2026-10-27'])
   })
@@ -307,7 +312,7 @@ describe('orphanedPlanned', () => {
   const origins = {
     goalIds: new Set(['umrah']),
     incomeIds: new Set(['salary']),
-    recurringIds: new Set(['gym']),
+    billIds: new Set(['rent']),
   }
   const row = (id: string, over: Partial<LocalPlanned>) =>
     planned({ id, occurrence: '2026-09-01', ...over })
@@ -323,16 +328,28 @@ describe('orphanedPlanned', () => {
         goalId: null,
         incomeStreamId: 'old-stream',
       }),
-      row('recurring-null', {
-        origin: 'recurring',
+      row('bill-null', {
+        origin: 'bill',
         role: 'payment',
         goalId: null,
-        recurringId: null,
+        billId: null,
+      }),
+      row('bill-gone', {
+        origin: 'bill',
+        role: 'set_aside',
+        goalId: null,
+        billId: 'old-bill',
       }),
     ]
     const plan = orphanedPlanned(rows, origins, (p) => p.id === 'goal-partial')
     expect(plan.skip.sort()).toEqual(
-      ['goal-gone', 'goal-null', 'income-gone', 'recurring-null'].sort(),
+      [
+        'goal-gone',
+        'goal-null',
+        'income-gone',
+        'bill-null',
+        'bill-gone',
+      ].sort(),
     )
     expect(plan.closeRest).toEqual(['goal-partial'])
   })
@@ -361,12 +378,24 @@ describe('orphanedPlanned', () => {
     })
   })
 
-  it('skips a hand-made set-aside whose goal is gone — it could never be confirmed', () => {
+  it('skips a hand-made set-aside whose goal or bill is gone — it could never be confirmed', () => {
     const plan = orphanedPlanned(
-      [row('manual-set-aside', { origin: 'manual', goalId: 'gone' })],
+      [
+        row('manual-set-aside', { origin: 'manual', goalId: 'gone' }),
+        row('manual-bill-set-aside', {
+          origin: 'manual',
+          goalId: null,
+          billId: 'old-bill',
+        }),
+        row('manual-live-bill', {
+          origin: 'manual',
+          goalId: null,
+          billId: 'rent',
+        }),
+      ],
       origins,
       () => false,
     )
-    expect(plan.skip).toEqual(['manual-set-aside'])
+    expect(plan.skip).toEqual(['manual-set-aside', 'manual-bill-set-aside'])
   })
 })

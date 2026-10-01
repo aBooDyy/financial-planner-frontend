@@ -15,7 +15,7 @@ const CHUNK_SIZE = 200
 
 const now = () => new Date().toISOString()
 
-/** The marker every imported row carries, matching `recurring:<id>:<date>` and `email:<id>`. */
+/** The marker every imported row carries, in the same `<kind>:<id>` form as `email:<id>`. */
 export const batchSource = (batchId: string): string => `csv:${batchId}`
 
 export const batchIdFromSource = (source: string | null): string | null =>

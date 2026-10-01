@@ -40,14 +40,16 @@ const withPots = (over: Partial<BalanceRow> = {}) =>
     availableStr: 'SR 4,933.00',
     reservations: [
       {
-        goalId: 'umrah',
-        goalName: 'Umrah trip',
+        ownerId: 'umrah',
+        owner: 'goal',
+        ownerName: 'Umrah trip',
         color: '#F59E0B',
         amountStr: 'SR 4,000.00',
       },
       {
-        goalId: 'tuition',
-        goalName: 'Tuition',
+        ownerId: 'tuition',
+        owner: 'goal',
+        ownerName: 'Tuition',
         color: '#8B5CF6',
         amountStr: 'SR 1,067.00',
       },

@@ -6,11 +6,10 @@ import { db } from '#/db/db'
 import type {
   LocalBalanceNode,
   LocalGoal,
-  LocalGoalAllocation,
+  LocalSetAside,
   LocalTransaction,
 } from '#/db/types'
-import { walletReservations } from '#/features/goals/data/reservations'
-import { startOfToday } from '#/features/goals/data/planning'
+import { walletSetAsides } from '#/features/setAsides/data/totals'
 import { walletDeltas } from '#/features/transactions/data/ledger'
 import { activeNodes } from '#/features/wallets/data/archive'
 import {
@@ -75,30 +74,30 @@ const tx = (
 const GOAL: LocalGoal = {
   id: 'trip',
   name: 'Trip',
-  kind: 'onetime',
   currency: 'SAR',
   color: '#EC4899',
   position: 0,
   amount: null,
   target: 500_000,
-  saved: 0,
-  frequency: null,
-  customInterval: null,
-  customUnit: null,
-  nextDue: null,
-  dueDate: null,
+  dueDate: '2027-01-01',
+  mustHave: false,
+  saveWalletId: null,
+  useCategoryId: null,
+  closedAt: null,
+  pausedAt: null,
   plannedAt: null,
   planAmount: null,
   planCount: null,
   planStart: null,
   setAsideDay: null,
-  payOnDue: false,
   ...meta,
 }
 
-const ALLOCATION: LocalGoalAllocation = {
+const SET_ASIDE: LocalSetAside = {
   id: 'a1',
   goalId: 'trip',
+  billId: null,
+  occurrence: null,
   source: 'wallet',
   walletId: 'checking',
   externalLabel: null,
@@ -108,6 +107,9 @@ const ALLOCATION: LocalGoalAllocation = {
   position: 0,
   date: '2026-05-01',
   plannedId: null,
+  releasedAt: null,
+  releasedById: null,
+  movedByTransferId: null,
   ...meta,
 }
 
@@ -146,7 +148,7 @@ beforeAll(async () => {
   await db.balanceNodes.bulkPut(NODES)
   await db.transactions.bulkPut(TXNS)
   await db.goals.bulkPut([GOAL])
-  await db.goalAllocations.bulkPut([ALLOCATION])
+  await db.setAsides.bulkPut([SET_ASIDE])
 })
 
 /** What the page showed when it held every row. */
@@ -154,15 +156,7 @@ function fromEveryRow() {
   const rates = mergeRates([])
   const live = NODES.filter((n) => n.deleted === 0)
   const deltas = walletDeltas(live, TXNS, rates)
-  const reservations = walletReservations(
-    [ALLOCATION],
-    [GOAL],
-    live,
-    rates,
-    TXNS,
-    startOfToday(),
-    [],
-  )
+  const reservations = walletSetAsides([SET_ASIDE], [GOAL], [], live, rates)
   return {
     deltas,
     view: buildWalletsView(
@@ -172,7 +166,7 @@ function fromEveryRow() {
       deltas,
       reservations,
     ),
-    held: heldCurrencies('SAR', [live, [GOAL], TXNS, [ALLOCATION], []]),
+    held: heldCurrencies('SAR', [live, [GOAL], [], TXNS, [SET_ASIDE], []]),
   }
 }
 
@@ -184,7 +178,7 @@ describe('useWallets', () => {
     expect(result.current.deltas).toEqual(expected.deltas)
     expect(result.current.view).toEqual(expected.view)
     expect(result.current.held).toEqual(expected.held)
-    // The set-aside was partly paid out, and the deleted EUR row still counts as held.
+    // The set-aside earmarks the wallet, and the deleted EUR row still counts as held.
     expect(result.current.view.hasReserved).toBe(true)
     expect(result.current.held).toContain('EUR')
   })

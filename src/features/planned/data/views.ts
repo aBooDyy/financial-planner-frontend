@@ -5,8 +5,8 @@
 import type {
   LocalBalanceNode,
   LocalGoal,
-  LocalGoalAllocation,
   LocalPlanned,
+  LocalSetAside,
   LocalTransaction,
 } from '#/db/types'
 import type { GoalProgress } from '#/features/goals/data/progress'
@@ -37,11 +37,11 @@ export function relativeDue(date: string, today: string): string {
 
 // --- The Planned tab (1c) ------------------------------------------------------------
 
-export type PlannedTag = 'goal' | 'obligation' | 'income'
+export type PlannedTag = 'goal' | 'bill' | 'income'
 
 export const TAG_LABEL: Record<PlannedTag, string> = {
   goal: 'Goal',
-  obligation: 'Obligation',
+  bill: 'Bill',
   income: 'Income',
 }
 
@@ -93,7 +93,6 @@ export const NEXT_DAYS = 14
 
 export type PlannedListInput = {
   planned: ReadonlyArray<LocalPlanned>
-  goals: ReadonlyArray<LocalGoal>
   nodes: ReadonlyArray<LocalBalanceNode>
   index: SettlementIndex
   rates: RatesMap
@@ -101,14 +100,9 @@ export type PlannedListInput = {
   today: string
 }
 
-const tagOf = (
-  item: LocalPlanned,
-  goals: ReadonlyMap<string, LocalGoal>,
-): PlannedTag => {
+const tagOf = (item: LocalPlanned): PlannedTag => {
   if (item.role === 'income') return 'income'
-  if (item.role === 'payment') return 'obligation'
-  const goal = item.goalId ? goals.get(item.goalId) : undefined
-  return goal?.kind === 'recurring' ? 'obligation' : 'goal'
+  return item.origin === 'bill' || item.billId ? 'bill' : 'goal'
 }
 
 /** Each goal's generated set-asides in order, so a row can say "3 of 8". */
@@ -132,7 +126,6 @@ function sequences(
 
 export function buildPlannedList(input: PlannedListInput): PlannedListView {
   const { index, rates, base, today } = input
-  const goals = new Map(input.goals.map((g) => [g.id, g]))
   const wallets = new Map(
     input.nodes.filter((n) => n.kind === 'wallet').map((n) => [n.id, n]),
   )
@@ -143,7 +136,7 @@ export function buildPlannedList(input: PlannedListInput): PlannedListView {
   const view = (item: LocalPlanned): PlannedRowView => {
     const settled = settledOf(item, index, rates)
     const remainder = Math.max(0, item.amount - settled)
-    const tag = tagOf(item, goals)
+    const tag = tagOf(item)
     const isDue = item.date <= today
     const wallet = item.walletId ? wallets.get(item.walletId) : undefined
     const sequence = seq.get(item.id) ?? null
@@ -231,7 +224,7 @@ export type ContributionEntry = {
   date: string
   /** In the goal's currency: a settlement's amount, or what is still open on a planned row. */
   amount: number
-  source: 'transaction' | 'allocation' | 'planned'
+  source: 'transaction' | 'setAside' | 'planned'
   settlementId: string | null
   plannedId: string | null
   walletId: string | null
@@ -275,14 +268,15 @@ export type GoalPlanView = {
     oldestDue: LocalPlanned | null
   }
   progress: {
-    /** Stored baseline + settled progress. */
+    /** Live set-asides plus what was used from the goal. */
     saved: number
     /** Σ still open on rows that are due — the striped segment. */
     awaiting: number
-    /** Target (one-time / open-ended) or this cycle's amount (obligations). */
+    /** The goal's target; 0 for a goal without one. */
     target: number
     left: number
-    stillReserved: number
+    /** Live set-asides alone. */
+    setAside: number
   }
   nextPlanned: LocalPlanned | null
   contributions: ContributionEntry[]
@@ -294,7 +288,7 @@ export type GoalPlanInput = {
   /** What the live plan would generate today (the planner's `desired`). */
   desired: ReadonlyArray<DesiredPlanned>
   txns: ReadonlyArray<LocalTransaction>
-  allocations: ReadonlyArray<LocalGoalAllocation>
+  setAsides: ReadonlyArray<LocalSetAside>
   progress: GoalProgress | undefined
   nodes: ReadonlyArray<LocalBalanceNode>
   index: SettlementIndex
@@ -336,11 +330,8 @@ export function buildGoalPlanView(input: GoalPlanInput): GoalPlanView {
   const awaiting = mine
     .filter((p) => p.status === 'open' && p.date <= today)
     .reduce((a, p) => a + inGoal(remainderOf(p, index, rates), p.currency), 0)
-  const saved = goal.saved + (input.progress?.progress ?? 0)
-  const target =
-    goal.kind === 'onetime' || goal.kind === 'openended'
-      ? (goal.target ?? 0)
-      : (goal.amount ?? 0)
+  const saved = input.progress?.progress ?? 0
+  const target = goal.target ?? 0
 
   const contributions: ContributionEntry[] = []
   for (const t of input.txns) {
@@ -358,22 +349,22 @@ export function buildGoalPlanView(input: GoalPlanInput): GoalPlanView {
       caption: `${wallets.get(t.walletId) ?? 'Deleted account'} · confirmed`,
     })
   }
-  for (const a of input.allocations) {
+  for (const a of input.setAsides) {
     if (a.deleted !== 0 || a.goalId !== goal.id) continue
     const from =
-      a.source === 'external'
-        ? (a.externalLabel ?? 'External')
+      a.source === 'outside'
+        ? (a.externalLabel ?? 'Outside')
         : (wallets.get(a.walletId ?? '') ?? 'Deleted account')
     contributions.push({
       key: `a:${a.id}`,
       state: 'confirmed',
       date: a.date,
       amount: inGoal(a.amount, a.currency),
-      source: 'allocation',
+      source: 'setAside',
       settlementId: a.id,
       plannedId: a.plannedId,
       walletId: a.source === 'wallet' ? a.walletId : null,
-      externalLabel: a.source === 'external' ? a.externalLabel : null,
+      externalLabel: a.source === 'outside' ? a.externalLabel : null,
       caption: `${from} · confirmed`,
     })
   }
@@ -431,7 +422,7 @@ export function buildGoalPlanView(input: GoalPlanInput): GoalPlanView {
       awaiting,
       target,
       left: Math.max(0, target - saved),
-      stillReserved: input.progress?.stillReserved ?? 0,
+      setAside: input.progress?.setAside ?? 0,
     },
     nextPlanned:
       mine

@@ -18,10 +18,10 @@ import type { CurrencyCode } from '#/lib/currency'
  */
 export function useTransactions() {
   const budgetRows = useLiveQuery(() => db.budgets.toArray())
-  const recurringRows = useLiveQuery(() => db.recurrings.toArray())
   const nodeRows = useLiveQuery(() => db.balanceNodes.toArray())
   const goalRows = useLiveQuery(() => db.goals.toArray())
-  const allocationRows = useLiveQuery(() => db.goalAllocations.toArray())
+  const billRows = useLiveQuery(() => db.bills.toArray())
+  const setAsideRows = useLiveQuery(() => db.setAsides.toArray())
   // `null`, not `undefined`, when there is no row — so "no settings" is not "still loading".
   const settings = useLiveQuery(
     async () => (await db.balanceSettings.get(SETTINGS_KEY)) ?? null,
@@ -37,10 +37,10 @@ export function useTransactions() {
 
   const loading =
     budgetRows === undefined ||
-    recurringRows === undefined ||
     nodeRows === undefined ||
     goalRows === undefined ||
-    allocationRows === undefined ||
+    billRows === undefined ||
+    setAsideRows === undefined ||
     settings === undefined ||
     !ratesReady ||
     !catalogLoaded
@@ -64,18 +64,22 @@ export function useTransactions() {
     () => (goalRows ?? []).filter((g) => g.deleted === 0),
     [goalRows],
   )
+  const bills = useMemo(
+    () => (billRows ?? []).filter((b) => b.deleted === 0),
+    [billRows],
+  )
 
   const inputs = useMemo(
     (): SpendingInputs => ({
       budgets: budgetRows ?? [],
-      recurrings: recurringRows ?? [],
       nodes: accounts.nodes,
       base,
       rates,
-      allocations: allocationRows ?? [],
+      setAsides: setAsideRows ?? [],
       goals,
+      bills,
     }),
-    [budgetRows, recurringRows, accounts, base, rates, allocationRows, goals],
+    [budgetRows, accounts, base, rates, setAsideRows, goals, bills],
   )
 
   return {

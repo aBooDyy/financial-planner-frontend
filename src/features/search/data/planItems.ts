@@ -1,9 +1,6 @@
-import type { LocalBudget, LocalPlanned, LocalRecurring } from '#/db/types'
+import type { LocalBudget, LocalPlanned } from '#/db/types'
 import { FREQUENCIES } from '#/features/goals/constants'
-import {
-  customFrequencyMeta,
-  frequencyMetaOf,
-} from '#/features/goals/data/cadence'
+import { customFrequencyMeta } from '#/features/goals/data/cadence'
 import {
   budgetIdentity,
   budgetPeriodLabel,
@@ -13,7 +10,6 @@ import type { CurrencyCode } from '#/lib/currency'
 import {
   NEUTRAL_COLOR,
   dateLabel,
-  merchantName,
   nodeIcon,
   signedMoney,
   toBaseMajor,
@@ -45,8 +41,8 @@ function categoryFacts(categoryId: string | null, ctx: ItemContext) {
 }
 
 const seriesOf = (p: LocalPlanned): string | undefined =>
-  p.recurringId
-    ? `recurring:${p.recurringId}`
+  p.billId
+    ? `bill:${p.billId}:${p.role}`
     : p.incomeStreamId
       ? `income:${p.incomeStreamId}`
       : p.goalId
@@ -139,48 +135,4 @@ export function budgetItems(
   ctx: ItemContext,
 ): SearchItem[] {
   return budgets.filter((b) => b.deleted === 0).map((b) => budgetItem(b, ctx))
-}
-
-function recurringItem(r: LocalRecurring, ctx: ItemContext): SearchItem {
-  const cat = categoryFacts(r.categoryId, ctx)
-  const incoming = r.type === 'income'
-  return {
-    row: () => ({
-      key: `recurring:${r.id}`,
-      target: { kind: 'recurring', id: r.id },
-      title: r.name,
-      sub: `${frequencyMetaOf(r).label} · next ${dateLabel(r.nextDue, ctx)}`,
-      valueStr: signedMoney(r.amount, r.currency, incoming, ctx),
-      positive: incoming,
-      color: cat?.color ?? NEUTRAL_COLOR,
-      iconId: cat?.icon ?? null,
-    }),
-    text: searchText([
-      r.name,
-      r.note,
-      ...(cat?.path ?? []),
-      merchantName(r.merchantId, ctx),
-      ...amountFields(r.amount, r.currency, ctx),
-    ]),
-    flow: r.type,
-    date: r.nextDue,
-    categoryId: cat?.leafId ?? null,
-    rootId: cat?.rootId ?? null,
-    wholeCategory: false,
-    walletIds: [r.walletId],
-    baseMajor: toBaseMajor(r.amount, r.currency, ctx),
-  }
-}
-
-/** Every live schedule, next due first. */
-export function recurringItems(
-  recurrings: ReadonlyArray<LocalRecurring>,
-  ctx: ItemContext,
-): SearchItem[] {
-  return recurrings
-    .filter((r) => r.deleted === 0)
-    .sort(
-      (a, b) => a.nextDue.localeCompare(b.nextDue) || a.id.localeCompare(b.id),
-    )
-    .map((r) => recurringItem(r, ctx))
 }

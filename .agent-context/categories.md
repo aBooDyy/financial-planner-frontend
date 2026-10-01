@@ -33,8 +33,9 @@ has, and one table means one model, one outbox entity, one sync handler.
   a single `categoryId` (wire `category_id`, a server FK to `t_categories`): the child's id
   when a subcategory was chosen, else the root's; the root is found through the catalog
   (`rootOf`). That covers `LocalTransaction.categoryId` (null on transfer legs and
-  adjustments), `LocalRecurring.categoryId` (required), `LocalPlanned.categoryId` (null on a
-  set-aside), `LocalMerchant.learnedCategoryId`, `LocalIntegrationKey.defaultCategoryId`,
+  adjustments), `LocalBill.categoryId` (required, spend), `LocalIncomeStream.categoryId`
+  (required, income), `LocalGoal.useCategoryId` (nullable, spend), `LocalPlanned.categoryId`
+  (null on a set-aside), `LocalMerchant.learnedCategoryId`, `LocalIntegrationKey.defaultCategoryId`,
   `LocalInboundImport.suggestedCategoryId`, and an email rule's `categoryId`. Budgets stay
   **root-scoped**: `LocalBudget.categoryId` is a **root** id (set for `scopeType: 'category'`)
   and `walletId` is set for `'wallet'` — together they replaced the overloaded `target`. A row
@@ -81,9 +82,10 @@ version and retries once, `404` drops the local row, network errors bubble. Spec
   (a retried create) that row is stored as-is. Otherwise the slug was taken — another device
   created the same category first — so it finds the server row with the **same `parentId` and
   `slug`** and `remapLocally(localId, serverId)` (`data/refile.ts`) rewrites every local
-  reference in one Dexie transaction: `categoryId` on transactions, recurrings and planned rows,
-  budgets' `categoryId`, merchants' `learnedCategoryId`, children's `parentId`, and the same
-  wire fields (`category_id`, `learned_category_id`, `parent_id`) inside queued outbox payloads.
+  reference in one Dexie transaction: `categoryId` on transactions, bills, income streams and
+  planned rows, budgets' `categoryId`, merchants' `learnedCategoryId`, goals' `useCategoryId`,
+  children's `parentId`, and the same wire fields (`category_id`, `learned_category_id`,
+  `use_category_id`, `parent_id`) inside queued outbox payloads.
   Then the local row goes. This hazard only exists since rows store ids: under slugs, two
   devices' "Coffee" were the same filing. An import template's `config` (owned by
   `features/import`) is rewritten by that slice's `remapTemplateCategories(fromId, toId)`
@@ -102,7 +104,7 @@ version and retries once, `404` drops the local row, network errors bubble. Spec
   ([data-layer-and-sync.md](data-layer-and-sync.md#failed-pushes-flag-hold-retry--never-drop)).
   Either way, first `pushCategoryDelete` clears the `transaction`, `planned` and `merchant`
   delta watermarks, so the rows this device moved or unlinked are restored from the server too
-  (budgets and recurrings pull in full anyway). A `404` does the same and then drops the local
+  (budgets, bills, income streams and goals pull in full anyway). A `404` does the same and then drops the local
   row.
 
 Copy-on-write seeding on first read is unchanged — it just seeds children too.
@@ -269,8 +271,8 @@ deleteCategory(id, moveToId?)
   subtree = id + its children's ids
   target  = moveToId, if it is live, outside the subtree and of the same type
   target?  refileLocally(subtree, target.id, rootOf(target))    → the delete carries { move_to }
-  in use?  (any live transaction / recurring / planned row on the subtree, via the
-           `categoryId` index)                                  → CategoryDeleteRefused('in_use')
+  in use?  (any live transaction / bill / planned row on the subtree, via the
+           `categoryId` index, or income stream, by a filter)  → CategoryDeleteRefused('in_use')
   else     unlinkLocally(subtree)                               → the delete carries no payload
   for each child: drop its pending outbox entries, delete the local row
   drop the parent's pending outbox entries, delete the parent locally
@@ -288,12 +290,15 @@ never synced needs no server op at all.
 
 ### Moving what is filed — `data/refile.ts`
 
-A category **in use** (anything in the ledger, a schedule or a planned row) can only be deleted
+A category **in use** (anything in the ledger, a bill, an income stream or a planned row) can
+only be deleted
 with a target; the server refuses otherwise. The "keep them as they are" option is gone — it was
 lossy anyway. `refileLocally(from, to, toRoot)` mirrors `DELETE /categories/{id}?move_to=`:
 
-- transactions, recurrings and planned rows filed under any id in `from` → `to` (found through
-  the `categoryId` index);
+- transactions, bills and planned rows filed under any id in `from` → `to` (found through
+  the `categoryId` index), and income streams likewise (a filter over the small table);
+- goals whose `useCategoryId` is in `from` → `to` — or `null` when nothing is filed and the
+  delete just unlinks (a goal's remembered "Use it" category does not make a category in use);
 - budgets on `from` → **`toRoot`** (budgets are root-scoped, so moving into a child caps its
   root);
 - merchants whose `learnedCategoryId` is in `from` → `to`.
@@ -324,10 +329,10 @@ Recorded as a sync pattern in
 `features/categories/components/`.
 
 - **`useCategoryTree(initialType)`** is the list's view model: the catalog filtered to one
-  type, with live `txCount` / `recurringCount` / `plannedCount` per row, tallied by
+  type, with live `txCount` / `billCount` / `incomeCount` / `plannedCount` per row, tallied by
   `categoryId`. `txCount` comes from the stored `category` ledger totals
-  (`useLedgerCounts('category')`), never a scan of `transactions`; recurrings and planned rows
-  are small tables and are tallied directly. A **parent's counts roll up its children's** — its delete takes them along, so
+  (`useLedgerCounts('category')`), never a scan of `transactions`; bills, income streams and
+  planned rows are small tables and are tallied directly. A **parent's counts roll up its children's** — its delete takes them along, so
   that is the number a user deleting it needs to see; a child counts only rows filed under its
   own id.
 - **`CategoryTree` / `CategoryTreeRow`** render the two levels with one row anatomy.
@@ -381,7 +386,7 @@ siblings. A still-queued create has its payload rewritten instead, as for any ed
   top-level option's wording differs (`noneLabel`).
 - **`DeleteCategoryDialog`** is a `ConfirmDialog` (trash icon, danger tone). It names the
   subcategories about to go with the parent and, when anything is filed under it (`txCount` /
-  `recurringCount` / `plannedCount` from `useCategoryTree`), says how much will move and shows a
+  `billCount` / `incomeCount` / `plannedCount` from `useCategoryTree`), says how much will move and shows a
   required **"Move them to"** `MoveTargetSelect` — there is no keep option. With no same-type
   category left it says to add one first and the confirm stays disabled. With nothing filed it is
   a plain confirm ("Nothing is filed under it. This can't be undone."). The confirm reads
@@ -396,7 +401,7 @@ siblings. A still-queued create has its payload rewritten instead, as for any ed
 ## The picker — `CategoryPicker`
 
 `components/CategoryPicker` is the one control for choosing a category **or** a subcategory,
-everywhere one is chosen: quick-add, the transaction/recurring editor, the review queue, an
+everywhere one is chosen: quick-add, the transaction editor, the review queue, an
 email rule's and an integration key's default. Props: `type`, `categoryId` (the leaf),
 `onChange(categoryId)`, plus `none: { label, onPick }` for a surface where "no category" is an
 answer (the rule and key defaults: "Decide when reviewing") — it becomes the list's first row,
@@ -420,7 +425,7 @@ built **only while open** — the same pattern as `CurrencyPicker`:
 
 | Surface                                                            | How                                                                                                                                                                                         |
 | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `features/transactions/data/selectors.ts`                          | `buildCashflow` / `buildBreakdown` / `buildActivityList` / `buildBudgetsView` / `buildRecurringView` take `catalog: CategoryCatalog` as a **required second parameter**                     |
+| `features/transactions/data/selectors.ts`                          | `buildCashflow` / `buildBreakdown` / `buildActivityList` / `buildBudgetsView` take `catalog: CategoryCatalog` as a **required second parameter**                     |
 | `useTransactions`                                                  | returns `catalog` alongside `SpendingData`; `TransactionsPage` threads it                                                                                                                   |
 | `CategoryPicker`, `TransactionDialog`, `QuickAddCard`, `CategoryIcon`       | `useCategoryCatalog()` directly                                                                                                                                                             |
 | `features/import`                                                  | `useCsvImport` builds the catalog from its own Dexie read; `categoryOptions(catalog)` flattens it for the matcher by id, `fallbackCategoriesOf(catalog)` picks one default per direction, a v1 template is upgraded through `bySlug` ([import.md](import.md)) |

@@ -8,7 +8,6 @@ import { BreakdownCard } from './BreakdownCard'
 import { BudgetHealthCard, BudgetsCard } from './BudgetsCard'
 import { CashflowHeroCard } from './CashflowHeroCard'
 import { DaysCard } from './DaysCard'
-import { RecurringCard, UpcomingCard } from './RecurringCard'
 import { TransactionList } from './TransactionList'
 
 /**
@@ -70,24 +69,11 @@ describe('loading cards', () => {
     expect(hasFigure(health.textContent)).toBe(false)
   })
 
-  it('recurring keeps its header and actions, with placeholder rows', () => {
-    const list = mount(<RecurringCard view={null} onAdd={noop} onEdit={noop} />)
-    expect(screen.getByRole('button', { name: /new recurring/i })).toBeTruthy()
-    expect(screen.queryByText('No recurring items yet')).toBeNull()
-    expect(hasFigure(list.textContent)).toBe(false)
-
-    const upcoming = mount(<UpcomingCard view={null} onAdd={noop} />)
-    expect(screen.getByText('Upcoming this month')).toBeTruthy()
-    expect(screen.queryByText('Nothing else due this month')).toBeNull()
-    expect(placeholders(upcoming)).toBe(2 * 4)
-  })
-
   it('the calendar draws its days and working controls, with no figure in any cell', () => {
     const calendar = buildCalendar(
       {
         txns: [],
         budgets: [],
-        recurrings: [],
         nodes: [],
         base: 'SAR',
         rates: {},

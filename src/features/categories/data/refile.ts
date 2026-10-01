@@ -7,7 +7,9 @@ import type { OutboxEntity, OutboxEntry } from '#/db/types'
 export const refileTables = () => [
   db.categories,
   db.transactions,
-  db.recurrings,
+  db.bills,
+  db.incomeStreams,
+  db.goals,
   db.plannedTransactions,
   db.budgets,
   db.merchants,
@@ -24,18 +26,20 @@ export async function subtreeIds(id: string): Promise<Set<string>> {
   return new Set([id, ...children.map((c) => c.id)])
 }
 
-/** Whether any live transaction, recurring or planned row is filed under one of `ids`. */
+/**
+ * Whether any live transaction, bill, income stream or planned row is filed under one of
+ * `ids`. A goal's remembered "Use it" category does not count: it is moved or cleared.
+ */
 export async function isInUse(ids: Ids): Promise<boolean> {
   const keys = [...ids]
-  for (const table of [
-    db.transactions,
-    db.recurrings,
-    db.plannedTransactions,
-  ]) {
+  for (const table of [db.transactions, db.bills, db.plannedTransactions]) {
     const filed = await table.where('categoryId').anyOf(keys).toArray()
     if (filed.some((row) => row.deleted === 0)) return true
   }
-  return false
+  const streams = await db.incomeStreams
+    .filter((s) => s.deleted === 0 && ids.has(s.categoryId))
+    .count()
+  return streams > 0
 }
 
 /**
@@ -67,12 +71,13 @@ export async function refileLocally(
     from,
     to,
   )
+  await moveGoalUseCategory(from, to)
   await moveCachedRefs(from, to)
 }
 
 /**
- * Mirror a delete of categories nothing is filed under: a merchant forgets them, and a budget
- * on them goes (server-side it is deleted with the category).
+ * Mirror a delete of categories nothing is filed under: a merchant and a goal forget them, and
+ * a budget on them goes (server-side it is deleted with the category).
  */
 export async function unlinkLocally(from: Ids): Promise<void> {
   await moveRefs(
@@ -83,6 +88,7 @@ export async function unlinkLocally(from: Ids): Promise<void> {
     from,
     null,
   )
+  await moveGoalUseCategory(from, null)
   await moveCachedRefs(from, null)
   const budgets = await db.budgets
     .filter((b) => b.categoryId !== null && from.has(b.categoryId))
@@ -113,6 +119,12 @@ export async function remapLocally(
     toId,
   )
   await moveRefs(db.categories, 'category', 'parentId', 'parent_id', from, toId)
+  await moveGoalUseCategory(from, toId)
+}
+
+/** A goal remembers the category "Use it" files under; it follows a move, or is cleared. */
+async function moveGoalUseCategory(from: Ids, to: string | null) {
+  await moveRefs(db.goals, 'goal', 'useCategoryId', 'use_category_id', from, to)
 }
 
 /**
@@ -135,8 +147,16 @@ async function moveCachedRefs(from: Ids, to: string | null): Promise<void> {
 
 async function moveLedger(from: Ids, to: string): Promise<void> {
   await moveIndexed(db.transactions, 'transaction', from, to)
-  await moveIndexed(db.recurrings, 'recurring', from, to)
+  await moveIndexed(db.bills, 'bill', from, to)
   await moveIndexed(db.plannedTransactions, 'planned', from, to)
+  await moveRefs(
+    db.incomeStreams,
+    'income',
+    'categoryId',
+    'category_id',
+    from,
+    to,
+  )
 }
 
 type Filed = { id: string; categoryId: string | null }

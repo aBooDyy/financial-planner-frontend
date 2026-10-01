@@ -66,10 +66,6 @@ export function useSearchView({
     () => whenEnabled(read, () => db.budgets.toArray()),
     [read],
   )
-  const recurrings = useLiveQuery(
-    () => whenEnabled(read, () => db.recurrings.toArray()),
-    [read],
-  )
   const merchants = useLiveQuery(
     () => whenEnabled(read, () => db.merchants.toArray()),
     [read],
@@ -91,7 +87,6 @@ export function useSearchView({
       !txns ||
       !planned ||
       !budgets ||
-      !recurrings ||
       !merchants ||
       !nodeRows ||
       !rateRows ||
@@ -103,7 +98,6 @@ export function useSearchView({
         txns,
         planned,
         budgets,
-        recurrings,
         nodes: nodeRows,
         merchants,
         deltas,
@@ -117,7 +111,6 @@ export function useSearchView({
     txns,
     planned,
     budgets,
-    recurrings,
     merchants,
     nodeRows,
     rateRows,

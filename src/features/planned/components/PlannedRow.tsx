@@ -8,13 +8,13 @@ import { cn } from '#/lib/utils'
 const TAG_TONE: Record<PlannedTag, TagTone> = {
   goal: 'accent',
   income: 'accent',
-  obligation: 'neutral',
+  bill: 'neutral',
 }
 
 const TAG_ICON = {
   goal: Target,
   income: ArrowDownLeft,
-  obligation: CalendarClock,
+  bill: CalendarClock,
 } satisfies Record<PlannedTag, unknown>
 
 type Props = {

@@ -14,7 +14,7 @@ const TODAY = '2026-09-27'
 
 const bill = (name: string, occurrence: string, amount: number) =>
   planned({
-    origin: 'recurring',
+    origin: 'bill',
     role: 'payment',
     goalId: null,
     name,
@@ -25,7 +25,6 @@ const bill = (name: string, occurrence: string, amount: number) =>
 function viewOf(rows: LocalPlanned[], balance: number, reserved = 0) {
   const list = buildPlannedList({
     planned: rows,
-    goals: [],
     nodes: [],
     index: indexSettlements([], []),
     rates: RATES,

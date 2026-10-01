@@ -8,9 +8,9 @@ import {
 } from '#/features/categories/__fixtures__/categories'
 import { goalProgress } from '#/features/goals/data/progress'
 import {
-  deleteAllocation,
-  createAllocation,
-} from '#/features/goals/data/mutations'
+  createSetAside,
+  deleteSetAside,
+} from '#/features/setAsides/data/mutations'
 import {
   createTransaction,
   deleteTransaction,
@@ -22,10 +22,11 @@ import {
 } from '#/features/transactions/data/selectors'
 import { periodOf } from '#/features/transactions/data/planning'
 import {
+  bill,
   goal,
+  income as stream,
   m,
   planned,
-  recurring,
   wallet,
 } from '#/features/planned/testing/fixtures'
 import {
@@ -59,18 +60,19 @@ const SEP_SET_ASIDE = planned({
 const item = (id: string) => db.plannedTransactions.get(id)
 const txOf = (plannedId: string) =>
   db.transactions.where('plannedId').equals(plannedId).toArray()
-const allocationsOf = (plannedId: string) =>
-  db.goalAllocations.where('plannedId').equals(plannedId).toArray()
+const setAsidesOf = (plannedId: string) =>
+  db.setAsides.where('plannedId').equals(plannedId).toArray()
 
 beforeEach(async () => {
   await Promise.all(
     [
       db.plannedTransactions,
       db.transactions,
-      db.goalAllocations,
+      db.setAsides,
       db.goals,
+      db.bills,
+      db.incomeStreams,
       db.balanceNodes,
-      db.recurrings,
       db.categories,
       db.outbox,
     ].map((t) => t.clear()),
@@ -82,14 +84,14 @@ beforeEach(async () => {
 })
 
 describe('confirmPlanned', () => {
-  it('turns a set-aside into a dated reservation linked back to it, and closes it', async () => {
+  it('turns a set-aside into a dated set-aside record linked back to it, and closes it', async () => {
     const result = await confirmPlanned('sep', {
       walletId: 'w1',
       date: '2026-09-24',
     })
 
-    expect(result).toMatchObject({ kind: 'allocation', status: 'done' })
-    const [reservation] = await allocationsOf('sep')
+    expect(result).toMatchObject({ kind: 'setAside', status: 'done' })
+    const [reservation] = await setAsidesOf('sep')
     expect(reservation).toMatchObject({
       goalId: 'umrah',
       source: 'wallet',
@@ -99,11 +101,11 @@ describe('confirmPlanned', () => {
       plannedId: 'sep',
     })
     expect((await item('sep'))?.status).toBe('done')
-    // A set-aside is a reservation, not a spend.
+    // A set-aside labels money in place; it is not a spend.
     expect(await db.transactions.count()).toBe(0)
     const queued = await db.outbox.toArray()
     expect(queued.map((e) => [e.entity, e.op])).toEqual([
-      ['allocation', 'create'],
+      ['setAside', 'create'],
       ['planned', 'update'],
     ])
   })
@@ -115,7 +117,7 @@ describe('confirmPlanned', () => {
     // The next confirm defaults to what is still open.
     await confirmPlanned('sep', { walletId: 'w1' })
     // Rows come back in primary-key (random uuid) order; compare them as a set.
-    const reservations = await allocationsOf('sep')
+    const reservations = await setAsidesOf('sep')
     expect(reservations.map((a) => a.amount).sort((a, b) => b - a)).toEqual([
       m(1000),
       m(500),
@@ -128,19 +130,18 @@ describe('confirmPlanned', () => {
     expect((await item('sep'))?.status).toBe('done')
     const progress = goalProgress(
       [UMRAH],
-      await db.goalAllocations.toArray(),
+      await db.setAsides.toArray(),
       [],
       {},
-      new Date(2026, 8, 24),
     ).umrah!
     expect(progress.progress).toBe(m(2000))
   })
 
   it('holds a set-aside outside any wallet when an external source is named', async () => {
     await confirmPlanned('sep', { externalLabel: 'Dad’s help' })
-    const [reservation] = await allocationsOf('sep')
+    const [reservation] = await setAsidesOf('sep')
     expect(reservation).toMatchObject({
-      source: 'external',
+      source: 'outside',
       walletId: null,
       externalLabel: 'Dad’s help',
       currency: 'SAR',
@@ -192,6 +193,27 @@ describe('confirmPlanned', () => {
     expect(income.categoryId).toBe(catId('salary'))
   })
 
+  it('files a payday under its stream’s own category', async () => {
+    await db.incomeStreams.put(
+      stream({ id: 'salary', categoryId: catId('other_income') }),
+    )
+    await db.plannedTransactions.put(
+      planned({
+        id: 'payday',
+        origin: 'income',
+        role: 'income',
+        goalId: null,
+        incomeStreamId: 'salary',
+        walletId: 'w1',
+        amount: m(12000),
+        occurrence: '2026-09-27',
+      }),
+    )
+    await confirmPlanned('payday')
+    const [income] = await txOf('payday')
+    expect(income.categoryId).toBe(catId('other_income'))
+  })
+
   it('files a payday under the income fallback when the user has no Salary category', async () => {
     await db.categories.bulkDelete([catId('salary')])
     await db.plannedTransactions.put(
@@ -211,27 +233,71 @@ describe('confirmPlanned', () => {
     expect(income.categoryId).toBe(catId('other_income'))
   })
 
-  it('records an obligation payment as a spend on the goal, in the user’s own category', async () => {
+  it('records a bill payment as a spend for the bill, in the bill’s category and merchant', async () => {
+    await db.bills.put(
+      bill({ id: 'rent', merchantId: 'm-landlord', note: 'Flat 4' }),
+    )
     await db.plannedTransactions.put(
       planned({
         id: 'rent-oct',
+        origin: 'bill',
         role: 'payment',
-        goalId: 'umrah',
+        goalId: null,
+        billId: 'rent',
         name: 'Rent',
         amount: m(3500),
         occurrence: '2026-10-01',
       }),
     )
-    await confirmPlanned('rent-oct', {
-      walletId: 'w1',
-      categoryId: catId('housing'),
-    })
+    await confirmPlanned('rent-oct', { walletId: 'w1' })
     const [payment] = await txOf('rent-oct')
     expect(payment).toMatchObject({
       type: 'spend',
-      goalId: 'umrah',
+      goalId: null,
+      billId: 'rent',
+      merchantId: 'm-landlord',
+      note: 'Flat 4',
       categoryId: catId('housing'),
       plannedId: 'rent-oct',
+    })
+  })
+
+  it('puts a bill’s set-aside toward the occurrence it covers', async () => {
+    await db.bills.put(bill({ id: 'rent' }))
+    await db.plannedTransactions.put(
+      planned({
+        id: 'rent-save',
+        origin: 'bill',
+        role: 'set_aside',
+        goalId: null,
+        billId: 'rent',
+        amount: m(1000),
+        occurrence: '2026-11-01',
+      }),
+    )
+    await confirmPlanned('rent-save', { walletId: 'w1' })
+    const [row] = await setAsidesOf('rent-save')
+    expect(row).toMatchObject({
+      goalId: null,
+      billId: 'rent',
+      occurrence: '2026-11-01',
+      amount: m(1000),
+    })
+  })
+
+  it('refuses a set-aside whose bill or goal is gone', async () => {
+    await db.plannedTransactions.put(
+      planned({
+        id: 'orphan',
+        origin: 'bill',
+        role: 'set_aside',
+        goalId: null,
+        billId: 'gone',
+        walletId: 'w1',
+      }),
+    )
+    await expect(confirmPlanned('orphan')).rejects.toMatchObject({
+      code: 'origin_gone',
     })
   })
 
@@ -244,24 +310,24 @@ describe('confirmPlanned', () => {
     })
   })
 
-  it('moves a Spending schedule past the occurrence it settled', async () => {
-    await db.recurrings.put(
-      recurring({ id: 'gym', nextDue: '2026-09-05', walletId: 'w1' }),
+  it('moves a repeating bill past the occurrence it paid', async () => {
+    await db.bills.put(
+      bill({ id: 'gym', nextDue: '2026-09-05', walletId: 'w1' }),
     )
     await db.plannedTransactions.put(
       planned({
         id: 'gym-sep',
-        origin: 'recurring',
+        origin: 'bill',
         role: 'payment',
         goalId: null,
-        recurringId: 'gym',
+        billId: 'gym',
         walletId: 'w1',
         amount: m(200),
         occurrence: '2026-09-05',
       }),
     )
     await confirmPlanned('gym-sep')
-    expect((await db.recurrings.get('gym'))?.nextDue).toBe('2026-10-05')
+    expect((await db.bills.get('gym'))?.nextDue).toBe('2026-10-05')
   })
 })
 
@@ -286,9 +352,9 @@ describe('re-opening when a settlement goes away', () => {
     expect((await item('payday'))?.status).toBe('open')
   })
 
-  it('re-opens a done set-aside when its reservation is deleted', async () => {
+  it('re-opens a done set-aside when its set-aside record is deleted', async () => {
     const { settlementId } = await confirmPlanned('sep', { walletId: 'w1' })
-    await deleteAllocation(settlementId)
+    await deleteSetAside(settlementId)
     expect((await item('sep'))?.status).toBe('open')
   })
 
@@ -296,8 +362,10 @@ describe('re-opening when a settlement goes away', () => {
     await db.plannedTransactions.put(
       planned({
         id: 'rent-oct',
+        origin: 'bill',
         role: 'payment',
-        goalId: 'umrah',
+        goalId: null,
+        billId: 'rent',
         amount: m(3500),
         occurrence: '2026-10-01',
       }),
@@ -308,7 +376,8 @@ describe('re-opening when a settlement goes away', () => {
       currency: 'SAR',
       categoryId: catId('housing'),
       walletId: 'w1',
-      goalId: 'umrah',
+      goalId: null,
+      billId: 'rent',
       date: '2026-09-30',
       note: null,
       plannedId: 'rent-oct',
@@ -316,17 +385,19 @@ describe('re-opening when a settlement goes away', () => {
     expect((await item('rent-oct'))?.status).toBe('done')
   })
 
-  it('closes a set-aside when a reservation is saved against it', async () => {
-    await createAllocation({
-      goalId: 'umrah',
-      source: 'wallet',
-      walletId: 'w1',
-      externalLabel: null,
-      amount: m(1500),
-      currency: 'SAR',
-      note: null,
-      plannedId: 'sep',
-    })
+  it('closes a set-aside when a set-aside record is saved against it', async () => {
+    await createSetAside(
+      { goalId: 'umrah' },
+      {
+        source: 'wallet',
+        walletId: 'w1',
+        externalLabel: null,
+        amount: m(1500),
+        currency: 'SAR',
+        note: null,
+        plannedId: 'sep',
+      },
+    )
     expect((await item('sep'))?.status).toBe('done')
   })
 })
@@ -382,7 +453,7 @@ describe('addContribution', () => {
     expect((await item('sep'))?.status).toBe('done')
   })
 
-  it('“Paid now” with nothing due writes an unlinked reservation', async () => {
+  it('“Paid now” with nothing due writes an unlinked set-aside', async () => {
     await skipPlanned('sep')
     const result = await addContribution('umrah', {
       mode: 'now',
@@ -391,8 +462,8 @@ describe('addContribution', () => {
       date: '2026-09-24',
     })
     expect(result).toMatchObject({ kind: 'settled', plannedId: null })
-    const [reservation] = await db.goalAllocations.toArray()
-    expect(reservation).toMatchObject({ amount: m(700), plannedId: null })
+    const [row] = await db.setAsides.toArray()
+    expect(row).toMatchObject({ amount: m(700), plannedId: null })
   })
 
   it('“Plan for later” writes a hand-made planned item', async () => {
@@ -449,7 +520,6 @@ describe('planned rows never touch the ledger’s totals', () => {
       const data = {
         txns: await db.transactions.toArray(),
         budgets: await db.budgets.toArray(),
-        recurrings: [],
         nodes: [MAIN],
         base: 'SAR',
         rates: {},

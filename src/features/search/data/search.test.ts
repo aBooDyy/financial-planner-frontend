@@ -13,7 +13,6 @@ import {
   catalog,
   merchant,
   planned,
-  recurring,
   sources,
   tx,
 } from './__fixtures__/search'
@@ -63,7 +62,7 @@ describe('buildSearchView — idle', () => {
     expect(view.groups).toEqual([])
     expect(view.empty).toBe(false)
     expect(view.idleText).toBe(
-      'Search every transaction, budget, recurring item and account, whatever tab or account you are on.',
+      'Search every transaction, budget, planned item and account, whatever tab or account you are on.',
     )
   })
 
@@ -236,11 +235,12 @@ describe('buildSearchView — the other groups', () => {
     expect(view.groups[0].rows[0].sub).toBe('Planned · 01/10/2026')
   })
 
-  it('lists one schedule once, at its soonest occurrence the filters keep', () => {
+  it('lists one bill once, at its soonest occurrence the filters keep', () => {
+    const bill = { origin: 'bill' as const, goalId: null, billId: 'r1' }
     const series = [
-      planned({ id: 'n1', recurringId: 'r1', date: '2026-10-10' }),
-      planned({ id: 'n2', recurringId: 'r1', date: '2026-11-10' }),
-      planned({ id: 'n3', recurringId: 'r1', date: '2026-12-10' }),
+      planned({ id: 'n1', ...bill, date: '2026-10-10' }),
+      planned({ id: 'n2', ...bill, date: '2026-11-10' }),
+      planned({ id: 'n3', ...bill, date: '2026-12-10' }),
     ]
     const soonest = run({ planned: series }, { query: 'rent' })
     expect(keys(soonest, 'planned')).toEqual(['planned:n1'])
@@ -291,24 +291,12 @@ describe('buildSearchView — the other groups', () => {
     expect(rows[2]).toMatchObject({ valueStr: '€400.00/wk', color: '#222222' })
   })
 
-  it('draws a recurring item with its cadence and next date, matched on merchant', () => {
-    const view = run(
-      {
-        recurrings: [recurring({ merchantId: 'm-gym', nextDue: '2026-10-05' })],
-        merchants: [merchant({ id: 'm-gym', displayName: 'PureGym' })],
-      },
-      { query: 'puregym' },
-    )
-    expect(view.groups[0].rows[0].sub).toBe('Monthly · next 05/10/2026')
-  })
-
-  it('orders the groups Accounts, Transactions, Planned, Budgets, Recurring', () => {
+  it('orders the groups Accounts, Transactions, Planned, Budgets', () => {
     const view = run(
       {
         txns: [tx({ note: 'main thing' })],
         planned: [planned({ name: 'main plan' })],
         budgets: [budget({ scopeType: 'wallet', walletId: MAIN.id })],
-        recurrings: [recurring({ name: 'main gym' })],
       },
       { query: 'main' },
     )
@@ -317,7 +305,6 @@ describe('buildSearchView — the other groups', () => {
       'transactions',
       'planned',
       'budgets',
-      'recurring',
     ])
   })
 })
@@ -377,21 +364,6 @@ describe('buildSearchView — filters', () => {
       ids({ date: 'custom', from: '2026-08-01', to: '2026-08-31' }),
     ).toEqual(['tx:aug', 'tx:i'])
     expect(ids({ date: 'custom', to: '2026-07-31' })).toEqual(['tx:old'])
-  })
-
-  it('test a recurring item by its next due date and drop budgets and accounts', () => {
-    const view = run(
-      {
-        recurrings: [
-          recurring({ id: 'soon', name: 'main a', nextDue: '2026-09-30' }),
-          recurring({ id: 'later', name: 'main b', nextDue: '2026-11-01' }),
-        ],
-        budgets: [budget({ scopeType: 'wallet', walletId: MAIN.id })],
-      },
-      { query: 'main', filters: { date: 'month' } },
-    )
-    expect(view.groups.map((g) => g.key)).toEqual(['recurring'])
-    expect(keys(view, 'recurring')).toEqual(['recurring:soon'])
   })
 
   it('match a root picked whole, or a child picked alone', () => {
@@ -508,7 +480,7 @@ describe('buildSearchView — narrowed to the page', () => {
       tx({ id: 'main', note: 'lunch' }),
       tx({ id: 'cash', note: 'lunch', walletId: CASH.id }),
     ],
-    recurrings: [recurring({ name: 'lunch club' })],
+    planned: [planned({ name: 'lunch club' })],
   }
 
   it("keeps the tab's group and scope, counting what Everywhere adds", () => {

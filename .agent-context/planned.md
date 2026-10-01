@@ -1,36 +1,47 @@
 # Planned transactions — `src/features/planned/`
 
-Scheduled intentions to move money: goal set-asides, obligation payments, paydays, Spending
-schedules, and hand-made "plan for later" items. **A planned row never touches balances,
-budgets, cashflow or goal progress.** Only what *settles* it does — an ordinary transaction or a
-dated goal reservation carrying its `plannedId`. Product rules and the design live in
+Scheduled intentions to move money: goal set-asides, bill payments and set-asides, paydays, and
+hand-made "plan for later" items. **A planned row never touches balances, budgets, cashflow or
+goal progress.** Only what *settles* it does — an ordinary transaction or a set-aside carrying
+its `plannedId`.
+
+> **Interim (2026-10-02):** the planning model changed under this slice (see
+> [bills.md](bills.md), [set-asides.md](set-asides.md), [goals.md](goals.md)). The generator
+> now plans goal set-asides (from the interim funding plan) and paydays only; **bills generate
+> nothing yet** and nothing auto-confirms. The bills engine (coverage, two-tier priority,
+> release, autopay) replaces the generation and runner sections below. Product rules and the design live in
 `working.local/planned-transactions/` (03 lifecycle, 04 snapshot/recalc, 05 set-asides, 06
 contract) until folded into the root knowledge base; this file is how the frontend realizes them.
 
 ## The entity
 
-- **Dexie** `plannedTransactions` (`id, goalId, incomeStreamId, recurringId, status, date, dirty,
-  deleted`), `LocalPlanned` in `db/types.ts`, outbox entity `'planned'`. Lowercase enums inside
-  the app (`origin: goal|income|recurring|manual`, `role: payment|set_aside|income`,
+- **Dexie** `plannedTransactions` (`id, goalId, incomeStreamId, billId, categoryId, status,
+  date, dirty, deleted`), `LocalPlanned` in `db/types.ts`, outbox entity `'planned'`. Lowercase
+  enums inside the app (`origin: goal|income|bill|manual`, `role: payment|set_aside|income`,
   `status: open|done|skipped`), UPPER on the wire, mapped in `api/types.ts`. Wire is
   **snake_case** like every other entity (06 §4's camelCase was wrong; the backend follows the
   API-wide rule).
 - `occurrence` is the date the generator assigned and is **part of the row's identity** — it
   never changes. `date` is when it is due now; moving it sets `pinned`.
-- **Settled is derived, never stored**: Σ linked transactions + linked reservations, converted
-  to the item's currency (`data/settle.ts`). `remainder = max(0, amount − settled)`. Status
-  follows settlements through two hooks in `data/rows.ts`, called by every settlement write
-  path (transactions create/update/delete/bulk-delete, allocations create/update/delete):
+- `review` (wire `review`, default false) marks a payday set-aside waiting in the review queue;
+  sent on create and on every PATCH. Links (`goalId` / `incomeStreamId` / `billId`) go on
+  create only. Origin ↔ role: `goal` → set-aside, `income` → income, `bill` → payment or
+  set-aside, `manual` → any (a goal's "use it later" payment is a manual payment with `goalId`).
+- **Settled is derived, never stored**: Σ linked transactions + linked set-asides (released
+  ones included — the money was set aside), converted to the item's currency
+  (`data/settle.ts`). `remainder = max(0, amount − settled)`. Status follows settlements through
+  two hooks in `data/rows.ts`, called by every settlement write path (transactions
+  create/update/delete/bulk-delete, set-asides create/update/delete):
   `closeCovered` (open → done once covered) and `reopenUnderSettled` (done → open once not).
   So saving a transaction with a `plannedId` from the transaction dialog closes the item exactly like
   confirming it does, and deleting it re-opens the item.
-- A legacy Spending auto-post (`source = recurring:<id>:<date>`, no `plannedId`) settles the
-  matching RECURRING occurrence (`legacyMarkerOf`), so the switch-over never double posts.
+- The legacy `recurring:<id>:<date>` source marker is gone: settlement is by `plannedId` only.
 
 ## Deterministic ids (`data/ids.ts`)
 
 Generated rows get `uuidv5("<user>:<ORIGIN>:<originId>:<ROLE>:<occurrence>", PLANNED_NAMESPACE)`
-— a synchronous SHA-1 (Web Crypto's digest is async only, and the generator is pure). Two
+— a synchronous SHA-1 (Web Crypto's digest is async only, and the generator is pure). The
+origin segment is the wire name (`GOAL`, `INCOME`, `BILL`, `MANUAL`). Two
 devices generating the same occurrence produce the same PK. The namespace constant must never
 change (it would re-key every row). Tested against CPython's `uuid5` vectors. Manual rows use
 random UUIDs.
@@ -54,18 +65,18 @@ random UUIDs.
 
 ## Generation (`data/generate.ts`) — pure
 
-`desiredPlanned({userId, goals, income, recurrings, plan, base, rates, today, legacyMarkers})`
-builds the rows the origins call for today:
+`desiredPlanned({userId, income, plan, base, rates, today})` builds the rows the origins call
+for today:
 
-- **Goal set-asides** from `planGoals()` (the funding engine, unchanged) via `datedSchedule`:
-  month *m* of a goal's schedule falls *m* months after its first set-aside date (the goal's
-  `setAsideDay`, default the 1st, on or after today). One-time goals get their **whole**
-  schedule — it is the stored plan — and the last row absorbs rounding so the plan sums to
-  exactly what is left. Open-ended, sinking and long-cycle bills roll within the 90-day horizon.
-- **Obligation payments**: `recurring` goals, one PAYMENT per cycle from `nextDue` within the
-  horizon (plus set-asides only when the cycle is longer than a month). A one-time goal with
-  `payOnDue` also gets one PAYMENT for its target on its due date — even once saving is done.
-- **Paydays** within the horizon, from `goals/data/paydays.paydaysOf` (re-exported here).
+- **Goal set-asides** from `planGoals()` (`goals/data/fundingPlan.ts`, interim) via
+  `datedSchedule`: month *m* of a goal's schedule falls *m* months after its first set-aside date
+  (the goal's `setAsideDay`, default the 1st, on or after today), suggested into the goal's
+  `saveWalletId`. A **finite plan** (a goal with a target and a due date, `isFinitePlan`) gets
+  its **whole** schedule — it is the stored plan — and the last row absorbs rounding so the plan
+  sums to exactly what is left (`target − saved`, `saved` from set-asides + use). Any other goal
+  rolls within the 90-day horizon. Closed and paused goals plan nothing.
+- **Paydays** within the horizon, from `goals/data/paydays.paydaysOf` (re-exported here),
+  stopping after a stream's `endsOn`.
   Monthly paydays fall on the stream's `day`, clamped (31st → Sep 30). Weekly / quarterly /
   semi / annual step from the stream's `anchorDate` (a known payday, migration `0025`) so a
   quarterly bonus lands in its real months; a stream with no anchor steps from a fixed epoch
@@ -73,11 +84,6 @@ builds the rows the origins call for today:
   functions of the stream, so every device derives the same dates and ids. Editing the
   anchor, frequency or day re-dates the future open unpinned unsettled paydays on the next
   `fill` (old occurrences removed, new ones created — paydays have no stored plan).
-- **Spending schedules** (ADR-6): PAYMENT or INCOME by type, iterating `advanceDue` (custom
-  intervals included) from `nextDue` (the old auto-poster's exact dates, so its markers match). Auto-post schedules catch
-  up from `nextDue`; hand-confirmed ones surface only the last 31 days. Nothing is generated
-  after `endsOn` (inclusive); `nextDue` may still advance past it, which is how a schedule ends.
-
 ## Reconciliation (`data/reconcile.ts`) — pure
 
 `reconcilePlanned(desired, existing, ctx)` → `{create, update, remove}`. Never touches a row
@@ -86,9 +92,9 @@ that is done, skipped, pinned, settled (even partly) or due; never touches MANUA
 - **`fill`** (background): creates what is missing; removes future unsettled rows whose origin
   is gone or no longer produces them (a payday that moved). **It never rewrites a goal's
   set-asides**: a one-time goal's stored plan stays exactly as saved; rolling plans only grow
-  past their last set-aside. Paydays and Spending schedules have no stored plan, so their future
-  rows follow the stream / schedule (amount, wallet, name, `categoryId` — the patchable fields;
-  a schedule's rows copy its leaf `categoryId`, a payday or set-aside has none).
+  past their last set-aside. Paydays have no stored plan, so their future rows follow the
+  stream (amount, wallet, name, `categoryId` — the patchable fields; a payday or set-aside
+  carries no category). Only a bill's occurrence may be created already due.
 - **`recalc`** (one goal): rewrites that goal's future open unpinned unsettled rows to the live
   plan — update, create, remove.
 - A completed goal loses its future set-asides; a deleted origin its future unsettled open rows
@@ -97,30 +103,30 @@ that is done, skipped, pinned, settled (even partly) or due; never touches MANUA
 ## The planner (`data/runner.ts`, `hooks/usePlannedRunner.ts`)
 
 `usePlannedRunner()` is mounted **once, in the root layout** (like `useSync`). It waits until this
-device has pulled the planner's inputs (`db/plannerInputs.ts` — `pullAll` records it when goals,
-spending and planned all came home: an in-memory counter in `db/pullState.ts` plus a per-user
+device has pulled the planner's inputs (`db/plannerInputs.ts` — `pullAll` records it when goals
+and income, bills, set-asides, spending and planned all came home: an in-memory counter in `db/pullState.ts` plus a per-user
 `syncState` marker that outlives the tab). A device that pulled them on an earlier launch does
 not wait for this launch's pull, so an app opened offline still generates and auto-posts what
 came due. Then it runs debounced 500 ms on origin changes (a
-stamp of goals / income / recurrings), each pull, each plan-rewrite request, and day rollover.
+stamp of goals / income / bills), each pull, each plan-rewrite request, and day rollover.
 `runPlanner` is single-flight through one queue shared with recalc and undo:
 
 1. Goals with no stored plan (`plannedAt === null`, i.e. new) and goals whose plan the user just
    changed are rewritten in `recalc` mode and get a snapshot (`plannedAt/planAmount/planCount/
    planStart` on the goal — the headline of the rows from today).
 2. Everything else gets `fill`.
-3. Open rows whose origin is gone (link null or the goal / stream / schedule deleted) are
+3. Open rows whose origin is gone (link null or the goal / stream / bill deleted) are
    resolved, so they never wait in Needs confirming for nothing: **skipped** when unsettled,
    **closed with the rest abandoned** when partly settled (`orphanedPlanned` in `reconcile.ts`).
-   MANUAL rows are left alone unless they are set-asides of a deleted goal.
-4. Open RECURRING rows due today or earlier: fully settled ones (legacy marker) are closed;
-   auto-post ones are confirmed with the planned amount and wallet (source marker kept) and the
-   schedule's `nextDue` moves past them. `confirmPlanned` (auto or by hand) files a recurring
-   row's transaction under the schedule's goal and merchant, with its note, else the item's name. This **replaced `transactions/data/autopost.ts`** and
-   its Spending-page mount effect.
+   MANUAL rows are left alone unless they are set-asides of a deleted goal or bill. (Deleting a
+   goal or bill deletes its set-asides locally, as the server does, so its past set-aside rows
+   read as unsettled and are skipped.)
 
-**Plan-changing edits** (`goals/data/mutations.updateGoal` / `setGoalDate` when target, due
-date, amount, frequency, next due, baseline, currency, set-aside day or pay-on-due change) file
+Nothing auto-confirms any more: the recurring auto-poster went with recurring schedules, and
+bill autopay comes with the bills engine.
+
+**Plan-changing edits** (`goals/data/mutations.updateGoal` when currency, amount, target, due
+date or set-aside day change) file
 a request in `data/recalcRequests.ts` — a leaf module, so the goals slice never imports the
 planner. The runner picks it up and remembers the rewrite's undo in `stores/recalcUndo.ts`.
 Name / colour / position edits leave the plan alone. A goal's first plan is written silently
@@ -142,14 +148,18 @@ it is created again under its old id. Not persisted (04 §5).
 ## Settlement mutations (`data/mutations.ts`)
 
 `confirmPlanned(id, {amount?, walletId?, externalLabel?, date?, categoryId?, note?})`
-writes by role: INCOME → income transaction; PAYMENT → spend with the goal (the user's own
-category — ADR-7); SET_ASIDE → a dated reservation
-(wallet, or an external label). Amounts are in the item's currency and converted to the
+writes by role: INCOME → income transaction (under the stream's own category); PAYMENT → a
+spend carrying the bill (`billId`, the bill's category, merchant and note) or, for a goal's
+manual payment, the goal; SET_ASIDE → a set-aside for the row's goal, or its bill and
+occurrence (`origin_gone` when that owner no longer exists) — in a wallet, or outside under a
+label. Settling a bill's payment moves the bill's `nextDue` past the occurrence
+(`advanceBillPast`; close-the-rest and skip do too). Amounts are in the item's currency and converted to the
 wallet's. Defaults: the open remainder, the item's wallet, **today**. Partial keeps it open;
 overpaying closes it and the excess still counts. Also `closeRest`, `skipPlanned` (refused
 with settlements), `reopenPlanned`, `movePlanned` (pins), `editPlannedAmount` (pins),
-`deleteManualPlanned`, and `addContribution(goalId, {mode: 'now'|'later', …})` — "now" settles
-the goal's oldest due item if there is one, "later" writes a MANUAL row. Errors are
+`deleteManualPlanned`, and `addContribution(goalId, {mode: 'now'|'later', …})` — always a
+set-aside: "now" settles the goal's oldest due set-aside if there is one (unless `link: false`),
+else writes an unlinked set-aside; "later" writes a MANUAL set-aside row. Errors are
 `PlannedActionError` with a stable `code`.
 
 **The category of a confirmed entry** (`categoryFor(type, wanted)`): the input's `categoryId`,
@@ -158,8 +168,7 @@ type. Otherwise an income entry goes to the user's **Salary** root (`bySlug('sal
 exists — a stream's paydays carry no category, and a payday is a salary — and anything else to
 the type's `catalog.fallbackFor(type)`: `other` for a payment, `other_income` for income. With no
 catalog pulled yet it trusts the wanted id; with neither it throws `category_invalid`. The
-goal-payment path of `addContribution` files under the spend fallback the same way; the
-auto-poster (`runner.ts`) passes the row's id, else its schedule's.
+wanted id is the input's, else the row's, else the bill's, else the income stream's.
 
 ## Reading it (`hooks/`, `data/views.ts`, `data/preview.ts`)
 
@@ -178,21 +187,20 @@ runner uses, so the screen always shows what the planner would write.
 
 **One shared read.** `usePlannedData` reads through `data/plannerTables.ts`, a module-level
 store consumed with `useSyncExternalStore`: the first mounted consumer opens one Dexie
-`liveQuery` per table (goals, income, recurrings, planned, transactions, allocations, nodes,
+`liveQuery` per table (goals, income, bills, planned, transactions, set-asides, nodes,
 settings, rates), the last one to unmount closes them (`openPlannerReads()` reports how many
 are open). Per-table queries keep a write to one table from re-reading the others. The
 derivation is shared too: `liveInputs` / `derivePlannerState` / the live nodes are memoised at
 module level on the table arrays' identity (plus base, rates, user, day), so however many
-hooks a page mounts — the Goals page's detail + Recalculate-all card, Spending's tab + transaction dialog
+hooks a page mounts — Spending's tab + transaction dialog
 + confirm dialog + QuickAdd — the tables are read once and the plan derived once. No provider
 is needed, so the hooks work unchanged in tests and in any tree. A consumer that mounts while
 others are open renders the current snapshot at once (no loading flash).
 
 **Linked transactions only (`data/linkedTransactions.ts`).** The planner's derivation needs only
 the transactions that link to something: a `goalId` (goal progress, contributions), a
-`plannedId` (settlements), or a legacy `recurring:` `source` (legacy settlements +
-`legacyMarkers`). `linkedTransactions()` reads just those through the `goalId` / `plannedId` /
-`source` indexes (IndexedDB keeps no index entry for a null key), de-duplicated and in primary-key
+`billId` (bill payments), or a `plannedId` (settlements). `linkedTransactions()` reads just
+those through the `goalId` / `billId` / `plannedId` indexes (IndexedDB keeps no index entry for a null key), de-duplicated and in primary-key
 order like a full read, soft-deleted rows included (`liveInputs` drops them). As a `liveQuery` it
 still fires when a row is unlinked (the old key is in the observed range). `plannerTables`,
 `loadPlannerInputs` and `useGoals` all use it — **never add a full `db.transactions` read to the
@@ -208,19 +216,20 @@ result until the new one lands, and that stale ledger must never price the new w
 The Spending page composes these; they read only the public hooks above.
 
 - **Tab.** `TransactionsPage` calls `usePlanned()` once and passes the view down: tabs are
-  Activity · Planned · Budgets · Recurring (routes `/transactions/$view`), the Planned label carries an amber count pill when
+  Activity · Planned · Budgets (routes `/transactions/$view`), the Planned label carries an amber count pill when
   `dueCount > 0`, and Activity leads with `PlannedNudge` in that case.
 - **`PlannedCard`** (1c): header, then `PlannedBand` sections — "Needs confirming · N" (amber,
   no caption) with live rows, "Planned · next 14 days" (neutral, `nextCaption`) with
   muted rows, and "Later in <Month>" collapsed behind "N more · Show all". `PlannedEmpty`
   links to `/goals`. `PlannedRow` draws one row: a dashed icon in the origin's colour
-  (`hooks/useOriginColors`: goal → stream → its category's root colour, as everywhere else), name + `TagPill`, meta, amount
+  (`hooks/useOriginColors`: goal → bill → stream → its category's root colour, as everywhere else), name + `TagPill`
+  (Goal / Bill / Income), meta, amount
   (income in accent, outflow in text colour, never red; muted rows grey with a dashed pill),
   and — due rows only — Skip + Confirm ("Confirm received" for income). A partly settled row
   has no Skip (refused with settlements); its dialog offers "Close the rest".
 - **The rail** (`PlannedRail`, the side column; below the list on mobile). With nothing planned it
-  is `PlanningGuideCard`: links to the four places planned rows come from (Goals › Income /
-  Obligations / Goals, Spending › Recurring). Otherwise two cards over `hooks/usePlannedOutlook`,
+  is `PlanningGuideCard`: links to the three places planned rows come from (income, bills,
+  goals — still the `/goals` sections until Planning replaces them). Otherwise two cards over `hooks/usePlannedOutlook`,
   which takes the list `usePlanned()` already built plus every live account's balance in base
   (`allAccountsMinor` over the Spending scope sections; `null` while balances load). Both look
   `OUTLOOK_DAYS` (30) ahead through `data/outlook.ts` (open rows with a remainder, overdue ones
@@ -234,7 +243,8 @@ The Spending page composes these; they read only the public hooks above.
     use `inset-inline-start`. The readout rests on the lowest day. Pointer or arrow keys scrub it
     (it is a `role="slider"` with a per-day `aria-valuetext`), and Escape returns to the lowest day.
     Status line: short (first day below zero) beats reserved (first day under goal money) beats
-    clear. Goal money is `walletReservations` from the planner's own inputs, summed over live
+    clear. Goal money is `walletSetAsides` (every live wallet set-aside, bills' included) from the
+    planner's own inputs, summed over live
     wallets in base, and held flat: it doesn't step with future set-asides.
   - **Where it's headed** (`HeadedCard`, pure `data/headed.ts`, tested). Planned income against
     payments and set-asides as a `SegmentedBar` (scaled to whichever is larger), a legend with
@@ -245,7 +255,7 @@ The Spending page composes these; they read only the public hooks above.
   `origin_gone` for a deleted goal's leftover set-aside) opens the dialog, which shows why and
   still offers Skip.
 - **`ConfirmPlannedDialog`** (1d) — `{ plannedId: string | null; onOpenChange }`, open while
-  `plannedId` is set; also imported by the Goals slice. State lives in `hooks/useConfirmForm`
+  `plannedId` is set. State lives in `hooks/useConfirmForm`
   (seeded once per opening from `useConfirmPlanned().defaults`: remainder, suggested wallet or
   the first wallet, today). Fields: an `AmountWell` ("How much are you confirming?" / "How much
   came in?", "of X planned" under it), From/Into `ConfirmWalletSelect` (+ "External…" with a
@@ -263,17 +273,15 @@ The Spending page composes these; they read only the public hooks above.
 
 ## Where the UI reads it
 
-- **Goals** (`features/goals/components/detail/`): the goal read view renders `useGoalPlan` through
-  the pure `goals/data/goalDetail.ts`; Recalculate / Undo / Confirm <Mon> / + Add contribution
-  live there, and it opens `ConfirmPlannedDialog` for a due or future row. Summary's
-  `RecalcAllCard` uses `useRecalcAll`. List rows count due items straight off the table
-  (`dueCountByGoal`) instead of mounting another `usePlannedData`. See [goals.md](goals.md).
+- **Goals**: nothing yet — the goal detail that read `useGoalPlan` / `useRecalcAll` went with the
+  old Goals page. Both hooks (and `buildGoalPlanView`, `ConfirmPlannedDialog`) stay on the
+  public surface for the Planning page. See [goals.md](goals.md).
 
 ## What planned rows never affect
 
-`walletDeltas`, budgets, the cashflow hero, day totals, `goalProgress`, reservations — none of
+`walletDeltas`, budgets, the cashflow hero, day totals, `goalProgress`, set-aside totals — none of
 them read `plannedTransactions`. Pinned by a regression test in `data/mutations.test.ts`. A confirmed
-set-aside (a reservation) does reach the Spending hero's **Saved** — never Spent, day totals or
+set-aside does reach the Spending hero's **Saved** — never Spent, day totals or
 budgets ([transactions.md](transactions.md)).
 
 ## Tests

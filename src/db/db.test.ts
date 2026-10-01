@@ -5,25 +5,25 @@ import { describe, expect, it } from 'vitest'
 /**
  * The schema is declared once, at its current version. What is worth pinning is the shape
  * that declaration produces — every table the app reads, the indexes the features actually
- * query by — and the one-off wipe the version-2 upgrade performs.
+ * query by — and the one-off wipes the version-2 and version-4 upgrades perform.
  */
 
 describe('the local database', () => {
-  it('opens at version 3 with every table the app reads', async () => {
+  it('opens at version 4 with every table the app reads', async () => {
     const { db } = await import('./db')
     await db.open()
 
-    expect(db.verno).toBe(3)
+    expect(db.verno).toBe(4)
     expect(db.tables.map((t) => t.name).sort()).toEqual([
       'appConfig',
       'balanceNodes',
       'balanceSettings',
+      'bills',
       'budgets',
       'categories',
       'customCurrencies',
       'emailConnections',
       'exchangeRates',
-      'goalAllocations',
       'goals',
       'importBatches',
       'importTemplates',
@@ -35,7 +35,7 @@ describe('the local database', () => {
       'merchants',
       'outbox',
       'plannedTransactions',
-      'recurrings',
+      'setAsides',
       'syncState',
       'transactions',
     ])
@@ -109,10 +109,12 @@ describe('the local database', () => {
       dirty: 0,
       deleted: 0,
     })
-    await db.goalAllocations.put({
+    await db.setAsides.put({
       id: 'a-p',
       goalId: 'g1',
-      source: 'external',
+      billId: null,
+      occurrence: null,
+      source: 'outside',
       walletId: null,
       externalLabel: 'Dad',
       amount: 50,
@@ -121,6 +123,9 @@ describe('the local database', () => {
       position: 0,
       date: '2026-09-01',
       plannedId: 'p-1',
+      releasedAt: null,
+      releasedById: null,
+      movedByTransferId: null,
       createdAt: '',
       updatedAt: '',
       version: 'v1',
@@ -131,11 +136,11 @@ describe('the local database', () => {
     const found = await settlementsOf(['p-1'])
 
     expect(found.txns.map((t) => t.id)).toEqual(['tx-p'])
-    expect(found.allocations.map((a) => a.id)).toEqual(['a-p'])
-    await Promise.all([db.transactions.clear(), db.goalAllocations.clear()])
+    expect(found.setAsides.map((a) => a.id)).toEqual(['a-p'])
+    await Promise.all([db.transactions.clear(), db.setAsides.clear()])
   })
 
-  it('indexes `categoryId` on the three ledger tables a category re-file walks', async () => {
+  it('indexes `categoryId` on the three tables a category re-file walks', async () => {
     const { db } = await import('./db')
     await db.open()
 
@@ -143,8 +148,27 @@ describe('the local database', () => {
       db.table(table).schema.indexes.map((i) => i.name)
 
     expect(indexed('transactions')).toContain('categoryId')
-    expect(indexed('recurrings')).toContain('categoryId')
+    expect(indexed('bills')).toContain('categoryId')
     expect(indexed('plannedTransactions')).toContain('categoryId')
+  })
+
+  it('indexes the planning links the planner and set-aside reads walk', async () => {
+    const { db } = await import('./db')
+    await db.open()
+
+    const indexed = (table: string) =>
+      db.table(table).schema.indexes.map((i) => i.name)
+
+    expect(indexed('transactions')).toEqual(
+      expect.arrayContaining(['goalId', 'billId', 'plannedId']),
+    )
+    expect(indexed('plannedTransactions')).toEqual(
+      expect.arrayContaining(['goalId', 'incomeStreamId', 'billId']),
+    )
+    expect(indexed('plannedTransactions')).not.toContain('recurringId')
+    expect(indexed('setAsides')).toEqual(
+      expect.arrayContaining(['goalId', 'billId', 'walletId', 'plannedId']),
+    )
   })
 
   it('wipes synced rows, the outbox and the watermarks when upgrading from version 1', async () => {
@@ -176,13 +200,128 @@ describe('the local database', () => {
     const upgraded = new AppDatabase(name)
     await upgraded.open()
 
-    expect(upgraded.verno).toBe(3)
+    expect(upgraded.verno).toBe(4)
     expect(await upgraded.categories.count()).toBe(0)
     expect(await upgraded.transactions.count()).toBe(0)
     expect(await upgraded.syncState.count()).toBe(0)
     expect(await upgraded.outbox.count()).toBe(0)
     expect(await upgraded.appConfig.count()).toBe(1)
     expect(await upgraded.importBatches.count()).toBe(1)
+    upgraded.close()
+  })
+
+  it('replaces the planning model when upgrading from version 3', async () => {
+    const name = 'upgrade-from-v3'
+    const v3 = new Dexie(name)
+    v3.version(3).stores({
+      appConfig: 'id',
+      balanceNodes: 'id, parentId, dirty, deleted',
+      categories: 'id, slug, parentId, dirty, deleted',
+      incomeStreams: 'id, dirty, deleted',
+      goals: 'id, dirty, deleted',
+      goalAllocations: 'id, goalId, walletId, plannedId, dirty, deleted',
+      transactions:
+        'id, walletId, goalId, merchantId, transferId, categoryId, date, source, plannedId, dirty, deleted',
+      budgets: 'id, dirty, deleted',
+      recurrings: 'id, categoryId, dirty, deleted',
+      plannedTransactions:
+        'id, goalId, incomeStreamId, recurringId, categoryId, status, date, dirty, deleted',
+      syncState: 'id',
+      outbox: '++seq, [entity+id]',
+      ledgerTotals: 'id, kind',
+    })
+    await v3.open()
+    await v3.table('balanceNodes').put({ id: 'w1', parentId: null })
+    await v3.table('goals').put({ id: 'g1', kind: 'onetime' })
+    await v3.table('incomeStreams').put({ id: 's1', frequency: 'monthly' })
+    await v3.table('goalAllocations').put({ id: 'a1', goalId: 'g1' })
+    await v3.table('recurrings').put({ id: 'r1', categoryId: 'c1' })
+    await v3.table('plannedTransactions').put({ id: 'p1', recurringId: 'r1' })
+    await v3.table('budgets').put({ id: 'b1' })
+    await v3.table('transactions').bulkPut([
+      {
+        id: 't-linked',
+        type: 'spend',
+        amount: 100,
+        currency: 'SAR',
+        walletId: 'w1',
+        goalId: 'g1',
+        plannedId: 'p1',
+        deleted: 0,
+      },
+      {
+        id: 't-plain',
+        type: 'spend',
+        amount: 50,
+        currency: 'SAR',
+        walletId: 'w1',
+        goalId: null,
+        plannedId: null,
+        deleted: 0,
+      },
+    ])
+    await v3.table('syncState').bulkPut([
+      { id: 'u:transaction', since: 'a' },
+      { id: 'u:planned', since: 'b' },
+      { id: 'u:plannerInputs', since: 'c' },
+    ])
+    const outbox = v3.table('outbox')
+    for (const entity of [
+      'recurring',
+      'allocation',
+      'goal',
+      'income',
+      'planned',
+      'node',
+      'budget',
+    ])
+      await outbox.add({ entity, id: `${entity}-1`, op: 'create' })
+    await outbox.add({
+      entity: 'transaction',
+      id: 't-linked',
+      op: 'update',
+      payload: { goal_id: 'g1', planned_id: 'p1', amount: 100 },
+    })
+    v3.close()
+
+    const { AppDatabase } = await import('./db')
+    const upgraded = new AppDatabase(name)
+    await upgraded.open()
+
+    expect(upgraded.verno).toBe(4)
+    const names = upgraded.tables.map((t) => t.name)
+    expect(names).not.toContain('recurrings')
+    expect(names).not.toContain('goalAllocations')
+    expect(await upgraded.goals.count()).toBe(0)
+    expect(await upgraded.incomeStreams.count()).toBe(0)
+    expect(await upgraded.plannedTransactions.count()).toBe(0)
+    expect(await upgraded.bills.count()).toBe(0)
+    expect(await upgraded.setAsides.count()).toBe(0)
+    // Untouched: wallets, budgets and the ledger rows, minus their cleared links.
+    expect(await upgraded.balanceNodes.count()).toBe(1)
+    expect(await upgraded.budgets.count()).toBe(1)
+    expect(await upgraded.transactions.get('t-linked')).toMatchObject({
+      goalId: null,
+      plannedId: null,
+      amount: 100,
+    })
+    expect(await upgraded.transactions.get('t-plain')).toMatchObject({
+      amount: 50,
+    })
+    const left = await upgraded.outbox.toArray()
+    expect(left.map((e) => e.entity).sort()).toEqual([
+      'budget',
+      'node',
+      'transaction',
+    ])
+    expect(left.find((e) => e.entity === 'transaction')?.payload).toEqual({
+      goal_id: null,
+      planned_id: null,
+      amount: 100,
+    })
+    expect(
+      (await upgraded.syncState.toArray()).map((w) => w.id).sort(),
+    ).toEqual(['u:transaction'])
     upgraded.close()
   })
 })

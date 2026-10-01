@@ -3,6 +3,7 @@ import { remainderOf, shortDate, usePlannedData } from '#/features/planned'
 import type { LocalPlanned } from '#/features/planned'
 import type { TxType } from '#/features/transactions/api/types'
 import {
+  billIdForMatch,
   findQuickAddMatch,
   goalIdForMatch,
   plannedWalletOf,
@@ -25,7 +26,7 @@ export function useQuickAddMatch(args: {
   const data = usePlannedData()
   const minor = parseAmountToMinor(args.amount, args.currency)
   const { index } = data.state
-  const { planned, rates, recurrings } = data.inputs
+  const { planned, rates } = data.inputs
 
   const item: LocalPlanned | null = useMemo(
     () =>
@@ -53,14 +54,15 @@ export function useQuickAddMatch(args: {
       : null,
     linked,
     setLinked: (on: boolean) => setUnlinkedId(on || !item ? null : item.id),
-    /** What the entry saves with: the item it settles, the goal a payment carries, and the
-     *  wallet the item planned (null: QuickAdd's own account). */
+    /** What the entry saves with: the item it settles, the goal or bill a payment carries,
+     *  and the wallet the item planned (null: QuickAdd's own account). */
     rates,
     link:
       item && linked
         ? {
             plannedId: item.id,
-            goalId: goalIdForMatch(item, args.type, recurrings),
+            goalId: goalIdForMatch(item, args.type),
+            billId: billIdForMatch(item, args.type),
             name: item.name,
             wallet: wallet?.currency
               ? { id: wallet.id, currency: wallet.currency }

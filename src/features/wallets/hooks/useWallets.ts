@@ -9,8 +9,7 @@ import {
   heldCurrencies,
 } from '#/features/wallets/data/selectors'
 import { readLedgerSummary } from '#/features/transactions/data/ledgerReads'
-import { walletReservations } from '#/features/goals/data/reservations'
-import { startOfToday } from '#/features/goals/data/planning'
+import { walletSetAsides } from '#/features/setAsides/data/totals'
 import { useStableRates } from '#/hooks/useStableRates'
 import type { CurrencyCode } from '#/lib/currency'
 
@@ -21,9 +20,9 @@ const NONE: Record<string, never> = {}
  * writes and on sync-applied server changes — no remote fetching here.
  *
  * `loading` is true until the nodes are known (the tree can draw); `balancesLoading` until
- * every input a figure derives from has landed — the ledger, the goals and their set-asides,
- * the planned rows, the rates and the base currency. Until then the view carries the tree
- * with no deltas and no reservations, and its figures must not be shown.
+ * every input a figure derives from has landed — the ledger, the bills and goals and their
+ * set-asides, the rates and the base currency. Until then the view carries the tree with no
+ * deltas and no set-asides, and its figures must not be shown.
  */
 export function useWallets() {
   const nodes = useLiveQuery(() => db.balanceNodes.toArray())
@@ -33,8 +32,8 @@ export function useWallets() {
   )
   const rateRows = useLiveQuery(() => db.exchangeRates.toArray())
   const goalRows = useLiveQuery(() => db.goals.toArray())
-  const allocationRows = useLiveQuery(() => db.goalAllocations.toArray())
-  const plannedRows = useLiveQuery(() => db.plannedTransactions.toArray())
+  const billRows = useLiveQuery(() => db.bills.toArray())
+  const setAsideRows = useLiveQuery(() => db.setAsides.toArray())
   const rates = useStableRates(rateRows)
   const ratesReady = rateRows !== undefined
   const ledger = useLiveQuery(
@@ -48,8 +47,8 @@ export function useWallets() {
     settings === undefined ||
     !ratesReady ||
     goalRows === undefined ||
-    allocationRows === undefined ||
-    plannedRows === undefined ||
+    billRows === undefined ||
+    setAsideRows === undefined ||
     ledger === undefined
   const base: CurrencyCode = settings?.baseCurrency ?? DEFAULT_BASE_CURRENCY
 
@@ -58,27 +57,21 @@ export function useWallets() {
   )
   // Transactions are the ledger: their signed deltas, summed in the query, fold into balances.
   const deltas = balancesLoading ? NONE : ledger.deltas
-  // Goal set-asides earmark part of each wallet — until a goal payment consumes them.
+  // Set-asides earmark part of each wallet until they are released.
   const liveGoals = (goalRows ?? []).filter((g) => g.deleted === 0)
+  const liveBills = (billRows ?? []).filter((b) => b.deleted === 0)
   const reservations = balancesLoading
     ? NONE
-    : walletReservations(
-        allocationRows,
-        liveGoals,
-        liveNodes,
-        rates,
-        ledger.goalLinked,
-        startOfToday(),
-        plannedRows,
-      )
+    : walletSetAsides(setAsideRows, liveGoals, liveBills, liveNodes, rates)
   // Archived nodes keep their ledger and earmarks but leave the tree and its totals.
   const active = activeNodes(liveNodes)
   const view = buildWalletsView(active, base, rates, deltas, reservations)
   const held = heldCurrencies(base, [
     liveNodes,
     liveGoals,
+    liveBills,
     (ledger?.currencies ?? []).map((currency) => ({ currency })),
-    allocationRows ?? [],
+    setAsideRows ?? [],
     rateRows ?? [],
   ])
 

@@ -1,21 +1,16 @@
 import { db } from '#/db/db'
 import type { OutboxEntry } from '#/db/types'
-import { allocationsApi } from '#/features/goals/api/allocationsApi'
 import { goalsApi } from '#/features/goals/api/goalsApi'
 import type {
-  CreateGoalAllocationWire,
   CreateGoalWire,
   CreateIncomeWire,
-  UpdateGoalAllocationWire,
   UpdateGoalWire,
   UpdateIncomeWire,
 } from '#/features/goals/api/types'
 import { ApiError } from '#/lib/apiError'
 import {
-  localAllocationToUpdateWire,
   localGoalToUpdateWire,
   localIncomeToUpdateWire,
-  serverAllocationToLocal,
   serverGoalToLocal,
   serverIncomeToLocal,
 } from './mappers'
@@ -196,123 +191,14 @@ async function pushGoalDelete(entry: OutboxEntry): Promise<void> {
   })
 }
 
-// --- Goal allocations ----------------------------------------------------------------
-
-async function pushAllocationCreate(entry: OutboxEntry): Promise<void> {
-  try {
-    const allocation = await allocationsApi.create(
-      entry.payload as CreateGoalAllocationWire,
-    )
-    await db.transaction('rw', db.goalAllocations, db.outbox, async () => {
-      await db.goalAllocations.put(serverAllocationToLocal(allocation))
-      await db.outbox.delete(entry.seq)
-    })
-  } catch (e) {
-    if (statusOf(e) === 409) {
-      await db.outbox.delete(entry.seq)
-      await pullAllocations()
-      return
-    }
-    throw e
-  }
-}
-
-async function pushAllocationUpdate(entry: OutboxEntry): Promise<void> {
-  const id = entry.id
-  try {
-    const allocation = await allocationsApi.update(
-      id,
-      entry.payload as UpdateGoalAllocationWire,
-    )
-    await db.transaction('rw', db.goalAllocations, db.outbox, async () => {
-      await db.goalAllocations.put(serverAllocationToLocal(allocation))
-      await db.outbox.delete(entry.seq)
-    })
-  } catch (e) {
-    const status = statusOf(e)
-    if (status === 409) {
-      await rebaseAllocation(entry)
-      return
-    }
-    if (status === 404) {
-      await db.transaction('rw', db.goalAllocations, db.outbox, async () => {
-        await db.goalAllocations.delete(id)
-        await db.outbox.delete(entry.seq)
-      })
-      return
-    }
-    throw e
-  }
-}
-
-async function rebaseAllocation(entry: OutboxEntry): Promise<void> {
-  const fresh = (await allocationsApi.list()).find((a) => a.id === entry.id)
-  const local = await db.goalAllocations.get(entry.id)
-  if (!fresh || !local) {
-    await db.outbox.delete(entry.seq)
-    return
-  }
-  try {
-    const allocation = await allocationsApi.update(
-      entry.id,
-      localAllocationToUpdateWire({ ...local, version: fresh.version }),
-    )
-    await db.transaction('rw', db.goalAllocations, db.outbox, async () => {
-      await db.goalAllocations.put(serverAllocationToLocal(allocation))
-      await db.outbox.delete(entry.seq)
-    })
-  } catch (e) {
-    if (statusOf(e) !== 409) throw e
-    await db.transaction('rw', db.goalAllocations, db.outbox, async () => {
-      await db.goalAllocations.put(serverAllocationToLocal(fresh))
-      await db.outbox.delete(entry.seq)
-    })
-  }
-}
-
-async function pushAllocationDelete(entry: OutboxEntry): Promise<void> {
-  try {
-    await allocationsApi.del(entry.id)
-  } catch (e) {
-    if (statusOf(e) !== 404) throw e
-  }
-  await db.transaction('rw', db.goalAllocations, db.outbox, async () => {
-    await db.goalAllocations.delete(entry.id)
-    await db.outbox.delete(entry.seq)
-  })
-}
-
-export async function pullAllocations(): Promise<void> {
-  const server = await allocationsApi.list()
-  const serverIds = new Set(server.map((a) => a.id))
-  await db.transaction('rw', db.goalAllocations, async () => {
-    for (const a of server) {
-      const local = await db.goalAllocations.get(a.id)
-      if (!local || (local.dirty === 0 && local.deleted === 0)) {
-        await db.goalAllocations.put(serverAllocationToLocal(a))
-      }
-    }
-    for (const l of await db.goalAllocations.toArray()) {
-      if (l.dirty === 0 && !serverIds.has(l.id)) {
-        await db.goalAllocations.delete(l.id)
-      }
-    }
-  })
-}
-
 // --- Engine plug-ins -----------------------------------------------------------------
 
-/** Push one income/goal/allocation outbox entry. Throws on network/unexpected errors. */
+/** Push one income/goal outbox entry. Throws on network/unexpected errors. */
 export async function pushGoalsEntry(entry: OutboxEntry): Promise<void> {
   if (entry.entity === 'income') {
     if (entry.op === 'create') return pushIncomeCreate(entry)
     if (entry.op === 'update') return pushIncomeUpdate(entry)
     return pushIncomeDelete(entry)
-  }
-  if (entry.entity === 'allocation') {
-    if (entry.op === 'create') return pushAllocationCreate(entry)
-    if (entry.op === 'update') return pushAllocationUpdate(entry)
-    return pushAllocationDelete(entry)
   }
   if (entry.op === 'create') return pushGoalCreate(entry)
   if (entry.op === 'update') return pushGoalUpdate(entry)
@@ -356,5 +242,5 @@ export async function pullGoals(): Promise<void> {
 }
 
 export async function pullGoalsAll(): Promise<void> {
-  await Promise.all([pullIncome(), pullGoals(), pullAllocations()])
+  await Promise.all([pullIncome(), pullGoals()])
 }

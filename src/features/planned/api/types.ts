@@ -5,10 +5,10 @@ import type { CurrencyCode } from '#/lib/currency'
  * Lowercase inside the app, the backend's PersistedEnum UPPER_SNAKE name on the wire —
  * translated only here, at the boundary.
  */
-export type PlannedOrigin = 'goal' | 'income' | 'recurring' | 'manual'
-export type PlannedOriginWire = 'GOAL' | 'INCOME' | 'RECURRING' | 'MANUAL'
+export type PlannedOrigin = 'goal' | 'income' | 'bill' | 'manual'
+export type PlannedOriginWire = 'GOAL' | 'INCOME' | 'BILL' | 'MANUAL'
 
-/** What confirming creates: a spend, a reservation, or an income entry. */
+/** What confirming creates: a spend, a set-aside, or an income entry. */
 export type PlannedRole = 'payment' | 'set_aside' | 'income'
 export type PlannedRoleWire = 'PAYMENT' | 'SET_ASIDE' | 'INCOME'
 
@@ -18,13 +18,13 @@ export type PlannedStatusWire = 'OPEN' | 'DONE' | 'SKIPPED'
 const ORIGIN_TO_WIRE: Record<PlannedOrigin, PlannedOriginWire> = {
   goal: 'GOAL',
   income: 'INCOME',
-  recurring: 'RECURRING',
+  bill: 'BILL',
   manual: 'MANUAL',
 }
 const ORIGIN_FROM_WIRE: Record<PlannedOriginWire, PlannedOrigin> = {
   GOAL: 'goal',
   INCOME: 'income',
-  RECURRING: 'recurring',
+  BILL: 'bill',
   MANUAL: 'manual',
 }
 const ROLE_TO_WIRE: Record<PlannedRole, PlannedRoleWire> = {
@@ -68,7 +68,7 @@ export type Planned = {
   role: PlannedRole
   goalId: string | null
   incomeStreamId: string | null
-  recurringId: string | null
+  billId: string | null
   walletId: string | null
   name: string
   amount: number
@@ -79,6 +79,8 @@ export type Planned = {
   date: string
   status: PlannedStatus
   pinned: boolean
+  /** A payday set-aside waiting in the review queue. */
+  review: boolean
   note: string | null
   createdAt: string
   updatedAt: string
@@ -93,7 +95,7 @@ export type PlannedWire = {
   role: PlannedRoleWire
   goal_id: string | null
   income_stream_id: string | null
-  recurring_id: string | null
+  bill_id: string | null
   wallet_id: string | null
   name: string
   amount: number
@@ -103,6 +105,7 @@ export type PlannedWire = {
   date: string
   status: PlannedStatusWire
   pinned: boolean
+  review?: boolean
   note: string | null
   created_at: string
   updated_at: string
@@ -111,8 +114,8 @@ export type PlannedWire = {
 
 export type CreatePlannedWire = Omit<
   PlannedWire,
-  'created_at' | 'updated_at' | 'version'
->
+  'created_at' | 'updated_at' | 'version' | 'review'
+> & { review: boolean }
 
 /** `PATCH` carries every mutable field, so an omission never reads as "clear it". */
 export type UpdatePlannedWire = {
@@ -122,6 +125,7 @@ export type UpdatePlannedWire = {
   wallet_id: string | null
   status: PlannedStatusWire
   pinned: boolean
+  review: boolean
   note: string | null
   name: string
   category_id: string | null
@@ -160,7 +164,7 @@ export const toPlanned = (w: PlannedWire): Planned => ({
   role: fromWireRole(w.role),
   goalId: w.goal_id,
   incomeStreamId: w.income_stream_id,
-  recurringId: w.recurring_id,
+  billId: w.bill_id,
   walletId: w.wallet_id,
   name: w.name,
   amount: w.amount,
@@ -170,6 +174,7 @@ export const toPlanned = (w: PlannedWire): Planned => ({
   date: w.date,
   status: fromWirePlannedStatus(w.status),
   pinned: w.pinned,
+  review: w.review ?? false,
   note: w.note,
   createdAt: w.created_at,
   updatedAt: w.updated_at,

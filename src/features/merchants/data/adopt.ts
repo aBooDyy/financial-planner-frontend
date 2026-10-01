@@ -1,6 +1,7 @@
 import type {
+  LocalBill,
+  LocalIncomeStream,
   LocalMerchantAlias,
-  LocalRecurring,
   LocalTransaction,
   OutboxEntry,
 } from '#/db/types'
@@ -10,7 +11,7 @@ import type {
  *
  * When `POST /merchants` is refused with `409 merchants.alias.taken`, nothing was written:
  * the temp merchant does not exist server-side, so every local reference to it has to move
- * to the winner the server named. A transaction or schedule whose push is *still queued* only
+ * to the winner the server named. A transaction, bill or income stream whose push is *still queued* only
  * needs its queued payload rewritten — enqueueing a second update for a row the server has never seen
  * would push a `merchant_id` the server would reject, then immediately correct it.
  */
@@ -20,8 +21,10 @@ export type AdoptionInput = {
   winnerId: string
   /** Local transactions that point at the temp merchant. */
   transactions: Pick<LocalTransaction, 'id' | 'merchantId'>[]
-  /** Local recurring schedules that point at the temp merchant. */
-  recurrings: Pick<LocalRecurring, 'id' | 'merchantId'>[]
+  /** Local bills that point at the temp merchant. */
+  bills: Pick<LocalBill, 'id' | 'merchantId'>[]
+  /** Local income streams that point at the temp merchant. */
+  streams: Pick<LocalIncomeStream, 'id' | 'merchantId'>[]
   /** The whole outbox as it stands. */
   queued: OutboxEntry[]
   /** The aliases the temp merchant carried. */
@@ -37,9 +40,12 @@ export type AdoptionPlan = {
   rewrites: { seq: number; payload: unknown }[]
   /** Already-pushed transactions that need a real `PATCH`. */
   patchTransactionIds: string[]
-  repointRecurringIds: string[]
-  /** Already-pushed schedules that need a real `PATCH`. */
-  patchRecurringIds: string[]
+  repointBillIds: string[]
+  /** Already-pushed bills that need a real `PATCH`. */
+  patchBillIds: string[]
+  repointIncomeIds: string[]
+  /** Already-pushed income streams that need a real `PATCH`. */
+  patchIncomeIds: string[]
   /** Temp alias rows to repoint at the winner and push onto it. */
   aliasesToFold: LocalMerchantAlias[]
   /** Temp alias rows whose key belongs to a third merchant — dropped, not pushed. */
@@ -51,7 +57,11 @@ const isPayloadObject = (
 ): payload is Record<string, unknown> =>
   typeof payload === 'object' && payload !== null
 
-type LinkedEntity = 'transaction' | 'recurring'
+const LINKED_ENTITIES = ['transaction', 'bill', 'income'] as const
+type LinkedEntity = (typeof LINKED_ENTITIES)[number]
+
+const isLinked = (entity: string): entity is LinkedEntity =>
+  (LINKED_ENTITIES as readonly string[]).includes(entity)
 
 const queueKey = (entity: LinkedEntity, id: string) => `${entity}:${id}`
 
@@ -60,7 +70,7 @@ export function planAdoption(input: AdoptionInput): AdoptionPlan {
 
   const rewritable = new Map<string, OutboxEntry[]>()
   for (const entry of input.queued) {
-    if (entry.entity !== 'transaction' && entry.entity !== 'recurring') continue
+    if (!isLinked(entry.entity)) continue
     if (entry.op === 'delete' || !isPayloadObject(entry.payload)) continue
     const key = queueKey(entry.entity, entry.id)
     const list = rewritable.get(key)
@@ -95,7 +105,8 @@ export function planAdoption(input: AdoptionInput): AdoptionPlan {
     return { repoint, patch }
   }
   const transactions = planLinked('transaction', input.transactions)
-  const recurrings = planLinked('recurring', input.recurrings)
+  const bills = planLinked('bill', input.bills)
+  const streams = planLinked('income', input.streams)
 
   const ownedElsewhere = new Set(
     input.knownAliases
@@ -119,8 +130,10 @@ export function planAdoption(input: AdoptionInput): AdoptionPlan {
     repointTransactionIds: transactions.repoint,
     rewrites,
     patchTransactionIds: transactions.patch,
-    repointRecurringIds: recurrings.repoint,
-    patchRecurringIds: recurrings.patch,
+    repointBillIds: bills.repoint,
+    patchBillIds: bills.patch,
+    repointIncomeIds: streams.repoint,
+    patchIncomeIds: streams.patch,
     aliasesToFold,
     aliasesToDiscard,
   }

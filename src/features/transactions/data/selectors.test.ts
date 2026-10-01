@@ -4,8 +4,7 @@ import type {
   LocalBudget,
   LocalCategory,
   LocalGoal,
-  LocalGoalAllocation,
-  LocalRecurring,
+  LocalSetAside,
   LocalTransaction,
 } from '#/db/types'
 import { buildCatalog } from '#/features/categories/data/catalog'
@@ -16,7 +15,6 @@ import {
   buildBudgetsView,
   buildCalendar,
   buildCashflow,
-  buildRecurringView,
   calendarGridOf,
   CUSTOM_DAY_GRID_MAX_DAYS,
   periodCaption,
@@ -127,11 +125,11 @@ const CATALOG = buildCatalog([
 const txRows = (rows: ActivityRow[]): TxRow[] =>
   rows.filter((r): r is TxRow => r.kind === 'tx')
 
-const allocationRow = (
-  over: Partial<LocalGoalAllocation> = {},
-): LocalGoalAllocation => ({
+const allocationRow = (over: Partial<LocalSetAside> = {}): LocalSetAside => ({
   id: `a${seq++}`,
   goalId: 'g1',
+  billId: null,
+  occurrence: null,
   source: 'wallet',
   walletId: 'w1',
   externalLabel: null,
@@ -141,6 +139,9 @@ const allocationRow = (
   position: 0,
   date: '2026-06-10',
   plannedId: null,
+  releasedAt: null,
+  releasedById: null,
+  movedByTransferId: null,
   createdAt: '',
   updatedAt: '',
   version: '',
@@ -152,7 +153,6 @@ const allocationRow = (
 const data = (over: Partial<SpendingData>): SpendingData => ({
   txns: [],
   budgets: [],
-  recurrings: [],
   nodes: [wallet],
   base: 'SAR',
   rates: RATES,
@@ -173,13 +173,13 @@ describe('buildCashflow', () => {
       allocationRow({ amount: 99_000, date: '2026-05-31' }), // outside June
       allocationRow({
         amount: 50_000,
-        source: 'external',
+        source: 'outside',
         walletId: null,
         externalLabel: 'Dad',
       }), // not held in a wallet
     ]
     const view = buildCashflow(
-      data({ txns, allocations }),
+      data({ txns, setAsides: allocations }),
       CATALOG,
       ALL,
       periodOf(ANCHOR, 'month'),
@@ -221,7 +221,7 @@ describe('buildCashflow', () => {
   it('takes set-asides only from wallets in scope', () => {
     const allocations = [allocationRow({ amount: 60_000, walletId: 'w1' })]
     const scoped = buildCashflow(
-      data({ allocations }),
+      data({ setAsides: allocations }),
       CATALOG,
       { type: 'wallet', id: 'elsewhere' },
       periodOf(ANCHOR, 'month'),
@@ -293,92 +293,13 @@ describe('buildBudgetsView', () => {
       data({
         txns,
         budgets: [budget({})],
-        allocations: [allocationRow({ amount: 500_000 })],
+        setAsides: [allocationRow({ amount: 500_000 })],
       }),
       CATALOG,
       ALL,
       TODAY,
     )
     expect(view.rows[0].spentStr).toBe('SR 1,700')
-  })
-})
-
-describe('buildRecurringView', () => {
-  const recurring = (over: Partial<LocalRecurring>): LocalRecurring => ({
-    id: 'r1',
-    name: 'Rent',
-    type: 'spend',
-    amount: 350_000,
-    currency: 'SAR',
-    categoryId: 'cat-housing',
-    walletId: 'w1',
-    goalId: null,
-    merchantId: null,
-    endsOn: null,
-    note: null,
-    frequency: 'monthly',
-    customInterval: null,
-    customUnit: null,
-    nextDue: '2026-06-25',
-    autopost: true,
-    createdAt: '',
-    updatedAt: '',
-    version: '',
-    dirty: 0,
-    deleted: 0,
-    ...over,
-  })
-
-  it('normalizes spend cadence to a monthly figure and lists upcoming items', () => {
-    const view = buildRecurringView(
-      data({
-        recurrings: [
-          recurring({}),
-          recurring({
-            id: 'r2',
-            name: 'Insurance',
-            amount: 1_200_000,
-            frequency: 'annual',
-            nextDue: '2026-11-20',
-          }),
-        ],
-      }),
-      CATALOG,
-      ALL,
-      TODAY,
-    )
-    // 3,500/mo + 12,000/yr → 3,500 + 1,000 = 4,500/mo
-    expect(view.monthlyStr).toBe('SR 4,500')
-    expect(view.activeCount).toBe(2)
-    // Only the June item is "upcoming this month".
-    expect(view.upcoming).toHaveLength(1)
-    expect(view.upcoming[0].name).toBe('Rent')
-  })
-
-  it('keeps an ended schedule listed but out of the totals and upcoming', () => {
-    const view = buildRecurringView(
-      data({
-        recurrings: [
-          recurring({ endsOn: '2027-06-01' }),
-          recurring({
-            id: 'r2',
-            name: 'Old gym',
-            nextDue: '2026-06-28',
-            endsOn: '2026-05-28',
-          }),
-        ],
-      }),
-      CATALOG,
-      ALL,
-      TODAY,
-    )
-    expect(view.monthlyStr).toBe('SR 3,500')
-    expect(view.activeCount).toBe(1)
-    expect(view.upcoming.map((u) => u.name)).toEqual(['Rent'])
-    expect(view.rows.map((r) => [r.name, r.ended, r.untilStr])).toEqual([
-      ['Rent', false, 'until Jun 1, 2027'],
-      ['Old gym', true, null],
-    ])
   })
 })
 
@@ -1091,11 +1012,11 @@ describe('balance adjustments', () => {
 })
 
 describe('confirmed planned items in Activity', () => {
-  const allocation = (
-    over: Partial<LocalGoalAllocation> = {},
-  ): LocalGoalAllocation => ({
+  const allocation = (over: Partial<LocalSetAside> = {}): LocalSetAside => ({
     id: `a${seq++}`,
     goalId: 'umrah',
+    billId: null,
+    occurrence: null,
     source: 'wallet',
     walletId: 'w1',
     externalLabel: null,
@@ -1105,6 +1026,9 @@ describe('confirmed planned items in Activity', () => {
     position: 0,
     date: '2026-06-10',
     plannedId: null,
+    releasedAt: null,
+    releasedById: null,
+    movedByTransferId: null,
     createdAt: '',
     updatedAt: '',
     version: '',
@@ -1125,7 +1049,7 @@ describe('confirmed planned items in Activity', () => {
   it('lists a set-aside as its own row, kept out of the day total', () => {
     const view = list({
       txns: [tx({ type: 'spend', amount: 5_000, date: '2026-06-10' })],
-      allocations: [allocation({ date: '2026-06-10' })],
+      setAsides: [allocation({ date: '2026-06-10' })],
     })
     expect(view.groups).toHaveLength(1)
     const [day] = view.groups
@@ -1135,14 +1059,14 @@ describe('confirmed planned items in Activity', () => {
       name: 'Umrah trip',
       sourceName: 'Main',
       amountStr: 'SR 1,500.00',
-      goalId: 'umrah',
+      ownerId: 'umrah',
     })
   })
 
   it('gives a day holding only set-asides no total; they feed Saved, not Spent', () => {
     const d = data({
       goals: [umrah],
-      allocations: [allocation({ date: '2026-06-03' })],
+      setAsides: [allocation({ date: '2026-06-03' })],
     })
     const view = buildActivityList(
       d,
@@ -1161,21 +1085,23 @@ describe('confirmed planned items in Activity', () => {
   it('shows an external set-aside only when no account scope is set', () => {
     const allocations = [
       allocation({
-        source: 'external',
+        source: 'outside',
         walletId: null,
         externalLabel: 'Dad’s help',
       }),
     ]
-    expect(list({ allocations }).groups[0].rows[0]).toMatchObject({
+    expect(list({ setAsides: allocations }).groups[0].rows[0]).toMatchObject({
       kind: 'set_aside',
       sourceName: 'Dad’s help',
     })
-    expect(list({ allocations }, { type: 'wallet', id: 'w1' }).empty).toBe(true)
+    expect(
+      list({ setAsides: allocations }, { type: 'wallet', id: 'w1' }).empty,
+    ).toBe(true)
   })
 
   it('skips deleted and out-of-window set-asides', () => {
     const view = list({
-      allocations: [
+      setAsides: [
         allocation({ deleted: 1 }),
         allocation({ date: '2026-05-31' }),
       ],
@@ -1183,11 +1109,12 @@ describe('confirmed planned items in Activity', () => {
     expect(view.empty).toBe(true)
   })
 
-  it('tags a confirmed payday, a confirmed payment and an unplanned goal spend', () => {
+  it('tags a confirmed payday, a bill payment and a spend from a goal', () => {
     expect(txTagOf(tx({ type: 'income', plannedId: 'p1' }))).toBe('income')
-    expect(txTagOf(tx({ type: 'spend', plannedId: 'p2', goalId: 'g' }))).toBe(
-      'obligation',
+    expect(txTagOf(tx({ type: 'spend', plannedId: 'p2', billId: 'b' }))).toBe(
+      'bill',
     )
+    expect(txTagOf(tx({ type: 'spend', billId: 'b' }))).toBe('bill')
     expect(txTagOf(tx({ type: 'spend', goalId: 'g' }))).toBe('goal')
     expect(txTagOf(tx({ type: 'spend' }))).toBeNull()
     const row = list({

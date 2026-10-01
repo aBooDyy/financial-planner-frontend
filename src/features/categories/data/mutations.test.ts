@@ -7,10 +7,10 @@ import type {
   LocalInboundImport,
   LocalMerchant,
   LocalPlanned,
-  LocalRecurring,
   LocalTransaction,
   OutboxEntity,
 } from '#/db/types'
+import { bill, goal, income } from '#/features/planned/testing/fixtures'
 import type {
   CreateCategoryWire,
   UpdateCategoryWire,
@@ -246,9 +246,8 @@ describe('updateCategory', () => {
       color: '#1F9D6B',
     })
     expect(
-      (
-        (await outbox().first())?.payload as CreateCategoryWire | undefined
-      )?.spend_class,
+      ((await outbox().first())?.payload as CreateCategoryWire | undefined)
+        ?.spend_class,
     ).toBeNull()
     await markSynced(id)
 
@@ -487,30 +486,6 @@ const tx = (id: string, categoryId: string): LocalTransaction => ({
   deleted: 0,
 })
 
-const recurring = (id: string, categoryId: string): LocalRecurring => ({
-  id,
-  name: 'Coffee club',
-  type: 'spend',
-  amount: 5000,
-  currency: 'SAR',
-  categoryId,
-  walletId: 'w1',
-  goalId: null,
-  merchantId: null,
-  endsOn: null,
-  note: null,
-  frequency: 'monthly',
-  customInterval: null,
-  customUnit: null,
-  nextDue: '2026-10-01',
-  autopost: false,
-  createdAt: '2026-06-12T00:00:00Z',
-  updatedAt: '2026-06-12T00:00:00Z',
-  version: 'v1',
-  dirty: 0,
-  deleted: 0,
-})
-
 const budget = (id: string, categoryId: string): LocalBudget => ({
   id,
   scopeType: 'category',
@@ -549,7 +524,7 @@ const planned = (id: string, categoryId: string): LocalPlanned => ({
   role: 'payment',
   goalId: null,
   incomeStreamId: null,
-  recurringId: null,
+  billId: null,
   walletId: 'w1',
   name: 'Coffee',
   amount: 1500,
@@ -559,6 +534,7 @@ const planned = (id: string, categoryId: string): LocalPlanned => ({
   date: '2026-10-01',
   status: 'open',
   pinned: false,
+  review: false,
   note: null,
   createdAt: '2026-06-12T00:00:00Z',
   updatedAt: '2026-06-12T00:00:00Z',
@@ -627,7 +603,9 @@ const clearFiled = async () => {
     db.integrationKeys.clear(),
     db.inboundImports.clear(),
     db.transactions.clear(),
-    db.recurrings.clear(),
+    db.bills.clear(),
+    db.incomeStreams.clear(),
+    db.goals.clear(),
     db.plannedTransactions.clear(),
     db.budgets.clear(),
     db.merchants.clear(),
@@ -644,7 +622,8 @@ describe('deleteCategory with a move target', () => {
       tx('t2', dining),
       tx('t3', groceries),
     ])
-    await db.recurrings.put(recurring('r1', dining))
+    await db.bills.put(bill({ id: 'r1', categoryId: dining, version: 'v1' }))
+    await db.goals.put(goal({ id: 'g1', useCategoryId: cafes, version: 'v1' }))
     await db.plannedTransactions.put(planned('p1', cafes))
 
     await deleteCategory(dining, groceries)
@@ -652,7 +631,8 @@ describe('deleteCategory with a move target', () => {
     expect(await filedUnder('t1')).toBe(groceries)
     expect(await filedUnder('t2')).toBe(groceries)
     expect(await filedUnder('t3')).toBe(groceries)
-    expect((await db.recurrings.get('r1'))?.categoryId).toBe(groceries)
+    expect((await db.bills.get('r1'))?.categoryId).toBe(groceries)
+    expect((await db.goals.get('g1'))?.useCategoryId).toBe(groceries)
     expect((await db.plannedTransactions.get('p1'))?.categoryId).toBe(groceries)
     // The server re-files synced rows itself; this device queues no per-row edits.
     const entries = await db.outbox.toArray()
@@ -663,6 +643,37 @@ describe('deleteCategory with a move target', () => {
       id: dining,
       payload: { move_to: groceries },
     })
+  })
+
+  it('re-files income streams, which keep the category in use', async () => {
+    const { salary } = await seedTree()
+    const bonus = await createCategory({
+      name: 'Bonus',
+      type: 'income',
+      color: '#1F9D6B',
+    })
+    await markSynced(bonus)
+    await db.incomeStreams.put(
+      income({ id: 's1', categoryId: salary, version: 'v1' }),
+    )
+
+    await expect(deleteCategory(salary)).rejects.toMatchObject({
+      code: 'settings.category.in_use',
+    })
+    await deleteCategory(salary, bonus)
+
+    expect((await db.incomeStreams.get('s1'))?.categoryId).toBe(bonus)
+  })
+
+  it('clears a goal’s remembered category when nothing else is filed there', async () => {
+    const { takeaway } = await seedTree()
+    await db.goals.put(
+      goal({ id: 'g1', useCategoryId: takeaway, version: 'v1' }),
+    )
+
+    await deleteCategory(takeaway)
+
+    expect((await db.goals.get('g1'))?.useCategoryId).toBeNull()
   })
 
   it('moves only the deleted subcategory’s rows', async () => {

@@ -32,11 +32,10 @@ const group = (id: string, over: Partial<LocalBalanceNode> = {}) =>
 const spending = (nodes: LocalBalanceNode[]): SpendingData => ({
   txns: [],
   budgets: [],
-  recurrings: [],
   nodes,
   base: 'SAR',
   rates: { SAR: 1 },
-  allocations: [],
+  setAsides: [],
   goals: [],
 })
 

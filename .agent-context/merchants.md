@@ -109,9 +109,9 @@ not exist server-side and can never be patched or deleted remotely. The winner's
 
 `planAdoption` is pure and decides, `adoptWinner` applies it in one Dexie transaction:
 
-1. Local transactions and recurring schedules pointing at the temp id are repointed at the
-   winner (schedules have no `merchantId` index — a `filter` over the small table).
-2. A transaction or schedule whose push is **still queued** has its queued payload's
+1. Local transactions, bills and income streams pointing at the temp id are repointed at the
+   winner (bills and streams have no `merchantId` index — a `filter` over the small tables).
+2. A transaction, bill or income stream whose push is **still queued** has its queued payload's
    `merchant_id` rewritten in place — no second op. Only rows the server has already seen earn a real `PATCH`.
 3. The temp merchant row and everything queued for it are deleted.
 4. Its spellings move onto the winner and queue as ordinary alias adds (the endpoint is
@@ -132,16 +132,18 @@ would otherwise lose its merchant links silently.
 ### Merge
 
 `POST /merchants/merge` carries the **source's** version and is deliberately **not** queued
-through the outbox: the server repoints transactions, recurring schedules and inbound imports in
-one transaction and bumps every version it touches, so the client pulls merchants, transactions
-and recurrings afterwards rather than guessing. Deleting a merchant clears it locally on
-transactions and schedules alike, mirroring the server's `SET NULL`. It therefore needs a connection, and failures surface in the dialog. Offline,
+through the outbox: the server repoints transactions, bills, income streams and inbound imports
+in one transaction and bumps every version it touches, so the client pulls merchants,
+transactions, bills and income streams afterwards rather than guessing. Deleting a merchant
+clears it locally on transactions, bills and income streams alike, mirroring the server's
+`SET NULL`. It therefore needs a connection, and failures surface in the dialog. Offline,
 `MergeMerchantDialog` disables Merge and says why in its `DialogActions` hint.
 
 ## UI
 
-- **The transaction dialog** has a "Where?" merchant field, opening `MerchantOptions` as a pane (the recurring editor has the same field; a schedule's
-  merchant is copied onto each occurrence it posts), so a hand-entered row can finally be tagged. A learned category the flag did
+- **The transaction dialog** has a "Where?" merchant field, opening `MerchantOptions` as a pane
+  (a bill's merchant is copied onto each payment confirmed for it), so a hand-entered row can
+  finally be tagged. A learned category the flag did
   not auto-apply shows as a one-tap "Usually Groceries — use it" chip.
 - **Settings → Merchants** lists them by `times_seen` descending, which puts the near-duplicates
   a bulk import creates where they can be renamed, merged, or have a stray spelling forgotten.

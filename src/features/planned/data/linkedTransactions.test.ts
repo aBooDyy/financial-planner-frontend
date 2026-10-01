@@ -4,19 +4,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '#/db/db'
 import type { LocalTransaction } from '#/db/types'
 import {
-  allocation,
+  bill,
   goal,
   income,
   m,
   planned,
-  recurring,
+  setAside,
   tx,
   wallet,
 } from '#/features/planned/testing/fixtures'
 import { isoOf } from './dates'
 import { linkedTransactions } from './linkedTransactions'
 import { loadPlannerInputs } from './runner'
-import { legacyMarkerOf } from './settle'
 import { derivePlannerState, liveInputs } from './state'
 import type { PlannerInputs } from './state'
 import { buildGoalPlanView } from './views'
@@ -34,10 +33,10 @@ beforeEach(async () => {
     [
       db.transactions,
       db.plannedTransactions,
-      db.goalAllocations,
+      db.setAsides,
       db.goals,
       db.incomeStreams,
-      db.recurrings,
+      db.bills,
       db.balanceSettings,
       db.exchangeRates,
     ].map((t) => t.clear()),
@@ -45,12 +44,12 @@ beforeEach(async () => {
 })
 
 describe('linkedTransactions', () => {
-  it('reads exactly the goal-linked, planned-linked and legacy auto-post rows', async () => {
+  it('reads exactly the goal-, bill- and planned-linked rows', async () => {
     await db.transactions.bulkPut([
       tx({ id: 't9-goal', goalId: 'g1' }),
       tx({ id: 't1-planned', plannedId: 'p1' }),
       tx({ id: 't5-both', goalId: 'g1', plannedId: 'p2' }),
-      tx({ id: 't3-legacy', source: legacyMarkerOf('r1', '2026-09-01') }),
+      tx({ id: 't3-bill', billId: 'b1' }),
       tx({ id: 't2-import', source: 'import:batch-1' }),
       tx({ id: 't4-neither' }),
       tx({ id: 't0-deleted-linked', plannedId: 'p3', deleted: 1 }),
@@ -61,7 +60,7 @@ describe('linkedTransactions', () => {
     expect(ids(await linkedTransactions())).toEqual([
       't0-deleted-linked',
       't1-planned',
-      't3-legacy',
+      't3-bill',
       't5-both',
       't9-goal',
     ])
@@ -70,30 +69,22 @@ describe('linkedTransactions', () => {
   it('gives the planner exactly what a full-table read gave it', async () => {
     const umrah = goal({
       id: 'umrah',
-      kind: 'onetime',
       target: m(13000),
-      saved: m(1000),
       dueDate: '2027-03-01',
     })
-    const rent = goal({
-      id: 'rent',
-      kind: 'recurring',
-      amount: m(3000),
-      frequency: 'monthly',
-      nextDue: '2026-06-25',
-    })
-    await db.goals.bulkPut([umrah, rent])
+    const fund = goal({ id: 'fund', amount: m(300) })
+    await db.goals.bulkPut([umrah, fund])
+    await db.bills.put(bill({ id: 'rent', nextDue: '2026-06-25' }))
     await db.incomeStreams.put(
       income({ id: 'salary', amount: m(20000), day: 27, walletId: 'w1' }),
-    )
-    await db.recurrings.put(
-      recurring({ id: 'gym', nextDue: '2026-06-05', autopost: true }),
     )
     await db.plannedTransactions.bulkPut([
       planned({ id: 'p-umrah', goalId: 'umrah', occurrence: '2026-06-01' }),
       planned({
         id: 'p-rent',
-        goalId: 'rent',
+        origin: 'bill',
+        goalId: null,
+        billId: 'rent',
         role: 'payment',
         amount: m(3000),
         occurrence: '2026-05-25',
@@ -108,14 +99,14 @@ describe('linkedTransactions', () => {
         occurrence: '2026-05-27',
       }),
     ])
-    await db.goalAllocations.put(
-      allocation({ goalId: 'umrah', amount: m(900), date: '2026-06-01' }),
+    await db.setAsides.put(
+      setAside({ goalId: 'umrah', amount: m(900), date: '2026-06-01' }),
     )
     await db.transactions.bulkPut([
       tx({ goalId: 'umrah', amount: m(400), date: '2026-06-02' }),
-      tx({ goalId: 'rent', plannedId: 'p-rent', amount: m(3000) }),
+      tx({ billId: 'rent', plannedId: 'p-rent', amount: m(3000) }),
       tx({ type: 'income', plannedId: 'p-salary', amount: m(20000) }),
-      tx({ source: legacyMarkerOf('gym', '2026-06-05'), amount: m(200) }),
+      tx({ billId: 'rent', amount: m(200) }),
       tx({ goalId: 'umrah', amount: m(50), deleted: 1 }),
       tx({ amount: m(35), date: '2026-06-03' }),
       tx({ type: 'income', amount: m(500), date: '2026-06-04' }),
@@ -137,19 +128,16 @@ describe('linkedTransactions', () => {
     // The dataset exercises every kind of link the planner reads.
     expect(after.index.has('p-rent')).toBe(true)
     expect(after.index.has('p-salary')).toBe(true)
-    expect(
-      [...after.index.keys()].some((k) => k.endsWith('gym:2026-06-05')),
-    ).toBe(true)
-    expect(after.progress.umrah?.progress).toBeGreaterThan(0)
+    expect(after.progress.umrah?.progress).toBe(m(1300))
 
-    for (const g of [umrah, rent]) {
+    for (const g of [umrah, fund]) {
       const view = (inputs: PlannerInputs, state: typeof before) =>
         buildGoalPlanView({
           goal: g,
           planned: inputs.planned,
           desired: state.desired,
           txns: inputs.txns,
-          allocations: inputs.allocations,
+          setAsides: inputs.setAsides,
           progress: state.progress[g.id],
           nodes: [MAIN],
           index: state.index,

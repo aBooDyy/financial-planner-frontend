@@ -1,24 +1,18 @@
-import type { LocalBudget, LocalRecurring, LocalTransaction } from '#/db/types'
+import type { LocalBudget, LocalTransaction } from '#/db/types'
 import type {
   Budget,
   CreateBudgetWire,
-  CreateRecurringWire,
   CreateTransactionWire,
   CreateTransferWire,
-  Recurring,
   Transaction,
   UpdateBudgetWire,
-  UpdateRecurringWire,
   UpdateTransactionWire,
   UpdateTransferWire,
 } from '#/features/transactions/api/types'
 import {
-  toWireObligationFreq,
   toWirePeriod,
   toWireScope,
   toWireTransactionType,
-  toWireTxType,
-  toWireUnit,
 } from '#/features/transactions/api/types'
 
 // --- Transactions --------------------------------------------------------------------
@@ -26,6 +20,7 @@ import {
 export const serverTransactionToLocal = (t: Transaction): LocalTransaction => ({
   ...t,
   merchantId: t.merchantId ?? null,
+  billId: t.billId ?? null,
   plannedId: t.plannedId ?? null,
   dirty: 0,
   deleted: 0,
@@ -41,6 +36,8 @@ export const localTransactionToCreateWire = (
   category_id: l.categoryId,
   wallet_id: l.walletId,
   goal_id: l.goalId,
+  // Always sent: PATCH replaces, so omitting it would clear the bill link.
+  bill_id: l.billId ?? null,
   // Always sent: PATCH replaces, so omitting it would silently clear the merchant link.
   merchant_id: l.merchantId,
   date: l.date,
@@ -60,6 +57,8 @@ export const localTransactionToUpdateWire = (
   category_id: l.categoryId,
   wallet_id: l.walletId,
   goal_id: l.goalId,
+  // Always sent: PATCH replaces, so omitting it would clear the bill link.
+  bill_id: l.billId ?? null,
   // Always sent: PATCH replaces, so omitting it would silently clear the merchant link.
   merchant_id: l.merchantId,
   date: l.date,
@@ -142,62 +141,4 @@ export const localBudgetToUpdateWire = (l: LocalBudget): UpdateBudgetWire => ({
   limit_amount: l.limit,
   currency: l.currency,
   excludes_bills: l.excludesBills ?? false,
-})
-
-// --- Recurring -----------------------------------------------------------------------
-
-export const serverRecurringToLocal = (r: Recurring): LocalRecurring => ({
-  ...r,
-  dirty: 0,
-  deleted: 0,
-})
-
-// Rows stored before custom frequencies carry no interval fields at all.
-const recurringRepeatWire = (
-  l: LocalRecurring,
-): Pick<
-  CreateRecurringWire,
-  'frequency' | 'custom_interval' | 'custom_unit'
-> => ({
-  frequency: toWireObligationFreq(l.frequency),
-  custom_interval: l.customInterval ?? null,
-  custom_unit: l.customUnit ? toWireUnit(l.customUnit) : null,
-})
-
-export const localRecurringToCreateWire = (
-  l: LocalRecurring,
-): CreateRecurringWire => ({
-  id: l.id,
-  name: l.name,
-  type: toWireTxType(l.type),
-  amount: l.amount,
-  currency: l.currency,
-  category_id: l.categoryId,
-  wallet_id: l.walletId,
-  goal_id: l.goalId,
-  merchant_id: l.merchantId ?? null,
-  ...recurringRepeatWire(l),
-  next_due: l.nextDue,
-  ends_on: l.endsOn ?? null,
-  autopost: l.autopost,
-  note: l.note ?? null,
-})
-
-export const localRecurringToUpdateWire = (
-  l: LocalRecurring,
-): UpdateRecurringWire => ({
-  version: l.version,
-  name: l.name,
-  type: toWireTxType(l.type),
-  amount: l.amount,
-  currency: l.currency,
-  category_id: l.categoryId,
-  wallet_id: l.walletId,
-  goal_id: l.goalId,
-  merchant_id: l.merchantId ?? null,
-  ...recurringRepeatWire(l),
-  next_due: l.nextDue,
-  ends_on: l.endsOn ?? null,
-  autopost: l.autopost,
-  note: l.note ?? null,
 })

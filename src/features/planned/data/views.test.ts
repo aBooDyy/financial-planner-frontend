@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   RATES,
-  allocation,
   goal,
   m,
   planned,
+  setAside,
   wallet,
 } from '#/features/planned/testing/fixtures'
 import { indexSettlements } from './settle'
@@ -19,7 +19,6 @@ import type { ContributionEntry } from './views'
 const TODAY = '2026-09-24'
 const MAIN = wallet({ id: 'w1', name: 'Main Checking' })
 const UMRAH = goal({ id: 'umrah', name: 'Umrah trip', target: m(13000) })
-const RENT = goal({ id: 'rent', name: 'Rent', kind: 'recurring' })
 
 const umrahMonth = (occurrence: string, over = {}) =>
   planned({
@@ -57,7 +56,9 @@ describe('buildPlannedList', () => {
     ),
     planned({
       id: 'rent-sep',
-      goalId: 'rent',
+      origin: 'bill',
+      goalId: null,
+      billId: 'rent',
       role: 'payment',
       name: 'Rent',
       walletId: 'w1',
@@ -78,7 +79,6 @@ describe('buildPlannedList', () => {
   ]
   const view = buildPlannedList({
     planned: items,
-    goals: [UMRAH, RENT],
     nodes: [MAIN],
     index: indexSettlements([], []),
     rates: RATES,
@@ -110,7 +110,7 @@ describe('buildPlannedList', () => {
       amountStr: 'SR 1,500.00',
     })
     expect(rent).toMatchObject({
-      tag: 'obligation',
+      tag: 'bill',
       metaStr: 'Due today · Main Checking',
       oneTap: true,
     })
@@ -126,11 +126,10 @@ describe('buildPlannedList', () => {
   it('shows a partly settled row by its remainder', () => {
     const partial = buildPlannedList({
       planned: [umrahMonth('2026-09-01')],
-      goals: [UMRAH],
       nodes: [MAIN],
       index: indexSettlements(
         [],
-        [allocation({ plannedId: 'umrah:2026-09-01', amount: m(1000) })],
+        [setAside({ plannedId: 'umrah:2026-09-01', amount: m(1000) })],
       ),
       rates: RATES,
       base: 'SAR',
@@ -197,8 +196,8 @@ describe('buildGoalPlanView', () => {
       umrahMonth('2026-09-01'),
       umrahMonth('2026-10-01'),
     ]
-    const allocations = [
-      allocation({
+    const setAsides = [
+      setAside({
         id: 'a-aug',
         goalId: 'umrah',
         plannedId: 'umrah:2026-08-01',
@@ -216,10 +215,10 @@ describe('buildGoalPlanView', () => {
       planned: rows,
       desired: [],
       txns: [],
-      allocations,
+      setAsides,
       progress: undefined,
       nodes: [MAIN],
-      index: indexSettlements([], allocations),
+      index: indexSettlements([], setAsides),
       rates: RATES,
       today: TODAY,
     })

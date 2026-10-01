@@ -6,12 +6,10 @@
  * - A row that is done, skipped, pinned, settled (even partly) or already due is never
  *   touched. The backlog stays for the user to confirm or skip.
  * - `fill` (the background run) creates what is missing and drops future rows an origin no
- *   longer produces — a bill's cycle that moved, a payday that changed. It never rewrites a
- *   goal's set-asides: a one-time goal's stored plan is left exactly as saved, and a rolling
- *   one (open-ended, sinking, a long-cycle bill) only grows at its far end.
+ *   longer produces — a payday that changed. It never rewrites a goal's set-asides: a dated
+ *   goal's stored plan is left exactly as saved, and a rolling one only grows at its far end.
  * - `recalc` (one goal, on request) rewrites that goal's future rows to the live plan.
- * - Paydays and Spending schedules have no stored plan; their future rows follow the
- *   stream / schedule as it is now.
+ * - Paydays have no stored plan; their future rows follow the stream as it is now.
  * - An origin that is gone takes its future unsettled open rows with it; history stays.
  */
 import type { LocalGoal, LocalPlanned } from '#/db/types'
@@ -33,7 +31,7 @@ export type ReconcileContext = {
   /** Goals still in the live plan — a completed goal needs no more set-asides. */
   activeGoalIds: ReadonlySet<string>
   incomeIds: ReadonlySet<string>
-  recurringIds: ReadonlySet<string>
+  billIds: ReadonlySet<string>
   /** `fill` leaves these goals alone (the caller rewrites them with `recalc`). */
   skipGoalIds?: ReadonlySet<string>
 }
@@ -109,7 +107,7 @@ export function reconcilePlanned(
     if (p.origin === 'goal') return !p.goalId || !ctx.goals.has(p.goalId)
     if (p.origin === 'income')
       return !p.incomeStreamId || !ctx.incomeIds.has(p.incomeStreamId)
-    return !p.recurringId || !ctx.recurringIds.has(p.recurringId)
+    return !p.billId || !ctx.billIds.has(p.billId)
   }
   const skipped = (goalId: string | null) =>
     !!goalId && (ctx.skipGoalIds?.has(goalId) ?? false)
@@ -158,7 +156,8 @@ export function reconcilePlanned(
         if (last && d.occurrence <= last) continue
       }
     }
-    if (d.occurrence < ctx.today && d.origin !== 'recurring') continue
+    // Only a bill's occurrence may arrive already due (it waits in Needs confirming).
+    if (d.occurrence < ctx.today && d.origin !== 'bill') continue
     plan.create.push(d)
   }
   return plan
@@ -167,7 +166,7 @@ export function reconcilePlanned(
 export type OrphanOrigins = {
   goalIds: ReadonlySet<string>
   incomeIds: ReadonlySet<string>
-  recurringIds: ReadonlySet<string>
+  billIds: ReadonlySet<string>
 }
 
 export type OrphanPlan = {
@@ -181,7 +180,7 @@ export type OrphanPlan = {
  * Open rows whose origin is gone would wait in "Needs confirming" forever for something that
  * no longer exists, so they are resolved instead: skipped when nothing settles them, closed
  * with the rest abandoned when something does. A hand-made row belongs to no origin and stays —
- * unless it is a set-aside whose goal is gone, which could never be confirmed.
+ * unless it is a set-aside whose goal or bill is gone, which could never be confirmed.
  */
 export function orphanedPlanned(
   rows: ReadonlyArray<LocalPlanned>,
@@ -190,13 +189,14 @@ export function orphanedPlanned(
 ): OrphanPlan {
   const goalGone = (p: LocalPlanned) =>
     !p.goalId || !origins.goalIds.has(p.goalId)
+  const billGone = (p: LocalPlanned) =>
+    !p.billId || !origins.billIds.has(p.billId)
   const gone = (p: LocalPlanned): boolean => {
     if (p.origin === 'goal') return goalGone(p)
     if (p.origin === 'income')
       return !p.incomeStreamId || !origins.incomeIds.has(p.incomeStreamId)
-    if (p.origin === 'recurring')
-      return !p.recurringId || !origins.recurringIds.has(p.recurringId)
-    return p.role === 'set_aside' && goalGone(p)
+    if (p.origin === 'bill') return billGone(p)
+    return p.role === 'set_aside' && (p.billId ? billGone(p) : goalGone(p))
   }
   const plan: OrphanPlan = { skip: [], closeRest: [] }
   for (const p of rows) {

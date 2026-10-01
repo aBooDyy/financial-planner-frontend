@@ -5,13 +5,12 @@ import { DEFAULT_DATE_FORMAT, formatDate } from '#/lib/date'
 import type { DateFormat } from '#/lib/date'
 import type {
   LocalBalanceNode,
+  LocalBill,
   LocalBudget,
   LocalGoal,
-  LocalGoalAllocation,
-  LocalRecurring,
+  LocalSetAside,
   LocalTransaction,
 } from '#/db/types'
-import { frequencyMetaOf } from '#/features/goals/data/cadence'
 import type { AdjustmentType, TxType } from '#/features/transactions/api/types'
 import { isAdjustment, isCashflow } from '#/features/transactions/api/types'
 import { AMBER, AT_RISK_RATIO, RED } from '#/features/transactions/constants'
@@ -35,9 +34,7 @@ import {
   inWindow,
   midnight,
   monthKey,
-  monthlyFactor,
   parseISO,
-  relFuture,
   sameDay,
   sameMonth,
   startOfWeek,
@@ -84,14 +81,15 @@ export type Scope =
 export type SpendingData = {
   txns: LocalTransaction[]
   budgets: LocalBudget[]
-  recurrings: LocalRecurring[]
   nodes: LocalBalanceNode[]
   base: CurrencyCode
   rates: RatesMap
-  /** Goal reservations — listed in Activity as "Set aside" rows, never counted in a total. */
-  allocations?: ReadonlyArray<LocalGoalAllocation>
-  /** Names the goal a set-aside row belongs to. */
-  goals?: ReadonlyArray<LocalGoal>
+  /** Set-asides — listed in Activity as "Set aside" rows, never counted in a total. */
+  setAsides?: ReadonlyArray<LocalSetAside>
+  /** Name the goal a set-aside row belongs to. */
+  goals?: ReadonlyArray<Pick<LocalGoal, 'id' | 'name'>>
+  /** Name the bill a set-aside row belongs to. */
+  bills?: ReadonlyArray<Pick<LocalBill, 'id' | 'name'>>
 }
 
 /** Everything the selectors read except the ledger rows. */
@@ -319,9 +317,9 @@ const flowTxns = (data: SpendingData, scope: Scope): FlowTxn[] =>
   liveTxns(data, scope).filter(isFlow)
 
 /**
- * Σ wallet-held goal reservations dated in the window, in base currency — the hero's "Saved".
- * A reservation keeps the money in its wallet, so it is never a spend; a spend linked to a goal
- * is a payment that left the wallet and counts as Spent like any other.
+ * Σ wallet-held set-asides dated in the window, in base currency — the hero's "Saved". A
+ * set-aside keeps the money in its wallet, so it is never a spend; a spend linked to a goal or
+ * bill is a payment that left the wallet and counts as Spent like any other.
  */
 function savedInWindow(
   data: SpendingData,
@@ -329,7 +327,7 @@ function savedInWindow(
   win: DateWindow,
 ): number {
   const matcher = walletMatcher(scope, data.nodes)
-  return (data.allocations ?? [])
+  return (data.setAsides ?? [])
     .filter(
       (a) =>
         a.deleted === 0 &&
@@ -528,23 +526,23 @@ export type TxRow = {
   amountStr: string
 }
 
-export type TxTag = 'goal' | 'obligation' | 'income'
+export type TxTag = 'goal' | 'bill' | 'income'
 
 export const TX_TAG_LABEL: Record<TxTag, string> = {
   goal: 'Goal',
-  obligation: 'Obligation',
+  bill: 'Bill',
   income: 'Income',
 }
 
 /**
- * A confirmed planned payday reads "Income", a confirmed planned payment "Obligation"; an
- * unplanned spend toward a goal keeps its "Goal" pill.
+ * A confirmed planned payday reads "Income", a payment for a bill "Bill"; a spend from a goal
+ * keeps its "Goal" pill.
  */
 export const txTagOf = (t: LocalTransaction): TxTag | null =>
   t.plannedId && t.type === 'income'
     ? 'income'
-    : t.plannedId && t.type === 'spend'
-      ? 'obligation'
+    : t.type === 'spend' && t.billId
+      ? 'bill'
       : t.type === 'spend' && t.goalId !== null
         ? 'goal'
         : null
@@ -569,10 +567,11 @@ export type TransferRow = {
 export type SetAsideRow = {
   kind: 'set_aside'
   id: string
-  goalId: string
-  /** The goal's name. */
+  /** The bill or goal it is set aside for. */
+  ownerId: string
+  /** The bill's or goal's name. */
   name: string
-  /** "Main Checking", or an external source's label. */
+  /** "Main Checking", or where money held outside is. */
   sourceName: string
   sourceColor: string
   amountStr: string
@@ -728,19 +727,20 @@ function transferRowOf(
 }
 
 function setAsideRowOf(
-  a: LocalGoalAllocation,
+  a: LocalSetAside,
   ctx: ActivityContext,
-  goalNames: ReadonlyMap<string, string>,
+  ownerNames: ReadonlyMap<string, string>,
 ): SetAsideRow {
   const wallet = a.walletId ? ctx.nodeById.get(a.walletId) : undefined
+  const ownerId = a.goalId ?? a.billId ?? ''
   return {
     kind: 'set_aside',
     id: a.id,
-    goalId: a.goalId,
-    name: goalNames.get(a.goalId) ?? 'Goal',
+    ownerId,
+    name: ownerNames.get(ownerId) ?? (a.billId ? 'Bill' : 'Goal'),
     sourceName:
-      a.source === 'external'
-        ? (a.externalLabel ?? 'External')
+      a.source === 'outside'
+        ? (a.externalLabel ?? 'Outside')
         : walletLabelOf(wallet, ctx, DELETED_ACCOUNT),
     sourceColor: wallet?.color ?? NO_WALLET_COLOR,
     amountStr: formatMoney(
@@ -750,14 +750,14 @@ function setAsideRowOf(
   }
 }
 
-/** Live reservations in the window: a wallet's when it is in scope, an external one only unscoped. */
+/** Set-asides made in the window: a wallet's when it is in scope, one held outside only unscoped. */
 function windowSetAsides(
   data: SpendingData,
   win: DateWindow,
   scope: Scope,
   inScope: (walletId: string) => boolean,
-): LocalGoalAllocation[] {
-  return (data.allocations ?? []).filter(
+): LocalSetAside[] {
+  return (data.setAsides ?? []).filter(
     (a) =>
       a.deleted === 0 &&
       inWindow(a.date, win) &&
@@ -840,7 +840,7 @@ export function buildActivityList(
     if (day) day.push(t)
     else byDay.set(t.date, [t])
   }
-  const setAsidesByDay = new Map<string, LocalGoalAllocation[]>()
+  const setAsidesByDay = new Map<string, LocalSetAside[]>()
   for (const a of windowSetAsides(data, win, scope, ctx.inScope)) {
     const day = setAsidesByDay.get(a.date)
     if (day) day.push(a)
@@ -849,14 +849,16 @@ export function buildActivityList(
   const order = [...new Set([...byDay.keys(), ...setAsidesByDay.keys()])].sort(
     (a, b) => b.localeCompare(a),
   )
-  const goalNames = new Map((data.goals ?? []).map((g) => [g.id, g.name]))
+  const ownerNames = new Map(
+    [...(data.goals ?? []), ...(data.bills ?? [])].map((o) => [o.id, o.name]),
+  )
 
   const yesterday = addDays(today, -1)
   const groups: DayGroup[] = order.map((date) => {
     const txnsOfDay = byDay.get(date) ?? []
     const setAsideRows = (setAsidesByDay.get(date) ?? [])
       .sort((a, b) => b.id.localeCompare(a.id))
-      .map((a) => setAsideRowOf(a, ctx, goalNames))
+      .map((a) => setAsideRowOf(a, ctx, ownerNames))
     let spent = 0
     let income = 0
     for (const t of txnsOfDay) {
@@ -1457,179 +1459,5 @@ export function buildBudgetsView(
           ? `${formatMoneyRounded(left, data.base)} still spendable this month`
           : `Over your cap by ${formatMoneyRounded(-left, data.base)}`,
     },
-  }
-}
-
-// --- Recurring -----------------------------------------------------------------------
-
-export type RecurringRow = {
-  id: string
-  name: string
-  color: string
-  /** The leaf the schedule files under — its icon is the most specific one to draw. */
-  categoryId: string
-  catName: string
-  walletName: string
-  walletColor: string
-  cadenceLabel: string
-  autopost: boolean
-  isIncome: boolean
-  amountStr: string
-  nextStr: string
-  /** Past its end date: it schedules nothing more. */
-  ended: boolean
-  /** "until Jun 1, 2027" while an end date is still ahead; null when it repeats forever. */
-  untilStr: string | null
-}
-
-export type UpcomingItem = {
-  dateStr: string
-  relStr: string
-  name: string
-  color: string
-  isIncome: boolean
-  amtStr: string
-}
-
-export type RecurringView = {
-  rows: RecurringRow[]
-  empty: boolean
-  countStr: string
-  monthlyStr: string
-  dueThisStr: string
-  activeCount: number
-  nextLabel: string
-  nextColor: string
-  segments: CashflowSegment[]
-  upcoming: UpcomingItem[]
-  upcomingEmpty: boolean
-}
-
-/** A schedule whose next occurrence would fall after its end date. */
-const hasEnded = (r: LocalRecurring): boolean =>
-  r.endsOn != null && r.nextDue > r.endsOn
-
-const fmtLong = (d: Date): string =>
-  d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-
-export function buildRecurringView(
-  data: SpendingData,
-  catalog: CategoryCatalog,
-  scope: Scope,
-  today: Date,
-): RecurringView {
-  const matcher = walletMatcher(scope, data.nodes)
-  const items = data.recurrings.filter(
-    (r) => r.deleted === 0 && matcher(r.walletId),
-  )
-  const nodeById = new Map(data.nodes.map((n) => [n.id, n]))
-  const sorted = [...items].sort(
-    (a, b) =>
-      Number(hasEnded(a)) - Number(hasEnded(b)) ||
-      a.nextDue.localeCompare(b.nextDue),
-  )
-  const live = sorted.filter((r) => !hasEnded(r))
-
-  const spend = live.filter((r) => r.type === 'spend')
-  const monthly = spend.reduce(
-    (s, r) =>
-      s +
-      convertMinor(r.amount, r.currency, data.base, data.rates) *
-        monthlyFactor(r),
-    0,
-  )
-
-  const mStart = new Date(today.getFullYear(), today.getMonth(), 1)
-  const mEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0)
-  const inThisMonth = (iso: string) => {
-    const d = parseISO(iso)
-    return midnight(d) >= midnight(mStart) && midnight(d) <= midnight(mEnd)
-  }
-  let dueThis = 0
-  for (const r of live) {
-    if (r.type === 'spend' && inThisMonth(r.nextDue))
-      dueThis += convertMinor(r.amount, r.currency, data.base, data.rates)
-  }
-
-  const next =
-    live.length > 0
-      ? (live.find((r) => midnight(parseISO(r.nextDue)) >= midnight(today)) ??
-        live[0])
-      : undefined
-  const denom = Math.max(monthly, 1)
-
-  const rows: RecurringRow[] = sorted.map((r) => {
-    const cat = catalog.rootOf(r.categoryId)
-    const wallet = nodeById.get(r.walletId)
-    return {
-      id: r.id,
-      name: r.name,
-      color: cat.color,
-      categoryId: r.categoryId,
-      catName: cat.name,
-      walletName: wallet?.name ?? '',
-      walletColor: wallet?.color ?? 'var(--fp-border-strong)',
-      cadenceLabel: frequencyMetaOf(r).label,
-      autopost: r.autopost,
-      isIncome: r.type === 'income',
-      amountStr: `${r.type === 'income' ? '+' : '−'}${formatMoneyRounded(
-        convertMinor(r.amount, r.currency, data.base, data.rates),
-        data.base,
-      )}`,
-      nextStr: fmtShort(parseISO(r.nextDue)),
-      ended: hasEnded(r),
-      untilStr:
-        r.endsOn && !hasEnded(r)
-          ? `until ${fmtLong(parseISO(r.endsOn))}`
-          : null,
-    }
-  })
-
-  const upcoming = live
-    .filter((r) => inThisMonth(r.nextDue))
-    .map((r): UpcomingItem => {
-      const cat = catalog.rootOf(r.categoryId)
-      return {
-        dateStr: fmtShort(parseISO(r.nextDue)),
-        relStr: relFuture(r.nextDue, today),
-        name: r.name,
-        color: cat.color,
-        isIncome: r.type === 'income',
-        amtStr: `${r.type === 'income' ? '+' : '−'}${formatMoneyRounded(
-          convertMinor(r.amount, r.currency, data.base, data.rates),
-          data.base,
-        )}`,
-      }
-    })
-
-  return {
-    rows,
-    empty: items.length === 0,
-    countStr: `${items.length} item${items.length === 1 ? '' : 's'}`,
-    monthlyStr: formatMoneyRounded(monthly, data.base),
-    dueThisStr: formatMoneyRounded(dueThis, data.base),
-    activeCount: live.length,
-    nextLabel: next
-      ? `Next: ${next.name} · ${fmtShort(parseISO(next.nextDue))}`
-      : 'Nothing scheduled',
-    nextColor: next
-      ? catalog.rootOf(next.categoryId).color
-      : 'var(--fp-border-strong)',
-    segments: spend.map((r) => {
-      const perMonth =
-        convertMinor(r.amount, r.currency, data.base, data.rates) *
-        monthlyFactor(r)
-      const pct = (perMonth / denom) * 100
-      return {
-        key: r.id,
-        label: r.name,
-        color: catalog.rootOf(r.categoryId).color,
-        pct,
-        valueStr: `${formatMoneyRounded(perMonth, data.base)}/mo`,
-        pctStr: `${formatShare(pct)} of monthly`,
-      }
-    }),
-    upcoming,
-    upcomingEmpty: upcoming.length === 0,
   }
 }

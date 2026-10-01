@@ -3,7 +3,7 @@
  * links only an unmistakable match; the transaction dialog offers a looser one, which the user
  * sees and can switch off.
  */
-import type { LocalBalanceNode, LocalPlanned, LocalRecurring } from '#/db/types'
+import type { LocalBalanceNode, LocalPlanned } from '#/db/types'
 import type { TxType } from '#/features/transactions/api/types'
 import type { RatesMap } from '#/lib/config/rates'
 import { convertMinor } from '#/lib/currency'
@@ -16,14 +16,13 @@ export const QUICK_MATCH_DAYS = 3
 export const DIALOG_MATCH = { days: 7, tolerance: 0.1 } as const
 
 /**
- * Paydays and Spending schedules, plus obligation payments. A set-aside is never settled by a
- * transaction, and a hand-made item is too loosely defined to guess at.
+ * Paydays and bill payments. A set-aside is never settled by a transaction, and a hand-made
+ * item is too loosely defined to guess at.
  */
 const settlesBy = (item: LocalPlanned, type: TxType): boolean =>
   type === 'income'
     ? item.role === 'income'
-    : item.role === 'payment' &&
-      (item.origin === 'recurring' || item.origin === 'goal')
+    : item.role === 'payment' && item.origin === 'bill'
 
 const oldestFirst = (a: LocalPlanned, b: LocalPlanned): number =>
   a.date.localeCompare(b.date) ||
@@ -81,17 +80,17 @@ export const findQuickAddMatch = ({
     tolerance: 0,
   })
 
-/** A payment toward a goal carries the goal, whichever origin planned it. */
-export function goalIdForMatch(
+/** A spend settling a goal's planned payment carries the goal. */
+export const goalIdForMatch = (
   item: LocalPlanned,
   type: TxType,
-  recurrings: ReadonlyArray<LocalRecurring>,
-): string | null {
-  if (type !== 'spend') return null
-  if (item.goalId) return item.goalId
-  if (item.origin !== 'recurring' || !item.recurringId) return null
-  return recurrings.find((r) => r.id === item.recurringId)?.goalId ?? null
-}
+): string | null => (type === 'spend' && !item.billId ? item.goalId : null)
+
+/** A spend settling a bill's planned payment carries the bill. */
+export const billIdForMatch = (
+  item: LocalPlanned,
+  type: TxType,
+): string | null => (type === 'spend' ? item.billId : null)
 
 /** The live wallet the item planned to use, or null (none planned, or since deleted). */
 export function plannedWalletOf(

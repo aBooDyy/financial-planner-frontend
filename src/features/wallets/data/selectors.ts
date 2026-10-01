@@ -5,20 +5,18 @@ import type { CurrencyCode } from '#/lib/currency'
 import { GROUP_ICON, WALLET_ICON, iconIdOr } from '#/lib/icons/fallbacks'
 import type { IconId } from '#/lib/icons/catalog.gen'
 import type { LocalBalanceNode } from '#/db/types'
+import type { WalletSetAsideLine } from '#/features/setAsides/data/totals'
 import { activeNodes } from './archive'
 
-// One goal's claim on a wallet, in the wallet's currency (built by goals/data/reservations).
-export type WalletReservation = {
-  goalId: string
-  goalName: string
-  color: string
-  amount: number
-}
+// One bill's or goal's set-aside in a wallet, in the wallet's currency
+// (built by setAsides/data/totals).
+export type WalletReservation = WalletSetAsideLine
 
-// A reserve line on a wallet row, ready to render.
+// A set-aside line on a wallet row, ready to render.
 export type ReservationRow = {
-  goalId: string
-  goalName: string
+  ownerId: string
+  owner: 'goal' | 'bill'
+  ownerName: string
   color: string
   amountStr: string
 }
@@ -296,8 +294,9 @@ export function buildWalletsView(
     const available = amount - reserved
     const reservationRows: ReservationRow[] = (reservations[node.id] ?? []).map(
       (l) => ({
-        goalId: l.goalId,
-        goalName: l.goalName,
+        ownerId: l.ownerId,
+        owner: l.owner,
+        ownerName: l.ownerName,
         color: l.color,
         amountStr: formatMoney(l.amount, currency),
       }),

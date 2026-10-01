@@ -75,7 +75,6 @@ vi.mock('#/features/transactions/api/transactionsApi', () => ({
     bulkDelete: () => Promise.resolve([]),
   },
   budgetsApi: { list: () => Promise.resolve([]) },
-  recurringsApi: { list: () => Promise.resolve([]) },
 }))
 
 vi.mock('#/features/wallets/api/walletsApi', () => ({

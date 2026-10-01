@@ -31,6 +31,19 @@ Alternatives considered (record if we ever switch):
 need no declaration of their own. Adding a table or an index means a new version with just
 that change, and an `.upgrade()` when installed data has to follow.
 
+- **Version 4 replaces the planning model** (recurring schedules and goal allocations became
+  bills and set-asides; goals, income streams and planned rows changed shape). It deletes the
+  `recurrings` and `goalAllocations` tables, adds `bills` (`id, categoryId, walletId, dirty,
+  deleted`) and `setAsides` (`id, goalId, billId, walletId, plannedId, dirty, deleted`),
+  re-indexes `plannedTransactions` on `billId` (no `recurringId`) and `transactions` on `billId`.
+  The upgrade **clears `goals`, `incomeStreams` and `plannedTransactions`** (the server dropped
+  and recreated them), **deletes queued outbox entries of `recurring`, `allocation`, `goal`,
+  `income` and `planned`** (their payloads are in a shape the server refuses), clears `goal_id` /
+  `planned_id` from local ledger rows and from queued `transaction` payloads (the server's `0037`
+  cleared those links), and deletes the per-user `:planned` watermark and `:plannerInputs`
+  marker, so the planned delta re-reads as a first sync and the planner waits for the new pull.
+  Every other table, the ledger rows and every other queued write survive. `db.test.ts` opens a
+  real v3 database and pins all of it. Deploy the backend (`0037`) first.
 - **Version 3 adds `ledgerTotals`** and builds it from the rows already on the device. It is
   derived data: never synced, not in `SYNCED_TABLES`, but wiped on sign-out with the rest
   (`USER_TABLES`). See [Running totals](#running-totals-maintained-in-the-database).
@@ -44,12 +57,12 @@ that change, and an `.upgrade()` when installed data has to follow.
   bumps the version. `appConfig` (no user data) and `importBatches` (local history; its rows
   come back with the re-pull, found by their `source` marker) survive. `db.test.ts` opens a
   real v1 database and pins what survives.
-- **`categoryId` is indexed on `transactions`, `recurrings` and `plannedTransactions`**: the
+- **`categoryId` is indexed on `transactions`, `bills` and `plannedTransactions`**: the
   category delete re-files by it and the Settings tree counts rows per category by it.
 - `AppDatabase` takes the database name (default `'means-app'`) so a test can open its own.
 
-- One Dexie table per synced entity (accounts, transactions, categories, budgets,
-  obligations…), keyed by the server **id** (use client-generated UUIDs so records exist
+- One Dexie table per synced entity (accounts, transactions, categories, budgets, bills,
+  set-asides…), keyed by the server **id** (use client-generated UUIDs so records exist
   before first sync).
 - Each record stores the server **`version`** and local sync metadata: `dirty` (has
   unsynced local changes), `deleted` (tombstone), `updated_at`.
@@ -125,6 +138,12 @@ updates it: **`db/ledgerTotalsMiddleware.ts`, a Dexie DBCore middleware register
 2. Append the mutation to the **outbox**.
 3. UI reflects the change at once (it's reading the local DB).
 4. The sync engine pushes the outbox in the background.
+
+`db/enqueue.ts` holds the outbox half of an ordinary write — `enqueueCreate`,
+`enqueueUpsert` (fold into the row's queued create or update, else queue an update on the
+last-synced version; rewriting clears a flagged failure) and `enqueueDelete` (drop the row's
+queued entries; queue a delete only if the server has seen it). The bills, set-asides, goals
+and income mutations use it; older slices still carry their own copies of the same logic.
 
 ## Sync engine
 
@@ -219,7 +238,8 @@ updates it: **`db/ledgerTotalsMiddleware.ts`, a Dexie DBCore middleware register
 
 ### The planner's gate (`db/pullState.ts`)
 
-`pullAll` wraps the pulls the planner generates from — goals, spending, planned rows — in one
+`pullAll` wraps the pulls the planner generates from — goals and income, bills, set-asides,
+spending, planned rows — in one
 `Promise.all` and, when all three came home, calls `recordPlannerInputsPulled`
 (`db/plannerInputs.ts`): it bumps `plannerInputsPulled` in a small Zustand store (this app load)
 and writes a per-user `syncState` marker (this device). `usePlannedRunner` does nothing until
@@ -237,7 +257,7 @@ navigation does not unmount, so the loops live for the session and stop at logou
 
 **Never start it from a page.** One pull fans out to _every_ collection (12 endpoints today), so a
 page-level `startSync()` refetches the whole dataset on each navigation — opening Wallets would
-fetch goals, budgets, recurrings, merchants and import templates. It also restarts the 5-minute
+fetch goals, bills, budgets, merchants and import templates. It also restarts the 5-minute
 interval from zero each time, so a user who changes tabs more often than that never gets a
 background pull at all. Both were live bugs: sync was started from five page components until the
 call was hoisted here. `startSync()` now ignores a second concurrent start, and
@@ -261,8 +281,8 @@ collections that grow read a delta instead, resuming from a watermark held in th
 | `/planned-transactions/changes` | `planned`   | `pullPlannedDelta` → `pullAll` |
 
 **Everything else stays on the full list, deliberately.** Balance nodes, balance settings,
-exchange rates, categories, custom currencies, income streams, goals, goal allocations,
-budgets, recurring schedules, import templates, and the email connections (whose alert rules ride inside the
+exchange rates, categories, custom currencies, income streams, goals, bills, set-asides,
+budgets, import templates, and the email connections (whose alert rules ride inside the
 connection row). Two reasons, and they are the same reason twice: those collections are bounded
 by how much a person can be bothered to create, and **a full list teaches deletion by absence** —
 whatever we hold and the response does not is gone. A delta cannot say that, which is why the
@@ -585,7 +605,7 @@ per-row mutations without leaving the pattern (`features/import/data/commit.ts`)
 - **One `schedulePush()` at the end** — never one per chunk, or an import becomes hundreds of
   debounce timers.
 - Every imported row carries `source = 'csv:<batchId>'`, the same convention as an
-  auto-posted schedule's `recurring:<id>:<date>` and the email path's `email:<connection_id>`. Dexie
+  email path's `email:<connection_id>`. Dexie
   indexes `source`, which is what makes an import findable — and undoable — as a unit.
 - `importBatches` is **local-only** (no outbox, no server table): the durable fact is the
   marker on the transactions, which _is_ synced, so an import committed on one device can be

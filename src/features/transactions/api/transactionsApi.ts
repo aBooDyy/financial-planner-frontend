@@ -11,17 +11,13 @@ import type {
   BulkTransactionResult,
   BulkTransferResult,
   CreateBudgetWire,
-  CreateRecurringWire,
   CreateTransactionWire,
   CreateTransferWire,
-  Recurring,
-  RecurringWire,
   Transaction,
   TransactionWire,
   Transfer,
   TransferWire,
   UpdateBudgetWire,
-  UpdateRecurringWire,
   UpdateTransactionWire,
   UpdateTransferWire,
 } from './types'
@@ -30,13 +26,12 @@ import {
   toBulkDeleteResult,
   toBulkResult,
   toBulkTransferResult,
-  toRecurring,
   toTransaction,
   toTransfer,
 } from './types'
 
 /**
- * Remote calls for the Spending entities (transactions, budgets, recurring schedules). The
+ * Remote calls for the Spending entities (transactions, budgets). The
  * sync engine owns when these run; UI reads from the local DB, never from here directly.
  */
 export const transactionsApi = {
@@ -109,15 +104,4 @@ export const budgetsApi = {
     http.patch<BudgetWire>(`/budgets/${id}`, payload).then(toBudget),
   remove: (id: string): Promise<void> =>
     http.del<void>(`/budgets/${id}`).then(() => undefined),
-}
-
-export const recurringsApi = {
-  list: (): Promise<Recurring[]> =>
-    http.get<RecurringWire[]>('/recurrings').then((r) => r.map(toRecurring)),
-  create: (payload: CreateRecurringWire): Promise<Recurring> =>
-    http.post<RecurringWire>('/recurrings', payload).then(toRecurring),
-  update: (id: string, payload: UpdateRecurringWire): Promise<Recurring> =>
-    http.patch<RecurringWire>(`/recurrings/${id}`, payload).then(toRecurring),
-  remove: (id: string): Promise<void> =>
-    http.del<void>(`/recurrings/${id}`).then(() => undefined),
 }

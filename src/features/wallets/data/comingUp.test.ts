@@ -19,7 +19,7 @@ const dollars = wallet({
 
 const bill = (over: Partial<LocalPlanned>) =>
   planned({
-    origin: 'recurring',
+    origin: 'bill',
     role: 'payment',
     goalId: null,
     walletId: 'w1',
@@ -45,7 +45,6 @@ function view(
   const nodes = [checking, dollars]
   const list = buildPlannedList({
     planned: rows,
-    goals: [],
     nodes,
     index: indexSettlements(txns, []),
     rates: RATES,

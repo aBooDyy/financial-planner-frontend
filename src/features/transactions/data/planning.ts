@@ -165,22 +165,6 @@ export const budgetWindow = (
   }
 }
 
-/** Human "overdue" / "today" / "in 3d" / "in 2w" for a future-ish date. */
-export const relFuture = (iso: string, today: Date): string => {
-  const days = Math.round(
-    (midnight(parseISO(iso)) - midnight(today)) / 86_400_000,
-  )
-  if (days < 0) return 'overdue'
-  if (days === 0) return 'today'
-  if (days === 1) return 'tomorrow'
-  if (days < 7) return `in ${days}d`
-  return `in ${Math.round(days / 7)}w`
-}
-
-/** Advance a recurring schedule one cadence forward from its current next-due. */
+/** Step a repeating schedule one cadence forward from its current next-due. */
 export const advanceDue = (iso: string, repeat: Repeat): string =>
   ymd(stepDue(parseISO(iso), frequencyMetaOf(repeat, 'monthly').cadence, 1))
-
-/** Normalize a recurring amount to a per-month figure using its cadence. */
-export const monthlyFactor = (repeat: Repeat): number =>
-  frequencyMetaOf(repeat, 'monthly').perYear / 12

@@ -67,6 +67,7 @@ const serverLeg = (
   categoryId: null,
   walletId: 'w1',
   goalId: null,
+  billId: null,
   merchantId: null,
   date: '2026-09-23',
   note: 'ATM withdrawal',

@@ -19,7 +19,6 @@ import {
   buildBudgetsView,
   buildCalendar,
   buildCashflow,
-  buildRecurringView,
   periodCaption,
   scopeFromValue,
   scopeToValue,
@@ -65,7 +64,6 @@ type Shown = {
 const NO_DATA: SpendingData = {
   txns: [],
   budgets: [],
-  recurrings: [],
   nodes: [],
   base: DEFAULT_BASE_CURRENCY,
   rates: {},
@@ -179,24 +177,9 @@ export function useSpendingViews({
         : null,
     [view, shown, catalog, scope],
   )
-  // Schedules never read the ledger, so this tab does not wait for it.
-  const recurring = useMemo(
-    () =>
-      view === 'recurring' && inputs
-        ? buildRecurringView(
-            { ...inputs, txns: [] },
-            catalog,
-            scope,
-            parseISO(today),
-          )
-        : null,
-    [view, inputs, catalog, scope, today],
-  )
-
   return {
     period,
     activity: calendar ? { calendar, cashflow, list, breakdown } : null,
     budgets,
-    recurring,
   }
 }

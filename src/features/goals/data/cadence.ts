@@ -1,9 +1,8 @@
 /**
  * A repeat rule as one shape: a preset frequency or a custom "every N days / weeks /
- * months". Every due-date step and every cadence string for a goal or a recurring schedule
- * reads from here.
+ * months". Every due-date step and every cadence string for a bill or an income stream reads
+ * from here.
  */
-import type { LocalGoal } from '#/db/types'
 import type {
   GoalFrequency,
   IntervalUnit,
@@ -17,10 +16,11 @@ import {
 } from '#/features/goals/constants'
 import type { Cadence, FreqMeta } from '#/features/goals/constants'
 
-export type Repeat = Pick<
-  LocalGoal,
-  'frequency' | 'customInterval' | 'customUnit'
->
+export type Repeat = {
+  frequency: ObligationFrequency | null
+  customInterval: number | null
+  customUnit: IntervalUnit | null
+}
 
 /** A repeat as an editor holds it: the preset chip, or the custom chip and its interval as typed. */
 export type RepeatDraft = {

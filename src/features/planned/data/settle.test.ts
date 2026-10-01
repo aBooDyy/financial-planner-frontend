@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   RATES,
-  allocation,
   m,
   planned,
+  setAside,
   tx,
 } from '#/features/planned/testing/fixtures'
 import {
@@ -26,7 +26,7 @@ describe('settledOf / remainderOf', () => {
         tx({ plannedId: 'other', amount: m(999) }),
         tx({ plannedId: 'p1', amount: m(50), deleted: 1 }),
       ],
-      [allocation({ plannedId: 'p1', amount: m(500), currency: 'SAR' })],
+      [setAside({ plannedId: 'p1', amount: m(500), currency: 'SAR' })],
     )
     expect(settledOf(item, index, RATES)).toBe(m(875))
     expect(remainderOf(item, index, RATES)).toBe(m(625))
@@ -42,20 +42,13 @@ describe('settledOf / remainderOf', () => {
     expect(remainderOf(item, index, RATES)).toBe(0)
   })
 
-  it('counts an entry the old auto-poster made as settling its occurrence', () => {
-    const item = planned({
-      origin: 'recurring',
-      role: 'payment',
-      goalId: null,
-      recurringId: 'gym',
-      occurrence: '2026-09-05',
-      amount: m(200),
-    })
+  it('still counts a released set-aside: the money was set aside, then used', () => {
+    const item = planned({ id: 'p1', amount: m(500) })
     const index = indexSettlements(
-      [tx({ source: 'recurring:gym:2026-09-05', amount: m(200) })],
       [],
+      [setAside({ plannedId: 'p1', amount: m(500), releasedAt: '2026-10-01' })],
     )
-    expect(settledOf(item, index, RATES)).toBe(m(200))
+    expect(settledOf(item, index, RATES)).toBe(m(500))
   })
 })
 
@@ -151,8 +144,8 @@ describe('behindOf', () => {
   const confirmed = indexSettlements(
     [],
     [
-      allocation({ goalId: 'umrah', plannedId: 'jul', amount: m(1500) }),
-      allocation({ goalId: 'umrah', plannedId: 'aug', amount: m(1500) }),
+      setAside({ goalId: 'umrah', plannedId: 'jul', amount: m(1500) }),
+      setAside({ goalId: 'umrah', plannedId: 'aug', amount: m(1500) }),
     ],
   )
 
@@ -177,9 +170,9 @@ describe('behindOf', () => {
     const ahead = indexSettlements(
       [],
       [
-        allocation({ plannedId: 'jul', amount: m(1500) }),
-        allocation({ plannedId: 'aug', amount: m(1500) }),
-        allocation({ plannedId: 'sep', amount: m(2000) }),
+        setAside({ plannedId: 'jul', amount: m(1500) }),
+        setAside({ plannedId: 'aug', amount: m(1500) }),
+        setAside({ plannedId: 'sep', amount: m(2000) }),
       ],
     )
     expect(behindOf('umrah', plan, ahead, RATES, '2026-09-24').behind).toBe(

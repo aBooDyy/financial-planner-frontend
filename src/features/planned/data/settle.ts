@@ -1,12 +1,8 @@
 /**
  * Pure derivations over planned rows and what settles them. Nothing here is stored: a row's
- * settled amount is always the sum of the transactions and reservations that point at it.
+ * settled amount is always the sum of the transactions and set-asides that point at it.
  */
-import type {
-  LocalGoalAllocation,
-  LocalPlanned,
-  LocalTransaction,
-} from '#/db/types'
+import type { LocalPlanned, LocalSetAside, LocalTransaction } from '#/db/types'
 import type { PlannedRole } from '#/features/planned/api/types'
 import { convertMinor } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
@@ -15,10 +11,11 @@ import { addDaysISO, isoOf } from './dates'
 
 /** A real row that settles (part of) a planned item. */
 export type Settlement = {
-  kind: 'transaction' | 'allocation'
+  kind: 'transaction' | 'setAside'
   id: string
   plannedId: string | null
   goalId: string | null
+  billId: string | null
   amount: number
   currency: CurrencyCode
   date: string
@@ -26,31 +23,15 @@ export type Settlement = {
   externalLabel: string | null
 }
 
-/** Settlements keyed by the planned id they point at (or a legacy recurring marker). */
+/** Settlements keyed by the planned id they point at. */
 export type SettlementIndex = ReadonlyMap<string, ReadonlyArray<Settlement>>
-
-const LEGACY_PREFIX = 'legacy:'
-
-/** How a legacy auto-post's `source` starts. */
-export const LEGACY_SOURCE_PREFIX = 'recurring:'
-
-/**
- * Before recurrings moved onto planned rows, an auto-posted occurrence was marked only by its
- * `source`. Such a transaction settles the occurrence it names, so nothing posts twice.
- */
-export const legacyMarkerOf = (recurringId: string, occurrence: string) =>
-  `${LEGACY_SOURCE_PREFIX}${recurringId}:${occurrence}`
-
-const legacyKeyOf = (item: LocalPlanned): string | null =>
-  item.origin === 'recurring' && item.recurringId
-    ? `${LEGACY_PREFIX}${legacyMarkerOf(item.recurringId, item.occurrence)}`
-    : null
 
 export const txSettlement = (t: LocalTransaction): Settlement => ({
   kind: 'transaction',
   id: t.id,
   plannedId: t.plannedId,
   goalId: t.goalId,
+  billId: t.billId ?? null,
   amount: t.amount,
   currency: t.currency,
   date: t.date,
@@ -58,21 +39,23 @@ export const txSettlement = (t: LocalTransaction): Settlement => ({
   externalLabel: null,
 })
 
-export const allocationSettlement = (a: LocalGoalAllocation): Settlement => ({
-  kind: 'allocation',
+/** A released set-aside still settled its row: the money was set aside, then used. */
+export const setAsideSettlement = (a: LocalSetAside): Settlement => ({
+  kind: 'setAside',
   id: a.id,
   plannedId: a.plannedId,
   goalId: a.goalId,
+  billId: a.billId,
   amount: a.amount,
   currency: a.currency,
   date: a.date,
   walletId: a.source === 'wallet' ? a.walletId : null,
-  externalLabel: a.source === 'external' ? a.externalLabel : null,
+  externalLabel: a.source === 'outside' ? a.externalLabel : null,
 })
 
 export function indexSettlements(
   txns: ReadonlyArray<LocalTransaction>,
-  allocations: ReadonlyArray<LocalGoalAllocation>,
+  setAsides: ReadonlyArray<LocalSetAside>,
 ): SettlementIndex {
   const out = new Map<string, Settlement[]>()
   const add = (key: string, s: Settlement) => {
@@ -81,14 +64,10 @@ export function indexSettlements(
     else out.set(key, [s])
   }
   for (const t of txns) {
-    if (t.deleted !== 0) continue
-    if (t.plannedId) add(t.plannedId, txSettlement(t))
-    else if (t.source?.startsWith(LEGACY_SOURCE_PREFIX))
-      add(`${LEGACY_PREFIX}${t.source}`, txSettlement(t))
+    if (t.deleted === 0 && t.plannedId) add(t.plannedId, txSettlement(t))
   }
-  for (const a of allocations) {
-    if (a.deleted === 0 && a.plannedId)
-      add(a.plannedId, allocationSettlement(a))
+  for (const a of setAsides) {
+    if (a.deleted === 0 && a.plannedId) add(a.plannedId, setAsideSettlement(a))
   }
   return out
 }
@@ -97,11 +76,7 @@ export function settlementsFor(
   item: LocalPlanned,
   index: SettlementIndex,
 ): Settlement[] {
-  const legacy = legacyKeyOf(item)
-  return [
-    ...(index.get(item.id) ?? []),
-    ...(legacy ? (index.get(legacy) ?? []) : []),
-  ]
+  return [...(index.get(item.id) ?? [])]
 }
 
 /** Σ what settles the item, in the item's currency. */
@@ -197,7 +172,7 @@ export function behindOf(
 export type MatchRef =
   | { goalId: string }
   | { incomeStreamId: string }
-  | { recurringId: string }
+  | { billId: string }
 
 /** How far before / after the entry's date a planned item still counts as the same one. */
 export const MATCH_WINDOW = { before: 45, after: 15 } as const
@@ -205,7 +180,7 @@ export const MATCH_WINDOW = { before: 45, after: 15 } as const
 const refersTo = (item: LocalPlanned, ref: MatchRef): boolean => {
   if ('goalId' in ref) return item.goalId === ref.goalId
   if ('incomeStreamId' in ref) return item.incomeStreamId === ref.incomeStreamId
-  return item.recurringId === ref.recurringId
+  return item.billId === ref.billId
 }
 
 /**

@@ -9,7 +9,7 @@ const TODAY = '2026-09-27'
 
 const payment = (amount: number, over: Partial<LocalPlanned> = {}) =>
   planned({
-    origin: 'recurring',
+    origin: 'bill',
     role: 'payment',
     goalId: null,
     amount,
@@ -23,7 +23,6 @@ const income = (amount: number, over: Partial<LocalPlanned> = {}) =>
 function headed(rows: LocalPlanned[]) {
   const list = buildPlannedList({
     planned: rows,
-    goals: [],
     nodes: [],
     index: indexSettlements([], []),
     rates: RATES,

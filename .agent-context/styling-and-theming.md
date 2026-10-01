@@ -305,7 +305,7 @@ stack itself is a shared primitive: it takes `BarSegment[]` (`key`, `label`, `co
 `valueStr`, `pctStr`, optional `note`) and reveals a part's figures on hover, keyboard focus and
 tap. A segment is a real `<button>` with an `aria-label` carrying the same three facts, so the bar
 is reachable without a pointer; non-active segments dim to 0.4 so the one being read stands out.
-The numbers are **built by the selectors, not the bar** — `buildCashflow`/`buildRecurringView`
+The numbers are **built by the selectors, not the bar** — `buildCashflow`/`buildBudgetsView`
 (`CashflowSegment`) and `buildWalletsView` (`GroupBar`) already hold the catalog, the base
 currency and the denominator, and money is never formatted in a component.
 

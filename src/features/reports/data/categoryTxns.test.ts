@@ -21,7 +21,6 @@ const main = wallet({ id: 'w1', name: 'Main' })
 const side = wallet({ id: 'w2', name: 'Side' })
 const inputs: SpendingInputs = {
   budgets: [],
-  recurrings: [],
   nodes: [main, side],
   base: 'SAR',
   rates: RATES,

@@ -57,8 +57,6 @@ export type LedgerSummary = {
   deltas: Record<string, number>
   /** Every currency a row is in, deleted rows included. */
   currencies: CurrencyCode[]
-  /** Every goal-linked row, deleted ones included — all that goal progress reads. */
-  goalLinked: LocalTransaction[]
 }
 
 export async function readLedgerSummary(
@@ -69,12 +67,9 @@ export async function readLedgerSummary(
     .where('kind')
     .equals('currency')
     .toArray()
-  // A null `goalId` is not a valid index key, so the index holds exactly the linked rows.
-  const goalLinked = await db.transactions.orderBy('goalId').toArray()
   return {
     deltas: walletDeltasFromTotals(nodes, totals, rates),
     currencies: currencies.map((t) => t.ref),
-    goalLinked: goalLinked.sort(byId),
   }
 }
 

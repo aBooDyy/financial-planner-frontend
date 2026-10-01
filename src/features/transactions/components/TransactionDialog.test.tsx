@@ -20,6 +20,7 @@ import { db } from '#/db/db'
 import type { LocalGoal } from '#/db/types'
 import { transferWallets } from '#/features/wallets/data/transferDialog'
 import {
+  bill,
   goal,
   income,
   m,
@@ -58,15 +59,14 @@ beforeAll(() => {
 afterEach(cleanup)
 
 const MAIN = wallet({ id: 'w1', name: 'Main Checking' })
-const RENT = goal({
+const RENT = bill({
   id: 'rent',
   name: 'Rent',
-  kind: 'recurring',
   amount: m(3500),
   nextDue: '2026-10-01',
 })
 const UMRAH = goal({ id: 'umrah', name: 'Umrah trip', target: m(13000) })
-const GOALS: LocalGoal[] = [RENT, UMRAH]
+const GOALS: LocalGoal[] = [UMRAH]
 
 const draft = (over: Partial<TxEditorDraft>): TxEditorDraft => ({
   type: 'spend',
@@ -82,13 +82,6 @@ const draft = (over: Partial<TxEditorDraft>): TxEditorDraft => ({
   toWalletId: '',
   toAmount: '',
   toAmountEdited: false,
-  name: '',
-  frequency: 'monthly',
-  customRepeat: false,
-  customInterval: '28',
-  customUnit: 'day',
-  autopost: false,
-  endsOn: null,
   scopeType: 'category',
   period: 'monthly',
   customDays: '30',
@@ -153,14 +146,17 @@ beforeEach(async () => {
   await Promise.all(db.tables.map((t) => t.clear()))
   await db.balanceNodes.put(MAIN)
   await db.goals.bulkPut(GOALS)
+  await db.bills.put(RENT)
   await db.incomeStreams.put(
     income({ id: 's1', label: 'Salary', amount: m(12000) }),
   )
   await db.plannedTransactions.bulkPut([
     planned({
       id: 'rent-oct',
+      origin: 'bill',
       role: 'payment',
-      goalId: 'rent',
+      goalId: null,
+      billId: 'rent',
       name: 'Rent',
       amount: m(3500),
       occurrence: '2026-10-01',
@@ -190,7 +186,8 @@ describe('TransactionDialog · planned links', () => {
     fireEvent.click(addButton())
     expect(onSave).toHaveBeenLastCalledWith({
       plannedId: 'rent-oct',
-      goalId: 'rent',
+      goalId: null,
+      billId: 'rent',
     })
 
     fireEvent.click(
@@ -200,7 +197,11 @@ describe('TransactionDialog · planned links', () => {
       screen.getByText('Saves as regular spending. Rent stays planned.'),
     ).toBeTruthy()
     fireEvent.click(addButton())
-    expect(onSave).toHaveBeenLastCalledWith({ plannedId: null, goalId: null })
+    expect(onSave).toHaveBeenLastCalledWith({
+      plannedId: null,
+      goalId: null,
+      billId: null,
+    })
   })
 
   it('does not guess for an amount far from any bill', async () => {
@@ -210,18 +211,10 @@ describe('TransactionDialog · planned links', () => {
     ).toBeTruthy()
     expect(screen.queryByText(/Matches planned/)).toBeNull()
     fireEvent.click(addButton())
-    expect(onSave).toHaveBeenLastCalledWith({ plannedId: null, goalId: null })
-  })
-
-  it('settles the chosen obligation’s planned payment', async () => {
-    const { onSave } = renderDialog({ goalId: 'rent', amount: '120' })
-    expect(
-      await screen.findByText('Settles the planned Oct 1 payment (Rent).'),
-    ).toBeTruthy()
-    fireEvent.click(addButton())
     expect(onSave).toHaveBeenLastCalledWith({
-      plannedId: 'rent-oct',
-      goalId: 'rent',
+      plannedId: null,
+      goalId: null,
+      billId: null,
     })
   })
 
@@ -231,10 +224,10 @@ describe('TransactionDialog · planned links', () => {
       await screen.findByRole('button', { name: /Counts toward: Nothing/ }),
     )
     expect(screen.getByRole('heading', { name: 'Counts toward' })).toBeTruthy()
-    const rent = await screen.findByRole('option', { name: /Rent/ })
-    expect(rent.textContent).toContain('Obligation · SR 3,500 due Oct 1')
-    fireEvent.click(rent)
-    expect(onGoal).toHaveBeenCalledWith('rent')
+    const umrah = await screen.findByRole('option', { name: /Umrah trip/ })
+    expect(umrah.textContent).toContain('Goal · SR 0 of SR 13,000')
+    fireEvent.click(umrah)
+    expect(onGoal).toHaveBeenCalledWith('umrah')
     expect(
       screen.getByRole('heading', { name: 'New transaction' }),
     ).toBeTruthy()
@@ -249,6 +242,7 @@ describe('TransactionDialog · planned links', () => {
     expect(onSave).toHaveBeenLastCalledWith({
       plannedId: null,
       goalId: 'umrah',
+      billId: null,
     })
   })
 
@@ -270,6 +264,7 @@ describe('TransactionDialog · planned links', () => {
     expect(onSave).toHaveBeenLastCalledWith({
       plannedId: 'pay-sep',
       goalId: null,
+      billId: null,
     })
   })
 })

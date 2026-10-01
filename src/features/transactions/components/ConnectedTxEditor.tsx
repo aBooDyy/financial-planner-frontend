@@ -6,7 +6,6 @@ import type { SpendingInputs } from '#/features/transactions/data/selectors'
 import type { TxEditorApi } from '#/features/transactions/hooks/useTxEditor'
 import type { CurrencyCode } from '#/lib/currency'
 import { BudgetEditor } from './BudgetEditor'
-import { RecurringEditor } from './RecurringEditor'
 import { TransactionDialog } from './TransactionDialog'
 
 type Props = {
@@ -21,8 +20,8 @@ type Props = {
 }
 
 /**
- * A `useTxEditor` instance wired to its editor — the transaction dialog, the budget editor or
- * the recurring editor. Renders nothing while nothing is being edited.
+ * A `useTxEditor` instance wired to its editor — the transaction dialog or the budget editor.
+ * Renders nothing while nothing is being edited.
  */
 export function ConnectedTxEditor({
   editor,
@@ -55,27 +54,6 @@ export function ConnectedTxEditor({
 
   const accounts = transferWallets(wallets, deltas, base)
   const accountSections = scopeSections(data, deltas)
-  if (editing.kind === 'recurring') {
-    return (
-      <RecurringEditor
-        editing={editing}
-        accounts={accounts}
-        accountSections={accountSections}
-        archivedIds={archivedWalletIds}
-        goals={goals}
-        base={base}
-        onField={editor.setField}
-        onType={editor.setType}
-        onCategory={editor.setCategory}
-        onGoal={editor.setGoal}
-        onMerchant={editor.setMerchant}
-        onApplySuggestion={editor.applySuggestion}
-        onSave={() => void editor.save()}
-        onDelete={() => void editor.remove()}
-        onClose={editor.close}
-      />
-    )
-  }
   return (
     <TransactionDialog
       editing={editing}

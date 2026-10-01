@@ -8,13 +8,13 @@ import type {
   LocalAppConfig,
   LocalBalanceNode,
   LocalBalanceSettings,
+  LocalBill,
   LocalBudget,
   LocalCategory,
   LocalCustomCurrency,
   LocalEmailConnection,
   LocalExchangeRate,
   LocalGoal,
-  LocalGoalAllocation,
   LocalImportBatch,
   LocalImportTemplate,
   LocalInboundImport,
@@ -24,7 +24,7 @@ import type {
   LocalMerchant,
   LocalMerchantAlias,
   LocalPlanned,
-  LocalRecurring,
+  LocalSetAside,
   LocalSyncWatermark,
   LocalTransaction,
   OutboxEntry,
@@ -32,9 +32,40 @@ import type {
 
 /**
  * Every table that mirrors server state, plus the sync bookkeeping about it: the outbox and
- * the delta watermarks. What the version-2 upgrade wipes.
+ * the delta watermarks.
  */
 const SYNCED_TABLES = [
+  'balanceNodes',
+  'balanceSettings',
+  'exchangeRates',
+  'categories',
+  'customCurrencies',
+  'incomeStreams',
+  'goals',
+  'bills',
+  'setAsides',
+  'transactions',
+  'budgets',
+  'plannedTransactions',
+  'merchants',
+  'merchantAliases',
+  'emailConnections',
+  'inboundImports',
+  'integrationKeys',
+  'importTemplates',
+  'syncState',
+  'outbox',
+] as const
+
+/**
+ * What a sign-out wipes: the synced tables, what is derived from them, and this device's
+ * import history. `appConfig` is deliberately kept — it holds no user data, and keeping it
+ * means the next sign-in already knows the currency table offline.
+ */
+const USER_TABLES = [...SYNCED_TABLES, 'ledgerTotals', 'importBatches'] as const
+
+/** The tables the version-2 upgrade wiped: what the synced set was then. */
+const VERSION_2_SYNCED_TABLES = [
   'balanceNodes',
   'balanceSettings',
   'exchangeRates',
@@ -58,11 +89,29 @@ const SYNCED_TABLES = [
 ] as const
 
 /**
- * What a sign-out wipes: the synced tables, what is derived from them, and this device's
- * import history. `appConfig` is deliberately kept — it holds no user data, and keeping it
- * means the next sign-in already knows the currency table offline.
+ * The planning model the version-4 upgrade replaced: its rows (and any queued write of them)
+ * are in a shape the server no longer takes, and the server dropped the data behind them.
  */
-const USER_TABLES = [...SYNCED_TABLES, 'ledgerTotals', 'importBatches'] as const
+const RETIRED_PLANNING_TABLES = [
+  'goals',
+  'incomeStreams',
+  'plannedTransactions',
+] as const
+const RETIRED_OUTBOX_ENTITIES = [
+  'recurring',
+  'allocation',
+  'goal',
+  'income',
+  'planned',
+]
+/** Per-user `syncState` rows that must start over with the planning tables. */
+const RETIRED_SYNC_STATE = [':planned', ':plannerInputs']
+
+/** A queued ledger payload without the links the server cleared. */
+const unlinkedPayload = (payload: unknown): unknown =>
+  payload && typeof payload === 'object' && 'goal_id' in payload
+    ? { ...payload, goal_id: null, planned_id: null }
+    : payload
 
 /**
  * The local-first database. The UI's source of truth: reads come from here (reactively),
@@ -78,13 +127,13 @@ export class AppDatabase extends Dexie {
   customCurrencies!: EntityTable<LocalCustomCurrency, 'id'>
   incomeStreams!: EntityTable<LocalIncomeStream, 'id'>
   goals!: EntityTable<LocalGoal, 'id'>
-  goalAllocations!: EntityTable<LocalGoalAllocation, 'id'>
+  bills!: EntityTable<LocalBill, 'id'>
+  setAsides!: EntityTable<LocalSetAside, 'id'>
   transactions!: EntityTable<LocalTransaction, 'id'>
   ledgerTotals!: EntityTable<LocalLedgerTotal, 'id'>
   merchants!: EntityTable<LocalMerchant, 'id'>
   merchantAliases!: EntityTable<LocalMerchantAlias, 'id'>
   budgets!: EntityTable<LocalBudget, 'id'>
-  recurrings!: EntityTable<LocalRecurring, 'id'>
   plannedTransactions!: EntityTable<LocalPlanned, 'id'>
   emailConnections!: EntityTable<LocalEmailConnection, 'id'>
   inboundImports!: EntityTable<LocalInboundImport, 'id'>
@@ -131,7 +180,9 @@ export class AppDatabase extends Dexie {
         outbox: '++seq, [entity+id]',
       })
       .upgrade(async (tx) => {
-        await Promise.all(SYNCED_TABLES.map((name) => tx.table(name).clear()))
+        await Promise.all(
+          VERSION_2_SYNCED_TABLES.map((name) => tx.table(name).clear()),
+        )
       })
     // Version 3: running totals over the ledger, built from the rows already on the device.
     this.version(3)
@@ -139,6 +190,44 @@ export class AppDatabase extends Dexie {
       .upgrade(async (tx) => {
         const rows = await tx.table<LocalTransaction>('transactions').toArray()
         await tx.table('ledgerTotals').bulkPut(totalsOf(rows))
+      })
+    // Version 4: the planning model. Recurring schedules and goal allocations become bills
+    // and set-asides; goals, income streams and planned rows take a new shape. The server
+    // dropped and recreated all of it, so the old rows, their queued writes and the planned
+    // watermark go, and the next pull is a first sync of the new tables. Ledger rows stay but
+    // lose their goal and planned links, which the server cleared too.
+    this.version(4)
+      .stores({
+        recurrings: null,
+        goalAllocations: null,
+        bills: 'id, categoryId, walletId, dirty, deleted',
+        setAsides: 'id, goalId, billId, walletId, plannedId, dirty, deleted',
+        plannedTransactions:
+          'id, goalId, incomeStreamId, billId, categoryId, status, date, dirty, deleted',
+        transactions:
+          'id, walletId, goalId, billId, merchantId, transferId, categoryId, date, source, plannedId, dirty, deleted',
+      })
+      .upgrade(async (tx) => {
+        await Promise.all(
+          RETIRED_PLANNING_TABLES.map((name) => tx.table(name).clear()),
+        )
+        const outbox = tx.table<OutboxEntry, number>('outbox')
+        await outbox
+          .filter((e) => RETIRED_OUTBOX_ENTITIES.includes(e.entity))
+          .delete()
+        await outbox
+          .filter((e) => e.entity === 'transaction')
+          .modify((e) => {
+            e.payload = unlinkedPayload(e.payload)
+          })
+        await tx
+          .table<LocalSyncWatermark, string>('syncState')
+          .filter((w) => RETIRED_SYNC_STATE.some((end) => w.id.endsWith(end)))
+          .delete()
+        await tx
+          .table<LocalTransaction, string>('transactions')
+          .filter((t) => t.goalId !== null || t.plannedId !== null)
+          .modify({ goalId: null, plannedId: null })
       })
     this.use(ledgerTotalsMiddleware)
   }

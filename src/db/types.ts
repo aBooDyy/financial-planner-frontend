@@ -6,11 +6,10 @@ import type {
   SafeHorizon,
 } from '#/features/wallets/api/types'
 import type {
-  GoalFrequency,
-  GoalKind,
   IntervalUnit,
   ObligationFrequency,
 } from '#/features/goals/api/types'
+import type { SetAsideSource } from '#/features/setAsides/api/types'
 import type {
   ImportSource,
   StoredTemplateConfig,
@@ -143,14 +142,25 @@ export type LocalIncomeStream = {
   label: string
   amount: number
   currency: CurrencyCode
-  frequency: GoalFrequency
+  frequency: ObligationFrequency
+  /** "Every `customInterval` `customUnit`s" — set exactly when `frequency` is 'custom'. */
+  customInterval: number | null
+  customUnit: IntervalUnit | null
   day: number
+  /** ISO date of a known payday; non-monthly paydays step from it. */
+  anchorDate: string | null
+  /** The last payday; null pays forever. */
+  endsOn: string | null
   color: string
   position: number
   /** Where the pay lands — what a planned payday confirms into. */
   walletId: string | null
-  /** ISO date of a known payday; non-monthly paydays step from it. */
-  anchorDate: string | null
+  /** An income category; a payday confirms under it. */
+  categoryId: string
+  merchantId: string | null
+  /** "Log it automatically when it arrives". */
+  autolog: boolean
+  note: string | null
   createdAt: string
   updatedAt: string
   version: string
@@ -158,22 +168,30 @@ export type LocalIncomeStream = {
   deleted: Flag
 }
 
+/**
+ * Something the user is saving for. Its shape follows from which fields are set (target +
+ * date, target + monthly amount, monthly amount alone); saved progress is derived from its
+ * set-asides and the spending linked to it, never stored.
+ */
 export type LocalGoal = {
   id: string
   name: string
-  kind: GoalKind
   currency: CurrencyCode
   color: string
   position: number
-  amount: number | null
   target: number | null
-  saved: number
-  frequency: ObligationFrequency | null
-  /** "Every `customInterval` `customUnit`s" — set only when `frequency` is 'custom'. */
-  customInterval: number | null
-  customUnit: IntervalUnit | null
-  nextDue: string | null
+  /** Monthly amount; required when there is no `dueDate`. */
+  amount: number | null
   dueDate: string | null
+  mustHave: boolean
+  /** Where its set-asides go by default. */
+  saveWalletId: string | null
+  /** The spend category "Use it" files under. */
+  useCategoryId: string | null
+  /** Marked as done. Only the close / reopen actions move it. */
+  closedAt: string | null
+  /** Paused: no planned set-asides while set. Only pause / resume (and close) move it. */
+  pausedAt: string | null
   // The stored plan's header (null until the planner first generates this goal's rows).
   plannedAt: string | null
   planAmount: number | null
@@ -181,8 +199,6 @@ export type LocalGoal = {
   planStart: string | null
   /** Day of the month set-asides fall on (1–28); null reads as the 1st. */
   setAsideDay: number | null
-  /** One-time obligations only: also plan the final payment on the due date. */
-  payOnDue: boolean
   createdAt: string
   updatedAt: string
   version: string
@@ -190,17 +206,65 @@ export type LocalGoal = {
   deleted: Flag
 }
 
-// A sourced chunk of a goal's saved progress: money reserved from a wallet (earmarked in
-// place, so the wallet shows reserved vs available) or held in an external source (a label).
-export type AllocationSource = 'wallet' | 'external'
-
-export type LocalGoalAllocation = {
+/** Something the user has to pay, once (`frequency: null`) or on a schedule. */
+export type LocalBill = {
   id: string
-  goalId: string
-  source: AllocationSource
-  // Set for `wallet` reserves; null for `external` (or once the wallet is deleted).
+  name: string
+  /** Per occurrence; 0 when the amount is not known yet. */
+  amount: number
+  currency: CurrencyCode
+  /** Null = "Just once": `nextDue` is its only occurrence. */
+  frequency: ObligationFrequency | null
+  /** "Every `customInterval` `customUnit`s" — set exactly when `frequency` is 'custom'. */
+  customInterval: number | null
+  customUnit: IntervalUnit | null
+  /** The next open occurrence; the client moves it on as occurrences settle. */
+  nextDue: string
+  /** Repeating bills only: the last date an occurrence may fall on. */
+  endsOn: string | null
+  /** "Paid from"; null = decide when paying. */
   walletId: string | null
-  // Set for `external` reserves (free-text source name); null for `wallet`.
+  /** "Save in"; null = the paid-from wallet. */
+  saveWalletId: string | null
+  /** The leaf spend category. */
+  categoryId: string
+  merchantId: string | null
+  note: string | null
+  /** "Log it automatically on the due date". */
+  autopay: boolean
+  /** False = "Nice to have". */
+  mustPay: boolean
+  color: string
+  position: number
+  /** Marked as done / ended. Only the close / reopen actions move it. */
+  closedAt: string | null
+  plannedAt: string | null
+  planAmount: number | null
+  planCount: number | null
+  planStart: string | null
+  setAsideDay: number | null
+  createdAt: string
+  updatedAt: string
+  version: string
+  dirty: Flag
+  deleted: Flag
+}
+
+/**
+ * Money labelled for one bill or one goal, in its real wallet (or held outside, named by a
+ * label). It never moves money. Live while `releasedAt` is null; a row is wholly live or
+ * wholly released — a partial release splits it.
+ */
+export type LocalSetAside = {
+  id: string
+  goalId: string | null
+  billId: string | null
+  /** A bill's: the due date of the occurrence it covers. Null for a goal. */
+  occurrence: string | null
+  source: SetAsideSource
+  /** `wallet` only; null once that wallet was deleted. */
+  walletId: string | null
+  /** `outside` only: where the money is held. */
   externalLabel: string | null
   amount: number
   currency: CurrencyCode
@@ -208,8 +272,13 @@ export type LocalGoalAllocation = {
   position: number
   /** When it was set aside (ISO date). */
   date: string
-  /** The planned set-aside this reservation settles, if any. */
+  /** The planned set-aside it settles, if any. */
   plannedId: string | null
+  releasedAt: string | null
+  /** The payment (transaction) that released it. */
+  releasedById: string | null
+  /** The transfer a move rode on, on both the released row and the new one. */
+  movedByTransferId: string | null
   createdAt: string
   updatedAt: string
   version: string
@@ -228,7 +297,13 @@ export type LocalTransaction = {
    */
   categoryId: string | null
   walletId: string
+  /** Money used from this goal. Never with `billId`. */
   goalId: string | null
+  /**
+   * A payment for this bill. Never with `goalId`, never on a transfer leg or adjustment. Rows
+   * stored before bills existed lack it, which reads as null.
+   */
+  billId?: string | null
   merchantId: string | null
   date: string
   note: string | null
@@ -284,38 +359,9 @@ export type LocalBudget = {
   deleted: Flag
 }
 
-export type LocalRecurring = {
-  id: string
-  name: string
-  type: TxType
-  amount: number
-  currency: CurrencyCode
-  /** The leaf category: a subcategory's id when one was picked, else the root's. */
-  categoryId: string
-  walletId: string
-  goalId: string | null
-  /** Who each occurrence pays (or is paid by); copied onto what it posts. */
-  merchantId: string | null
-  frequency: ObligationFrequency
-  /** "Every `customInterval` `customUnit`s" — set only when `frequency` is 'custom'. */
-  customInterval: number | null
-  customUnit: IntervalUnit | null
-  nextDue: string
-  /** The last date an occurrence may fall on; null repeats forever. */
-  endsOn: string | null
-  autopost: boolean
-  /** Copied onto every occurrence it posts, in place of the name. */
-  note: string | null
-  createdAt: string
-  updatedAt: string
-  version: string
-  dirty: Flag
-  deleted: Flag
-}
-
 // --- Planned transactions -------------------------------------------------------------
 // A scheduled intention to move money on a date. Never touches balances, budgets or goal
-// progress: only the transactions / reservations that settle it (via their `plannedId`) do.
+// progress: only the transactions / set-asides that settle it (via their `plannedId`) do.
 
 export type LocalPlanned = {
   id: string
@@ -323,7 +369,7 @@ export type LocalPlanned = {
   role: PlannedRole
   goalId: string | null
   incomeStreamId: string | null
-  recurringId: string | null
+  billId: string | null
   /** Suggested wallet; null means "ask at confirm". */
   walletId: string | null
   /** Display name, kept after the origin is deleted. */
@@ -339,6 +385,8 @@ export type LocalPlanned = {
   status: PlannedStatus
   /** Edited by hand, so the generator never rewrites it. */
   pinned: boolean
+  /** A payday set-aside waiting in the review queue. */
+  review: boolean
   note: string | null
   createdAt: string
   updatedAt: string
@@ -554,11 +602,11 @@ export type OutboxEntity =
   | 'settings'
   | 'income'
   | 'goal'
-  | 'allocation'
+  | 'bill'
+  | 'setAside'
   | 'transaction'
   | 'transfer'
   | 'budget'
-  | 'recurring'
   | 'category'
   | 'customCurrency'
   | 'rate'

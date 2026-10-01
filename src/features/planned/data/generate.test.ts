@@ -1,16 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import type { LocalGoal, LocalIncomeStream, LocalRecurring } from '#/db/types'
-import { planGoals } from '#/features/goals/data/selectors'
-import {
-  RATES,
-  goal,
-  income,
-  m,
-  recurring,
-} from '#/features/planned/testing/fixtures'
+import type { LocalGoal, LocalIncomeStream } from '#/db/types'
+import { planGoals } from '#/features/goals/data/fundingPlan'
+import { RATES, goal, income, m } from '#/features/planned/testing/fixtures'
 import { desiredPlanned, paydaysOf } from './generate'
 import type { DesiredPlanned } from './generate'
-import { catId } from '#/features/categories/__fixtures__/categories'
 
 const SEP_24 = new Date(2026, 8, 24)
 const JUN_12 = new Date(2026, 5, 12)
@@ -20,26 +13,23 @@ const generate = (
   opts: {
     goals?: LocalGoal[]
     income?: LocalIncomeStream[]
-    recurrings?: LocalRecurring[]
     today?: Date
     userId?: string
+    /** Saved so far per goal; the Umrah goal starts with SR 1,000. */
     progress?: Record<string, number>
-    legacy?: string[]
   } = {},
 ): DesiredPlanned[] => {
   const today = opts.today ?? SEP_24
   const goals = opts.goals ?? []
   const streams = opts.income ?? []
+  const saved = opts.progress ?? { umrah: m(1000) }
   return desiredPlanned({
     userId: opts.userId ?? 'u1',
-    goals,
     income: streams,
-    recurrings: opts.recurrings ?? [],
-    plan: planGoals(streams, goals, 'SAR', RATES, today, opts.progress),
+    plan: planGoals(streams, goals, 'SAR', RATES, today, saved),
     base: 'SAR',
     rates: RATES,
     today,
-    legacyMarkers: new Set(opts.legacy ?? []),
   })
 }
 
@@ -47,9 +37,7 @@ const umrah = (over: Partial<LocalGoal> = {}) =>
   goal({
     id: 'umrah',
     name: 'Umrah trip',
-    kind: 'onetime',
     target: m(13000),
-    saved: m(1000),
     dueDate: '2027-03-01',
     ...over,
   })
@@ -125,121 +113,13 @@ describe('desiredPlanned — goals', () => {
 
   it('adds up to exactly what is left when a split does not divide evenly', () => {
     const out = generate({
-      goals: [umrah({ target: m(10000), saved: 0, dueDate: '2027-02-01' })],
+      goals: [umrah({ target: m(10000), dueDate: '2027-02-01' })],
       income: [SALARY],
       today: JUN_12,
+      progress: {},
     })
     const setAsides = rows(out, 'umrah', 'set_aside')
     expect(setAsides.reduce((a, r) => a + r.amount, 0)).toBe(m(10000))
-  })
-
-  it('plans a monthly obligation as one payment per cycle within 90 days, no set-asides', () => {
-    const rent = goal({
-      id: 'rent',
-      name: 'Rent',
-      kind: 'recurring',
-      amount: m(3500),
-      frequency: 'monthly',
-      nextDue: '2026-10-01',
-    })
-    const out = generate({ goals: [rent], income: [SALARY] })
-    expect(rows(out, 'rent', 'set_aside')).toEqual([])
-    expect(
-      rows(out, 'rent', 'payment').map((r) => [r.occurrence, r.amount]),
-    ).toEqual([
-      ['2026-10-01', m(3500)],
-      ['2026-11-01', m(3500)],
-      ['2026-12-01', m(3500)],
-    ])
-    expect(rows(out, 'rent', 'payment')[0].name).toBe('Rent')
-  })
-
-  it('plans a quarterly obligation as monthly set-asides plus the quarterly payment', () => {
-    const insurance = goal({
-      id: 'ins',
-      name: 'Insurance',
-      kind: 'recurring',
-      amount: m(3000),
-      frequency: 'quarterly',
-      nextDue: '2026-12-01',
-    })
-    const out = generate({ goals: [insurance], income: [SALARY] })
-    expect(rows(out, 'ins', 'payment').map((r) => r.occurrence)).toEqual([
-      '2026-12-01',
-    ])
-    expect(rows(out, 'ins', 'set_aside').map((r) => r.occurrence)).toEqual([
-      '2026-10-01',
-      '2026-11-01',
-      '2026-12-01',
-    ])
-    expect(
-      rows(out, 'ins', 'set_aside')
-        .slice(0, 2)
-        .map((r) => r.amount),
-    ).toEqual([m(1500), m(1500)])
-  })
-
-  it('plans a custom 28-day obligation every 28 days from its next due, no set-asides', () => {
-    const refill = goal({
-      id: 'refill',
-      name: 'Pills refill',
-      kind: 'recurring',
-      amount: m(250),
-      frequency: 'custom',
-      customInterval: 28,
-      customUnit: 'day',
-      nextDue: '2026-10-01',
-    })
-    const out = generate({ goals: [refill], income: [SALARY] })
-    expect(rows(out, 'refill', 'set_aside')).toEqual([])
-    expect(rows(out, 'refill', 'payment').map((r) => r.occurrence)).toEqual([
-      '2026-10-01',
-      '2026-10-29',
-      '2026-11-26',
-    ])
-  })
-
-  it('saves toward a custom every-2-months obligation between its payments', () => {
-    const water = goal({
-      id: 'water',
-      name: 'Water bill',
-      kind: 'recurring',
-      amount: m(400),
-      frequency: 'custom',
-      customInterval: 2,
-      customUnit: 'month',
-      nextDue: '2026-10-31',
-    })
-    const out = generate({ goals: [water], income: [SALARY] })
-    // Stepped from the anchor, so a 31st keeps landing on the month's own 31st or end.
-    expect(rows(out, 'water', 'payment').map((r) => r.occurrence)).toEqual([
-      '2026-10-31',
-    ])
-    expect(rows(out, 'water', 'set_aside').length).toBeGreaterThan(0)
-  })
-
-  it('plans the final payment of a pay-on-due obligation for its whole target, on its due date', () => {
-    const tuition = umrah({
-      id: 'tuition',
-      name: 'Tuition',
-      dueDate: '2027-01-10',
-      payOnDue: true,
-    })
-    const out = generate({ goals: [tuition], income: [SALARY] })
-    expect(rows(out, 'tuition', 'payment')).toEqual([
-      expect.objectContaining({
-        occurrence: '2027-01-10',
-        amount: m(13000),
-        role: 'payment',
-      }),
-    ])
-  })
-
-  it('still plans that payment once the saving is complete', () => {
-    const done = umrah({ saved: m(13000), payOnDue: true })
-    const out = generate({ goals: [done], income: [SALARY] })
-    expect(rows(out, 'umrah', 'set_aside')).toEqual([])
-    expect(rows(out, 'umrah', 'payment')).toHaveLength(1)
   })
 
   it('counts settled progress, so a goal ahead of plan needs less', () => {
@@ -252,14 +132,45 @@ describe('desiredPlanned — goals', () => {
       generate({
         goals: [umrah()],
         income: [SALARY],
-        progress: { umrah: m(3000) },
+        progress: { umrah: m(4000) },
       }),
       'umrah',
       'set_aside',
     )
-    // Sep 24: 12,000 left over Oct–Feb is 2,400/mo; with 3,000 settled, 1,800/mo.
+    // Sep 24: 12,000 left over Oct–Feb is 2,400/mo; with 3,000 more saved, 1,800/mo.
     expect(behind[0].amount).toBe(m(2400))
     expect(ahead[0].amount).toBe(m(1800))
+  })
+
+  it('suggests the goal’s own save-in wallet on its set-asides', () => {
+    const out = generate({
+      goals: [umrah({ saveWalletId: 'savings' })],
+      income: [SALARY],
+    })
+    expect(
+      new Set(rows(out, 'umrah', 'set_aside').map((r) => r.walletId)),
+    ).toEqual(new Set(['savings']))
+  })
+
+  it('rolls a goal without a date at its monthly amount within the horizon', () => {
+    const fund = goal({ id: 'fund', amount: m(300) })
+    const out = generate({ goals: [fund], income: [SALARY], progress: {} })
+    expect(rows(out, 'fund', 'set_aside').map((r) => r.amount)).toEqual([
+      m(300),
+      m(300),
+      m(300),
+    ])
+  })
+
+  it('plans nothing for a goal that is closed or paused', () => {
+    const out = generate({
+      goals: [
+        umrah({ closedAt: '2026-09-01' }),
+        goal({ id: 'fund', amount: m(300), pausedAt: '2026-09-01' }),
+      ],
+      income: [SALARY],
+    })
+    expect(out.filter((r) => r.origin === 'goal')).toEqual([])
   })
 })
 
@@ -319,6 +230,11 @@ describe('desiredPlanned — income', () => {
     ).toEqual(['2026-10-15', '2027-01-15', '2027-04-15', '2027-07-15'])
   })
 
+  it('stops paydays after the stream’s last one', () => {
+    const out = generate({ income: [{ ...SALARY, endsOn: '2026-10-27' }] })
+    expect(out.map((r) => r.occurrence)).toEqual(['2026-09-27', '2026-10-27'])
+  })
+
   it('plans an anchored quarterly bonus in its own months, and re-plans when the anchor moves', () => {
     const bonus = income({
       id: 'bonus',
@@ -339,107 +255,6 @@ describe('desiredPlanned — income', () => {
     })
     expect(moved.map((r) => r.occurrence)).toEqual(['2026-11-15'])
     expect(moved[0].id).not.toBe(before[0].id)
-  })
-})
-
-describe('desiredPlanned — Spending schedules', () => {
-  it('plans a spend schedule as payments and an income one as paydays', () => {
-    const gym = recurring({ id: 'gym', nextDue: '2026-10-05' })
-    const rentIn = recurring({
-      id: 'rent-in',
-      type: 'income',
-      categoryId: catId('salary'),
-      nextDue: '2026-10-01',
-    })
-    const out = generate({ recurrings: [gym, rentIn] })
-    expect(
-      out.filter((r) => r.recurringId === 'gym').map((r) => r.role),
-    ).toEqual(['payment', 'payment', 'payment'])
-    expect(out.find((r) => r.recurringId === 'rent-in')).toMatchObject({
-      role: 'income',
-      categoryId: catId('salary'),
-      walletId: 'w1',
-    })
-  })
-
-  it('catches an auto-posted schedule up from its next due date', () => {
-    const out = generate({
-      recurrings: [
-        recurring({ id: 'auto', autopost: true, nextDue: '2026-07-05' }),
-      ],
-    })
-    expect(out.map((r) => r.occurrence).slice(0, 3)).toEqual([
-      '2026-07-05',
-      '2026-08-05',
-      '2026-09-05',
-    ])
-  })
-
-  it('stops a schedule on its end date, that date included', () => {
-    const out = generate({
-      recurrings: [
-        recurring({
-          id: 'ending',
-          autopost: true,
-          nextDue: '2026-09-05',
-          endsOn: '2026-10-05',
-        }),
-      ],
-    })
-    expect(out.map((r) => r.occurrence)).toEqual(['2026-09-05', '2026-10-05'])
-  })
-
-  it('steps a custom schedule by its own interval', () => {
-    const out = generate({
-      recurrings: [
-        recurring({
-          id: 'every-4-weeks',
-          autopost: true,
-          nextDue: '2026-09-05',
-          endsOn: '2026-11-30',
-          frequency: 'custom',
-          customInterval: 4,
-          customUnit: 'week',
-        }),
-      ],
-    })
-    expect(out.map((r) => r.occurrence)).toEqual([
-      '2026-09-05',
-      '2026-10-03',
-      '2026-10-31',
-      '2026-11-28',
-    ])
-  })
-
-  it('schedules nothing once a schedule is past its end date', () => {
-    const out = generate({
-      recurrings: [
-        recurring({ id: 'over', nextDue: '2026-10-05', endsOn: '2026-09-30' }),
-      ],
-    })
-    expect(out).toEqual([])
-  })
-
-  it('surfaces only the recent past of a schedule confirmed by hand', () => {
-    const out = generate({
-      recurrings: [recurring({ id: 'manual', nextDue: '2025-01-05' })],
-    })
-    expect(out[0].occurrence).toBe('2026-09-05')
-  })
-
-  it('marks an occurrence the old auto-poster already posted as done', () => {
-    const out = generate({
-      recurrings: [
-        recurring({ id: 'auto', autopost: true, nextDue: '2026-09-05' }),
-      ],
-      legacy: ['recurring:auto:2026-09-05'],
-    })
-    expect(out.map((r) => [r.occurrence, r.status])).toEqual([
-      ['2026-09-05', 'done'],
-      ['2026-10-05', 'open'],
-      ['2026-11-05', 'open'],
-      ['2026-12-05', 'open'],
-    ])
   })
 })
 

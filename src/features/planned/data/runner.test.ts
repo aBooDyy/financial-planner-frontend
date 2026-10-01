@@ -7,8 +7,7 @@ import {
   goal,
   income,
   m,
-  recurring,
-  tx,
+  setAside,
   wallet,
 } from '#/features/planned/testing/fixtures'
 import { useRecalcUndoStore } from '#/features/planned/stores/recalcUndo'
@@ -39,11 +38,17 @@ const SALARY = income({
 const UMRAH = goal({
   id: 'umrah',
   name: 'Umrah trip',
-  kind: 'onetime',
   target: m(13000),
-  saved: m(1000),
   dueDate: '2027-03-01',
 })
+/** The SR 1,000 already saved toward Umrah before any plan existed. */
+const BASELINE = setAside({
+  id: 'baseline',
+  goalId: 'umrah',
+  amount: m(1000),
+  date: '2026-05-01',
+})
+const withoutBaseline = () => db.setAsides.delete(BASELINE.id)
 
 const setAsides = async (): Promise<LocalPlanned[]> =>
   (await db.plannedTransactions.where('goalId').equals('umrah').toArray())
@@ -62,7 +67,7 @@ const planView = async (today: Date) => {
     planned: inputs.planned,
     desired: state.desired,
     txns: inputs.txns,
-    allocations: inputs.allocations,
+    setAsides: inputs.setAsides,
     progress: state.progress.umrah,
     nodes: [MAIN],
     index: state.index,
@@ -76,10 +81,10 @@ beforeEach(async () => {
     [
       db.plannedTransactions,
       db.transactions,
-      db.goalAllocations,
+      db.setAsides,
       db.goals,
+      db.bills,
       db.incomeStreams,
-      db.recurrings,
       db.balanceNodes,
       db.outbox,
     ].map((t) => t.clear()),
@@ -87,6 +92,7 @@ beforeEach(async () => {
   await db.balanceNodes.put(MAIN)
   await db.incomeStreams.put(SALARY)
   await db.goals.put(UMRAH)
+  await db.setAsides.put(BASELINE)
   useRecalcUndoStore.setState({ byGoal: {} })
 })
 
@@ -193,7 +199,7 @@ describe('runPlanner — paydays follow the stream', () => {
 })
 
 describe('runPlanner — rows whose origin is gone', () => {
-  it('skips the deleted goal’s due rows and closes the rest of a partly settled one', async () => {
+  it('skips the deleted goal’s due rows once its set-asides went with it', async () => {
     await runPlanner(USER, JUN_12)
     const jul = await byMonth('2026-07-01')
     const aug = await byMonth('2026-08-01')
@@ -207,10 +213,10 @@ describe('runPlanner — rows whose origin is gone', () => {
     const summary = await runPlanner(USER, new Date(2026, 7, 15))
 
     expect(summary.orphansResolved).toBe(2)
-    expect((await db.plannedTransactions.get(jul.id))?.status).toBe('done')
+    // Deleting a goal deletes its set-asides, as the server does, so nothing settles Jul.
+    expect(await db.setAsides.count()).toBe(0)
+    expect((await db.plannedTransactions.get(jul.id))?.status).toBe('skipped')
     expect((await db.plannedTransactions.get(aug.id))?.status).toBe('skipped')
-    // History stays: the partial reservation is untouched.
-    expect(await db.goalAllocations.count()).toBe(1)
   })
 
   it('skips a deleted stream’s past payday and a hand-made set-aside of a deleted goal', async () => {
@@ -221,7 +227,7 @@ describe('runPlanner — rows whose origin is gone', () => {
       role: 'set_aside',
       goalId: 'long-gone',
       incomeStreamId: null,
-      recurringId: null,
+      billId: null,
       walletId: null,
       name: 'Old set-aside',
       amount: m(100),
@@ -231,6 +237,7 @@ describe('runPlanner — rows whose origin is gone', () => {
       date: '2026-06-20',
       status: 'open',
       pinned: false,
+      review: false,
       note: null,
       createdAt: '',
       updatedAt: '',
@@ -385,19 +392,7 @@ describe('the design’s worked example (04 §4)', () => {
 describe('a plan-changing edit', () => {
   it('rewrites the stored plan through the planner and offers an undo', async () => {
     await runPlanner(USER, JUN_12)
-    const edited = (await db.goals.get('umrah'))!
-    await updateGoal('umrah', {
-      kind: edited.kind,
-      name: edited.name,
-      currency: edited.currency,
-      color: edited.color,
-      amount: edited.amount,
-      target: m(16200),
-      saved: edited.saved,
-      frequency: edited.frequency,
-      nextDue: edited.nextDue,
-      dueDate: edited.dueDate,
-    })
+    await updateGoal('umrah', { target: m(16200) })
 
     await runPlanner(USER, JUN_12)
 
@@ -410,114 +405,9 @@ describe('a plan-changing edit', () => {
 
   it('leaves the plan alone for a rename', async () => {
     await runPlanner(USER, JUN_12)
-    const g = (await db.goals.get('umrah'))!
-    await updateGoal('umrah', {
-      kind: g.kind,
-      name: 'Umrah 2027',
-      currency: g.currency,
-      color: '#3B82F6',
-      amount: g.amount,
-      target: g.target,
-      saved: g.saved,
-      frequency: g.frequency,
-      nextDue: g.nextDue,
-      dueDate: g.dueDate,
-    })
+    await updateGoal('umrah', { name: 'Umrah 2027', color: '#3B82F6' })
     await runPlanner(USER, JUN_12)
     expect(useRecalcUndoStore.getState().byGoal.umrah).toBeUndefined()
-  })
-})
-
-describe('Spending schedules on the planned pipeline', () => {
-  it('auto-confirms an auto-post schedule on its date and moves it on', async () => {
-    await db.goals.clear()
-    await db.recurrings.put(
-      recurring({
-        id: 'gym',
-        name: 'Gym',
-        autopost: true,
-        walletId: 'w1',
-        nextDue: '2026-09-05',
-      }),
-    )
-
-    const summary = await runPlanner(USER, SEP_24)
-
-    expect(summary.autoConfirmed).toBe(1)
-    const [posted] = await db.transactions.toArray()
-    expect(posted).toMatchObject({
-      type: 'spend',
-      amount: m(200),
-      walletId: 'w1',
-      date: '2026-09-05',
-      note: 'Gym',
-      source: 'recurring:gym:2026-09-05',
-    })
-    const row = await db.plannedTransactions.get(posted.plannedId ?? '')
-    expect(row).toMatchObject({ status: 'done', occurrence: '2026-09-05' })
-    expect((await db.recurrings.get('gym'))?.nextDue).toBe('2026-10-05')
-
-    // Running again posts nothing twice.
-    expect((await runPlanner(USER, SEP_24)).autoConfirmed).toBe(0)
-    expect(await db.transactions.count()).toBe(1)
-  })
-
-  it('posts each occurrence with the schedule’s merchant and note', async () => {
-    await db.goals.clear()
-    await db.recurrings.put(
-      recurring({
-        id: 'gym',
-        name: 'Gym',
-        autopost: true,
-        nextDue: '2026-09-05',
-        merchantId: 'm-fitness',
-        note: 'Family plan',
-      }),
-    )
-
-    await runPlanner(USER, SEP_24)
-
-    const [posted] = await db.transactions.toArray()
-    expect(posted).toMatchObject({
-      merchantId: 'm-fitness',
-      note: 'Family plan',
-    })
-  })
-
-  it('treats an entry the old auto-poster made as that occurrence, so nothing double-posts', async () => {
-    await db.goals.clear()
-    await db.recurrings.put(
-      recurring({ id: 'gym', autopost: true, nextDue: '2026-09-05' }),
-    )
-    await db.transactions.put(
-      tx({
-        source: 'recurring:gym:2026-09-05',
-        amount: m(200),
-        date: '2026-09-05',
-      }),
-    )
-
-    const summary = await runPlanner(USER, SEP_24)
-
-    expect(summary.autoConfirmed).toBe(0)
-    expect(await db.transactions.count()).toBe(1)
-    const sep = (await db.plannedTransactions.toArray()).find(
-      (p) => p.occurrence === '2026-09-05',
-    )
-    expect(sep?.status).toBe('done')
-  })
-
-  it('leaves a schedule without auto-post waiting for the user', async () => {
-    await db.goals.clear()
-    await db.recurrings.put(
-      recurring({ id: 'gym', autopost: false, nextDue: '2026-09-05' }),
-    )
-    await runPlanner(USER, SEP_24)
-    expect(await db.transactions.count()).toBe(0)
-    const sep = (await db.plannedTransactions.toArray()).find(
-      (p) => p.occurrence === '2026-09-05',
-    )
-    expect(sep?.status).toBe('open')
   })
 })
 
@@ -529,13 +419,16 @@ describe('recalculating around rows it may not rewrite', () => {
    * the confirmed row, so only Nov–Feb can be written — they must carry the whole 9,400.
    */
   const setUp = async () => {
-    await db.goals.put({ ...UMRAH, saved: 0 })
+    await withoutBaseline()
     await runPlanner(USER, SEP_24)
+    // Unlinked, as the scenario has it: on a real clock past Oct 1 the Oct row is due and
+    // would otherwise take the contribution.
     await addContribution('umrah', {
       mode: 'now',
       amount: m(1000),
       walletId: 'w1',
       date: '2026-09-24',
+      link: false,
     })
     const oct = await byMonth('2026-10-01')
     await movePlanned(oct.id, '2026-09-01')
@@ -548,7 +441,7 @@ describe('recalculating around rows it may not rewrite', () => {
     )
 
   it('first plans 2,600 × 5 from Oct 1', async () => {
-    await db.goals.put({ ...UMRAH, saved: 0 })
+    await withoutBaseline()
     await runPlanner(USER, SEP_24)
     expect(await amounts()).toEqual([
       ['2026-10', 2600],
@@ -604,7 +497,7 @@ describe('recalculating around rows it may not rewrite', () => {
   })
 
   it('counts a future row the user moved (still to be paid) toward what is left', async () => {
-    await db.goals.put({ ...UMRAH, saved: 0 })
+    await withoutBaseline()
     await runPlanner(USER, SEP_24)
     await movePlanned((await byMonth('2026-10-01')).id, '2026-10-20')
 

@@ -22,7 +22,8 @@ const api = {
   remove: vi.fn(),
 }
 const listTransactions = vi.fn()
-const listRecurrings = vi.fn().mockResolvedValue([])
+const listBills = vi.fn().mockResolvedValue([])
+const listIncome = vi.fn().mockResolvedValue([])
 
 vi.mock('#/features/merchants/api/merchantsApi', () => ({
   merchantsApi: new Proxy(
@@ -38,7 +39,12 @@ vi.mock('#/features/merchants/api/merchantsApi', () => ({
 vi.mock('#/features/transactions/api/transactionsApi', () => ({
   transactionsApi: { list: (...args: unknown[]) => listTransactions(...args) },
   budgetsApi: { list: vi.fn() },
-  recurringsApi: { list: (...args: unknown[]) => listRecurrings(...args) },
+}))
+vi.mock('#/features/bills/api/billsApi', () => ({
+  billsApi: { list: (...args: unknown[]) => listBills(...args) },
+}))
+vi.mock('#/features/goals/api/goalsApi', () => ({
+  goalsApi: { listIncome: (...args: unknown[]) => listIncome(...args) },
 }))
 vi.mock('#/db/sync', () => ({ schedulePush: vi.fn() }))
 
@@ -436,8 +442,10 @@ describe('mergeMerchants', () => {
     expect(await db.merchants.get('source')).toBeUndefined()
     expect(await db.merchantAliases.get('a-src')).toBeUndefined()
     expect((await db.merchants.get(WINNER))?.version).toBe('m-v1')
+    // The server repoints ledger rows, bills and income streams; all three are read back.
     expect(listTransactions).toHaveBeenCalled()
-    expect(listRecurrings).toHaveBeenCalled()
+    expect(listBills).toHaveBeenCalled()
+    expect(listIncome).toHaveBeenCalled()
   })
 
   it('refuses to merge a merchant into itself', async () => {

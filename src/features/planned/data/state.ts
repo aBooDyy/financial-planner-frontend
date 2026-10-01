@@ -5,32 +5,32 @@
  * always the number the planner would write.
  */
 import type {
+  LocalBill,
   LocalGoal,
-  LocalGoalAllocation,
   LocalIncomeStream,
   LocalPlanned,
-  LocalRecurring,
+  LocalSetAside,
   LocalTransaction,
 } from '#/db/types'
+import { planGoals } from '#/features/goals/data/fundingPlan'
+import type { GoalsPlan } from '#/features/goals/data/fundingPlan'
 import { goalProgress, progressByGoal } from '#/features/goals/data/progress'
 import type { GoalProgressMap } from '#/features/goals/data/progress'
-import { planGoals } from '#/features/goals/data/selectors'
-import type { GoalsPlan } from '#/features/goals/data/selectors'
 import type { CurrencyCode } from '#/lib/currency'
 import type { RatesMap } from '#/lib/config/rates'
 import { desiredPlanned } from './generate'
 import type { DesiredPlanned } from './generate'
-import { indexSettlements, LEGACY_SOURCE_PREFIX } from './settle'
+import { indexSettlements } from './settle'
 import type { SettlementIndex } from './settle'
 
 export type PlannerInputs = {
   goals: LocalGoal[]
   income: LocalIncomeStream[]
-  recurrings: LocalRecurring[]
+  bills: LocalBill[]
   planned: LocalPlanned[]
-  /** Only transactions linked to a goal, a planned row or a legacy auto-post. */
+  /** Only transactions linked to a goal, a bill or a planned row. */
   txns: LocalTransaction[]
-  allocations: LocalGoalAllocation[]
+  setAsides: LocalSetAside[]
   base: CurrencyCode
   rates: RatesMap
 }
@@ -50,10 +50,10 @@ export const liveInputs = (inputs: PlannerInputs): PlannerInputs => ({
   ...inputs,
   goals: live(inputs.goals),
   income: live(inputs.income),
-  recurrings: live(inputs.recurrings),
+  bills: live(inputs.bills),
   planned: live(inputs.planned),
   txns: live(inputs.txns),
-  allocations: live(inputs.allocations),
+  setAsides: live(inputs.setAsides),
 })
 
 export function derivePlannerState(
@@ -61,9 +61,8 @@ export function derivePlannerState(
   userId: string,
   today: Date,
 ): PlannerState {
-  const { goals, income, recurrings, planned, txns, allocations, base, rates } =
-    inputs
-  const progress = goalProgress(goals, allocations, txns, rates, today, planned)
+  const { goals, income, txns, setAsides, base, rates } = inputs
+  const progress = goalProgress(goals, setAsides, txns, rates)
   const plan = planGoals(
     income,
     goals,
@@ -72,21 +71,6 @@ export function derivePlannerState(
     today,
     progressByGoal(progress),
   )
-  const legacyMarkers = new Set(
-    txns
-      .map((t) => t.source)
-      .filter((s): s is string => !!s && s.startsWith(LEGACY_SOURCE_PREFIX)),
-  )
-  const desired = desiredPlanned({
-    userId,
-    goals: plan.entries.map((e) => e.goal).concat(plan.completed),
-    income,
-    recurrings,
-    plan,
-    base,
-    rates,
-    today,
-    legacyMarkers,
-  })
-  return { plan, progress, desired, index: indexSettlements(txns, allocations) }
+  const desired = desiredPlanned({ userId, income, plan, base, rates, today })
+  return { plan, progress, desired, index: indexSettlements(txns, setAsides) }
 }

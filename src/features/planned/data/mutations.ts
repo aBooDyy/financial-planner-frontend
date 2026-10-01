@@ -4,19 +4,18 @@
  * local-first: Dexie writes plus outbox entries, working offline.
  *
  * Confirming writes the real thing, linked back by `plannedId`: an ordinary transaction for
- * income and payments, a dated reservation for a set-aside. The item's status follows from
+ * income and payments, a dated set-aside for a set-aside. The item's status follows from
  * what settles it (`rows.ts#closeCovered`), so a partial leaves it open with a remainder.
  */
 import { db } from '#/db/db'
 import { schedulePush } from '#/db/sync'
-import type { LocalGoal, LocalPlanned, LocalRecurring } from '#/db/types'
+import type { LocalBill, LocalPlanned } from '#/db/types'
+import { updateBill } from '#/features/bills/data/mutations'
 import { buildCatalog } from '#/features/categories/data/catalog'
-import { createAllocation } from '#/features/goals/data/mutations'
+import { createSetAside } from '#/features/setAsides/data/mutations'
+import type { SetAsideOwner } from '#/features/setAsides/data/mutations'
 import type { PlannedRole } from '#/features/planned/api/types'
-import {
-  advanceRecurring,
-  createTransaction,
-} from '#/features/transactions/data/mutations'
+import { createTransaction } from '#/features/transactions/data/mutations'
 import { advanceDue } from '#/features/transactions/data/planning'
 import type { TxType } from '#/features/transactions/api/types'
 import { convertMinor } from '#/lib/currency'
@@ -62,22 +61,41 @@ async function openItem(id: string): Promise<LocalPlanned> {
 }
 
 async function settledNow(item: LocalPlanned): Promise<number> {
-  const { txns, allocations } = await settlementsOf([item.id])
+  const { txns, setAsides } = await settlementsOf([item.id])
   return settledOf(
     item,
-    indexSettlements(txns, allocations),
+    indexSettlements(txns, setAsides),
     await currentRates(),
   )
 }
 
-/** Keep a Spending schedule's `nextDue` past every occurrence the user has dealt with. */
-async function advanceSchedulePast(item: LocalPlanned): Promise<void> {
-  if (item.origin !== 'recurring' || !item.recurringId) return
-  const r = await db.recurrings.get(item.recurringId)
-  if (!r || r.deleted !== 0 || r.nextDue > item.occurrence) return
-  let next = r.nextDue
-  while (next <= item.occurrence) next = advanceDue(next, r)
-  await advanceRecurring(r.id, next)
+/** The bill a row belongs to, while it still exists. */
+async function billOf(item: LocalPlanned): Promise<LocalBill | null> {
+  if (!item.billId) return null
+  const bill = await db.bills.get(item.billId)
+  return bill && bill.deleted === 0 ? bill : null
+}
+
+/** Keep a repeating bill's `nextDue` past every occurrence the user has dealt with. */
+async function advanceBillPast(item: LocalPlanned): Promise<void> {
+  if (item.origin !== 'bill' || item.role !== 'payment') return
+  const bill = await billOf(item)
+  if (!bill?.frequency || bill.nextDue > item.occurrence) return
+  let next = bill.nextDue
+  while (next <= item.occurrence) next = advanceDue(next, bill)
+  await updateBill(bill.id, { nextDue: next })
+}
+
+/** Who a set-aside row puts money aside for: its goal, or its bill and occurrence. */
+async function setAsideOwnerOf(
+  item: LocalPlanned,
+): Promise<SetAsideOwner | null> {
+  if (item.goalId) {
+    const goal = await db.goals.get(item.goalId)
+    return goal && goal.deleted === 0 ? { goalId: goal.id } : null
+  }
+  const bill = await billOf(item)
+  return bill ? { billId: bill.id, occurrence: item.occurrence } : null
 }
 
 /** A category the user's tree actually has for this type, preferring `wanted`. */
@@ -117,21 +135,21 @@ export type ConfirmInput = {
   date?: string
   /** Income and payments: the leaf category the transaction is filed under. */
   categoryId?: string | null
-  /** Defaults to the schedule's note, else the item's name. */
+  /** Defaults to the bill's note, else the item's name. */
   note?: string | null
-  /** Provenance marker for the transaction (the auto-poster marks its rows). */
+  /** Provenance marker for the transaction. */
   source?: string | null
 }
 
 export type ConfirmResult = {
   settlementId: string
-  kind: 'transaction' | 'allocation'
+  kind: 'transaction' | 'setAside'
   /** The item's status after the settlement landed. */
   status: LocalPlanned['status']
 }
 
 /**
- * Settle a planned item: write the transaction or reservation it stands for, linked back to
+ * Settle a planned item: write the transaction or set-aside it stands for, linked back to
  * it. Settling the whole remainder (or more — the excess still counts) closes it; less
  * leaves it open with a smaller remainder.
  */
@@ -140,9 +158,9 @@ export async function confirmPlanned(
   input: ConfirmInput = {},
 ): Promise<ConfirmResult> {
   const item = await openItem(id)
-  // A set-aside is a reservation on its goal; with the goal gone there is nothing to hold it.
-  const goalId = item.goalId
-  if (item.role === 'set_aside' && !(goalId && (await db.goals.get(goalId))))
+  // A set-aside is held for its goal or bill; with that gone there is nothing to hold it.
+  const owner = item.role === 'set_aside' ? await setAsideOwnerOf(item) : null
+  if (item.role === 'set_aside' && !owner)
     throw new PlannedActionError('origin_gone')
   const rates = await currentRates()
   const remainder = Math.max(0, item.amount - (await settledNow(item)))
@@ -154,10 +172,9 @@ export async function confirmPlanned(
   const external = item.role === 'set_aside' ? input.externalLabel?.trim() : ''
 
   let result: Omit<ConfirmResult, 'status'>
-  if (item.role === 'set_aside' && external) {
-    const settlementId = await createAllocation({
-      goalId: goalId ?? '',
-      source: 'external',
+  if (owner && external) {
+    const settlementId = await createSetAside(owner, {
+      source: 'outside',
       walletId: null,
       externalLabel: external,
       amount,
@@ -166,14 +183,13 @@ export async function confirmPlanned(
       date,
       plannedId: item.id,
     })
-    result = { settlementId, kind: 'allocation' }
+    result = { settlementId, kind: 'setAside' }
   } else {
     const currency = walletId ? await walletCurrency(walletId) : null
     if (!walletId || !currency) throw new PlannedActionError('no_wallet')
     const inWallet = convertMinor(amount, item.currency, currency, rates)
-    if (item.role === 'set_aside') {
-      const settlementId = await createAllocation({
-        goalId: goalId ?? '',
+    if (owner) {
+      const settlementId = await createSetAside(owner, {
         source: 'wallet',
         walletId,
         externalLabel: null,
@@ -183,24 +199,27 @@ export async function confirmPlanned(
         date,
         plannedId: item.id,
       })
-      result = { settlementId, kind: 'allocation' }
+      result = { settlementId, kind: 'setAside' }
     } else {
       const type: TxType = item.role === 'income' ? 'income' : 'spend'
+      const bill = await billOf(item)
       const wanted =
-        input.categoryId !== undefined ? input.categoryId : item.categoryId
-      const schedule = await scheduleOf(item)
+        input.categoryId !== undefined
+          ? input.categoryId
+          : (item.categoryId ??
+            bill?.categoryId ??
+            (await streamCategoryOf(item)))
       const settlementId = await createTransaction({
         type,
         amount: inWallet,
         currency,
         categoryId: await categoryFor(type, wanted),
         walletId,
-        goalId:
-          type === 'spend' ? (item.goalId ?? schedule?.goalId ?? null) : null,
-        merchantId: schedule?.merchantId ?? null,
+        goalId: type === 'spend' && !bill ? item.goalId : null,
+        billId: type === 'spend' ? (bill?.id ?? null) : null,
+        merchantId: bill?.merchantId ?? null,
         date,
-        note:
-          input.note !== undefined ? input.note : schedule?.note || item.name,
+        note: input.note !== undefined ? input.note : bill?.note || item.name,
         source: input.source ?? null,
         plannedId: item.id,
       })
@@ -209,22 +228,22 @@ export async function confirmPlanned(
   }
 
   const after = await db.plannedTransactions.get(item.id)
-  if (after?.status === 'done') await advanceSchedulePast(item)
+  if (after?.status === 'done') await advanceBillPast(item)
   schedulePush()
   return { ...result, status: after?.status ?? 'open' }
 }
 
-/** The recurring schedule that planned `item`: its goal, merchant and note carry onto each posting. */
-async function scheduleOf(item: LocalPlanned): Promise<LocalRecurring | null> {
-  if (item.origin !== 'recurring' || !item.recurringId) return null
-  return (await db.recurrings.get(item.recurringId)) ?? null
+/** A payday files under its stream's own income category. */
+async function streamCategoryOf(item: LocalPlanned): Promise<string | null> {
+  if (!item.incomeStreamId) return null
+  return (await db.incomeStreams.get(item.incomeStreamId))?.categoryId ?? null
 }
 
 /** Done, with whatever is still open abandoned — the goal is simply behind by that much. */
 export async function closeRest(id: string): Promise<void> {
   const item = await openItem(id)
   await savePlanned({ ...item, status: 'done' })
-  await advanceSchedulePast(item)
+  await advanceBillPast(item)
   schedulePush()
 }
 
@@ -234,7 +253,7 @@ export async function skipPlanned(id: string): Promise<void> {
   if ((await settledNow(item)) > 0)
     throw new PlannedActionError('has_settlements')
   await savePlanned({ ...item, status: 'skipped' })
-  await advanceSchedulePast(item)
+  await advanceBillPast(item)
   schedulePush()
 }
 
@@ -280,18 +299,13 @@ export async function deleteManualPlanned(id: string): Promise<void> {
 
 // --- Contributions (1b) --------------------------------------------------------------
 
-/** Obligations are paid (money leaves); everything else is saved toward (money stays). */
-export const contributionRoleOf = (
-  goal: Pick<LocalGoal, 'kind'>,
-): PlannedRole => (goal.kind === 'recurring' ? 'payment' : 'set_aside')
-
 export type ContributionInput = {
   /** `now` settles it today; `later` plans it for `date`. */
   mode: 'now' | 'later'
   /** In the goal's currency. */
   amount: number
   walletId?: string | null
-  /** Set-asides only: held outside any wallet. */
+  /** Held outside any wallet. */
   externalLabel?: string | null
   date: string
   note?: string | null
@@ -304,9 +318,9 @@ export type ContributionResult =
   | { kind: 'planned'; plannedId: string }
 
 /**
- * "+ Add contribution" on a goal. Paid now settles the goal's oldest due item when there is
- * one (so it counts against the plan instead of beside it), else writes an unlinked
- * contribution. Plan for later writes a hand-made planned item a recalc never rewrites.
+ * "+ Add contribution" on a goal: a set-aside. Now settles the goal's oldest due set-aside
+ * when there is one (so it counts against the plan instead of beside it), else writes an
+ * unlinked one. Plan for later writes a hand-made planned item a recalc never rewrites.
  */
 export async function addContribution(
   goalId: string,
@@ -316,7 +330,7 @@ export async function addContribution(
   if (!goal || goal.deleted !== 0) throw new PlannedActionError('not_found')
   if (!Number.isFinite(input.amount) || input.amount <= 0)
     throw new PlannedActionError('bad_amount')
-  const role = contributionRoleOf(goal)
+  const role: PlannedRole = 'set_aside'
 
   if (input.mode === 'later') {
     const ts = new Date().toISOString()
@@ -328,9 +342,9 @@ export async function addContribution(
         role,
         goalId,
         incomeStreamId: null,
-        recurringId: null,
+        billId: null,
         walletId: input.walletId ?? null,
-        name: role === 'payment' ? goal.name : `${goal.name} set-aside`,
+        name: `${goal.name} set-aside`,
         amount: Math.round(input.amount),
         currency: goal.currency,
         categoryId: null,
@@ -338,6 +352,7 @@ export async function addContribution(
         date: input.date,
         status: 'open',
         pinned: false,
+        review: false,
         note: input.note ?? null,
         createdAt: ts,
         updatedAt: ts,
@@ -382,17 +397,16 @@ export async function addContribution(
     }
   }
 
-  const external = role === 'set_aside' ? input.externalLabel?.trim() : ''
+  const external = input.externalLabel?.trim() ?? ''
   if (!external && !input.walletId) throw new PlannedActionError('no_wallet')
-  let settlementId: string
-  if (role === 'set_aside') {
-    const currency = external
-      ? goal.currency
-      : await walletCurrency(input.walletId ?? '')
-    if (!currency) throw new PlannedActionError('no_wallet')
-    settlementId = await createAllocation({
-      goalId,
-      source: external ? 'external' : 'wallet',
+  const currency = external
+    ? goal.currency
+    : await walletCurrency(input.walletId ?? '')
+  if (!currency) throw new PlannedActionError('no_wallet')
+  const settlementId = await createSetAside(
+    { goalId },
+    {
+      source: external ? 'outside' : 'wallet',
       walletId: external ? null : (input.walletId ?? null),
       externalLabel: external || null,
       amount: convertMinor(
@@ -405,28 +419,8 @@ export async function addContribution(
       note: input.note ?? null,
       date: input.date,
       plannedId: null,
-    })
-  } else {
-    const walletId = input.walletId ?? ''
-    const currency = await walletCurrency(walletId)
-    if (!currency) throw new PlannedActionError('no_wallet')
-    settlementId = await createTransaction({
-      type: 'spend',
-      amount: convertMinor(
-        input.amount,
-        goal.currency,
-        currency,
-        await currentRates(),
-      ),
-      currency,
-      categoryId: await categoryFor('spend', null),
-      walletId,
-      goalId,
-      date: input.date,
-      note: input.note ?? goal.name,
-      plannedId: null,
-    })
-  }
+    },
+  )
   schedulePush()
   return { kind: 'settled', settlementId, plannedId: null }
 }

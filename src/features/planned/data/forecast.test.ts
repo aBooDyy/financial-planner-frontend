@@ -10,7 +10,7 @@ const TODAY = '2026-09-27'
 
 const bill = (over: Partial<LocalPlanned>) =>
   planned({
-    origin: 'recurring',
+    origin: 'bill',
     role: 'payment',
     goalId: null,
     name: 'Rent',
@@ -29,7 +29,6 @@ const payday = (over: Partial<LocalPlanned>) =>
 function forecast(rows: LocalPlanned[], balance: number, reserved = 0) {
   const list = buildPlannedList({
     planned: rows,
-    goals: [],
     nodes: [],
     index: indexSettlements([], []),
     rates: RATES,

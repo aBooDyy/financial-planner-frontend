@@ -3,7 +3,6 @@ import type {
   LocalBudget,
   LocalMerchant,
   LocalPlanned,
-  LocalRecurring,
   LocalTransaction,
 } from '#/db/types'
 import type { CategoryCatalog } from '#/features/categories/data/catalog'
@@ -18,7 +17,7 @@ import { hasActiveFilters } from './filters'
 import { inScope, itemPredicate } from './itemFilter'
 import type { ItemContext, SearchItem } from './items'
 import { ledgerItems } from './ledgerItems'
-import { budgetItems, plannedItems, recurringItems } from './planItems'
+import { budgetItems, plannedItems } from './planItems'
 import type {
   SearchContext,
   SearchFilters,
@@ -36,7 +35,6 @@ const GROUP_ORDER: ReadonlyArray<SearchGroupKey> = [
   'transactions',
   'planned',
   'budgets',
-  'recurring',
 ]
 
 const GROUP_TITLE: Record<SearchGroupKey, string> = {
@@ -44,14 +42,12 @@ const GROUP_TITLE: Record<SearchGroupKey, string> = {
   transactions: 'Transactions',
   planned: 'Planned',
   budgets: 'Budgets',
-  recurring: 'Recurring',
 }
 
 const VIEW_GROUP: Record<SpendingView, SearchGroupKey> = {
   activity: 'transactions',
   planned: 'planned',
   budgets: 'budgets',
-  recurring: 'recurring',
 }
 
 /** Every row search reads, unfiltered — deleted rows included; they are skipped here. */
@@ -59,7 +55,6 @@ export type SearchSources = {
   txns: LocalTransaction[]
   planned: LocalPlanned[]
   budgets: LocalBudget[]
-  recurrings: LocalRecurring[]
   nodes: LocalBalanceNode[]
   merchants: LocalMerchant[]
   /** Each wallet's signed delta over the whole ledger, in its own currency. */
@@ -109,7 +104,6 @@ export function indexSearch(
       transactions: ledgerItems(sources.txns, ctx),
       planned: plannedItems(sources.planned, ctx),
       budgets: budgetItems(sources.budgets, ctx),
-      recurring: recurringItems(sources.recurrings, ctx),
     },
     nodes,
     catalog: sources.catalog,

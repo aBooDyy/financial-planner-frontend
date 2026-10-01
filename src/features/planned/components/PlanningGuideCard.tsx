@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { ChevronRight, RefreshCw, Repeat, Target, Wallet } from 'lucide-react'
+import { ChevronRight, Repeat, Target, Wallet } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { LinkProps } from '@tanstack/react-router'
 import { RailCardHeader } from '#/components/RailCardHeader'
@@ -24,7 +24,7 @@ const STEPS: Step[] = [
     key: 'obligations',
     icon: Repeat,
     title: 'Add your bills',
-    text: 'Rent, loans and other obligations, due on time.',
+    text: 'Rent, loans and other bills, due on time.',
     link: { to: '/goals/$section', params: { section: 'obligations' } },
   },
   {
@@ -33,13 +33,6 @@ const STEPS: Step[] = [
     title: 'Set a goal',
     text: 'Monthly set-asides that get you there.',
     link: { to: '/goals/$section', params: { section: 'goals' } },
-  },
-  {
-    key: 'recurring',
-    icon: RefreshCw,
-    title: 'Schedule regular spending',
-    text: 'Subscriptions and other repeats.',
-    link: { to: '/transactions/$view', params: { view: 'recurring' } },
   },
 ]
 

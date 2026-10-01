@@ -122,7 +122,7 @@ export function WalletRow({
         <div className="border-b border-fp-border">
           {row.reservations.map((pot, i) => (
             <PotRow
-              key={pot.goalId}
+              key={pot.ownerId}
               pot={pot}
               depth={row.depth}
               last={i === row.reservations.length - 1}

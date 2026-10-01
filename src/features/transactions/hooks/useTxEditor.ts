@@ -3,21 +3,10 @@ import type {
   LocalBalanceNode,
   LocalBudget,
   LocalMerchant,
-  LocalRecurring,
   LocalTransaction,
 } from '#/db/types'
 import type { CategoryPrediction } from '#/features/merchants/hooks/useMerchantMatch'
 import { predictionFor } from '#/features/merchants/hooks/useMerchantMatch'
-import type { GoalFrequency, IntervalUnit } from '#/features/goals/api/types'
-import {
-  DEFAULT_CUSTOM_INTERVAL,
-  DEFAULT_CUSTOM_UNIT,
-} from '#/features/goals/constants'
-import {
-  repeatBlock,
-  repeatDraftOf,
-  repeatOfDraft,
-} from '#/features/goals/data/cadence'
 import type {
   BudgetPeriod,
   BudgetScope,
@@ -37,20 +26,13 @@ import {
   suggestReceived,
 } from '#/features/transactions/data/transferForm'
 import type { RatesMap } from '#/lib/config/rates'
-import {
-  addMonths,
-  startOfToday,
-  ymd,
-} from '#/features/transactions/data/planning'
+import { startOfToday, ymd } from '#/features/transactions/data/planning'
 import {
   createBudget,
-  createRecurring,
   createTransaction,
   deleteBudget,
-  deleteRecurring,
   deleteTransaction,
   updateBudget,
-  updateRecurring,
   updateTransaction,
 } from '#/features/transactions/data/mutations'
 import type { CurrencyCode } from '#/lib/currency'
@@ -58,7 +40,7 @@ import { minorToInputValue, parseAmountToMinor } from '#/lib/currency'
 import { useEntrySession } from '#/features/transactions/stores/entrySession'
 import { useEntryDefaults } from './useEntryDefaults'
 
-export type TxEditorKind = 'tx' | 'budget' | 'recurring'
+export type TxEditorKind = 'tx' | 'budget'
 
 /** A transfer is a third kind of entry here, though on disk it is two legs. */
 export type EditorTxType = TxType | 'transfer'
@@ -86,16 +68,6 @@ export type TxEditorDraft = {
   /** What the destination receives, in its currency. Tracks `amount` until edited. */
   toAmount: string
   toAmountEdited: boolean
-  // recurring
-  name: string
-  frequency: GoalFrequency
-  /** Repeat every `customInterval` `customUnit`s instead of `frequency`. */
-  customRepeat: boolean
-  customInterval: string
-  customUnit: IntervalUnit
-  autopost: boolean
-  /** The last date an occurrence may fall on; null repeats forever. */
-  endsOn: string | null
   // budget
   scopeType: BudgetScope
   period: BudgetPeriod
@@ -104,8 +76,12 @@ export type TxEditorDraft = {
   currency: CurrencyCode
 }
 
-/** What "Counts toward" resolved: the planned item settled and, for a spend, the goal paid. */
-export type SaveLink = { plannedId: string | null; goalId?: string | null }
+/** What "Counts toward" resolved: the planned item settled and, for a spend, its goal or bill. */
+export type SaveLink = {
+  plannedId: string | null
+  goalId?: string | null
+  billId?: string | null
+}
 
 export type TxEditorState = {
   kind: TxEditorKind
@@ -121,14 +97,6 @@ export type TxEditorState = {
 
 const firstCategoryOf = (catalog: CategoryCatalog, type: TxType): string =>
   catalog.byType(type).at(0)?.id ?? DELETED_CATEGORY_ID
-
-/** A new schedule is most often a bill; start on Housing when the user kept it. */
-const recurringCategoryOf = (catalog: CategoryCatalog): string => {
-  const housing = catalog.bySlug('housing')
-  return housing?.type === 'spend'
-    ? housing.id
-    : firstCategoryOf(catalog, 'spend')
-}
 
 /** Whether `id` is a live category filed as `type`. */
 const isOfType = (catalog: CategoryCatalog, id: string, type: TxType) =>
@@ -199,13 +167,6 @@ export function useTxEditor(
     toWalletId: defaults.toWalletId,
     toAmount: '',
     toAmountEdited: false,
-    name: '',
-    frequency: 'monthly',
-    customRepeat: false,
-    customInterval: String(DEFAULT_CUSTOM_INTERVAL),
-    customUnit: DEFAULT_CUSTOM_UNIT,
-    autopost: false,
-    endsOn: null,
     scopeType: 'category',
     period: 'monthly',
     customDays: '30',
@@ -281,38 +242,6 @@ export function useTxEditor(
         customDays: String(b.customDays ?? 30),
         limit: minorToInputValue(b.limit, b.currency),
         currency: b.currency,
-      },
-    })
-
-  // --- Recurring ---
-  const openAddRecurring = () =>
-    setEditing({
-      kind: 'recurring',
-      id: null,
-      draft: {
-        ...blank(),
-        categoryId: recurringCategoryOf(catalog),
-        date: ymd(addMonths(startOfToday(), 1)),
-      },
-    })
-  const openEditRecurring = (r: LocalRecurring) =>
-    setEditing({
-      kind: 'recurring',
-      id: r.id,
-      draft: {
-        ...blank(),
-        name: r.name,
-        type: r.type,
-        amount: minorToInputValue(r.amount, r.currency),
-        categoryId: r.categoryId,
-        walletId: r.walletId,
-        goalId: r.goalId,
-        merchantId: r.merchantId ?? null,
-        ...repeatDraftOf(r, 'monthly'),
-        autopost: r.autopost,
-        date: r.nextDue,
-        endsOn: r.endsOn ?? null,
-        note: r.note ?? '',
       },
     })
 
@@ -517,6 +446,8 @@ export function useTxEditor(
         categoryId: draft.categoryId,
         walletId: draft.walletId,
         goalId: draft.type === 'spend' ? (link?.goalId ?? draft.goalId) : null,
+        billId:
+          draft.type === 'spend' && link ? (link.billId ?? null) : undefined,
         plannedId: link ? link.plannedId : draft.plannedId,
         merchantId: draft.merchantId,
         date: draft.date,
@@ -531,51 +462,25 @@ export function useTxEditor(
       return
     }
 
-    if (kind === 'budget') {
-      const limit = parseAmountToMinor(draft.limit, draft.currency) ?? 0
-      if (limit <= 0) return
-      const payload = {
-        scopeType: draft.scopeType,
-        categoryId:
-          draft.scopeType === 'category'
-            ? budgetRootOf(catalog, draft.categoryId)
-            : null,
-        walletId: draft.scopeType === 'wallet' ? draft.walletId : null,
-        period: draft.period,
-        customDays:
-          draft.period === 'custom'
-            ? Math.max(1, parseInt(draft.customDays, 10) || 30)
-            : null,
-        limit,
-        currency: draft.currency,
-      }
-      if (id) await updateBudget(id, payload)
-      else await createBudget(payload)
-      close()
-      return
-    }
-
-    if (!draft.walletId) return
-    const currency = walletCurrency(draft.walletId)
-    const amount = parseAmountToMinor(draft.amount, currency) ?? 0
-    if (amount <= 0 || repeatBlock(draft)) return
+    const limit = parseAmountToMinor(draft.limit, draft.currency) ?? 0
+    if (limit <= 0) return
     const payload = {
-      name: draft.name.trim() || 'Recurring',
-      type: draft.type,
-      amount,
-      currency,
-      categoryId: draft.categoryId,
-      walletId: draft.walletId,
-      goalId: draft.type === 'spend' ? draft.goalId : null,
-      merchantId: draft.merchantId,
-      ...repeatOfDraft(draft),
-      nextDue: draft.date,
-      endsOn: draft.endsOn,
-      autopost: draft.autopost,
-      note: draft.note.trim() || null,
+      scopeType: draft.scopeType,
+      categoryId:
+        draft.scopeType === 'category'
+          ? budgetRootOf(catalog, draft.categoryId)
+          : null,
+      walletId: draft.scopeType === 'wallet' ? draft.walletId : null,
+      period: draft.period,
+      customDays:
+        draft.period === 'custom'
+          ? Math.max(1, parseInt(draft.customDays, 10) || 30)
+          : null,
+      limit,
+      currency: draft.currency,
     }
-    if (id) await updateRecurring(id, payload)
-    else await createRecurring(payload)
+    if (id) await updateBudget(id, payload)
+    else await createBudget(payload)
     close()
   }
 
@@ -584,8 +489,7 @@ export function useTxEditor(
     if (editing.kind === 'tx' && editing.draft.type === 'transfer')
       await deleteTransfer(editing.id)
     else if (editing.kind === 'tx') await deleteTransaction(editing.id)
-    else if (editing.kind === 'budget') await deleteBudget(editing.id)
-    else await deleteRecurring(editing.id)
+    else await deleteBudget(editing.id)
     close()
   }
 
@@ -596,8 +500,6 @@ export function useTxEditor(
     openEditTransfer,
     openAddBudget,
     openEditBudget,
-    openAddRecurring,
-    openEditRecurring,
     setField,
     setType,
     swapTransferWallets,

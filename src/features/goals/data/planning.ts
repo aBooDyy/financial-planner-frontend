@@ -1,9 +1,8 @@
 /**
  * Date math for the planning engine. Everything is parameterized by `today` (local midnight)
- * rather than reading the clock, so the funding view is pure and testable. Dates on the wire
+ * rather than reading the clock, so the funding plan is pure and testable. Dates on the wire
  * are ISO `YYYY-MM-DD` strings; these helpers convert at the edge.
  */
-import type { FreqMeta } from '#/features/goals/constants'
 
 /** Today at local midnight — the single reference point the engine plans from. */
 export const startOfToday = (): Date => {
@@ -27,12 +26,6 @@ export const parseISO = (s: string | null, fallback: Date): Date => {
 export const ymd = (d: Date): string =>
   `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 
-export const addMonths = (base: Date, n: number): Date =>
-  new Date(base.getFullYear(), base.getMonth() + n, base.getDate())
-
-export const fmtMonth = (d: Date): string =>
-  d.toLocaleString('en-US', { month: 'short', year: 'numeric' })
-
 /**
  * Day-aware count of monthly set-asides still possible between `today` and a due date — at
  * least 1, so a goal due this month still spreads over one contribution.
@@ -45,33 +38,6 @@ export const setAsidesLeft = (iso: string | null, today: Date): number => {
   if (d.getDate() < today.getDate()) months -= 1
   return Math.max(1, months)
 }
-
-export const daysUntil = (iso: string | null, today: Date): number => {
-  const d = parseISO(iso, today)
-  return Math.round((d.getTime() - today.getTime()) / 86_400_000)
-}
-
-/** Human "in 9d" / "in 4 mos" / "in 1y 2m" / "past due" for a due date. */
-export const relUntil = (iso: string | null, today: Date): string => {
-  const days = daysUntil(iso, today)
-  if (days <= 0) return 'past due'
-  if (days < 31) return `in ${days}d`
-  const months = setAsidesLeft(iso, today)
-  if (months < 12) return `in ${months} mos`
-  const years = Math.floor(months / 12)
-  const rem = months % 12
-  return `in ${years}y${rem ? ` ${rem}m` : ''}`
-}
-
-export const ordinal = (n: number): string => {
-  const s = ['th', 'st', 'nd', 'rd']
-  const v = n % 100
-  return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`
-}
-
-/** Default next-due for a fresh recurring goal: the 1st of a month `ahead` periods out. */
-export const nextDueDefault = (freq: FreqMeta, today: Date): string =>
-  ymd(new Date(today.getFullYear(), today.getMonth() + freq.ahead, 1))
 
 /** Set-asides fall on this day of the month (1–28, so every month has one). */
 export const clampSetAsideDay = (day: number | null | undefined): number =>

@@ -49,6 +49,14 @@ vi.mock('#/features/goals/data/sync', () => ({
   pullGoalsAll: track('goals'),
   pushGoalsEntry: track('push:goals'),
 }))
+vi.mock('#/features/bills/data/sync', () => ({
+  pullBills: track('bills'),
+  pushBillsEntry: track('push:bills'),
+}))
+vi.mock('#/features/setAsides/data/sync', () => ({
+  pullSetAsides: track('setAsides'),
+  pushSetAsidesEntry: track('push:setAsides'),
+}))
 vi.mock('#/features/merchants/data/sync', () => ({
   pullMerchantsAll: track('merchants'),
   pushMerchantsEntry: track('push:merchants'),
@@ -89,6 +97,8 @@ const collections = [
   'categories',
   'customCurrencies',
   'goals',
+  'bills',
+  'setAsides',
   'merchants',
   'importTemplates',
   'spending',

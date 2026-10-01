@@ -6,8 +6,7 @@ import type {
   LocalBudget,
   LocalCategory,
   LocalGoal,
-  LocalGoalAllocation,
-  LocalRecurring,
+  LocalSetAside,
   LocalTransaction,
 } from '#/db/types'
 import { buildCatalog } from '#/features/categories/data/catalog'
@@ -27,7 +26,6 @@ import {
   buildBudgetsView,
   buildCalendar,
   buildCashflow,
-  buildRecurringView,
   scopeSections,
 } from './selectors'
 import type { Scope, SpendingData } from './selectors'
@@ -232,37 +230,14 @@ const BUDGETS: LocalBudget[] = [
   budget({ id: 'gone', period: 'custom', customDays: 900, deleted: 1 }),
 ]
 
-const RECURRINGS: LocalRecurring[] = [
-  {
-    id: 'r1',
-    name: 'Rent',
-    type: 'spend',
-    amount: 300_000,
-    currency: 'SAR',
-    categoryId: catId('rent'),
-    walletId: 'checking',
-    goalId: null,
-    merchantId: null,
-    endsOn: null,
-    note: null,
-    frequency: 'monthly',
-    customInterval: null,
-    customUnit: null,
-    nextDue: '2026-10-01',
-    autopost: true,
-    ...meta,
-  },
-]
-
 const GOALS = [{ id: 'g1', name: 'Trip', deleted: 0 } as LocalGoal]
 
-const allocation = (
-  date: string,
-  walletId: string | null,
-): LocalGoalAllocation => ({
+const allocation = (date: string, walletId: string | null): LocalSetAside => ({
   id: `a${date}${walletId}`,
   goalId: 'g1',
-  source: walletId ? 'wallet' : 'external',
+  billId: null,
+  occurrence: null,
+  source: walletId ? 'wallet' : 'outside',
   walletId,
   externalLabel: walletId ? null : 'Dad',
   amount: 25_000,
@@ -271,6 +246,9 @@ const allocation = (
   position: 0,
   date,
   plannedId: null,
+  releasedAt: null,
+  releasedById: null,
+  movedByTransferId: null,
   ...meta,
 })
 const ALLOCATIONS = [
@@ -297,11 +275,10 @@ const byId = (a: LocalTransaction, b: LocalTransaction) =>
 const LIVE_NODES = NODES.filter((n) => n.deleted === 0)
 const inputs = {
   budgets: BUDGETS,
-  recurrings: RECURRINGS,
   nodes: LIVE_NODES,
   base: 'SAR',
   rates: RATES,
-  allocations: ALLOCATIONS,
+  setAsides: ALLOCATIONS,
   goals: GOALS,
 } as const
 const FULL: SpendingData = { ...inputs, txns: [...TXNS].sort(byId) }
@@ -412,7 +389,6 @@ describe('readLedgerWindow', () => {
         both((d) => buildCalendar(d, scope, p, false, t))
         both((d) => buildCalendar(d, scope, p, true, t))
         both((d) => buildBudgetsView(d, CATALOG, scope, t))
-        both((d) => buildRecurringView(d, CATALOG, scope, t))
       }
     },
   )

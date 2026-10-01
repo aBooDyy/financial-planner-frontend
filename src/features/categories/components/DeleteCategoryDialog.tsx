@@ -30,8 +30,9 @@ const title = (t: DeleteTarget) =>
 function filedSummary(t: DeleteTarget): string {
   const parts = [
     t.txCount > 0 ? plural(t.txCount, 'transaction', 'transactions') : null,
-    t.recurringCount > 0
-      ? plural(t.recurringCount, 'recurring payment', 'recurring payments')
+    t.billCount > 0 ? plural(t.billCount, 'bill', 'bills') : null,
+    t.incomeCount > 0
+      ? plural(t.incomeCount, 'income stream', 'income streams')
       : null,
     t.plannedCount > 0
       ? plural(t.plannedCount, 'planned item', 'planned items')

@@ -1,18 +1,17 @@
 /**
- * The TxEditor's "Counts toward" choices (1e): the goals and obligations a spend can pay, or
- * the income streams an income entry can be the payday of — the most relevant first.
+ * The TxEditor's "Counts toward" choices (1e): the goals a spend can use money from, or the
+ * income streams an income entry can be the payday of — the most relevant first.
  */
 import type { LocalGoal, LocalIncomeStream, LocalPlanned } from '#/db/types'
-import { FREQUENCIES } from '#/features/goals/constants'
-import { shortDate } from '#/features/planned/data/views'
+import { frequencyMetaOf } from '#/features/goals/data/cadence'
 import { formatMoneyRounded } from '#/lib/currency'
 
-export type CountsKind = 'goal' | 'obligation' | 'income'
+export type CountsKind = 'goal' | 'income'
 
 export type CountsOption = {
   id: string
   name: string
-  /** "Goal · SR 4,000 of 13,000" / "Obligation · SR 3,500 due Oct 1" / "Income · SR 12,000 monthly". */
+  /** "Goal · SR 4,000 of 13,000" / "Income · SR 12,000 monthly". */
   sub: string
   color: string
   kind: CountsKind
@@ -78,16 +77,7 @@ function split(
 
 export function goalOption(goal: LocalGoal, saved: number): CountsOption {
   const money = (n: number) => formatMoneyRounded(n, goal.currency)
-  if (goal.kind === 'recurring') {
-    return {
-      id: goal.id,
-      name: goal.name,
-      sub: `Obligation · ${money(goal.amount ?? 0)}${goal.nextDue ? ` due ${shortDate(goal.nextDue)}` : ''}`,
-      color: goal.color,
-      kind: 'obligation',
-    }
-  }
-  const target = goal.kind === 'sinking' ? goal.amount : goal.target
+  const target = goal.target
   return {
     id: goal.id,
     name: goal.name,
@@ -100,10 +90,9 @@ export function goalOption(goal: LocalGoal, saved: number): CountsOption {
 }
 
 /**
- * Goals and obligations for a spend, in tiers: anything with an open planned *payment* near the
- * date (nearest first), then other obligations, then saving goals with a planned set-aside near
- * the date (nearest first), then the rest by position. `savedOf` is the goal's saved figure,
- * baseline included.
+ * Goals for a spend, in tiers: anything with an open planned *payment* near the date (nearest
+ * first), then goals with a planned set-aside near the date (nearest first), then the rest by
+ * position. `savedOf` is the goal's saved figure.
  */
 export function rankGoalOptions(args: {
   goals: ReadonlyArray<LocalGoal>
@@ -122,7 +111,7 @@ export function rankGoalOptions(args: {
   const near = nearestOpen(args.planned, args.date, (p) => p.goalId)
   // A spend only ever settles a payment, so a payment due soon outranks a set-aside due soon.
   const tierOf = (g: LocalGoal): number =>
-    payments.has(g.id) ? 0 : !isSavingGoal(g) ? 1 : near.has(g.id) ? 2 : 3
+    payments.has(g.id) ? 0 : near.has(g.id) ? 1 : 2
   const ranked = [...live].sort((a, b) => {
     const ta = tierOf(a)
     const tb = tierOf(b)
@@ -151,14 +140,10 @@ export function rankIncomeOptions(args: {
     rank(live, near).map((s) => ({
       id: s.id,
       name: s.label,
-      sub: `Income · ${formatMoneyRounded(s.amount, s.currency)} ${FREQUENCIES[s.frequency].label.toLowerCase()}`,
+      sub: `Income · ${formatMoneyRounded(s.amount, s.currency)} ${frequencyMetaOf(s, 'monthly').label.toLowerCase()}`,
       color: s.color,
       kind: 'income' as const,
     })),
     args.selectedId,
   )
 }
-
-/** A saving goal is funded by set-asides (reservations), not by spends. */
-export const isSavingGoal = (goal: LocalGoal): boolean =>
-  goal.kind !== 'recurring'

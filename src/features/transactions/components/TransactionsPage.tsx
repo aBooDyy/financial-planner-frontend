@@ -49,7 +49,6 @@ import { CashflowHeroCard } from './CashflowHeroCard'
 import { ConnectedTxEditor } from './ConnectedTxEditor'
 import { DaysCard } from './DaysCard'
 import { QuickAddCard } from './QuickAddCard'
-import { RecurringCard, UpcomingCard } from './RecurringCard'
 import { TransactionList } from './TransactionList'
 import { ScopeBalanceHeader } from './ScopeBalanceHeader'
 import { ScopeSelect } from './ScopeSelect'
@@ -148,10 +147,6 @@ export function TransactionsPage() {
     const b = inputs.budgets.find((x) => x.id === id && x.deleted === 0)
     if (b) editor.openEditBudget(b)
   }
-  const onEditRecurring = (id: string) => {
-    const r = inputs.recurrings.find((x) => x.id === id && x.deleted === 0)
-    if (r) editor.openEditRecurring(r)
-  }
   // Drop `?review=1` on close so a reload doesn't reopen what the user just dismissed.
   const closeReview = () => {
     setReviewOpen(false)
@@ -167,15 +162,13 @@ export function TransactionsPage() {
   const activeWallet =
     wallets.find((w) => w.id === entryDefaults.walletId) ?? null
   const activeCurrency: CurrencyCode = activeWallet?.currency ?? base
-  const { activity, budgets, recurring } = views
+  const { activity, budgets } = views
   const busy =
     view === 'activity'
       ? !activity?.cashflow
       : view === 'budgets'
         ? !budgets
-        : view === 'recurring'
-          ? !recurring
-          : false
+        : false
 
   const balancesLoading = loading || !deltas
   const scopePicker = (compact: boolean) => (
@@ -286,13 +279,6 @@ export function TransactionsPage() {
                 onEdit={onEditBudget}
               />
             ) : null}
-            {view === 'recurring' ? (
-              <RecurringCard
-                view={recurring}
-                onAdd={editor.openAddRecurring}
-                onEdit={onEditRecurring}
-              />
-            ) : null}
           </div>
 
           {/* Right rail */}
@@ -323,9 +309,6 @@ export function TransactionsPage() {
             ) : null}
             {view === 'budgets' ? (
               <BudgetHealthCard view={budgets} onAdd={editor.openAddBudget} />
-            ) : null}
-            {view === 'recurring' ? (
-              <UpcomingCard view={recurring} onAdd={editor.openAddRecurring} />
             ) : null}
           </div>
         </div>

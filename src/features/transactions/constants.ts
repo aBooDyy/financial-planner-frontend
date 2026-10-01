@@ -10,12 +10,7 @@ export type RangeMode = 'year' | 'month' | 'week' | 'day'
 export type PeriodMode = RangeMode | 'custom'
 
 /** The Spending page's tabs, in order; each is a `/transactions/<view>` route. */
-export const SPENDING_VIEWS = [
-  'activity',
-  'planned',
-  'budgets',
-  'recurring',
-] as const
+export const SPENDING_VIEWS = ['activity', 'planned', 'budgets'] as const
 
 export type SpendingView = (typeof SPENDING_VIEWS)[number]
 

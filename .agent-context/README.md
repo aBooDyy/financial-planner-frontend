@@ -15,17 +15,22 @@ root product [`.agent-context/`](../../.agent-context/). Keep
 - [wallets.md](wallets.md) — the Wallets feature (first synced entity): how the Dexie +
   sync engine, money/derivation, and the recreated UI are realized; the transfer and
   adjust-balance dialogs.
-- [goals.md](goals.md) — the Goals planning feature: income streams + ranked goals, the
-  client-side funding engine, and the shared chrome (`src/components/chrome/`).
-- [transactions.md](transactions.md) — the Spending feature: the ledger + budgets + recurring,
+- [goals.md](goals.md) — goals and income streams: the kind-less goal shape, progress from
+  set-asides, the interim funding plan, paydays and cadence (the Goals page is a placeholder
+  while Planning is rebuilt).
+- [bills.md](bills.md) — bills (once or repeating, must pay / nice to have): the entity, its
+  full-representation sync, the mutations and the cross-entity cascades.
+- [set-asides.md](set-asides.md) — set-asides: labels on money in real wallets for a bill or
+  goal, live vs released, the mutations and the pure totals (wallet pots, per-owner sums).
+- [transactions.md](transactions.md) — the Spending feature: the ledger + budgets,
   the catalog-taking selectors, client-side derivation of wallet balances & goal contributions,
   settlement links to planned rows, and transfers between wallets (two linked legs, the `transfer` outbox entity, the
   collapsed activity row and its scope rules, exclusion from totals), and balance adjustments
   (`adjustment_in`/`adjustment_out` rows outside every total).
 - [planned.md](planned.md) — Planned transactions: the entity and its derived settled amount,
   deterministic UUIDv5 ids, the generator and reconciler, the app-level planner (fill /
-  recalc + undo, auto-post), settlement mutations, the id-taken sync branch, the hooks the
-  Planned tab and goal detail read, and the Planned tab + confirm dialog components.
+  recalc + undo, orphan resolution), settlement mutations, the id-taken sync branch, the hooks
+  the Planned tab reads, and the Planned tab + confirm dialog components.
 - [reports.md](reports.md) — Reports: the URL-held period/comparison/accounts, the preset
   periods and comparison windows, the windowed read + pre-period balance, and the pure builders
   (summary, balance strip, trend buckets, category breakdown, largest expenses).

@@ -1,15 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { LocalPlanned } from '#/db/types'
-import {
-  m,
-  planned,
-  RATES,
-  recurring,
-  wallet,
-} from '#/features/planned/testing/fixtures'
+import { m, planned, RATES, wallet } from '#/features/planned/testing/fixtures'
 import {
   DIALOG_MATCH,
   findAmountMatch,
+  billIdForMatch,
   findQuickAddMatch,
   goalIdForMatch,
   plannedWalletOf,
@@ -32,10 +27,10 @@ const payday = (over: Partial<LocalPlanned> = {}) =>
 
 const netflix = (over: Partial<LocalPlanned> = {}) =>
   planned({
-    origin: 'recurring',
+    origin: 'bill',
     role: 'payment',
     goalId: null,
-    recurringId: 'r1',
+    billId: 'r1',
     name: 'Netflix',
     amount: m(45),
     occurrence: '2026-09-23',
@@ -80,12 +75,14 @@ describe('findQuickAddMatch', () => {
     expect(find(items, { type: 'income', amount: m(45) })).toBeNull()
   })
 
-  it('takes recurring income and obligation payments, never set-asides or manual items', () => {
+  it('takes paydays and bill payments, never set-asides or manual items', () => {
     const items = [
       planned({
         id: 'rent',
+        origin: 'bill',
         role: 'payment',
-        goalId: 'rent',
+        goalId: null,
+        billId: 'rent',
         amount: m(3500),
         occurrence: TODAY,
       }),
@@ -133,17 +130,19 @@ describe('findQuickAddMatch', () => {
   })
 })
 
-describe('goalIdForMatch', () => {
-  it('carries the goal on a payment, directly or through its schedule', () => {
-    const rs = [recurring({ id: 'r1', goalId: 'car' })]
-    expect(
-      goalIdForMatch(planned({ role: 'payment', goalId: 'rent' }), 'spend', rs),
-    ).toBe('rent')
-    expect(goalIdForMatch(netflix(), 'spend', rs)).toBe('car')
-    expect(
-      goalIdForMatch(netflix({ recurringId: 'r2' }), 'spend', rs),
-    ).toBeNull()
-    expect(goalIdForMatch(payday(), 'income', rs)).toBeNull()
+describe('goalIdForMatch / billIdForMatch', () => {
+  it('carries the goal or the bill a payment belongs to, on a spend only', () => {
+    const goalPayment = planned({
+      origin: 'manual',
+      role: 'payment',
+      goalId: 'car',
+    })
+    expect(goalIdForMatch(goalPayment, 'spend')).toBe('car')
+    expect(billIdForMatch(goalPayment, 'spend')).toBeNull()
+    expect(goalIdForMatch(netflix(), 'spend')).toBeNull()
+    expect(billIdForMatch(netflix(), 'spend')).toBe('r1')
+    expect(goalIdForMatch(payday(), 'income')).toBeNull()
+    expect(billIdForMatch(payday(), 'income')).toBeNull()
   })
 })
 
@@ -213,7 +212,9 @@ describe('findAmountMatch', () => {
   const rent = planned({
     id: 'rent',
     role: 'payment',
-    goalId: 'rent',
+    origin: 'bill',
+    goalId: null,
+    billId: 'rent',
     amount: m(4500),
     occurrence: '2026-09-30',
   })

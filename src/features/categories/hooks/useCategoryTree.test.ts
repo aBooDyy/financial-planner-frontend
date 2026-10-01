@@ -46,7 +46,8 @@ beforeEach(async () => {
   await Promise.all([
     db.categories.clear(),
     db.transactions.clear(),
-    db.recurrings.clear(),
+    db.bills.clear(),
+    db.incomeStreams.clear(),
     db.plannedTransactions.clear(),
   ])
   await db.categories.bulkPut(defaultCategoryRows())

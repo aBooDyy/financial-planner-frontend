@@ -85,7 +85,7 @@ replaced by a runtime guard at the two gates where a code enters the app:
 
 1. **The wire** — every feature's `api/types.ts` mapper calls `fromWireCurrency` /
    `fromWireCurrencyOrNull`, which **throw** on a code the store doesn't know (balances
-   node/settings/rate, goals income/goal/allocation, spending transaction/budget/recurring,
+   node/settings/rate, goals income/goal, bill, set-aside, spending transaction/budget,
    inbound-imports staged import, integration key).
 2. **The CSV parse boundary** — `resolveCurrencyCode` / `isSupportedCurrency` are called
    _before_ the amount is parsed, so an unlisted code reads as

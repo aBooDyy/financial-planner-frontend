@@ -1,11 +1,10 @@
 import { useMemo } from 'react'
-import { walletReservations } from '#/features/goals/data/reservations'
-import { dateOf } from '#/features/planned/data/dates'
 import { buildForecast } from '#/features/planned/data/forecast'
 import type { ForecastView } from '#/features/planned/data/forecast'
 import { buildHeaded } from '#/features/planned/data/headed'
 import type { HeadedView } from '#/features/planned/data/headed'
 import type { PlannedListView } from '#/features/planned/data/views'
+import { walletSetAsides } from '#/features/setAsides/data/totals'
 import { activeNodes } from '#/features/wallets/data/archive'
 import { convertMinor } from '#/lib/currency'
 import { usePlannedData } from './usePlannedData'
@@ -31,17 +30,15 @@ export function usePlannedOutlook(
   const { due, next, later } = list
   const rows = useMemo(() => [...due, ...next, ...later], [due, next, later])
 
-  // Goal money in live wallets, in base — what the forecast warns before dipping into.
+  // Money set aside in live wallets, in base — what the forecast warns before dipping into.
   const reserved = useMemo(() => {
     if (loading) return 0
-    const byWallet = walletReservations(
-      inputs.allocations,
+    const byWallet = walletSetAsides(
+      inputs.setAsides,
       inputs.goals,
+      inputs.bills,
       nodes,
       inputs.rates,
-      inputs.txns,
-      dateOf(today),
-      inputs.planned,
     )
     return activeNodes(nodes).reduce(
       (sum, n) =>
@@ -59,7 +56,7 @@ export function usePlannedOutlook(
         ),
       0,
     )
-  }, [loading, inputs, nodes, today])
+  }, [loading, inputs, nodes])
 
   const headed = useMemo(
     () =>

@@ -28,7 +28,6 @@ vi.mock('#/features/transactions/api/transactionsApi', () => ({
     remove: vi.fn(),
   },
   budgetsApi: { list: vi.fn() },
-  recurringsApi: { list: vi.fn() },
 }))
 
 const { CHUNK_SIZE, commitImport, liveCreatedCategories, rowsSource } =

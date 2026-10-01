@@ -5,16 +5,16 @@ type Props = {
   pot: ReservationRow
   depth: number
   last: boolean
-  onOpen: (goalId: string) => void
+  onOpen: (ownerId: string) => void
 }
 
-/** What one goal holds in a wallet. Tapping it opens the goal. */
+/** What one bill or goal holds in a wallet. Tapping it opens it. */
 export function PotRow({ pot, depth, last, onOpen }: Props) {
   return (
     <button
       type="button"
-      onClick={() => onOpen(pot.goalId)}
-      aria-label={`Open ${pot.goalName}, ${pot.amountStr} set aside`}
+      onClick={() => onOpen(pot.ownerId)}
+      aria-label={`Open ${pot.ownerName}, ${pot.amountStr} set aside`}
       className={`flex w-full items-center gap-[9px] pe-[10px] ps-[45px] text-start hover:bg-fp-surface-2 sm:pe-[14px] sm:ps-[60px] ${
         last ? 'pt-[5px] pb-[10px]' : 'py-[5px]'
       }`}
@@ -25,7 +25,7 @@ export function PotRow({ pot, depth, last, onOpen }: Props) {
         style={{ background: pot.color }}
       />
       <span className="min-w-0 flex-1 truncate text-[12.5px] text-fp-text-2">
-        {pot.goalName}
+        {pot.ownerName}
       </span>
       <span className="fp-sensitive shrink-0 text-[12.5px] font-semibold whitespace-nowrap text-fp-text-2 tabular-nums">
         {pot.amountStr}

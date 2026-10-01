@@ -8,7 +8,6 @@ export const OPEN_KINDS = [
   'transfer',
   'planned',
   'budget',
-  'recurring',
 ] as const
 
 export type OpenKind = (typeof OPEN_KINDS)[number]
@@ -22,7 +21,6 @@ export const OPEN_VIEW: Record<OpenKind, SpendingView> = {
   transfer: 'activity',
   planned: 'planned',
   budget: 'budgets',
-  recurring: 'recurring',
 }
 
 const isOpenKind = (value: string): value is OpenKind =>

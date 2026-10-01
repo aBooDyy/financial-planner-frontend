@@ -23,6 +23,7 @@ const asTransaction = (id: string): Transaction => ({
   categoryId: 'cat-groceries',
   walletId: 'w1',
   goalId: null,
+  billId: null,
   merchantId: null,
   date: '2026-09-01',
   note: null,
@@ -78,7 +79,6 @@ vi.mock('#/features/transactions/api/transactionsApi', () => ({
     },
   },
   budgetsApi: { list: () => Promise.resolve([]) },
-  recurringsApi: { list: () => Promise.resolve([]) },
 }))
 
 const { clearLocalDb, db } = await import('./db')

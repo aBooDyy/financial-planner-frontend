@@ -6,8 +6,8 @@
  */
 import type {
   LocalBalanceNode,
-  LocalGoalAllocation,
   LocalPlanned,
+  LocalSetAside,
   LocalTransaction,
 } from '#/db/types'
 import { walletLiveBalances } from '#/features/transactions/data/ledger'
@@ -76,12 +76,14 @@ export function previewConfirm(args: {
   )
 
   const extraTxns: LocalTransaction[] = []
-  const extraAllocations: LocalGoalAllocation[] = []
-  if (amount > 0 && item.role === 'set_aside' && item.goalId) {
-    extraAllocations.push({
+  const extraSetAsides: LocalSetAside[] = []
+  if (amount > 0 && item.role === 'set_aside' && (item.goalId || item.billId)) {
+    extraSetAsides.push({
       id: PREVIEW_ID,
       goalId: item.goalId,
-      source: wallet ? 'wallet' : 'external',
+      billId: item.goalId ? null : item.billId,
+      occurrence: item.goalId ? null : item.occurrence,
+      source: wallet ? 'wallet' : 'outside',
       walletId: wallet ? wallet.id : null,
       externalLabel: wallet ? null : 'preview',
       amount: wallet ? inWallet : amount,
@@ -90,6 +92,9 @@ export function previewConfirm(args: {
       position: 0,
       date,
       plannedId: item.id,
+      releasedAt: null,
+      releasedById: null,
+      movedByTransferId: null,
       createdAt: '',
       updatedAt: '',
       version: '',
@@ -104,7 +109,8 @@ export function previewConfirm(args: {
       currency: walletCurrency,
       categoryId: item.categoryId,
       walletId: wallet.id,
-      goalId: item.goalId,
+      goalId: item.billId ? null : item.goalId,
+      billId: item.billId,
       merchantId: null,
       date,
       note: null,
@@ -128,7 +134,7 @@ export function previewConfirm(args: {
       {
         ...inputs,
         txns: [...inputs.txns, ...extraTxns],
-        allocations: [...inputs.allocations, ...extraAllocations],
+        setAsides: [...inputs.setAsides, ...extraSetAsides],
       },
       args.userId,
       args.today,
@@ -136,11 +142,8 @@ export function previewConfirm(args: {
     goalPreview = {
       id: goal.id,
       name: goal.name,
-      savedAfter: goal.saved + (after.progress[goal.id]?.progress ?? 0),
-      target:
-        goal.kind === 'onetime' || goal.kind === 'openended'
-          ? (goal.target ?? 0)
-          : (goal.amount ?? 0),
+      savedAfter: after.progress[goal.id]?.progress ?? 0,
+      target: goal.target ?? 0,
       liveAmountAfter: fitGoalPlanFrom(
         goal.id,
         after.desired,
