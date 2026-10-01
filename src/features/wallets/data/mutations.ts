@@ -3,11 +3,24 @@ import { requeued } from '#/db/syncFailure'
 import { schedulePush } from '#/db/sync'
 import { newId } from '#/lib/uuid'
 import { SETTINGS_KEY } from '#/db/types'
-import type { LocalBalanceNode, OutboxEntry } from '#/db/types'
+import type {
+  LocalBalanceNode,
+  LocalBalanceSettings,
+  OutboxEntry,
+} from '#/db/types'
 import type { CurrencyCode } from '#/lib/currency'
-import type { NodeKind } from '#/features/wallets/api/types'
+import type {
+  NodeKind,
+  PlanningSettings,
+} from '#/features/wallets/api/types'
 import { hasArchivedAncestor } from './archive'
-import { localNodeToCreateWire, localNodeToUpdateWire } from './mappers'
+import {
+  localNodeToCreateWire,
+  localNodeToUpdateWire,
+  localSettingsToUpdateWire,
+  normalizedPlanning,
+  planningSettingsOf,
+} from './mappers'
 
 export type NodeDraft = {
   kind: NodeKind
@@ -228,16 +241,53 @@ export async function deleteNode(id: string): Promise<void> {
 }
 
 export async function setBaseCurrency(code: CurrencyCode): Promise<void> {
+  await updateSettingsRow((settings) => ({ ...settings, baseCurrency: code }))
+}
+
+/** Change any of the planning settings; the rest keep their stored values. */
+export async function updatePlanningSettings(
+  patch: Partial<PlanningSettings>,
+): Promise<void> {
+  await updateSettingsRow((settings) => ({
+    ...settings,
+    ...normalizedPlanning({ ...planningSettingsOf(settings), ...patch }),
+  }))
+}
+
+/**
+ * A deleted income stream stops being the main paycheck, as the server does on delete. Only a
+ * queued PATCH naming it is rebuilt — otherwise the server's own change arrives with the pull.
+ */
+export async function forgetMainIncomeStream(streamId: string): Promise<void> {
+  await db.transaction('rw', db.balanceSettings, db.outbox, async () => {
+    const settings = await db.balanceSettings.get(SETTINGS_KEY)
+    if (settings?.mainIncomeStreamId !== streamId) return
+    const next = { ...settings, mainIncomeStreamId: null }
+    await db.balanceSettings.put(next)
+    const queued = await pending('settings', SETTINGS_KEY).first()
+    if (queued) {
+      queued.payload = localSettingsToUpdateWire(next)
+      await db.outbox.put(queued)
+    }
+  })
+}
+
+/**
+ * Write the settings row and queue its PATCH. The PATCH is a full representation built from
+ * the row, so a queued one is simply rebuilt.
+ */
+async function updateSettingsRow(
+  change: (settings: LocalBalanceSettings) => LocalBalanceSettings,
+): Promise<void> {
   const settings = await db.balanceSettings.get(SETTINGS_KEY)
   if (!settings) return
 
-  const next = {
-    ...settings,
-    baseCurrency: code,
+  const next: LocalBalanceSettings = {
+    ...change(settings),
     updatedAt: now(),
-    dirty: 1 as const,
+    dirty: 1,
   }
-  const payload = { version: settings.version, base_currency: code }
+  const payload = localSettingsToUpdateWire(next)
 
   await db.transaction('rw', db.balanceSettings, db.outbox, async () => {
     await db.balanceSettings.put(next)

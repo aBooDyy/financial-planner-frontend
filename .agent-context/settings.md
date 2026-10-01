@@ -79,6 +79,19 @@ Notifications, Archived, Data & privacy. Each pane is its own route — see
   index carries the two-level tree, [categories.md](categories.md)); `exchangeRates` carries a
   `dirty` index (rates are per-user editable, so a background pull must not clobber a local
   edit — `pullRates` respects `dirty`, like `pullNodes`). `clearLocalDb` clears both.
+- **The balance-settings row also holds the planning settings** (`LocalBalanceSettings`:
+  `safeHorizon` `until_payday | end_of_month | days` + `safeHorizonDays` 7–90, `paydayMode`
+  `review | auto`, `mainIncomeStreamId`, `incomeVaries` + `incomeFloor`). The row and its
+  mutations stay in `features/wallets/` (`setBaseCurrency`, `updatePlanningSettings(patch)`),
+  the wire maps in `wallets/api/types.ts`. **`PATCH /balance-settings` is a full
+  representation**: anything omitted resets to its default, so `localSettingsToUpdateWire`
+  sends every field every time, and the `409` rebase in `db/sync.ts` re-sends the whole local
+  row on the fresh version (it used to send only `base_currency`, which would now reset the
+  rest). Like the server, the client drops a value its setting does not use
+  (`normalizedPlanning`: days only with `days`, a floor only while income varies). The planning
+  fields are optional on the local row (rows stored before them lack them); read them through
+  `planningSettingsOf(row)`, which fills the defaults. Deleting an income stream calls
+  `forgetMainIncomeStream`, mirroring the server clearing `main_income_stream_id`.
 - `features/settings/` keeps the **rate** half: the rate update lives on `walletsApi`,
   profile on `authApi`, and `data/mutations.ts` owns `setExchangeRate`. The **category**
   half — `api/`, `data/mappers.ts`, `data/mutations.ts`, `data/sync.ts` and the pure

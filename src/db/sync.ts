@@ -2,9 +2,11 @@ import { walletsApi } from '#/features/wallets/api/walletsApi'
 import type {
   CreateNodeWire,
   UpdateNodeWire,
+  UpdateSettingsWire,
 } from '#/features/wallets/api/types'
 import {
   localNodeToUpdateWire,
+  localSettingsToUpdateWire,
   serverNodeToLocal,
   serverSettingsToLocal,
 } from '#/features/wallets/data/mappers'
@@ -486,7 +488,7 @@ async function pushNodeDelete(entry: OutboxEntry): Promise<void> {
 async function pushSettings(entry: OutboxEntry): Promise<void> {
   try {
     const settings = await walletsApi.updateSettings(
-      entry.payload as { version: string; base_currency: string },
+      entry.payload as UpdateSettingsWire,
     )
     await db.transaction('rw', db.balanceSettings, db.outbox, async () => {
       await db.balanceSettings.put(serverSettingsToLocal(settings))
@@ -494,13 +496,14 @@ async function pushSettings(entry: OutboxEntry): Promise<void> {
     })
   } catch (e) {
     if (statusOf(e) === 409) {
+      // The PATCH is a full representation, so the rebase re-sends the whole local row.
       const fresh = await walletsApi.getSettings()
       const local = await db.balanceSettings.get(SETTINGS_KEY)
-      const base = local?.baseCurrency ?? fresh.baseCurrency
-      const settings = await walletsApi.updateSettings({
-        version: fresh.version,
-        base_currency: base,
-      })
+      const settings = await walletsApi.updateSettings(
+        local
+          ? localSettingsToUpdateWire({ ...local, version: fresh.version })
+          : (entry.payload as UpdateSettingsWire),
+      )
       await db.transaction('rw', db.balanceSettings, db.outbox, async () => {
         await db.balanceSettings.put(serverSettingsToLocal(settings))
         await db.outbox.delete(entry.seq)

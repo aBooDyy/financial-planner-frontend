@@ -9,6 +9,7 @@ import type {
   ExchangeRate,
   ExchangeRateWire,
   UpdateNodeWire,
+  UpdateSettingsWire,
 } from './types'
 import { toNode, toRate, toSettings } from './types'
 
@@ -34,10 +35,7 @@ export const walletsApi = {
   getSettings: (): Promise<BalanceSettings> =>
     http.get<BalanceSettingsWire>('/balance-settings').then(toSettings),
 
-  updateSettings: (payload: {
-    version: string
-    base_currency: string
-  }): Promise<BalanceSettings> =>
+  updateSettings: (payload: UpdateSettingsWire): Promise<BalanceSettings> =>
     http
       .patch<BalanceSettingsWire>('/balance-settings', payload)
       .then(toSettings),

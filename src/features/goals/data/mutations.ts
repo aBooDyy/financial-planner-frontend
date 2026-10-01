@@ -17,6 +17,7 @@ import type {
   ObligationFrequency,
 } from '#/features/goals/api/types'
 import { requestPlanRecalc } from '#/features/planned/data/recalcRequests'
+import { forgetMainIncomeStream } from '#/features/wallets/data/mutations'
 import { closeCovered, reopenUnderSettled } from '#/features/planned/data/rows'
 import {
   localAllocationToCreateWire,
@@ -192,6 +193,7 @@ export async function updateIncome(
 
 export async function deleteIncome(id: string): Promise<void> {
   await deleteRecord('income', id, db.incomeStreams)
+  await forgetMainIncomeStream(id)
 }
 
 // --- Goals ---------------------------------------------------------------------------

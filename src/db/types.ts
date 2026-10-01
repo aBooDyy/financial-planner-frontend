@@ -1,6 +1,10 @@
 import type { AppConfig } from '#/lib/config/appConfig'
 import type { CurrencyCode } from '#/lib/currency'
-import type { NodeKind } from '#/features/wallets/api/types'
+import type {
+  NodeKind,
+  PaydayMode,
+  SafeHorizon,
+} from '#/features/wallets/api/types'
 import type {
   GoalFrequency,
   GoalKind,
@@ -52,9 +56,20 @@ export type LocalBalanceNode = {
 // Single per-user settings row, stored under a constant key.
 export const SETTINGS_KEY = 'me'
 
+/**
+ * The per-user settings row: the base currency plus the planning settings. The planning
+ * fields are optional because rows stored before they existed lack them; read them through
+ * `planningSettingsOf`, which fills the defaults.
+ */
 export type LocalBalanceSettings = {
   id: typeof SETTINGS_KEY
   baseCurrency: CurrencyCode
+  safeHorizon?: SafeHorizon
+  safeHorizonDays?: number | null
+  paydayMode?: PaydayMode
+  mainIncomeStreamId?: string | null
+  incomeVaries?: boolean
+  incomeFloor?: number | null
   createdAt: string
   updatedAt: string
   version: string
