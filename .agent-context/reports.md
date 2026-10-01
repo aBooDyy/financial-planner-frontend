@@ -62,6 +62,12 @@ new period loads (state, not a ref), so switching presets never flashes skeleton
   largest, delta; expanding shows "N transactions · avg · last period" and the leaves the rows
   were filed under — a row filed on the root itself is listed as **"General"**.
 - `largest.ts` — the six biggest spends, titled merchant → note → leaf category name.
+- `categoryTxns.ts` — the transactions behind one breakdown row. A `CategoryPick` is
+  `{ type, rootId, subId }`: `subId: null` is the whole root (rolled up via `rootOf`), the
+  root's own id is its "General" rows. `categoryTxnsOf` applies the breakdown's own filters
+  (live, the pick's type, in scope, `start..dataEnd`), so the list always matches the figure the
+  user clicked; `buildCategoryTxns` feeds those rows to Spending's `buildActivityList` (no
+  set-asides) for the day-grouped view, plus title / count / exact total.
 
 ## UI (`components/`)
 
@@ -69,7 +75,13 @@ new period loads (state, not a ref), so switching presets never flashes skeleton
 → `RangeControls` (period `MenuSelect` prominent, caption or custom-span button, account filter on
 mobile, comparison `MenuSelect`) → `SummaryCards` (net leads full-width on mobile) → `TrendCard`
 (`BalanceSummary`, `TrendReadout`, `TrendChart`) → `CategoryBreakdownCard` (`CategoryRow`) beside
-`LargestExpensesCard` (360px rail on desktop). Bars use the app's `fp-chart-in` / `fp-chart-out`
+`LargestExpensesCard` (360px rail on desktop). An expanded category's panel has a **View all** button and
+each subcategory row is a button (chevron at the end); either opens
+`CategoryTransactionsDialog` — a `ResponsiveDialog` holding Spending's `ActivityGroups` (exported
+from `TransactionList`), so rows look and badge exactly as on Spending. It mounts per opening and
+reads `useTransactions` itself (the `QuickAddSheet` pattern); `useReport` hands it the ledger
+`rows`. A row opens the transaction editor (`useTxEditor` + `ConnectedTxEditor`) stacked over the
+dialog, and the list follows the edit live. Bars use the app's `fp-chart-in` / `fp-chart-out`
 pair (as the Wallets money in & out chart does), not the design's raw green / near-black.
 Loading follows the house rule: chrome renders at once, figures skeleton via `ValueOrSkeleton`,
 lists via `SkeletonRows`, the chart as placeholder bars. Amounts carry `fp-sensitive`.

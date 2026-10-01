@@ -84,6 +84,8 @@ export function useReport(controls: ReportControls) {
     range,
     today: parseISO(todayKey),
     view: fresh ?? shown,
+    /** The ledger rows the fresh view was built from; null while a new period loads. */
+    rows: ledger && ledger.key === key ? ledger.rows : null,
     sections,
     scope,
     balancesLoading: loading || !deltas,

@@ -1,11 +1,14 @@
+import { useState } from 'react'
 import { MobileTabBar } from '#/components/chrome/MobileTabBar'
 import { TopNav } from '#/components/chrome/TopNav'
 import { useLogout } from '#/features/auth/hooks/useLogout'
 import { ScopeSelect } from '#/features/transactions/components/ScopeSelect'
+import type { CategoryPick } from '#/features/reports/data/categoryTxns'
 import { useReport } from '#/features/reports/hooks/useReport'
 import { useReportControls } from '#/features/reports/hooks/useReportControls'
 import { useSessionStore } from '#/stores/session'
 import { CategoryBreakdownCard } from './CategoryBreakdownCard'
+import { CategoryTransactionsDialog } from './CategoryTransactionsDialog'
 import { LargestExpensesCard } from './LargestExpensesCard'
 import { RangeControls } from './RangeControls'
 import { ReportsHeader } from './ReportsHeader'
@@ -16,8 +19,9 @@ export function ReportsPage() {
   const user = useSessionStore((s) => s.user)
   const logout = useLogout()
   const controls = useReportControls()
-  const { range, today, view, sections, scope, balancesLoading } =
+  const { range, today, view, rows, sections, scope, balancesLoading } =
     useReport(controls)
+  const [pick, setPick] = useState<CategoryPick | null>(null)
 
   if (!user) return null
 
@@ -57,7 +61,10 @@ export function ReportsPage() {
             partial={range.partial}
           />
           <div className="grid grid-cols-1 items-start gap-[14px] md:grid-cols-[minmax(0,1fr)_360px] md:gap-[18px]">
-            <CategoryBreakdownCard breakdown={view?.breakdown ?? null} />
+            <CategoryBreakdownCard
+              breakdown={view?.breakdown ?? null}
+              onViewTransactions={setPick}
+            />
             <LargestExpensesCard
               items={view?.largest ?? null}
               partial={range.partial}
@@ -67,6 +74,16 @@ export function ReportsPage() {
       </div>
 
       <MobileTabBar active="reports" />
+
+      {pick ? (
+        <CategoryTransactionsDialog
+          pick={pick}
+          rows={rows}
+          scope={scope}
+          range={range}
+          onClose={() => setPick(null)}
+        />
+      ) : null}
     </div>
   )
 }

@@ -4,6 +4,7 @@ import { EmptyState } from '#/components/EmptyState'
 import { ToggleGroup, ToggleGroupItem } from '#/components/ui/toggle-group'
 import { ValueOrSkeleton } from '#/components/ValueOrSkeleton'
 import type { CategoryBreakdown } from '#/features/reports/data/breakdown'
+import type { CategoryPick } from '#/features/reports/data/categoryTxns'
 import type { TxType } from '#/features/transactions/api/types'
 import { SkeletonRows } from '#/features/transactions/components/SkeletonRows'
 import { CategoryRow } from './CategoryRow'
@@ -12,6 +13,7 @@ import { CARD_TITLE, REPORT_CARD } from './styles'
 type Props = {
   /** Null while the period's rows load. */
   breakdown: Record<TxType, CategoryBreakdown> | null
+  onViewTransactions: (pick: CategoryPick) => void
 }
 
 const TYPES: { value: TxType; label: string }[] = [
@@ -24,7 +26,10 @@ const EMPTY_TITLE: Record<TxType, string> = {
   income: 'No income in this period',
 }
 
-export function CategoryBreakdownCard({ breakdown }: Props) {
+export function CategoryBreakdownCard({
+  breakdown,
+  onViewTransactions,
+}: Props) {
   const [type, setType] = useState<TxType>('spend')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const shown = breakdown?.[type] ?? null
@@ -72,6 +77,9 @@ export function CategoryBreakdownCard({ breakdown }: Props) {
               expanded={item.id === expandedId}
               onToggle={() =>
                 setExpandedId((id) => (id === item.id ? null : item.id))
+              }
+              onViewTransactions={(subId) =>
+                onViewTransactions({ type, rootId: item.id, subId })
               }
             />
           ))}

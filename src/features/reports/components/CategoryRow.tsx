@@ -1,3 +1,4 @@
+import { ChevronRight, ListIcon } from 'lucide-react'
 import { IconChip } from '#/components/icons/IconChip'
 import type {
   CategoryItem,
@@ -9,10 +10,17 @@ type Props = {
   item: CategoryItem
   expanded: boolean
   onToggle: () => void
+  /** Shows the transactions behind the whole category (null) or one of its subcategories. */
+  onViewTransactions: (subId: string | null) => void
 }
 
 /** One category: its share bar and change; opens onto the subcategories beneath it. */
-export function CategoryRow({ item, expanded, onToggle }: Props) {
+export function CategoryRow({
+  item,
+  expanded,
+  onToggle,
+  onViewTransactions,
+}: Props) {
   return (
     <div>
       <button
@@ -45,13 +53,30 @@ export function CategoryRow({ item, expanded, onToggle }: Props) {
         </span>
       </button>
       {expanded ? (
-        <div className="ms-[52px] me-2 mb-2 flex flex-col gap-[11px] rounded-[12px] bg-fp-surface-2 px-[14px] py-3">
-          <span className="fp-sensitive text-[12px] font-semibold text-fp-text-2">
-            {item.detail}
-          </span>
-          {item.subs.map((sub) => (
-            <SubcategoryRow key={sub.id} sub={sub} color={item.color} />
-          ))}
+        <div className="ms-[52px] me-2 mb-2 flex flex-col gap-[5px] rounded-[12px] bg-fp-surface-2 px-[14px] py-3">
+          <div className="flex items-center gap-2">
+            <span className="fp-sensitive min-w-0 flex-1 text-[12px] font-semibold text-fp-text-2">
+              {item.detail}
+            </span>
+            <button
+              type="button"
+              onClick={() => onViewTransactions(null)}
+              className="flex flex-none items-center gap-[5px] rounded-[9px] border border-fp-border bg-fp-surface px-[9px] py-[5px] text-[12px] font-bold text-fp-text hover:bg-fp-bg focus-visible:ring-[3px] focus-visible:ring-fp-accent/30 focus-visible:outline-none"
+            >
+              <ListIcon size={13} strokeWidth={2.2} />
+              View all
+            </button>
+          </div>
+          <div className="-mx-2 flex flex-col">
+            {item.subs.map((sub) => (
+              <SubcategoryRow
+                key={sub.id}
+                sub={sub}
+                color={item.color}
+                onClick={() => onViewTransactions(sub.id)}
+              />
+            ))}
+          </div>
         </div>
       ) : null}
     </div>
@@ -61,14 +86,23 @@ export function CategoryRow({ item, expanded, onToggle }: Props) {
 function SubcategoryRow({
   sub,
   color,
+  onClick,
 }: {
   sub: SubcategoryItem
   color: string
+  onClick: () => void
 }) {
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_38px_auto] items-center gap-3">
+    <button
+      type="button"
+      onClick={onClick}
+      className="grid w-full grid-cols-[minmax(0,1fr)_38px_auto_14px] items-center gap-3 rounded-[10px] px-2 py-[6px] text-start hover:bg-fp-surface focus-visible:ring-[3px] focus-visible:ring-fp-accent/30 focus-visible:outline-none"
+    >
       <span className="flex min-w-0 flex-col gap-[6px]">
-        <span className="truncate text-[13px] font-semibold">{sub.name}</span>
+        <span className="truncate text-[13px] font-semibold">
+          {sub.name}
+          <span className="sr-only">, view transactions</span>
+        </span>
         <ShareBar pct={sub.barPct} color={color} className="h-1 bg-fp-border" />
       </span>
       <span className="text-end text-[12px] font-semibold text-fp-text-3">
@@ -82,7 +116,13 @@ function SubcategoryRow({
           <DeltaText delta={sub.delta} className="text-[11.5px]" />
         ) : null}
       </span>
-    </div>
+      <ChevronRight
+        aria-hidden
+        size={14}
+        strokeWidth={2.2}
+        className="text-fp-text-3 rtl:-scale-x-100"
+      />
+    </button>
   )
 }
 

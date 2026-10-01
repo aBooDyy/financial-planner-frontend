@@ -100,7 +100,8 @@ export function TransactionList({ view, onAdd, onRowClick, action }: Props) {
   )
 }
 
-function ActivityGroups({
+/** The day-grouped rows of an Activity list, headers and all, without the card around them. */
+export function ActivityGroups({
   view,
   onRowClick,
 }: {
