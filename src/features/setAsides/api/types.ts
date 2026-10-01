@@ -156,3 +156,57 @@ export type CloseEffectWire = {
   released: SetAsideWire[]
   created: SetAsideWire[]
 }
+
+// --- Batches (`POST /set-asides/release`, `POST /set-asides/move`) ----------------------
+
+/**
+ * One row to release: whole, or — with an `amount` below the row's — split, the rest staying
+ * live under `remainder_id`.
+ */
+export type ReleaseItemWire = {
+  id: string
+  amount?: number
+  remainder_id?: string
+}
+
+export type ReleaseWire = {
+  released_at: string
+  released_by_id?: string
+  items: ReleaseItemWire[]
+}
+
+/** Where a moved part goes; anything left out keeps the source's. */
+export type MoveTargetWire = {
+  wallet_id?: string
+  goal_id?: string
+  bill_id?: string
+  /** With `bill_id` only. */
+  occurrence?: string
+}
+
+export type MoveItemWire = ReleaseItemWire & {
+  new_id: string
+  to: MoveTargetWire
+}
+
+export type MoveWire = {
+  date: string
+  transfer_id?: string
+  items: MoveItemWire[]
+}
+
+/** The source rows, now released (item order), then remainders, then (move) the new rows. */
+export type SetAsideBatchWire = {
+  released: SetAsideWire[]
+  created: SetAsideWire[]
+}
+
+export type SetAsideBatch = {
+  released: SetAside[]
+  created: SetAside[]
+}
+
+export const toSetAsideBatch = (w: SetAsideBatchWire): SetAsideBatch => ({
+  released: w.released.map(toSetAside),
+  created: w.created.map(toSetAside),
+})

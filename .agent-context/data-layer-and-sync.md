@@ -154,6 +154,12 @@ the action goes out, treats the server's "already in that state" refusal as succ
 the server's copy, retries a `common.conflict` once on the fresh version, and treats `404` as
 gone. See [bills.md](bills.md#actions--dataactionsts).
 
+**Batch actions** (`setAside` `release` / `move`) write several rows at once. Such an entry is
+keyed by one row and lists the others in `OutboxEntry.alsoRows`; the drain's same-row hold reads
+every key an entry writes (`rowKeysOf` in `db/sync.ts`), so a batch waits behind a failed or
+backing-off write of any of its rows, and any later write of them waits behind the batch. See
+[set-asides.md](set-asides.md#release-and-move--databatchests).
+
 ## Sync engine
 
 - **Push**: drain the outbox to the backend, in `seq` order, a **page of one full wave**

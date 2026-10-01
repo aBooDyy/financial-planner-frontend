@@ -225,8 +225,18 @@ async function drainPass(): Promise<PassOutcome> {
   return 'done'
 }
 
+/** The rows an entry writes: its own, and any others a batch action touches. */
+const rowKeysOf = (entry: OutboxEntry): string[] => [
+  rowKey(entry.entity, entry.id),
+  ...(entry.alsoRows ?? []).map((id) => rowKey(entry.entity, id)),
+]
+
+const block = (entry: OutboxEntry, pass: Pass): void => {
+  for (const key of rowKeysOf(entry)) pass.blocked.add(key)
+}
+
 const isHeld = (entry: OutboxEntry, pass: Pass): boolean =>
-  pass.blocked.has(rowKey(entry.entity, entry.id)) ||
+  rowKeysOf(entry).some((key) => pass.blocked.has(key)) ||
   isBackingOff(entry, pass.now)
 
 /**
@@ -269,7 +279,7 @@ async function pushPage(
   let at = 0
   while (at < page.length) {
     if (isHeld(page[at], pass)) {
-      pass.blocked.add(rowKey(page[at].entity, page[at].id))
+      block(page[at], pass)
       at += 1
       continue
     }
@@ -295,7 +305,7 @@ async function noteOutcomes(
   const stillQueued = new Set(left.map((entry) => entry?.seq))
   for (const entry of run) {
     if (stillQueued.has(entry.seq)) {
-      pass.blocked.add(rowKey(entry.entity, entry.id))
+      block(entry, pass)
     } else if (entry.failure) {
       pass.released = true
     }

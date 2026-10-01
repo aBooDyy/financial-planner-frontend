@@ -17,8 +17,11 @@ goal allocations and serves bills and goals alike (working docs:
 - **Live while `releasedAt` is null.** A released row stays as history, with `releasedById`
   (the payment that released it) when there was one. A row is wholly live or wholly released: a
   partial release splits it. `movedByTransferId` links a release and the new row of a move.
-- `plannedId` = the planned SET_ASIDE row it settles. **A released set-aside still settles its
-  row** (the money was set aside, then used).
+- `plannedId` = the planned SET_ASIDE row it settles. It settles it while **live**, and still
+  does once a **payment** released it (`releasedById` — the money was set aside, then used). One
+  freed, moved or released by a close does not (`settlesItsRow` in `planned/data/settle.ts`): the
+  money is no longer set aside for that row — a same-owner move's new row carries the link
+  instead, so the row is never counted twice.
 
 ## Sync — `data/sync.ts`
 
@@ -38,6 +41,39 @@ when omitted. Usual `409` / `404` handling.
   aside). Re-opens the planned row it was settling.
 - `dropSetAsidesOf('goalId' | 'billId', id)` — the local mirror of the server's cascade when a
   goal or bill is deleted: rows and their queued writes go, nothing is queued.
+
+## Release and move — `data/batches.ts`
+
+"Free it up", a payment releasing what it used, "move them with the transfer", "Move to…": each
+is applied here at once and queued as **one** batch entry (`op: 'release' | 'move'`) the server
+applies all-or-nothing (`POST /set-asides/release`, `/move`).
+
+- `releaseSetAsides(parts, {releasedAt?, releasedById?})` — `parts` are `{id, amount?}`; an
+  `amount` below the row's **splits** it: the row is released with its amount cut to the part,
+  and the rest is written as a new **live** row (same owner, occurrence, wallet/label, planned
+  link, note, position, date) under a `remainder_id` minted here. Whole otherwise.
+- `moveSetAsides(parts, {date?, transferId?})` — each part also names `to: {walletId?, owner?}`.
+  The source is released on `date` (and split as above); a new row (`new_id` minted here) holds
+  the moved amount for the target: another wallet (it becomes a wallet set-aside), and/or
+  another bill or goal (planned link dropped; a bill target's occurrence = the one named, else
+  the source's when it is the same bill, else the target's `nextDue`; a goal's is null).
+  Anything not named keeps the source's. `transferId` is stamped on the released and new rows.
+- Both refuse (throw `SetAsideBatchError`, writing nothing) a row that is not live here.
+- **The entry holds every row it writes.** It is keyed by the first source, and `alsoRows`
+  lists the others — sources, remainders, new rows — so the drain holds it behind any earlier
+  write of any of them, and holds any later write of them behind it
+  ([data-layer-and-sync.md](data-layer-and-sync.md#writes-optimistic-local-first)).
+- **An edit after a batch never folds into a write queued before it** (that would send the
+  batch's effect ahead of the batch): `updateSetAside` appends a fresh update when a batch
+  touches the row (`touchedByBatch`, `data/queue.ts`).
+- **Pushing.** Success stores the `released` + `created` rows — except a row with writes still
+  queued after the batch, which keeps the user's newer edit and is settled by its own push
+  (`storeServerSetAsides` skips rows with `hasQueuedWrites`). `409 already_released`, `404
+  not_found` and `409 id_taken` mean the batch no longer applies as written (applied before,
+  or overtaken elsewhere): the entry settles and the touched rows are cleaned and re-pulled
+  (`resyncSetAsides`). Anything else is flagged.
+- The server caps a batch at `limits.set_aside_batch_max` (200). The client does not read that
+  limit yet; a caller sending more must split.
 
 ## Totals — `data/totals.ts` (pure)
 
@@ -59,4 +95,4 @@ Goal progress (`goals/data/progress.ts`) = live set-asides + spending from the g
 
 ## Tests
 
-`data/{mutations,sync,totals}.test.ts`.
+`data/{mutations,sync,totals,batches}.test.ts`.

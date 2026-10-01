@@ -3,11 +3,14 @@ import type { OutboxEntry } from '#/db/types'
 import { setAsidesApi } from '#/features/setAsides/api/setAsidesApi'
 import type {
   CreateSetAsideWire,
+  MoveWire,
+  ReleaseWire,
   SetAside,
   UpdateSetAsideWire,
 } from '#/features/setAsides/api/types'
 import { ApiError } from '#/lib/apiError'
 import { localSetAsideToUpdateWire, serverSetAsideToLocal } from './mappers'
+import { hasQueuedWrites } from './queue'
 
 /**
  * Push/pull handlers for set-asides, plugged into the shared sync engine (`db/sync.ts`): the
@@ -18,14 +21,17 @@ import { localSetAsideToUpdateWire, serverSetAsideToLocal } from './mappers'
 const statusOf = (e: unknown): number => (e instanceof ApiError ? e.status : -1)
 
 /**
- * Store rows an action answered with (a close, a release, a move) as the server now holds them.
- * They are the rows that action wrote, so they replace whatever this device held for them.
+ * Store rows an action answered with (a close, a release, a move) as the server now holds them —
+ * except a row with writes still queued behind the action: it keeps the user's newer edit, and
+ * its own push (a `409` rebase onto the server's version) settles it.
  */
 export async function storeServerSetAsides(
   rows: ReadonlyArray<SetAside>,
 ): Promise<void> {
-  if (rows.length === 0) return
-  await db.setAsides.bulkPut(rows.map(serverSetAsideToLocal))
+  for (const row of rows) {
+    if (!(await hasQueuedWrites(row.id)))
+      await db.setAsides.put(serverSetAsideToLocal(row))
+  }
 }
 
 async function storeAndSettle(
@@ -107,10 +113,40 @@ async function pushSetAsideDelete(entry: OutboxEntry): Promise<void> {
   })
 }
 
+/**
+ * Refusals that mean the batch can no longer apply as this device wrote it: a source already
+ * released or gone, or an id already taken — on a replay, the batch itself landed before. The
+ * batch is all-or-nothing server-side, so the server's rows are the answer.
+ */
+const BATCH_SETTLED = new Set([
+  'planning.set_aside.already_released',
+  'planning.set_aside.not_found',
+  'planning.set_aside.id_taken',
+])
+
+async function pushSetAsideBatch(entry: OutboxEntry): Promise<void> {
+  try {
+    const batch =
+      entry.op === 'release'
+        ? await setAsidesApi.release(entry.payload as ReleaseWire)
+        : await setAsidesApi.move(entry.payload as MoveWire)
+    await db.transaction('rw', db.setAsides, db.outbox, async () => {
+      await db.outbox.delete(entry.seq)
+      await storeServerSetAsides([...batch.released, ...batch.created])
+    })
+  } catch (e) {
+    if (!(e instanceof ApiError) || !BATCH_SETTLED.has(e.code)) throw e
+    await db.outbox.delete(entry.seq)
+    await resyncSetAsides([entry.id, ...(entry.alsoRows ?? [])])
+  }
+}
+
 /** Push one `setAside` outbox entry. Throws on network/unexpected errors. */
 export async function pushSetAsidesEntry(entry: OutboxEntry): Promise<void> {
   if (entry.op === 'create') return pushSetAsideCreate(entry)
   if (entry.op === 'update') return pushSetAsideUpdate(entry)
+  if (entry.op === 'release' || entry.op === 'move')
+    return pushSetAsideBatch(entry)
   return pushSetAsideDelete(entry)
 }
 
@@ -136,21 +172,19 @@ export async function pullSetAsides(): Promise<void> {
 }
 
 /**
- * An action this device applied locally (a close's releases and moved copies) was settled by
- * the server's own state instead — it was already closed, or the version could not be
- * reconciled. The rows it marked hold no outbox entries of their own, so they are cleaned and
- * the full pull replaces them with what the server holds (dropping copies it never wrote).
+ * An action this device applied locally (a close's or a batch's releases, remainders and new
+ * rows) was settled by the server's own state instead — already applied, refused as stale, or
+ * no longer applicable. The rows it marked hold no writes of their own, so they are cleaned and
+ * the full pull replaces them with what the server holds (dropping rows it never wrote). A row
+ * with writes still queued keeps them.
  */
 export async function resyncSetAsides(
   ids: ReadonlyArray<string>,
 ): Promise<void> {
   await db.transaction('rw', db.setAsides, db.outbox, async () => {
     for (const id of ids) {
-      const queued = await db.outbox
-        .where('[entity+id]')
-        .equals(['setAside', id])
-        .count()
-      if (queued === 0) await db.setAsides.update(id, { dirty: 0 })
+      if (!(await hasQueuedWrites(id)))
+        await db.setAsides.update(id, { dirty: 0 })
     }
   })
   await pullSetAsides()

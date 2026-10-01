@@ -39,7 +39,15 @@ export const txSettlement = (t: LocalTransaction): Settlement => ({
   externalLabel: null,
 })
 
-/** A released set-aside still settled its row: the money was set aside, then used. */
+/**
+ * A set-aside settles its planned row while it is live, and still does once a payment released
+ * it (the money was set aside, then used). One freed, moved or released by a close does not:
+ * the money is no longer set aside for that row (a move's new row carries the link instead).
+ */
+export const settlesItsRow = (
+  a: Pick<LocalSetAside, 'releasedAt' | 'releasedById'>,
+): boolean => a.releasedAt === null || a.releasedById !== null
+
 export const setAsideSettlement = (a: LocalSetAside): Settlement => ({
   kind: 'setAside',
   id: a.id,
@@ -67,7 +75,8 @@ export function indexSettlements(
     if (t.deleted === 0 && t.plannedId) add(t.plannedId, txSettlement(t))
   }
   for (const a of setAsides) {
-    if (a.deleted === 0 && a.plannedId) add(a.plannedId, setAsideSettlement(a))
+    if (a.deleted === 0 && a.plannedId && settlesItsRow(a))
+      add(a.plannedId, setAsideSettlement(a))
   }
   return out
 }

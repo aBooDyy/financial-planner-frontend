@@ -597,8 +597,9 @@ export type LocalSyncWatermark = {
 }
 
 /**
- * `create` / `update` / `delete` write a row; the rest are actions on one row (a bill's or
- * goal's close and reopen, a goal's pause and resume) that the server applies atomically.
+ * `create` / `update` / `delete` write a row; the rest are actions the server applies
+ * atomically: on one row (a bill's or goal's close and reopen, a goal's pause and resume) or,
+ * for set-asides, on a batch of rows (release, move).
  */
 export type OutboxOp =
   | 'create'
@@ -608,6 +609,8 @@ export type OutboxOp =
   | 'reopen'
   | 'pause'
   | 'resume'
+  | 'release'
+  | 'move'
 export type OutboxEntity =
   | 'node'
   | 'settings'
@@ -652,6 +655,11 @@ export type OutboxEntry = {
   payload: unknown
   baseVersion: string | null
   createdAt: string
+  /**
+   * Other rows of the same entity a batch action writes besides `id`. The drain holds the entry
+   * behind their earlier entries too, exactly as behind its own row's. Not indexed.
+   */
+  alsoRows?: string[]
   /** Set while the last push of this payload failed; not indexed. */
   failure?: SyncFailure
   /** How many times the server has rejected it so far. */

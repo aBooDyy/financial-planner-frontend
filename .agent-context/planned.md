@@ -27,8 +27,9 @@ contract) until folded into the root knowledge base; this file is how the fronte
   sent on create and on every PATCH. Links (`goalId` / `incomeStreamId` / `billId`) go on
   create only. Origin ↔ role: `goal` → set-aside, `income` → income, `bill` → payment or
   set-aside, `manual` → any (a goal's "use it later" payment is a manual payment with `goalId`).
-- **Settled is derived, never stored**: Σ linked transactions + linked set-asides (released
-  ones included — the money was set aside), converted to the item's currency
+- **Settled is derived, never stored**: Σ linked transactions + linked set-asides that still
+  settle it (live, or released by a payment — not freed or moved; `settlesItsRow`), converted to
+  the item's currency
   (`data/settle.ts`). `remainder = max(0, amount − settled)`. Status follows settlements through
   two hooks in `data/rows.ts`, called by every settlement write path (transactions
   create/update/delete/bulk-delete, set-asides create/update/delete):

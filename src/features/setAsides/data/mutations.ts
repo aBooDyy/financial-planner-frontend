@@ -18,6 +18,7 @@ import type { CurrencyCode } from '#/lib/currency'
 import { isoOf } from '#/features/planned/data/dates'
 import { newId } from '#/lib/uuid'
 import { localSetAsideToCreateWire, localSetAsideToUpdateWire } from './mappers'
+import { touchedByBatch } from './queue'
 
 /** Exactly one owner: a goal, or a bill and (optionally) the occurrence it covers. */
 export type SetAsideOwner =
@@ -142,6 +143,12 @@ export async function updateSetAside(
   }
   await db.transaction('rw', db.setAsides, db.outbox, async () => {
     await db.setAsides.put(row)
+    if (await touchedByBatch(id)) {
+      // Folding this edit into a write queued before the batch would send the batch's own
+      // effect ahead of it; it goes after instead.
+      await enqueueUpdateAfter(row)
+      return
+    }
     await enqueueUpsert(
       'setAside',
       id,
@@ -153,6 +160,17 @@ export async function updateSetAside(
   await reopenUnderSettled([existing.plannedId])
   await closeCovered([row.plannedId])
   schedulePush()
+}
+
+async function enqueueUpdateAfter(row: LocalSetAside): Promise<void> {
+  await db.outbox.add({
+    op: 'update',
+    entity: 'setAside',
+    id: row.id,
+    payload: localSetAsideToUpdateWire(row),
+    baseVersion: row.version,
+    createdAt: now(),
+  })
 }
 
 /**

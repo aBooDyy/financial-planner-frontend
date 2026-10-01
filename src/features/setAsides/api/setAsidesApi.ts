@@ -1,11 +1,15 @@
 import { http } from '#/lib/http'
 import type {
   CreateSetAsideWire,
+  MoveWire,
+  ReleaseWire,
   SetAside,
+  SetAsideBatch,
+  SetAsideBatchWire,
   SetAsideWire,
   UpdateSetAsideWire,
 } from './types'
-import { toSetAside } from './types'
+import { toSetAside, toSetAsideBatch } from './types'
 
 /**
  * Remote calls for set-asides. The sync engine owns when these run; UI code reads from the
@@ -25,4 +29,14 @@ export const setAsidesApi = {
 
   del: (id: string): Promise<void> =>
     http.del<void>(`/set-asides/${id}`).then(() => undefined),
+
+  release: (payload: ReleaseWire): Promise<SetAsideBatch> =>
+    http
+      .post<SetAsideBatchWire>('/set-asides/release', payload)
+      .then(toSetAsideBatch),
+
+  move: (payload: MoveWire): Promise<SetAsideBatch> =>
+    http
+      .post<SetAsideBatchWire>('/set-asides/move', payload)
+      .then(toSetAsideBatch),
 }

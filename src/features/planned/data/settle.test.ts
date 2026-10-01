@@ -42,13 +42,22 @@ describe('settledOf / remainderOf', () => {
     expect(remainderOf(item, index, RATES)).toBe(0)
   })
 
-  it('still counts a released set-aside: the money was set aside, then used', () => {
+  it('counts a set-aside a payment released, but not one freed or moved', () => {
     const item = planned({ id: 'p1', amount: m(500) })
     const index = indexSettlements(
       [],
-      [setAside({ plannedId: 'p1', amount: m(500), releasedAt: '2026-10-01' })],
+      [
+        setAside({
+          plannedId: 'p1',
+          amount: m(200),
+          releasedAt: '2026-10-01',
+          releasedById: 't1',
+        }),
+        setAside({ plannedId: 'p1', amount: m(100), releasedAt: '2026-10-01' }),
+        setAside({ plannedId: 'p1', amount: m(50) }),
+      ],
     )
-    expect(settledOf(item, index, RATES)).toBe(m(500))
+    expect(settledOf(item, index, RATES)).toBe(m(250))
   })
 })
 
