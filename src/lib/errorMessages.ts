@@ -44,9 +44,15 @@ const MESSAGES: Record<string, string> = {
   'spending.transaction.category_invalid': 'Choose one of your categories.',
   'spending.transaction.category_type_mismatch':
     'Pick a category of the same kind — spending or income.',
-  'spending.recurring.category_invalid': 'Choose one of your categories.',
-  'spending.recurring.category_type_mismatch':
-    'Pick a category of the same kind — spending or income.',
+  'planning.bill.category_invalid': 'Choose one of your categories.',
+  'planning.bill.category_type_mismatch':
+    'A bill is filed under a spending category.',
+  'goals.income.category_invalid': 'Choose one of your categories.',
+  'goals.income.category_type_mismatch':
+    'Income is filed under an income category.',
+  'goals.goal.use_category_invalid': 'Choose one of your categories.',
+  'goals.goal.use_category_type_mismatch':
+    'Spending from a goal is filed under a spending category.',
   'planned.category_invalid': 'Choose one of your categories.',
   'planned.category_type_mismatch':
     'Pick a category of the same kind — spending or income.',
@@ -58,10 +64,13 @@ const MESSAGES: Record<string, string> = {
   'integrations.key.category_invalid': 'Choose one of your categories.',
   'inbound.import.category_invalid': 'Choose one of your categories.',
   'spending.transaction.merchant_invalid': 'Choose one of your merchants.',
-  'spending.recurring.merchant_invalid': 'Choose one of your merchants.',
-  'spending.recurring.end_date_invalid': 'Enter a valid end date.',
+  'planning.bill.merchant_invalid': 'Choose one of your merchants.',
+  'planning.bill.end_date_invalid':
+    'A bill that repeats can end on a date; one-offs can’t.',
+  'goals.income.merchant_invalid': 'Choose one of your merchants.',
   'spending.transaction.wallet_invalid': 'Choose one of your accounts.',
   'spending.transaction.goal_invalid': 'That goal is no longer available.',
+  'spending.transaction.bill_invalid': 'That bill is no longer available.',
   'spending.transaction.type_invalid': 'Choose spending or income.',
   'spending.transaction.transfer_leg':
     'This is one side of a transfer — change or delete the transfer instead.',
@@ -83,8 +92,14 @@ const MESSAGES: Record<string, string> = {
     'A balance adjustment must be in its wallet’s currency.',
   'spending.transaction.type_change':
     'A balance adjustment can’t become income or spending, or the other way round.',
-  'goals.allocation.planned_invalid':
+  'planning.set_aside.planned_invalid':
     'That planned set-aside is no longer available.',
+  'planning.set_aside.already_released': 'That money was already freed up.',
+  'planned.bill_invalid': 'That bill is no longer available.',
+  'balances.settings.main_income_invalid':
+    'That income is no longer available.',
+  'settings.category.spend_class_invalid':
+    'Only spending categories are sorted into needs, wants and savings.',
   // Minted by the planned slice (`PlannedActionError`), and the server's own planned codes.
   'planned.not_found': 'That planned item is no longer available.',
   'planned.not_open': 'That planned item is already confirmed or skipped.',
@@ -94,7 +109,7 @@ const MESSAGES: Record<string, string> = {
     'Something is already confirmed against it — close the rest instead.',
   'planned.not_manual':
     'Planned items from a goal can be skipped, not deleted.',
-  'planned.origin_gone': 'The goal this belonged to has been deleted.',
+  'planned.origin_gone': 'The bill or goal this belonged to has been deleted.',
   'merchants.not_found': 'That merchant is no longer available.',
   'merchants.name_required': 'Give the merchant a name.',
   'merchants.alias.taken': 'Another merchant already answers to that spelling.',
