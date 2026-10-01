@@ -105,6 +105,17 @@ describe('buildWalletsView', () => {
     expect(view.walletCount).toBe(2)
     expect(view.grandTotalStr).toBe('SR 15,000.00')
   })
+
+  it('takes bar shares over the positive nodes shown, so a negative node cannot push them past 100%', () => {
+    const tree = [
+      node({ id: 'a', amount: 600000, currency: 'SAR', position: 0 }),
+      node({ id: 'b', amount: 400000, currency: 'SAR', position: 1 }),
+      node({ id: 'card', amount: -500000, currency: 'SAR', position: 2 }),
+    ]
+    const bars = buildWalletsView(tree, 'SAR', rates).groupBars
+    expect(bars.map((b) => b.id)).toEqual(['a', 'b'])
+    expect(bars.map((b) => b.pct)).toEqual([60, 40])
+  })
 })
 
 describe('buildWalletsView reservations', () => {

@@ -136,8 +136,10 @@ walletDeltas?, reservations?)` builds the flattened tree (honoring collapse), gr
   ([icons.md](icons.md#a-nested-picker-goes-inside-the-parent-dialogs-children)).
   `TotalHeroCard` gains no icon — an aggregate has none to be.
   `TotalHeroCard`'s group bar is the shared `SegmentedBar`: each root group's chunk names
-  itself, its base-currency total and its share of the grand total on hover/focus/tap, which
-  is what `GroupBar.pctStr` exists for
+  itself, its base-currency total and its share on hover/focus/tap, which is what
+  `GroupBar.pctStr` exists for. Only positive root nodes get a chunk, and shares are taken
+  over their sum — not the netted grand total — so a negative root (a card in debt) can never
+  push the shares past 100%
   ([styling-and-theming.md](styling-and-theming.md#shadcnui-integration)).
   **Known gap:** at 320px the group row still overflows the card by ~28px and the trailing
   trash button clips. The chip costs horizontal room the row never had; `min-w-0 truncate` on

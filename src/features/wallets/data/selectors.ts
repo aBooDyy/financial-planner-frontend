@@ -328,8 +328,9 @@ export function buildWalletsView(
   }
   for (const root of roots) walk(root, 0)
 
-  // Top-level group/wallet bars for the hero stacked bar.
-  const groupBars: GroupBar[] = roots
+  // Top-level group/wallet bars for the hero stacked bar. Shares are over the positive
+  // nodes shown, not the netted total, so a negative node can't push them past 100%.
+  const positiveRoots = roots
     .map((n) => ({
       id: n.id,
       label: n.name,
@@ -337,9 +338,11 @@ export function buildWalletsView(
       value: baseTotal(n),
     }))
     .filter((b) => b.value > 0)
+  const barTotal = positiveRoots.reduce((sum, b) => sum + b.value, 0)
+  const groupBars: GroupBar[] = positiveRoots
     .sort((a, b) => b.value - a.value)
     .map((b) => {
-      const pct = grand > 0 ? (b.value / grand) * 100 : 0
+      const pct = (b.value / barTotal) * 100
       return {
         id: b.id,
         label: b.label,
