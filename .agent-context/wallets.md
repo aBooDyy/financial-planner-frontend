@@ -87,9 +87,10 @@ walletDeltas?, reservations?)` builds the flattened tree (honoring collapse), gr
   then the largest pot), one line per goal per wallet. Wallet money is **earmarked in
   place** — the balance and grand total are unchanged; reserving only reclassifies part of a
   wallet as spoken-for. **Over-reserving is allowed**: reserved is _not_ capped at the balance,
-  so `available` can go **negative** and the row carries `overReserved` (rendered red). The goal
-  editor warns first (red box + "Save anyway"), comparing each wallet's live balance against its
-  reserves from all goals (`reservedByWallet`) plus the draft's rows.
+  so `available` can go **negative** and the row carries `overReserved` (rendered red). Nothing
+  checks before the money is reserved — no editor, contribution or confirm flow compares against
+  `available` — so an over-reserve only shows **after the fact**, as the red available figure and
+  "over-reserved" label on the wallet row (`ReservedWalletLines`).
 
 ### The ledger read and the loading state
 
