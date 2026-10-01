@@ -31,7 +31,12 @@ const asServer = (
 ): Category => {
   const { dirty, deleted, ...rest } = row
   void [dirty, deleted]
-  return { ...rest, version: 'server-v1', ...over }
+  return {
+    ...rest,
+    spendClass: rest.spendClass ?? null,
+    version: 'server-v1',
+    ...over,
+  }
 }
 
 const failure = (status: number, code: string) =>

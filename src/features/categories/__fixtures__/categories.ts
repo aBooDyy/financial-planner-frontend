@@ -19,6 +19,7 @@ export const categoryRow = (
   type: 'spend',
   color: '#1F9D6B',
   icon: null,
+  spendClass: null,
   position: 0,
   createdAt: STAMP,
   updatedAt: STAMP,

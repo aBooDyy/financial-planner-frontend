@@ -3,7 +3,10 @@ import { requeued } from '#/db/syncFailure'
 import { schedulePush } from '#/db/sync'
 import { newId } from '#/lib/uuid'
 import type { LocalCategory } from '#/db/types'
-import type { DeleteCategoryWire } from '#/features/categories/api/types'
+import type {
+  DeleteCategoryWire,
+  SpendClass,
+} from '#/features/categories/api/types'
 import type { TxType } from '#/features/transactions/api/types'
 import { localCategoryToCreateWire, localCategoryToUpdateWire } from './mappers'
 import {
@@ -24,6 +27,8 @@ export type CategoryDraft = {
   /** `null`/omitted creates a top-level category; an id creates a child of that category. */
   parentId?: string | null
   icon?: string | null
+  /** Spend categories only; ignored (stored as null) for income. */
+  spendClass?: SpendClass | null
 }
 
 export type CategoryPatch = Partial<{
@@ -34,6 +39,8 @@ export type CategoryPatch = Partial<{
   position: number
   /** `null` moves it to the top level; see `moveRules` for where it may go. */
   parentId: string | null
+  /** `null` inherits the root's (a subcategory) or leaves it unsorted (a root). */
+  spendClass: SpendClass | null
 }>
 
 const liveCategories = async (): Promise<LocalCategory[]> =>
@@ -123,6 +130,7 @@ export async function createCategoryWithSlug(
     type,
     color: draft.color.trim() || (parent?.color ?? draft.color),
     icon: draft.icon ?? null,
+    spendClass: type === 'spend' ? (draft.spendClass ?? null) : null,
     position: await nextPosition(parentId),
     createdAt: ts,
     updatedAt: ts,
@@ -159,6 +167,12 @@ export async function updateCategory(
     name: patch.name !== undefined ? patch.name.trim() : existing.name,
     color: patch.color ?? existing.color,
     icon: patch.icon !== undefined ? patch.icon : existing.icon,
+    spendClass:
+      existing.type !== 'spend'
+        ? null
+        : patch.spendClass !== undefined
+          ? patch.spendClass
+          : (existing.spendClass ?? null),
     parentId,
     position:
       patch.position ??
@@ -171,6 +185,14 @@ export async function updateCategory(
     await enqueueCategoryUpsert(category)
   })
   schedulePush()
+}
+
+/** Tag a spend category as a need, want or saving (`null` clears it). */
+export async function setCategorySpendClass(
+  id: string,
+  spendClass: SpendClass | null,
+): Promise<void> {
+  await updateCategory(id, { spendClass })
 }
 
 /** The local mirror of the server's delete refusals; `code` is the server's. */

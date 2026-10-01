@@ -22,6 +22,7 @@ const {
   createCategory,
   createCategoryWithSlug,
   deleteCategory,
+  setCategorySpendClass,
   updateCategory,
 } = await import('./mutations')
 
@@ -220,6 +221,61 @@ describe('updateCategory', () => {
     expect((await db.categories.get(id))?.icon).toBe('fork-knife')
     const [entry] = await outbox().toArray()
     expect((entry.payload as UpdateCategoryWire).icon).toBe('fork-knife')
+  })
+
+  it('always sends the spend class, since an omitted one clears it', async () => {
+    const id = await createCategory({
+      name: 'Dining',
+      type: 'spend',
+      color: '#1F9D6B',
+      spendClass: 'want',
+    })
+    await markSynced(id)
+
+    await updateCategory(id, { name: 'Eating out' })
+
+    const [entry] = await outbox().toArray()
+    const payload = entry.payload as UpdateCategoryWire
+    expect(payload.spend_class).toBe('WANT')
+  })
+
+  it('tags a spend category and clears the tag again', async () => {
+    const id = await createCategory({
+      name: 'Rent',
+      type: 'spend',
+      color: '#1F9D6B',
+    })
+    expect(
+      (
+        (await outbox().first())?.payload as CreateCategoryWire | undefined
+      )?.spend_class,
+    ).toBeNull()
+    await markSynced(id)
+
+    await setCategorySpendClass(id, 'need')
+    expect((await db.categories.get(id))?.spendClass).toBe('need')
+
+    await setCategorySpendClass(id, null)
+    expect((await db.categories.get(id))?.spendClass).toBeNull()
+    const [entry] = await outbox().toArray()
+    const payload = entry.payload as UpdateCategoryWire
+    expect('spend_class' in payload).toBe(true)
+    expect(payload.spend_class).toBeNull()
+  })
+
+  it('never tags an income category', async () => {
+    const id = await createCategory({
+      name: 'Salary',
+      type: 'income',
+      color: '#1F9D6B',
+      spendClass: 'need',
+    })
+    expect((await db.categories.get(id))?.spendClass).toBeNull()
+    await markSynced(id)
+
+    await setCategorySpendClass(id, 'want')
+
+    expect((await db.categories.get(id))?.spendClass).toBeNull()
   })
 
   it('always tells the server where it sits, so an unmoved row stays put', async () => {

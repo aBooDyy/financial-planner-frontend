@@ -12,6 +12,7 @@ import type {
   StoredTemplateConfig,
 } from '#/features/import/data/types'
 import type { AliasOrigin } from '#/features/merchants/api/types'
+import type { SpendClass } from '#/features/categories/api/types'
 import type {
   PlannedOrigin,
   PlannedRole,
@@ -109,6 +110,11 @@ export type LocalCategory = {
   color: string
   /** Icon id, or `null` for "use the default for my type". Narrowed at the render boundary. */
   icon: string | null
+  /**
+   * Spend categories only. `null` on a subcategory inherits its root's; on a root, not sorted.
+   * Rows stored before the field existed lack it, which reads as `null`.
+   */
+  spendClass?: SpendClass | null
   position: number
   createdAt: string
   updatedAt: string

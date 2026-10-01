@@ -2,6 +2,31 @@ import type { TxType, TxTypeWire } from '#/features/transactions/api/types'
 import { fromWireTxType, toWireTxType } from '#/features/transactions/api/types'
 
 /**
+ * Where a spending category sits in the 50/30/20 split. Null on a subcategory inherits its
+ * root's; null on a root means not sorted yet. Income categories never carry one.
+ */
+export type SpendClass = 'need' | 'want' | 'saving'
+export type SpendClassWire = 'NEED' | 'WANT' | 'SAVING'
+
+const SPEND_CLASS_TO_WIRE: Record<SpendClass, SpendClassWire> = {
+  need: 'NEED',
+  want: 'WANT',
+  saving: 'SAVING',
+}
+const SPEND_CLASS_FROM_WIRE: Record<SpendClassWire, SpendClass> = {
+  NEED: 'need',
+  WANT: 'want',
+  SAVING: 'saving',
+}
+
+export const toWireSpendClass = (
+  c: SpendClass | null | undefined,
+): SpendClassWire | null => (c ? SPEND_CLASS_TO_WIRE[c] : null)
+export const fromWireSpendClass = (
+  w: SpendClassWire | null | undefined,
+): SpendClass | null => (w ? SPEND_CLASS_FROM_WIRE[w] : null)
+
+/**
  * Wire/domain types for the user-editable category tree. A row with `parentId === null` is
  * a category; one with a parent is a subcategory. Two levels, no deeper.
  */
@@ -14,6 +39,7 @@ export type Category = {
   type: TxType
   color: string
   icon: string | null
+  spendClass: SpendClass | null
   position: number
   createdAt: string
   updatedAt: string
@@ -28,6 +54,7 @@ export type CategoryWire = {
   type: TxTypeWire
   color: string
   icon: string | null
+  spend_class?: SpendClassWire | null
   position: number
   created_at: string
   updated_at: string
@@ -42,6 +69,7 @@ export type CreateCategoryWire = {
   type: TxTypeWire
   color: string
   icon: string | null
+  spend_class: SpendClassWire | null
   position: number
 }
 
@@ -51,6 +79,7 @@ export type UpdateCategoryWire = {
   name: string
   color: string
   icon: string | null
+  spend_class: SpendClassWire | null
   position: number
   parent: { id: string | null }
 }
@@ -66,6 +95,7 @@ export const toCategory = (w: CategoryWire): Category => ({
   type: fromWireTxType(w.type),
   color: w.color,
   icon: w.icon,
+  spendClass: fromWireSpendClass(w.spend_class),
   position: w.position,
   createdAt: w.created_at,
   updatedAt: w.updated_at,

@@ -4,7 +4,10 @@ import type {
   CreateCategoryWire,
   UpdateCategoryWire,
 } from '#/features/categories/api/types'
-import { toWireTxType } from '#/features/categories/api/types'
+import {
+  toWireSpendClass,
+  toWireTxType,
+} from '#/features/categories/api/types'
 
 /** Server category → local record (freshly synced: clean, not deleted). */
 export const serverCategoryToLocal = (c: Category): LocalCategory => ({
@@ -15,6 +18,7 @@ export const serverCategoryToLocal = (c: Category): LocalCategory => ({
   type: c.type,
   color: c.color,
   icon: c.icon,
+  spendClass: c.spendClass,
   position: c.position,
   createdAt: c.createdAt,
   updatedAt: c.updatedAt,
@@ -33,11 +37,12 @@ export const localCategoryToCreateWire = (
   type: toWireTxType(l.type),
   color: l.color,
   icon: l.icon,
+  spend_class: toWireSpendClass(l.spendClass),
   position: l.position,
 })
 
-// The update is based on the last-synced `version` (optimistic locking base). `icon` is
-// replace-on-PATCH: omitting it clears it, so the current value always goes along.
+// The update is based on the last-synced `version` (optimistic locking base). `icon` and
+// `spend_class` are replace-on-PATCH: omitting one clears it, so the current value always goes.
 export const localCategoryToUpdateWire = (
   l: LocalCategory,
 ): UpdateCategoryWire => ({
@@ -45,6 +50,7 @@ export const localCategoryToUpdateWire = (
   name: l.name,
   color: l.color,
   icon: l.icon,
+  spend_class: toWireSpendClass(l.spendClass),
   position: l.position,
   parent: { id: l.parentId },
 })

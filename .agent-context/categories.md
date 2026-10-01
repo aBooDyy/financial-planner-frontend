@@ -62,8 +62,15 @@ version and retries once, `404` drops the local row, network errors bubble. Spec
   dozens of rows; the delta machinery exists for the ledger, which is not
   ([data-layer-and-sync.md](data-layer-and-sync.md#incremental-pull-the-delta-streams)).
   Local edits win until pushed: a row that is `dirty` or `deleted` is left alone.
-- **`icon` is replace-on-PATCH.** `UpdateCategoryWire` always carries the current value,
-  because a PATCH that omits it clears it.
+- **`icon` and `spend_class` are replace-on-PATCH.** `UpdateCategoryWire` always carries the
+  current value of both, because a PATCH that omits one clears it.
+- **`spendClass`** (`'need' | 'want' | 'saving' | null`, wire `NEED`/`WANT`/`SAVING`) tags a
+  **spend** category for the Needs / Wants / Savings split. `null` on a subcategory inherits its
+  root's; `null` on a root means not sorted yet. Income categories never carry one: the mutations
+  store `null` for them whatever the caller passes (the server refuses one with
+  `settings.category.spend_class_invalid`). The field is optional on `LocalCategory` because rows
+  stored before it existed lack it; every reader treats a missing value as `null`. The server
+  seeds the default roots; `setCategorySpendClass(id, cls)` is the write path.
 - **`parent: { id }` rides on every update**, with `id: null` for the top level. It is an
   object because the server reads a bare top-level `null` as "absent". An omitted `parent`
   means "leave it", which keeps updates queued by older builds from moving anything. A
