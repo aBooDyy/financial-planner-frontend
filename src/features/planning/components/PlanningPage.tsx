@@ -27,8 +27,8 @@ export function PlanningPage() {
   const openSheet = usePlanningUi((s) => s.openSheet)
   const reset = usePlanningUi((s) => s.closeDetail)
 
-  // A panel belongs to the section it was opened from; leaving it (or Planning) closes it.
-  useEffect(() => reset, [reset, section])
+  // The page's panels belong to this visit; leaving Planning closes them.
+  useEffect(() => reset, [reset])
 
   if (!user) return null
 

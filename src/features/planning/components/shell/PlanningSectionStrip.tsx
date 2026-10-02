@@ -5,6 +5,7 @@ import {
 } from '#/features/planning/sections'
 import type { PlanningSection } from '#/features/planning/sections'
 import { CountBadge } from '#/features/planning/components/kit/CountBadge'
+import { usePlanningUi } from '#/features/planning/stores/planningUi'
 import { cn } from '#/lib/utils'
 import type { SectionBadge } from './sectionBadges'
 
@@ -15,6 +16,8 @@ type Props = {
 
 /** Mobile section switch under the top bar: five equal tabs, icon over label. */
 export function PlanningSectionStrip({ section, badges }: Props) {
+  // A detail panel belongs to the section it was opened from.
+  const closeDetail = usePlanningUi((s) => s.closeDetail)
   return (
     <nav
       aria-label="Planning sections"
@@ -30,6 +33,7 @@ export function PlanningSectionStrip({ section, badges }: Props) {
             to="/planning/$section"
             params={{ section: s }}
             aria-current={active ? 'page' : undefined}
+            onClick={closeDetail}
             className={cn(
               'relative flex min-w-0 flex-1 flex-col items-center gap-[3px] pt-2 pb-[7px] text-[11px] font-bold',
               active

@@ -310,6 +310,29 @@ Nice to have for bills, **Must have** / Nice to have for goals, "Left for spendi
   (default **Salary**, required on create), Log it automatically when it arrives, Ends, Note,
   Colour.
 
+### Overview — `components/overview/`
+
+Copy and shapes in `view/overview.ts`; the cards only draw them.
+
+- `VerdictCard` (`verdictCopy`): **Start your plan** (empty: nothing else renders; *Plan
+  something* → chooser), **Add your income to see if you're covered** (`start/no_income`; *Add
+  income*), **You're covered** / **Tight** (*See what's coming* → Upcoming), **Short by SR X a
+  paycheck** / **Short by SR X** (danger tint; the first decision's bill or goal named; **Fix
+  the gap** opens its editor).
+- `PaycheckCard` (`paycheckBar`): the stacked bar — Bills (grey), Saving up for bills
+  (`fp-chart-set-aside`), Goals (`fp-goal`), Left for spending (accent) — segments are buttons
+  to their section, values inline above 11 %. When the plan outruns pay the bar scales to the
+  plan, a danger line marks *Your pay · SR X* (positioned by `inset-inline-end`, so it mirrors)
+  and a hatch covers the overflow. Legend rows under it (Left for spending in danger when
+  negative). The "Last month: Needs · Wants · Savings" line is not built yet (wave D).
+- `Next30Card` (`next30Events`): bill payments and paydays in the next 30 days from Upcoming's
+  periods; a warn pill "N to confirm" with the names; desktop a 152px axis (dots in the bill's
+  colour, paydays ringed in accent, labels alternating above/below on stems and hidden when
+  within 15 % of the last on their side, ticks Today / +7 / … logical-positioned); mobile a dot
+  strip and a list. A bill's dot opens its detail, a payday the Income section.
+- `DecisionsCard` (`decisionNote`): goals get **Push out** (to `pushOutTo`, +6 months, with a
+  toast) and **Adjust**; bills **Adjust**.
+
 ### Bills, Goals, Income — `components/lists/`
 
 - **Bills** / **Goals**: a `SectionHeading` ("Bills 8", a summary line, **+ Add bill / goal**),
@@ -337,7 +360,8 @@ Nice to have for bills, **Must have** / Nice to have for goals, "Left for spendi
 
 `DetailHost` renders the open `PlanOwner` (a row's click) in `DetailFrame`: a 400px panel
 floating over the page's end edge on desktop (no reflow, Esc closes, the design's width rather
-than the kit's 330), a bottom sheet on mobile. Changing section closes it. Header: colour dot,
+than the kit's 330), a bottom sheet on mobile. A section tab's click closes it (not the section
+change itself, so Overview can switch to Bills and open a bill in one go). Header: colour dot,
 name, "Semi-annual · Insurance · Must pay" / "Must have goal · by Jun 2027", the ⋯ menu.
 
 - `DetailHero`: *Set aside so far* (a bill saved up for, blue bar) / *Next payment* (covered
