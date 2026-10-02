@@ -92,7 +92,7 @@ const renderCard = () =>
 const typeAmount = (value: string) =>
   fireEvent.change(screen.getByPlaceholderText('0.00'), { target: { value } })
 
-const HINT = 'Matches planned Salary (Sep 27) → Main Checking'
+const HINT = 'Matches upcoming Salary (Sep 27) → Main Checking'
 
 const saved = async () => {
   await waitFor(async () => expect(await db.transactions.count()).toBe(1))
@@ -193,7 +193,7 @@ describe('QuickAddCard · bill payments', () => {
     renderCard()
     typeAmount('200')
     expect(
-      await screen.findByText('Matches planned Gym (Sep 25) → Main Checking'),
+      await screen.findByText('Matches upcoming Gym (Sep 25) → Main Checking'),
     ).toBeDefined()
 
     fireEvent.click(screen.getByTitle('Add'))

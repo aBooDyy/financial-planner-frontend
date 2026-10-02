@@ -181,7 +181,7 @@ const addButton = () => screen.getByRole('button', { name: 'Add' })
 describe('TransactionDialog · planned links', () => {
   it('links a new spend to the bill its amount and date match, unless switched off', async () => {
     const { onSave } = renderDialog({ amount: '3400' })
-    expect(await screen.findByText('Matches planned Rent (Oct 1)')).toBeTruthy()
+    expect(await screen.findByText('Matches upcoming Rent (Oct 1)')).toBeTruthy()
     expect(
       screen.getByRole('button', { name: /Counts toward: Rent/ }),
     ).toBeTruthy()
@@ -193,10 +193,10 @@ describe('TransactionDialog · planned links', () => {
     })
 
     fireEvent.click(
-      screen.getByRole('switch', { name: 'Link to the planned item' }),
+      screen.getByRole('switch', { name: 'Link to the upcoming item' }),
     )
     expect(
-      screen.getByText('Saves as regular spending. Rent stays planned.'),
+      screen.getByText('Saves as regular spending. Rent is still upcoming.'),
     ).toBeTruthy()
     fireEvent.click(addButton())
     expect(onSave).toHaveBeenLastCalledWith({
@@ -211,7 +211,7 @@ describe('TransactionDialog · planned links', () => {
     expect(
       await screen.findByRole('button', { name: /Counts toward: Nothing/ }),
     ).toBeTruthy()
-    expect(screen.queryByText(/Matches planned/)).toBeNull()
+    expect(screen.queryByText(/Matches upcoming/)).toBeNull()
     fireEvent.click(addButton())
     expect(onSave).toHaveBeenLastCalledWith({
       plannedId: null,
@@ -251,7 +251,7 @@ describe('TransactionDialog · planned links', () => {
     expect(
       await screen.findByRole('button', { name: /Counts toward: Rent/ }),
     ).toBeTruthy()
-    await screen.findByText(/Settles the planned Oct 1 payment/)
+    await screen.findByText(/Settles the upcoming Oct 1 payment/)
     fireEvent.click(addButton())
     expect(onSave).toHaveBeenLastCalledWith({
       plannedId: 'rent-oct',
@@ -298,7 +298,7 @@ describe('TransactionDialog · planned links', () => {
       date: '2026-09-27',
     })
     expect(
-      await screen.findByText('Matches planned Salary (Sep 27)'),
+      await screen.findByText('Matches upcoming Salary (Sep 27)'),
     ).toBeTruthy()
     expect(screen.queryByRole('button', { name: /Counts toward/ })).toBeNull()
     expect(

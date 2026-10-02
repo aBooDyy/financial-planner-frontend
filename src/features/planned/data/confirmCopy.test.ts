@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { m } from '#/features/planned/testing/fixtures'
-import { effectLine, plannedForLine, primaryLabel } from './confirmCopy'
+import { effectLine, dueLine, primaryLabel } from './confirmCopy'
 import type { ConfirmPreview } from './preview'
 
 const SET_ASIDE = { currency: 'SAR', role: 'set_aside' as const }
@@ -25,16 +25,16 @@ const umrah = (over: Partial<NonNullable<ConfirmPreview['goal']>> = {}) => ({
   ...over,
 })
 
-describe('plannedForLine', () => {
+describe('dueLine', () => {
   it('says how far the planned date is from today', () => {
-    expect(plannedForLine('2026-09-01', '2026-09-24')).toBe(
-      'Planned for Sep 1 · 23 days ago',
+    expect(dueLine('2026-09-01', '2026-09-24')).toBe(
+      'Due Sep 1 · 23 days ago',
     )
-    expect(plannedForLine('2026-09-27', '2026-09-24')).toBe(
-      'Planned for Sep 27 · in 3 days',
+    expect(dueLine('2026-09-27', '2026-09-24')).toBe(
+      'Due Sep 27 · in 3 days',
     )
-    expect(plannedForLine('2026-09-24', '2026-09-24')).toBe(
-      'Planned for Sep 24 · today',
+    expect(dueLine('2026-09-24', '2026-09-24')).toBe(
+      'Due Sep 24 · today',
     )
   })
 })

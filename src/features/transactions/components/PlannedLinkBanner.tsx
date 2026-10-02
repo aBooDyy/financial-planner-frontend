@@ -55,7 +55,7 @@ export function PlannedLinkBanner({ banner, onLinked, onChooseStream }: Props) {
         <Switch
           checked={on}
           onCheckedChange={onLinked}
-          aria-label="Link to the planned item"
+          aria-label="Link to the upcoming item"
         />
       </label>
     </div>

@@ -197,7 +197,7 @@ export function useCountsToward(args: {
         : auto && linked
           ? {
               name: item.name,
-              sub: `Planned · ${formatMoneyRounded(item.amount, item.currency)} due ${shortDate(item.date)}`,
+              sub: `Upcoming · ${formatMoneyRounded(item.amount, item.currency)} due ${shortDate(item.date)}`,
               color: 'var(--fp-accent)',
             }
           : nothing
@@ -206,13 +206,13 @@ export function useCountsToward(args: {
     ? {
         auto,
         text: auto
-          ? `Matches planned ${item.name} (${shortDate(item.date)})`
-          : `Settles the planned ${shortDate(item.date)} ${WHAT[item.role]} (${item.name}).`,
+          ? `Matches upcoming ${item.name} (${shortDate(item.date)})`
+          : `Settles the upcoming ${shortDate(item.date)} ${WHAT[item.role]} (${item.name}).`,
         sub: linked
           ? `Expected ${formatMoney(item.amount, item.currency)} · ${
               isIncome ? 'marks the payday as received' : 'marks it as paid'
             }`
-          : `Saves as regular ${isIncome ? 'income' : 'spending'}. ${item.name} stays planned.`,
+          : `Saves as regular ${isIncome ? 'income' : 'spending'}. ${item.name} is still upcoming.`,
         linked,
       }
     : null

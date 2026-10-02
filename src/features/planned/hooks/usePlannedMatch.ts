@@ -46,7 +46,7 @@ export function usePlannedMatch(
     return {
       item,
       remainder,
-      hint: `Matches the planned ${shortDate(item.date)} ${WHAT[item.role]} (${formatMoney(remainder, item.currency)}). Saving will settle it instead of adding a second entry.`,
+      hint: `Matches the upcoming ${shortDate(item.date)} ${WHAT[item.role]} (${formatMoney(remainder, item.currency)}). Saving will settle it instead of adding a second entry.`,
     }
     // `ref` and `roles` are keyed by their content.
   }, [refKey, rolesKey, date, data.inputs, data.state])

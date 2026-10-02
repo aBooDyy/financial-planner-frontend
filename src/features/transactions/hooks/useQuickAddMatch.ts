@@ -46,9 +46,9 @@ export function useQuickAddMatch(args: {
   const linked = item !== null && unlinkedId !== item.id
 
   return {
-    /** "Matches planned Salary (Sep 27) → Main Checking", or null when nothing matches. */
+    /** "Matches upcoming Salary (Sep 27) → Main Checking", or null when nothing matches. */
     hint: item
-      ? `Matches planned ${item.name} (${shortDate(item.date)})${
+      ? `Matches upcoming ${item.name} (${shortDate(item.date)})${
           wallet ? ` → ${wallet.name}` : ''
         }`
       : null,

@@ -10,7 +10,7 @@ import {
 } from '#/features/planned/data/mutations'
 import {
   effectLine,
-  plannedForLine,
+  dueLine,
   primaryLabel,
 } from '#/features/planned/data/confirmCopy'
 import type { Effect } from '#/features/planned/data/confirmCopy'
@@ -138,7 +138,7 @@ export function useConfirmForm(plannedId: string | null, onDone: () => void) {
     busy,
     canConfirm,
     allowExternal: item?.role === 'set_aside',
-    headerLine: item ? plannedForLine(item.date, today) : '',
+    headerLine: item ? dueLine(item.date, today) : '',
     primaryLabel: item
       ? primaryLabel({
           role: item.role,

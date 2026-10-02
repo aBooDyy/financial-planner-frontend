@@ -91,7 +91,7 @@ describe('ConfirmPlannedDialog', () => {
 
     await waitFor(() => expect(amountField().value).toBe('1,500.00'))
     expect(screen.getByRole('heading').textContent).toBe(
-      `Planned for ${shortDate(daysAgo(23))} · 23 days agoUmrah trip`,
+      `Due ${shortDate(daysAgo(23))} · 23 days agoUmrah trip`,
     )
     expect(
       await screen.findByText(

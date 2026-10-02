@@ -231,11 +231,11 @@ export type ContributionEntry = {
   plannedId: string | null
   walletId: string | null
   externalLabel: string | null
-  /** "Main Checking · confirmed", "Planned · needs confirming", "Planned". */
+  /** "Main Checking · confirmed", "Upcoming · needs confirming", "Upcoming". */
   caption: string
 }
 
-/** A run of equal future planned rows, collapsed: "Nov 1 – Feb 1 · Planned · 4 more". */
+/** A run of equal future planned rows, collapsed: "Nov 1 – Feb 1 · Upcoming · 4 more". */
 export type ContributionRun = {
   key: string
   state: 'future'
@@ -420,10 +420,10 @@ export function buildGoalPlanView(input: GoalPlanInput): GoalPlanView {
       externalLabel: null,
       caption:
         state === 'due'
-          ? 'Planned · needs confirming'
+          ? 'Upcoming · needs confirming'
           : state === 'skipped'
-            ? 'Planned · skipped'
-            : 'Planned',
+            ? 'Upcoming · skipped'
+            : 'Upcoming',
     })
   }
   contributions.sort(
@@ -464,7 +464,7 @@ export function buildGoalPlanView(input: GoalPlanInput): GoalPlanView {
 
 /**
  * Collapse consecutive future rows of the same amount into one run (the design's
- * "Nov 1 – Feb 1 · Planned · 4 more"). The first of a run stays on its own line.
+ * "Nov 1 – Feb 1 · Upcoming · 4 more"). The first of a run stays on its own line.
  */
 export function collapseContributions(
   entries: ReadonlyArray<ContributionEntry>,

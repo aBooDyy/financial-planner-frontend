@@ -1,5 +1,5 @@
 /**
- * The confirm dialog's words (1d): the "Planned for Sep 1 · 23 days ago" line, the live
+ * The confirm dialog's words (1d): the "Due Sep 1 · 23 days ago" line, the live
  * effect line and the primary button. Pure, so every branch of the copy is testable.
  */
 import type { LocalPlanned } from '#/db/types'
@@ -9,8 +9,8 @@ import { daysBetween } from './dates'
 import type { ConfirmPreview } from './preview'
 import { shortDate } from './views'
 
-/** "Planned for Sep 1 · 23 days ago" / "· in 3 days" / "· today". */
-export function plannedForLine(date: string, today: string): string {
+/** "Due Sep 1 · 23 days ago" / "· in 3 days" / "· today". */
+export function dueLine(date: string, today: string): string {
   const days = daysBetween(today, date)
   const rel =
     days === 0
@@ -22,7 +22,7 @@ export function plannedForLine(date: string, today: string): string {
           : days < 0
             ? `${-days} days ago`
             : `in ${days} days`
-  return `Planned for ${shortDate(date)} · ${rel}`
+  return `Due ${shortDate(date)} · ${rel}`
 }
 
 export type EffectTone = 'neutral' | 'good' | 'partial'

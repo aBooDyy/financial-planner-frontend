@@ -308,8 +308,10 @@ its list, rail (`ForecastCard`, `HeadedCard`, `data/forecast.ts`, `data/headed.t
   the first wallet, today). Fields: an `AmountWell` ("How much are you confirming?" / "How much
   came in?", "of X planned" under it), From/Into `ConfirmWalletSelect` (+ "External…" with a
   label for set-asides) beside the Paid/Received `DateField` (relative hint); the effect line and the primary label come from the pure
-  `data/confirmCopy.ts` (`effectLine`, `primaryLabel`, `plannedForLine` — the small line above the title,
-  "Planned for Sep 1 · 23 days ago"). `EffectLine` is a `NoteBox`: full = accent (with a check), partial = warn with a bold
+  `data/confirmCopy.ts` (`effectLine`, `primaryLabel`, `dueLine` — the small line above the title,
+  "Due Sep 1 · 23 days ago"). User-facing copy says **upcoming**, never "planned" (D27): the
+  goal detail's captions ("Upcoming · needs confirming"), the dialog's match banners and hints
+  ("Matches upcoming Rent (Oct 1)"). `EffectLine` is a `NoteBox`: full = accent (with a check), partial = warn with a bold
   "Partial:", over / empty = neutral. Secondary: Move date (`MovePlannedPanel` replaces the row:
   "Move to" `DateField`, "A moved date is pinned…", Cancel / Move → `movePlanned`), Skip this one
   (asks first through a light `ConfirmDialog`), Close the rest (partials) as two equal quiet

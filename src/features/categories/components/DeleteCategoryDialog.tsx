@@ -32,7 +32,7 @@ function filedSummary(t: DeleteTarget): string {
     t.txCount > 0 ? plural(t.txCount, 'transaction', 'transactions') : null,
     t.billCount > 0 ? plural(t.billCount, 'bill', 'bills') : null,
     t.incomeCount > 0
-      ? plural(t.incomeCount, 'income stream', 'income streams')
+      ? plural(t.incomeCount, 'income', 'incomes')
       : null,
     t.plannedCount > 0
       ? plural(t.plannedCount, 'upcoming item', 'upcoming items')

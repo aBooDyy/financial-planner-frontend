@@ -225,8 +225,8 @@ describe('buildGoalPlanView', () => {
     expect(view.contributions.map((c) => [c.date, c.state, c.caption])).toEqual(
       [
         ['2026-08-02', 'confirmed', 'Main Checking · confirmed'],
-        ['2026-09-01', 'due', 'Planned · needs confirming'],
-        ['2026-10-01', 'future', 'Planned'],
+        ['2026-09-01', 'due', 'Upcoming · needs confirming'],
+        ['2026-10-01', 'future', 'Upcoming'],
       ],
     )
     expect(view.nextPlanned?.id).toBe('umrah:2026-10-01')
