@@ -19,6 +19,7 @@ import {
   reopenPlanned,
   skipPlanned,
 } from './mutations'
+import { PLANNED_NAMESPACE, uuidv5 } from './ids'
 import { billOwner } from './owners'
 import { takePlanRecalcRequests } from './recalcRequests'
 
@@ -244,8 +245,47 @@ describe('a planned bill set-aside fills occurrences in order', () => {
       }),
     )
     const id = '0190f0a0-0000-7000-8000-000000000001'
-    await confirmPlanned('rent-save', { walletId: 'main', settlementId: id })
-    expect((await db.setAsides.get(id))?.occurrence).toBe('2026-10-01')
+    const result = await confirmPlanned('rent-save', {
+      walletId: 'main',
+      settlementId: id,
+    })
+    const chunk = uuidv5(`${id}:2026-10-01`, PLANNED_NAMESPACE)
+    expect(result.settlementIds).toEqual([chunk])
+    expect((await db.setAsides.get(chunk))?.occurrence).toBe('2026-10-01')
+  })
+
+  it('keys every chunk by the row and its occurrence, so devices that spill differently never share an id', async () => {
+    await db.bills.put(
+      bill({
+        id: 'gym',
+        amount: m(50),
+        frequency: 'weekly',
+        nextDue: '2026-10-27',
+        walletId: 'main',
+      }),
+    )
+    await db.plannedTransactions.put(
+      planned({
+        id: 'gym-save',
+        origin: 'bill',
+        role: 'set_aside',
+        goalId: null,
+        billId: 'gym',
+        amount: m(80),
+        occurrence: '2026-10-25',
+      }),
+    )
+    const id = '0190f0a0-0000-7000-8000-000000000002'
+    const result = await confirmPlanned('gym-save', {
+      walletId: 'main',
+      settlementId: id,
+    })
+    expect(result.settlementIds).toEqual(
+      ['2026-10-27', '2026-11-03'].map((o) =>
+        uuidv5(`${id}:${o}`, PLANNED_NAMESPACE),
+      ),
+    )
+    expect(await db.setAsides.get(id)).toBeUndefined()
   })
 })
 

@@ -208,7 +208,10 @@ result carries `settlementId` and every row written (`settlementIds`).
 - **A bill set-aside fills occurrences in order** (`chunksFor` → `planning/data/fill.spill`):
   from the first open occurrence due on or after the row's date, each up to what it still
   needs, the rest spilling into the next — one set-aside per occurrence reached, all linked to
-  the row. (A weekly bill's payday set-aside covers several occurrences.)
+  the row. (A weekly bill's payday set-aside covers several occurrences.) With a
+  `settlementId` every chunk is written as `uuidv5("<settlementId>:<occurrence>")` — never the
+  bare id — so two devices that spill one row differently share an id only for the same
+  occurrence.
 - **A payment that settles an occurrence rewrites the bill's plan quietly**
   (`replanSettledOccurrence(billId, occurrence)` — `confirmPlanned` calls it; any other path that
   writes a bill payment, e.g. `settleBillPayment`, should too). Paying early would otherwise

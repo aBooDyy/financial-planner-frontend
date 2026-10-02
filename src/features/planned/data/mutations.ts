@@ -378,16 +378,17 @@ async function writeSetAsides(
   const spread =
     chunks.length > 0 ? chunks : [{ occurrence: bill.nextDue, amount: inBill }]
   const ids: string[] = []
-  for (const [i, chunk] of spread.entries()) {
+  for (const chunk of spread) {
     ids.push(
       await createSetAside(
         { billId: bill.id, occurrence: chunk.occurrence },
         {
           ...where,
-          id:
-            args.id && i > 0
-              ? uuidv5(`${args.id}:${chunk.occurrence}`, PLANNED_NAMESPACE)
-              : args.id,
+          // Per occurrence, never the bare id: two devices that spill one row differently
+          // then share an id only for the same occurrence.
+          id: args.id
+            ? uuidv5(`${args.id}:${chunk.occurrence}`, PLANNED_NAMESPACE)
+            : undefined,
           amount: convertMinor(chunk.amount, bill.currency, currency, rates),
         },
       ),
