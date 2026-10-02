@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { CurrencyCode } from '#/lib/currency'
 
 /**
  * What the planner just did on its own in Automatic payday mode, for the quiet toast
@@ -10,6 +11,7 @@ export type PaydayNotice = {
   /** Set-asides made without a tap, and their total in base currency. */
   count: number
   total: number
+  base: CurrencyCode
   /** Lines sent to the payday review instead. */
   review: number
 }

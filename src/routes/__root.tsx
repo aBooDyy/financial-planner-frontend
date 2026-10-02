@@ -6,6 +6,7 @@ import { useSessionBootstrap } from '#/features/auth/hooks/useSessionBootstrap'
 import { useEmailSyncBootstrap } from '#/features/email-sync/hooks/useEmailSyncBootstrap'
 import { PayloadViewContext } from '#/features/inbound-imports/components/payloadView'
 import { usePlannedRunner } from '#/features/planned'
+import { AppToastHost } from '#/features/planning/components/shell/AppToastHost'
 import { UpdatePrompt, usePersistentStorage } from '#/features/pwa'
 import { ReviewPayloadTree } from '#/features/integrations/components/ReviewPayloadTree'
 import { useAppConfig } from '#/lib/config/useAppConfig'
@@ -45,6 +46,7 @@ function RootLayout() {
         <PayloadViewContext.Provider value={ReviewPayloadTree}>
           <Outlet />
         </PayloadViewContext.Provider>
+        <AppToastHost />
         <UpdatePrompt />
         <Devtools />
       </TooltipProvider>

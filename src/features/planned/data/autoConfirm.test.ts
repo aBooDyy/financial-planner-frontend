@@ -284,6 +284,7 @@ describe('the planner’s auto pass', () => {
     expect(usePaydayNoticeStore.getState().notice).toMatchObject({
       count: 1,
       total: m(500),
+      base: 'SAR',
       review: 1,
     })
 

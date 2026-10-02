@@ -380,6 +380,7 @@ async function runAuto(
       at: today,
       count: summary.setAsides,
       total: summary.setAsideTotal,
+      base: inputs.base,
       review: summary.review,
     })
   return summary

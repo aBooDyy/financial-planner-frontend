@@ -4,7 +4,6 @@ import { MobileTabBar } from '#/components/chrome/MobileTabBar'
 import { TopNav } from '#/components/chrome/TopNav'
 import { useLogout } from '#/features/auth/hooks/useLogout'
 import { useOpenFromPlanningSearch } from '#/features/planning/hooks/useOpenFromPlanningSearch'
-import { usePaydayNoticeToast } from '#/features/planning/hooks/usePaydayNoticeToast'
 import { usePlanning } from '#/features/planning/hooks/usePlanning'
 import { isPlanningSection } from '#/features/planning/sections'
 import type { PlanningSection } from '#/features/planning/sections'
@@ -16,7 +15,6 @@ import { SectionView } from './SectionView'
 import { PlanningHeader } from './shell/PlanningHeader'
 import { PlanningSectionStrip } from './shell/PlanningSectionStrip'
 import { PlanningTabCard } from './shell/PlanningTabCard'
-import { PlanningToastView } from './shell/PlanningToastView'
 import { sectionBadges } from './shell/sectionBadges'
 
 /** Planning: what's coming, and whether the user is ready for it (04). */
@@ -26,7 +24,6 @@ export function PlanningPage() {
   const param = useParams({ from: '/planning/$section' }).section
   const section: PlanningSection = isPlanningSection(param) ? param : 'overview'
   const planning = usePlanning()
-  usePaydayNoticeToast()
   useOpenFromPlanningSearch(!planning.loading)
   const openSheet = usePlanningUi((s) => s.openSheet)
   const reset = usePlanningUi((s) => s.closeDetail)
@@ -57,7 +54,6 @@ export function PlanningPage() {
       </div>
       <MobileTabBar active="planning" />
       <PlanningSheets />
-      <PlanningToastView />
     </div>
   )
 }

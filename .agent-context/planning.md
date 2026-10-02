@@ -254,7 +254,7 @@ Nice to have for bills, **Must have** / Nice to have for goals, "Left for spendi
 
 - **Shell** — `PlanningPage`: `TopNav` (`active="planning"`), the mobile `PlanningSectionStrip`
   (five icon tabs) or the desktop `PlanningTabCard`, `PlanningHeader` (title + **Plan
-  something**), the section, the detail panel, `PlanningSheets` and `PlanningToastView`. Badges:
+  something**), the section, the detail panel and `PlanningSheets` (the toast is app-wide). Badges:
   Upcoming counts Needs confirming (warn), Overview counts Needs a decision (danger).
 - **Page state** — `stores/planningUi.ts`: the open detail (`PlanOwner`) and **one** sheet
   (`PlanningSheet`, a union by `kind`: chooser, the three editors, the anytime-action sheets,
@@ -262,7 +262,9 @@ Nice to have for bills, **Must have** / Nice to have for goals, "Left for spendi
   threaded callbacks; `PlanningSheets` renders the one open. A sheet that leads to another
   (Pay now → leftover, editor → delete) replaces itself.
 - **Toasts** — `stores/toast.ts` (`toast(message, action?)`), drawn by `PlanningToastView`:
-  bottom-centre dark pill, 3.6 s, optional action. Every write confirms with one.
+  bottom-centre dark pill, 3.6 s, optional action. Every write confirms with one. The view is
+  mounted app-wide by the root layout (`shell/AppToastHost`), so Wallets and Settings use the
+  same `toast()` and a toast raised just before leaving a page still shows.
 - **Kit** — `components/kit/`: `PlanCard`/`CardHeader`, `MicroLabel`, `StatusChip` (ok, warn,
   danger, blue, goal, neutral), `Spine`/`Dot`, `ProgressBar`, `ItemMenu` (the ⋯ menu, destructive
   last), `CountBadge`, `InfoLine` (the blue "what this will do" line).
@@ -391,8 +393,10 @@ reads free money after those transfers and turns the button into **Set aside any
 destination (`createTransfer`), then `confirmPlanned` per ticked line at its amount and wallet;
 **Not now** → `postponeReview` (`dismissFromReview` on the waiting lines: they stay in Needs
 confirming). Unticked lines are left alone. The Automatic-mode notice
-(`usePaydayNoticeStore`) becomes a Planning toast with a **Review** action
-(`usePaydayNoticeToast`, mounted by `PlanningPage` — so only while Planning is open).
+(`usePaydayNoticeStore`, carrying its `base` currency) becomes a toast with a **Review**
+action that opens this sheet and goes to Planning › Upcoming (`usePaydayNoticeToast`). It
+shows on **every** page: `AppToastHost` (the hook + `PlanningToastView`) is mounted once by
+the root layout, not by `PlanningPage`.
 
 ### Bills, Goals, Income — `components/lists/`
 
