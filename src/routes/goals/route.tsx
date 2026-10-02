@@ -1,22 +1,12 @@
-import { Outlet, createFileRoute } from '@tanstack/react-router'
-import { SessionGate } from '#/components/SessionGate'
+import { createFileRoute } from '@tanstack/react-router'
 
 export type GoalsSearch = {
-  /** `?goal=<id>` — open that goal's detail (a Wallets pot links here). */
+  /** `?goal=<id>` from an old link; it lands as `/planning/goals?open=goal:<id>`. */
   goal?: string
 }
 
+/** Goals became Planning: every `/goals` link redirects (see the child routes). */
 export const Route = createFileRoute('/goals')({
-  component: GoalsRoute,
   validateSearch: (search: Record<string, unknown>): GoalsSearch =>
     typeof search.goal === 'string' && search.goal ? { goal: search.goal } : {},
 })
-
-/** The session guard every Goals section shares. Each section is a child route. */
-function GoalsRoute() {
-  return (
-    <SessionGate>
-      <Outlet />
-    </SessionGate>
-  )
-}

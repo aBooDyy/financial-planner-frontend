@@ -83,27 +83,41 @@ rendering its feature component directly:
   param is dropped): the global search's way of opening a result. `useOpenFromSearch` waits for the
   page's data, opens that editor, then strips `open` with `replace`, re-arming on the next value.
 
-## Goals and Spending tabs
+## Planning and Spending tabs
 
-`/goals/$section` and `/transactions/$view` put the page tab in the URL, like Settings panes, so a
-tab is linkable and the back button moves between tabs. Each area is a directory:
+`/planning/$section` and `/transactions/$view` put the page tab in the URL, like Settings panes, so
+a tab is linkable and the back button moves between tabs. Each area is a directory:
 
-- `route.tsx` — the session guard + `Outlet`, and the area's search params (`?goal=`,
+- `route.tsx` — the session guard + `Outlet`, and the area's search params (`?open=`,
   `?review=`), so they're shared by every tab.
-- `index.tsx` — **redirects** the bare path to the first tab (`summary` / `activity`) in
-  `beforeLoad`, carrying the search along, so `/goals?goal=<id>` and `/transactions?review=1`
-  still work.
+- `index.tsx` — **redirects** the bare path to the first tab (`overview` / `activity`) in
+  `beforeLoad`, carrying the search along, so `/planning?open=goal:<id>` and
+  `/transactions?review=1` still work.
 - `$section.tsx` / `$view.tsx` — renders the page; `beforeLoad` redirects an unknown tab to the
-  first one. The valid tabs are `GOALS_SECTIONS` (`features/goals/components/sections.ts`) and
-  `SPENDING_VIEWS` (`features/transactions/constants.ts`: `activity`, `planned`, `budgets` —
-  the `recurring` tab went with recurring schedules, so `/transactions/recurring` now redirects
-  to Activity). While Planning is rebuilt, every `/goals/$section` renders the same placeholder.
+  first one. The valid tabs are `PLANNING_SECTIONS` (`features/planning/sections.ts`:
+  `overview`, `upcoming`, `bills`, `goals`, `income`) and `SPENDING_VIEWS`
+  (`features/transactions/constants.ts`: `activity`, `planned`, `budgets`).
 
 **A tab is a param, not a child route per tab** (unlike Settings) because the tabs share page
-state — the goal editor/detail, the Spending scope, range and calendar. One param route keeps
-the page mounted across tab switches, since TanStack only remounts a route's component on a
-param change when `remountDeps` asks it to. Tabs are `<Link>`s; the pages read the tab with
-`useParams` and navigate with `to: '/goals/$section'` / `'/transactions/$view'`.
+state — the Planning detail panel and sheets, the Spending scope, range and calendar. One param
+route keeps the page mounted across tab switches, since TanStack only remounts a route's
+component on a param change when `remountDeps` asks it to. Tabs are `<Link>`s; the pages read the
+tab with `useParams` and navigate with `to: '/planning/$section'` / `'/transactions/$view'`.
+
+**Old links redirect, so bookmarks and installed-PWA links survive** (04 §2):
+
+- `/goals` and `/goals/<section>` → `/planning/<section>` (`summary` → `overview`, `obligations`
+  → `bills`, `timeline` → `upcoming`, `goals`, `income`; anything else → `overview`), and
+  `?goal=<id>` → `/planning/goals?open=goal:<id>` (`data/goalsRedirect.ts`). `routes/goals/` only
+  holds these redirects; `GoalsSearch` keeps `?goal=` typed for the Wallets pot links.
+- `/transactions/planned` → `/planning/upcoming`, `/transactions/recurring` → `/planning/bills`
+  (checked before the unknown-tab fallback in `$view.tsx`).
+
+**`/planning?open=<kind>:<id>`** (`features/planning/data/openParam.ts`): `bill`, `goal`,
+`income` or `planned`, the id uuid-shaped or the param is dropped. Each kind opens on its section
+(`PLANNING_OPEN_SECTION`: a bill's detail on Bills, a goal's on Goals, the income editor on
+Income, a planned item's confirm dialog on Upcoming); the page consumes it once its data has
+loaded and strips it with `replace`, like Spending's `useOpenFromSearch`.
 
 ## Reports (`/reports`)
 

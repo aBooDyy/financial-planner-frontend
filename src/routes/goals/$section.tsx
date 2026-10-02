@@ -1,16 +1,15 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
-import { GoalsPage } from '#/features/goals/components/GoalsPage'
-import { isGoalsSection } from '#/features/goals/components/sections'
+import { goalsRedirect } from '#/features/planning/data/goalsRedirect'
 
+/** An old Goals section lands on its Planning section. */
 export const Route = createFileRoute('/goals/$section')({
-  component: GoalsPage,
   beforeLoad: ({ params, search }) => {
-    if (!isGoalsSection(params.section))
-      throw redirect({
-        to: '/goals/$section',
-        params: { section: 'summary' },
-        search,
-        replace: true,
-      })
+    const { section, open } = goalsRedirect(params.section, search.goal)
+    throw redirect({
+      to: '/planning/$section',
+      params: { section },
+      search: open ? { open } : {},
+      replace: true,
+    })
   },
 })

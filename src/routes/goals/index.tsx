@@ -1,12 +1,14 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
+import { goalsRedirect } from '#/features/planning/data/goalsRedirect'
 
-/** Goals always shows a section, so the bare path resolves to the first one. */
+/** `/goals` (and `/goals?goal=<id>`) lands on Planning. */
 export const Route = createFileRoute('/goals/')({
   beforeLoad: ({ search }) => {
+    const { section, open } = goalsRedirect(undefined, search.goal)
     throw redirect({
-      to: '/goals/$section',
-      params: { section: 'summary' },
-      search,
+      to: '/planning/$section',
+      params: { section },
+      search: open ? { open } : {},
       replace: true,
     })
   },

@@ -1,5 +1,11 @@
 import { Link } from '@tanstack/react-router'
-import { ChartColumn, PieChart, Plus, Target, Wallet } from 'lucide-react'
+import {
+  CalendarCheck,
+  ChartColumn,
+  PieChart,
+  Plus,
+  Wallet,
+} from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useQuickAddStore } from '#/features/transactions/stores/quickAdd'
 import { NAV_SECTIONS } from './sections'
@@ -7,7 +13,7 @@ import type { AppSection, NavSection } from './sections'
 
 const ICONS: Record<AppSection, LucideIcon> = {
   wallets: Wallet,
-  goals: Target,
+  planning: CalendarCheck,
   budget: PieChart,
   reports: ChartColumn,
 }

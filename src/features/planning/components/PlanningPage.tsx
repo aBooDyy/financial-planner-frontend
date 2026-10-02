@@ -1,0 +1,53 @@
+import { useEffect } from 'react'
+import { useParams } from '@tanstack/react-router'
+import { MobileTabBar } from '#/components/chrome/MobileTabBar'
+import { TopNav } from '#/components/chrome/TopNav'
+import { useLogout } from '#/features/auth/hooks/useLogout'
+import { usePlanning } from '#/features/planning/hooks/usePlanning'
+import { isPlanningSection } from '#/features/planning/sections'
+import type { PlanningSection } from '#/features/planning/sections'
+import { usePlanningUi } from '#/features/planning/stores/planningUi'
+import { useSessionStore } from '#/stores/session'
+import { PlanningHeader } from './shell/PlanningHeader'
+import { PlanningSectionStrip } from './shell/PlanningSectionStrip'
+import { PlanningTabCard } from './shell/PlanningTabCard'
+import { PlanningToastView } from './shell/PlanningToastView'
+import { sectionBadges } from './shell/sectionBadges'
+
+/** Planning: what's coming, and whether the user is ready for it (04). */
+export function PlanningPage() {
+  const user = useSessionStore((s) => s.user)
+  const logout = useLogout()
+  const param = useParams({ from: '/planning/$section' }).section
+  const section: PlanningSection = isPlanningSection(param) ? param : 'overview'
+  const planning = usePlanning()
+  const openSheet = usePlanningUi((s) => s.openSheet)
+  const reset = usePlanningUi((s) => s.closeDetail)
+
+  // The page's panels belong to this visit; leaving Planning closes them.
+  useEffect(() => reset, [reset])
+
+  if (!user) return null
+
+  const badges = sectionBadges(
+    planning.upcoming.dueCount,
+    planning.decisions.length,
+  )
+
+  return (
+    <div className="relative flex h-dvh flex-col overflow-hidden bg-fp-bg text-fp-text">
+      <TopNav user={user} active="planning" onSignOut={() => void logout()} />
+      <PlanningSectionStrip section={section} badges={badges} />
+      <div className="relative flex min-h-0 flex-1">
+        <main className="min-w-0 flex-1 overflow-auto">
+          <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-[14px] px-[14px] pt-[14px] pb-[30px] md:px-6 md:pt-[22px] md:pb-[60px]">
+            <PlanningHeader onPlan={() => openSheet({ kind: 'chooser' })} />
+            <PlanningTabCard section={section} badges={badges} />
+          </div>
+        </main>
+      </div>
+      <MobileTabBar active="planning" />
+      <PlanningToastView />
+    </div>
+  )
+}

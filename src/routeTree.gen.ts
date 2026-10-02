@@ -15,10 +15,12 @@ import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as ImportRouteImport } from './routes/import'
 import { Route as TransactionsRouteRouteImport } from './routes/transactions/route'
 import { Route as SettingsRouteRouteImport } from './routes/settings/route'
+import { Route as PlanningRouteRouteImport } from './routes/planning/route'
 import { Route as GoalsRouteRouteImport } from './routes/goals/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TransactionsIndexRouteImport } from './routes/transactions/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
+import { Route as PlanningIndexRouteImport } from './routes/planning/index'
 import { Route as GoalsIndexRouteImport } from './routes/goals/index'
 import { Route as TransactionsViewRouteImport } from './routes/transactions/$view'
 import { Route as SettingsPreferencesRouteImport } from './routes/settings/preferences'
@@ -32,6 +34,7 @@ import { Route as SettingsCurrenciesRouteImport } from './routes/settings/curren
 import { Route as SettingsCategoriesRouteImport } from './routes/settings/categories'
 import { Route as SettingsArchivedRouteImport } from './routes/settings/archived'
 import { Route as SettingsAccountRouteImport } from './routes/settings/account'
+import { Route as PlanningSectionRouteImport } from './routes/planning/$section'
 import { Route as GoalsSectionRouteImport } from './routes/goals/$section'
 import { Route as AuthSignupRouteImport } from './routes/auth/signup'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
@@ -68,6 +71,11 @@ const SettingsRouteRoute = SettingsRouteRouteImport.update({
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PlanningRouteRoute = PlanningRouteRouteImport.update({
+  id: '/planning',
+  path: '/planning',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GoalsRouteRoute = GoalsRouteRouteImport.update({
   id: '/goals',
   path: '/goals',
@@ -87,6 +95,11 @@ const SettingsIndexRoute = SettingsIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => SettingsRouteRoute,
+} as any)
+const PlanningIndexRoute = PlanningIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => PlanningRouteRoute,
 } as any)
 const GoalsIndexRoute = GoalsIndexRouteImport.update({
   id: '/',
@@ -153,6 +166,11 @@ const SettingsAccountRoute = SettingsAccountRouteImport.update({
   path: '/account',
   getParentRoute: () => SettingsRouteRoute,
 } as any)
+const PlanningSectionRoute = PlanningSectionRouteImport.update({
+  id: '/$section',
+  path: '/$section',
+  getParentRoute: () => PlanningRouteRoute,
+} as any)
 const GoalsSectionRoute = GoalsSectionRouteImport.update({
   id: '/$section',
   path: '/$section',
@@ -183,6 +201,7 @@ const AuthGoogleCallbackRoute = AuthGoogleCallbackRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/goals': typeof GoalsRouteRouteWithChildren
+  '/planning': typeof PlanningRouteRouteWithChildren
   '/settings': typeof SettingsRouteRouteWithChildren
   '/transactions': typeof TransactionsRouteRouteWithChildren
   '/import': typeof ImportRoute
@@ -192,6 +211,7 @@ export interface FileRoutesByFullPath {
   '/auth/login': typeof AuthLoginRoute
   '/auth/signup': typeof AuthSignupRoute
   '/goals/$section': typeof GoalsSectionRoute
+  '/planning/$section': typeof PlanningSectionRoute
   '/settings/account': typeof SettingsAccountRoute
   '/settings/archived': typeof SettingsArchivedRoute
   '/settings/categories': typeof SettingsCategoriesRoute
@@ -205,6 +225,7 @@ export interface FileRoutesByFullPath {
   '/settings/preferences': typeof SettingsPreferencesRoute
   '/transactions/$view': typeof TransactionsViewRoute
   '/goals/': typeof GoalsIndexRoute
+  '/planning/': typeof PlanningIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/transactions/': typeof TransactionsIndexRoute
   '/auth/google/callback': typeof AuthGoogleCallbackRoute
@@ -219,6 +240,7 @@ export interface FileRoutesByTo {
   '/auth/login': typeof AuthLoginRoute
   '/auth/signup': typeof AuthSignupRoute
   '/goals/$section': typeof GoalsSectionRoute
+  '/planning/$section': typeof PlanningSectionRoute
   '/settings/account': typeof SettingsAccountRoute
   '/settings/archived': typeof SettingsArchivedRoute
   '/settings/categories': typeof SettingsCategoriesRoute
@@ -232,6 +254,7 @@ export interface FileRoutesByTo {
   '/settings/preferences': typeof SettingsPreferencesRoute
   '/transactions/$view': typeof TransactionsViewRoute
   '/goals': typeof GoalsIndexRoute
+  '/planning': typeof PlanningIndexRoute
   '/settings': typeof SettingsIndexRoute
   '/transactions': typeof TransactionsIndexRoute
   '/auth/google/callback': typeof AuthGoogleCallbackRoute
@@ -241,6 +264,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/goals': typeof GoalsRouteRouteWithChildren
+  '/planning': typeof PlanningRouteRouteWithChildren
   '/settings': typeof SettingsRouteRouteWithChildren
   '/transactions': typeof TransactionsRouteRouteWithChildren
   '/import': typeof ImportRoute
@@ -250,6 +274,7 @@ export interface FileRoutesById {
   '/auth/login': typeof AuthLoginRoute
   '/auth/signup': typeof AuthSignupRoute
   '/goals/$section': typeof GoalsSectionRoute
+  '/planning/$section': typeof PlanningSectionRoute
   '/settings/account': typeof SettingsAccountRoute
   '/settings/archived': typeof SettingsArchivedRoute
   '/settings/categories': typeof SettingsCategoriesRoute
@@ -263,6 +288,7 @@ export interface FileRoutesById {
   '/settings/preferences': typeof SettingsPreferencesRoute
   '/transactions/$view': typeof TransactionsViewRoute
   '/goals/': typeof GoalsIndexRoute
+  '/planning/': typeof PlanningIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/transactions/': typeof TransactionsIndexRoute
   '/auth/google/callback': typeof AuthGoogleCallbackRoute
@@ -273,6 +299,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/goals'
+    | '/planning'
     | '/settings'
     | '/transactions'
     | '/import'
@@ -282,6 +309,7 @@ export interface FileRouteTypes {
     | '/auth/login'
     | '/auth/signup'
     | '/goals/$section'
+    | '/planning/$section'
     | '/settings/account'
     | '/settings/archived'
     | '/settings/categories'
@@ -295,6 +323,7 @@ export interface FileRouteTypes {
     | '/settings/preferences'
     | '/transactions/$view'
     | '/goals/'
+    | '/planning/'
     | '/settings/'
     | '/transactions/'
     | '/auth/google/callback'
@@ -309,6 +338,7 @@ export interface FileRouteTypes {
     | '/auth/login'
     | '/auth/signup'
     | '/goals/$section'
+    | '/planning/$section'
     | '/settings/account'
     | '/settings/archived'
     | '/settings/categories'
@@ -322,6 +352,7 @@ export interface FileRouteTypes {
     | '/settings/preferences'
     | '/transactions/$view'
     | '/goals'
+    | '/planning'
     | '/settings'
     | '/transactions'
     | '/auth/google/callback'
@@ -330,6 +361,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/goals'
+    | '/planning'
     | '/settings'
     | '/transactions'
     | '/import'
@@ -339,6 +371,7 @@ export interface FileRouteTypes {
     | '/auth/login'
     | '/auth/signup'
     | '/goals/$section'
+    | '/planning/$section'
     | '/settings/account'
     | '/settings/archived'
     | '/settings/categories'
@@ -352,6 +385,7 @@ export interface FileRouteTypes {
     | '/settings/preferences'
     | '/transactions/$view'
     | '/goals/'
+    | '/planning/'
     | '/settings/'
     | '/transactions/'
     | '/auth/google/callback'
@@ -361,6 +395,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   GoalsRouteRoute: typeof GoalsRouteRouteWithChildren
+  PlanningRouteRoute: typeof PlanningRouteRouteWithChildren
   SettingsRouteRoute: typeof SettingsRouteRouteWithChildren
   TransactionsRouteRoute: typeof TransactionsRouteRouteWithChildren
   ImportRoute: typeof ImportRoute
@@ -417,6 +452,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/planning': {
+      id: '/planning'
+      path: '/planning'
+      fullPath: '/planning'
+      preLoaderRoute: typeof PlanningRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/goals': {
       id: '/goals'
       path: '/goals'
@@ -444,6 +486,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/settings/'
       preLoaderRoute: typeof SettingsIndexRouteImport
       parentRoute: typeof SettingsRouteRoute
+    }
+    '/planning/': {
+      id: '/planning/'
+      path: '/'
+      fullPath: '/planning/'
+      preLoaderRoute: typeof PlanningIndexRouteImport
+      parentRoute: typeof PlanningRouteRoute
     }
     '/goals/': {
       id: '/goals/'
@@ -536,6 +585,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsAccountRouteImport
       parentRoute: typeof SettingsRouteRoute
     }
+    '/planning/$section': {
+      id: '/planning/$section'
+      path: '/$section'
+      fullPath: '/planning/$section'
+      preLoaderRoute: typeof PlanningSectionRouteImport
+      parentRoute: typeof PlanningRouteRoute
+    }
     '/goals/$section': {
       id: '/goals/$section'
       path: '/$section'
@@ -588,6 +644,20 @@ const GoalsRouteRouteWithChildren = GoalsRouteRoute._addFileChildren(
   GoalsRouteRouteChildren,
 )
 
+interface PlanningRouteRouteChildren {
+  PlanningSectionRoute: typeof PlanningSectionRoute
+  PlanningIndexRoute: typeof PlanningIndexRoute
+}
+
+const PlanningRouteRouteChildren: PlanningRouteRouteChildren = {
+  PlanningSectionRoute: PlanningSectionRoute,
+  PlanningIndexRoute: PlanningIndexRoute,
+}
+
+const PlanningRouteRouteWithChildren = PlanningRouteRoute._addFileChildren(
+  PlanningRouteRouteChildren,
+)
+
 interface SettingsRouteRouteChildren {
   SettingsAccountRoute: typeof SettingsAccountRoute
   SettingsArchivedRoute: typeof SettingsArchivedRoute
@@ -638,6 +708,7 @@ const TransactionsRouteRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   GoalsRouteRoute: GoalsRouteRouteWithChildren,
+  PlanningRouteRoute: PlanningRouteRouteWithChildren,
   SettingsRouteRoute: SettingsRouteRouteWithChildren,
   TransactionsRouteRoute: TransactionsRouteRouteWithChildren,
   ImportRoute: ImportRoute,
