@@ -59,6 +59,7 @@ const LEDGER: LedgerWindow = {
   period: SEPTEMBER,
   today: '2026-09-26',
   budgets: [],
+  payCalendar: { kind: 'month', perYear: 12 },
   rows: ROWS,
 }
 const CATALOG = defaultCatalog()

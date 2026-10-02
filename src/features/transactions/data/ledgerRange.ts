@@ -1,4 +1,5 @@
 import type { LocalBudget } from '#/db/types'
+import type { PayCalendar } from '#/features/planning/data/payPeriods'
 import { budgetWindow, ymd } from './planning'
 import type { DateWindow, Period } from './planning'
 import { calendarSpan } from './selectors'
@@ -28,13 +29,14 @@ export function ledgerRanges(
   period: Period,
   today: Date,
   budgets: ReadonlyArray<LocalBudget>,
+  payCalendar?: PayCalendar,
 ): IsoRange[] {
   const windows: DateWindow[] = [
     period,
     calendarSpan(period),
     ...budgets
       .filter((b) => b.deleted === 0)
-      .map((b) => budgetWindow(b.period, b.customDays, today)),
+      .map((b) => budgetWindow(b.period, b.customDays, today, payCalendar)),
   ]
   return mergeRanges(windows.map((w) => [ymd(w.start), ymd(w.end)]))
 }

@@ -12,6 +12,7 @@ import type {
 import { buildCatalog } from '#/features/categories/data/catalog'
 import type { PeriodMode } from '#/features/transactions/constants'
 import type { TransactionType } from '#/features/transactions/api/types'
+import { income } from '#/features/planned/testing/fixtures'
 import { totalsOf, walletDeltasFromTotals } from './ledgerTotals'
 import {
   readLedgerWindow,
@@ -392,6 +393,37 @@ describe('readLedgerWindow', () => {
       }
     },
   )
+})
+
+describe('readLedgerWindow with a main paycheck', () => {
+  it('reads each per-paycheck budget over its pay period and hands the calendar over', async () => {
+    const paycheck = budget({ id: 'paycheck', period: 'paycheck' })
+    await db.incomeStreams.put(income({ id: 'pay', amount: 500_000, day: 25 }))
+    await db.budgets.put(paycheck)
+    try {
+      const period = toIsoPeriod(periodOf(parseISO('2025-03-01'), 'month'))
+      const win = await readLedgerWindow(period, '2026-09-26')
+      expect(win.payCalendar.kind).toBe('paycheck')
+      const t = parseISO('2026-09-26')
+      const view = (txns: LocalTransaction[]) =>
+        buildBudgetsView(
+          {
+            ...inputs,
+            budgets: [...BUDGETS, paycheck],
+            payCalendar: win.payCalendar,
+            txns,
+          },
+          CATALOG,
+          { type: 'all' },
+          t,
+        )
+      expect(view(win.rows)).toEqual(view(FULL.txns))
+      expect(view(win.rows).rows.at(-1)?.windowStr).toBe('Sep 25 – Oct 24')
+    } finally {
+      await db.incomeStreams.delete('pay')
+      await db.budgets.delete('paycheck')
+    }
+  })
 })
 
 describe('readWalletDeltas', () => {

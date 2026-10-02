@@ -97,7 +97,12 @@ export function useSpendingViews({
         ? {
             period: fromIsoPeriod(ledger.period),
             today: parseISO(ledger.today),
-            data: { ...inputs, budgets: ledger.budgets, txns: ledger.rows },
+            data: {
+              ...inputs,
+              budgets: ledger.budgets,
+              payCalendar: ledger.payCalendar,
+              txns: ledger.rows,
+            },
           }
         : null,
     [inputs, ledger],

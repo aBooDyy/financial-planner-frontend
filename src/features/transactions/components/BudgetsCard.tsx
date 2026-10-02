@@ -45,7 +45,7 @@ function Row({ b, onEdit }: { b: BudgetRow; onEdit: (id: string) => void }) {
             </span>
           </div>
           <div className="mt-[3px] text-[12px] text-fp-text-3">
-            {b.scopeSub}
+            {b.scopeSub} · {b.windowStr}
           </div>
         </div>
         <div className="fp-sensitive flex-none text-right">
@@ -156,7 +156,9 @@ export function BudgetHealthCard({
         </div>
       </div>
       <div className="mb-[7px] flex justify-between text-[12.5px]">
-        <span className="font-semibold text-fp-text-2">Spent this month</span>
+        <span className="font-semibold text-fp-text-2">
+          Spent <ValueOrSkeleton value={h?.periodStr} className="h-3 w-16" />
+        </span>
         <span className="fp-sensitive font-bold tabular-nums">
           <ValueOrSkeleton
             value={h ? `${h.spentStr} / ${h.totalStr}` : null}

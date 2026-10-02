@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { income } from '#/features/planned/testing/fixtures'
 import { budgetWindow, windowOf, ymd } from './planning'
 
 const TODAY = new Date(2026, 5, 12) // Jun 12, 2026
@@ -38,9 +39,20 @@ describe('budgetWindow', () => {
     expect(ymd(w.start)).toBe('2026-05-30')
   })
 
-  it('reads a per-paycheck budget as the calendar month for now', () => {
+  it('reads a per-paycheck budget as the calendar month without a main paycheck', () => {
     const w = budgetWindow('paycheck', null, TODAY)
     expect(ymd(w.start)).toBe('2026-06-01')
     expect(ymd(w.end)).toBe('2026-06-30')
+  })
+
+  it('measures a per-paycheck budget over the pay period today falls in', () => {
+    const cal = {
+      kind: 'paycheck' as const,
+      stream: income({ day: 25 }),
+      perYear: 12,
+    }
+    const w = budgetWindow('paycheck', null, TODAY, cal)
+    expect(ymd(w.start)).toBe('2026-05-25')
+    expect(ymd(w.end)).toBe('2026-06-24')
   })
 })

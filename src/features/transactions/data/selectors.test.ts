@@ -8,6 +8,7 @@ import type {
   LocalTransaction,
 } from '#/db/types'
 import { buildCatalog } from '#/features/categories/data/catalog'
+import { income } from '#/features/planned/testing/fixtures'
 import { SPEND_CATEGORY_ICON } from '#/lib/icons/fallbacks'
 import {
   buildActivityList,
@@ -300,6 +301,57 @@ describe('buildBudgetsView', () => {
       TODAY,
     )
     expect(view.rows[0].spentStr).toBe('SR 1,700')
+  })
+
+  it('measures a per-paycheck budget over the pay period, and says so', () => {
+    const txns = [
+      tx({ categoryId: 'cat-groceries', amount: 10_000, date: '2026-05-24' }),
+      tx({ categoryId: 'cat-groceries', amount: 20_000, date: '2026-05-25' }),
+      tx({ categoryId: 'cat-groceries', amount: 30_000, date: '2026-06-12' }),
+    ]
+    const view = buildBudgetsView(
+      data({
+        txns,
+        budgets: [budget({ period: 'paycheck' })],
+        payCalendar: {
+          kind: 'paycheck',
+          stream: income({ day: 25 }),
+          perYear: 12,
+        },
+      }),
+      CATALOG,
+      ALL,
+      TODAY,
+    )
+    expect(view.rows[0]).toMatchObject({
+      spentStr: 'SR 500',
+      periodLabel: 'This paycheck',
+      windowStr: 'May 25 – Jun 24',
+    })
+    expect(view.health.periodStr).toBe('this paycheck')
+    expect(view.health.leftStr).toBe('SR 1,000 still spendable this paycheck')
+  })
+
+  it('labels each budget with the window it is measured over', () => {
+    const view = buildBudgetsView(
+      data({
+        txns: [],
+        budgets: [
+          budget({ id: 'w', period: 'weekly' }),
+          budget({ id: 'm' }),
+          budget({ id: 'c', period: 'custom', customDays: 14 }),
+        ],
+      }),
+      CATALOG,
+      ALL,
+      TODAY,
+    )
+    expect(view.rows.map((r) => r.periodLabel)).toEqual([
+      'This week',
+      'This month',
+      'Last 14 days',
+    ])
+    expect(view.health.periodStr).toBe('across their periods')
   })
 })
 

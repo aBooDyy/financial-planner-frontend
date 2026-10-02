@@ -15,6 +15,7 @@ import type { AdjustmentType, TxType } from '#/features/transactions/api/types'
 import { isAdjustment, isCashflow } from '#/features/transactions/api/types'
 import { AMBER, AT_RISK_RATIO, RED } from '#/features/transactions/constants'
 import type { DateWindow, Period } from './planning'
+import type { PayCalendar } from '#/features/planning/data/payPeriods'
 import { DELETED_CATEGORY_ID } from '#/features/categories/data/catalog'
 import type { CategoryCatalog } from '#/features/categories/data/catalog'
 import { liveBalancesFrom } from './ledger'
@@ -90,6 +91,8 @@ export type SpendingData = {
   goals?: ReadonlyArray<Pick<LocalGoal, 'id' | 'name'>>
   /** Name the bill a set-aside row belongs to. */
   bills?: ReadonlyArray<Pick<LocalBill, 'id' | 'name'>>
+  /** Sets a per-paycheck budget's window; calendar months when absent. */
+  payCalendar?: PayCalendar
 }
 
 /** Everything the selectors read except the ledger rows. */
@@ -1283,7 +1286,10 @@ export type BudgetRow = {
   /** The capped category's id, drawn as its icon; null for a wallet or overall cap. */
   categoryId: string | null
   scopeSub: string
+  /** The window it is measured over: "This paycheck", "This month", "Last 30 days". */
   periodLabel: string
+  /** "Oct 25 – Nov 24". */
+  windowStr: string
   spentStr: string
   limitStr: string
   remainStr: string
@@ -1305,6 +1311,8 @@ export type BudgetsView = {
     pct: number
     barColor: string
     leftStr: string
+    /** "this month", "this paycheck" — what the rail's totals cover. */
+    periodStr: string
   }
 }
 
@@ -1318,7 +1326,12 @@ function budgetSpentMinor(
   scope: Scope,
   today: Date,
 ): number {
-  const win = budgetWindow(budget.period, budget.customDays, today)
+  const win = budgetWindow(
+    budget.period,
+    budget.customDays,
+    today,
+    data.payCalendar,
+  )
   const matcher = walletMatcher(scope, data.nodes)
   let sum = 0
   for (const t of data.txns) {
@@ -1377,7 +1390,7 @@ export function budgetIdentity(
   }
 }
 
-/** "Weekly", "Monthly", or a custom span's "30d". */
+/** "Weekly", "Monthly", "Per paycheck", or a custom span's "30d". */
 export const budgetPeriodLabel = (
   b: Pick<LocalBudget, 'period' | 'customDays'>,
 ): string =>
@@ -1385,7 +1398,28 @@ export const budgetPeriodLabel = (
     ? `${b.customDays ?? 30}d`
     : b.period === 'weekly'
       ? 'Weekly'
-      : 'Monthly'
+      : b.period === 'paycheck'
+        ? 'Per paycheck'
+        : 'Monthly'
+
+/** The window a budget is measured over right now: "this paycheck", "last 30 days". */
+export const budgetWindowLabel = (
+  b: Pick<LocalBudget, 'period' | 'customDays'>,
+): string =>
+  b.period === 'custom'
+    ? `last ${b.customDays ?? 30} days`
+    : b.period === 'weekly'
+      ? 'this week'
+      : b.period === 'paycheck'
+        ? 'this paycheck'
+        : 'this month'
+
+const capitalised = (s: string): string =>
+  s.charAt(0).toUpperCase() + s.slice(1)
+
+/** "Oct 25 – Nov 24". */
+const windowCaption = (win: DateWindow): string =>
+  `${fmtShort(win.start)} – ${fmtShort(win.end)}`
 
 export function buildBudgetsView(
   data: SpendingData,
@@ -1404,7 +1438,10 @@ export function buildBudgetsView(
     return {
       id: b.id,
       ...budgetIdentity(b, catalog, nodeById),
-      periodLabel: budgetPeriodLabel(b),
+      periodLabel: capitalised(budgetWindowLabel(b)),
+      windowStr: windowCaption(
+        budgetWindow(b.period, b.customDays, today, data.payCalendar),
+      ),
       spentStr: formatMoneyRounded(spent, b.currency),
       limitStr: formatMoneyRounded(b.limit, b.currency),
       remainStr: over
@@ -1442,6 +1479,11 @@ export function buildBudgetsView(
       )
   const capPct = capLimit > 0 ? capSpent / capLimit : 0
   const left = capLimit - capSpent
+  const windows = new Set((overall ? [overall] : others).map(budgetWindowLabel))
+  const periodStr =
+    windows.size > 1
+      ? 'across their periods'
+      : ([...windows][0] ?? 'this month')
 
   return {
     rows,
@@ -1456,8 +1498,9 @@ export function buildBudgetsView(
       barColor: burnColor(capPct),
       leftStr:
         left >= 0
-          ? `${formatMoneyRounded(left, data.base)} still spendable this month`
+          ? `${formatMoneyRounded(left, data.base)} still spendable ${periodStr}`
           : `Over your cap by ${formatMoneyRounded(-left, data.base)}`,
+      periodStr,
     },
   }
 }

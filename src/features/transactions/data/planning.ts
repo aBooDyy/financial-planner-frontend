@@ -3,6 +3,8 @@
  * so the selectors stay pure and testable. Wire dates are ISO `YYYY-MM-DD` strings; these
  * helpers convert at the edge. Ported from the design's date helpers.
  */
+import { periodOf as payPeriodOf } from '#/features/planning/data/payPeriods'
+import type { PayCalendar } from '#/features/planning/data/payPeriods'
 import type { BudgetPeriod } from '#/features/transactions/api/types'
 import type { PeriodMode, RangeMode } from '#/features/transactions/constants'
 import { toMajor } from '#/lib/currency'
@@ -141,14 +143,22 @@ export const todayRelativeTo = (
   inWindow(ymd(today), win) ? null : today > win.end ? 'ahead' : 'behind'
 
 /**
- * A budget's measurement window, always ending today (weekly / monthly / custom-N-days). A
- * per-paycheck budget reads as monthly here until the pay-period window is built.
+ * A budget's measurement window around today: this week, this month, the last N days, or the
+ * pay period today falls in. Without a main paycheck the pay calendar is calendar months, so a
+ * per-paycheck budget then resets monthly.
  */
+const MONTHS: PayCalendar = { kind: 'month', perYear: 12 }
+
 export const budgetWindow = (
   period: BudgetPeriod,
   customDays: number | null,
   today: Date,
+  payCalendar: PayCalendar = MONTHS,
 ): DateWindow => {
+  if (period === 'paycheck') {
+    const { start, end } = payPeriodOf(payCalendar, ymd(today))
+    return { start: parseISO(start), end: parseISO(end) }
+  }
   if (period === 'weekly') {
     const s = startOfWeek(today)
     return { start: s, end: addDays(s, 6) }

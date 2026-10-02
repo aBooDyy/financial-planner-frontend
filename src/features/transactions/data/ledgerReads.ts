@@ -2,6 +2,8 @@ import { db } from '#/db/db'
 import type { LocalBudget, LocalTransaction } from '#/db/types'
 import type { RatesMap } from '#/lib/config/rates'
 import type { CurrencyCode } from '#/lib/currency'
+import type { PayCalendar } from '#/features/planning/data/payPeriods'
+import { readPayCalendar } from './payCalendar'
 import { walletDeltasFromTotals } from './ledgerTotals'
 import { ledgerRanges } from './ledgerRange'
 import { fromIsoPeriod, parseISO } from './planning'
@@ -15,6 +17,8 @@ export type LedgerWindow = {
   period: IsoPeriod
   today: string
   budgets: LocalBudget[]
+  /** The pay periods the budgets' windows were read for. */
+  payCalendar: PayCalendar
   rows: LocalTransaction[]
 }
 
@@ -27,13 +31,21 @@ export async function readLedgerWindow(
   period: IsoPeriod,
   today: string,
 ): Promise<LedgerWindow> {
-  const budgets = await db.budgets.toArray()
-  const ranges = ledgerRanges(fromIsoPeriod(period), parseISO(today), budgets)
+  const [budgets, payCalendar] = await Promise.all([
+    db.budgets.toArray(),
+    readPayCalendar(today),
+  ])
+  const ranges = ledgerRanges(
+    fromIsoPeriod(period),
+    parseISO(today),
+    budgets,
+    payCalendar,
+  )
   const rows = await db.transactions
     .where('date')
     .inAnyRange(ranges, { includeUppers: true })
     .toArray()
-  return { period, today, budgets, rows: rows.sort(byId) }
+  return { period, today, budgets, payCalendar, rows: rows.sort(byId) }
 }
 
 // Balances sum every row, so no window serves them: they come from the running totals the

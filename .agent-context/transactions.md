@@ -75,9 +75,20 @@ and `recurrings` went with the planning rebuild: a repeating payment is a **bill
   `goalId` → Saved, skipped by budgets) is gone. Its only special treatment left is the "Goal"
   pill.
 - **Budget periods and "Leave out planned bills".** `BudgetPeriod` is `weekly | monthly |
-  custom | paycheck` (wire `PAYCHECK`). A per-paycheck budget resets on each main payday; until
-  that window is built, `budgetWindow` and the search suffix read it as the calendar month, and
-  the editor does not offer it yet. `excludesBills` (wire `excludes_bills`, default off) marks a
+  custom | paycheck` (wire `PAYCHECK`). A per-paycheck budget resets on each main payday:
+  `budgetWindow(period, customDays, today, payCalendar?)` takes the engine's `PayCalendar` and
+  answers the pay period today falls in (`planning/data/payPeriods#periodOf`); without a main
+  paycheck (no income, or income varies) that calendar is calendar months, so it resets
+  monthly. **The calendar travels with the budgets**: `readLedgerWindow` reads it inside its
+  live query (`data/payCalendar.ts#readPayCalendar` — income streams, the settings row, rates
+  → `payCalendarOf`), widens the ledger ranges with it, and hands it back on `LedgerWindow`;
+  `useSpendingViews` puts it on `SpendingData.payCalendar`, so the budgets view and the rows
+  read for it can never disagree (an income edit re-runs the read). Each `BudgetRow` carries
+  `periodLabel` — the window it is measured over now ("This paycheck", "This week", "Last 14
+  days", from `budgetWindowLabel`) — and `windowStr` ("Oct 25 – Nov 24"), drawn as the pill and
+  after the scope line; the health rail's `periodStr` names the overall cap's window (or the
+  one all caps share; "across their periods" when they differ). `budgetPeriodLabel` stays the
+  cadence name ("Per paycheck") and search shows "/paycheck". `excludesBills` (wire `excludes_bills`, default off) marks a
   budget that skips payments for a bill (rows with a `billId`); it is stored and synced, and
   `BudgetDraft.excludesBills` left undefined keeps the stored choice. It is optional on
   `LocalBudget` because rows stored before it existed lack it (read as off).
@@ -344,7 +355,7 @@ without bound, and every builder only ever looks at a few dates. **What each con
 | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `buildCashflow`, `buildBreakdown`, `buildActivityList` | the period — a transfer's partner leg only counts when it is in that window too                                                                                |
 | `buildCalendar`                                        | `calendarSpan(period)`: the anchor month's whole-week grid, which spills into the neighbouring months; a custom day grid's whole weeks; a month grid's period  |
-| `buildBudgetsView`                                     | each live budget's `budgetWindow(period, customDays, today)` — **relative to today, not the anchor**, so browsing an old month still reads this month's budget span |
+| `buildBudgetsView`                                     | each live budget's `budgetWindow(period, customDays, today, payCalendar)` — **relative to today, not the anchor**, so browsing an old month still reads this month's budget span |
 | `scopeSections`, the `ConnectedTxEditor` accounts      | none — a balance is opening + the whole ledger, read from the running totals (`readWalletDeltas`)                                                              |
 | opening a transfer row                                 | both legs by the `transferId` index (`readTransferLegs`) — a leg can sit on another date                                                                      |
 

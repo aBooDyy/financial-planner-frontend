@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { LocalBudget } from '#/db/types'
+import { income } from '#/features/planned/testing/fixtures'
 import { ledgerRanges, mergeRanges } from './ledgerRange'
 import { parseISO, periodOf } from './planning'
 
@@ -116,5 +117,20 @@ describe('ledgerRanges', () => {
     expect(
       ledgerRanges(periodOf(new Date(2026, 8, 1), 'month'), TODAY, budgets),
     ).toEqual([['2025-08-23', '2026-10-03']])
+  })
+
+  it('reads a per-paycheck budget over the pay period today falls in', () => {
+    const budgets = [budget({ period: 'paycheck' })]
+    const cal = {
+      kind: 'paycheck' as const,
+      stream: income({ day: 25 }),
+      perYear: 12,
+    }
+    expect(
+      ledgerRanges(periodOf(new Date(2025, 0, 1), 'year'), TODAY, budgets, cal),
+    ).toEqual([
+      ['2025-01-01', '2025-12-31'],
+      ['2026-09-25', '2026-10-24'],
+    ])
   })
 })

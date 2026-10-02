@@ -91,11 +91,13 @@ export function plannedItems(
     .map((p) => plannedItem(p, ctx))
 }
 
-/** "/wk", "/mo", "/30d"; a per-paycheck budget reads monthly until pay periods exist. */
+/** "/wk", "/mo", "/paycheck", "/30d". */
 const budgetSuffix = (b: LocalBudget): string =>
   b.period === 'custom'
     ? customFrequencyMeta(b.customDays ?? 30, 'day').short
-    : FREQUENCIES[b.period === 'paycheck' ? 'monthly' : b.period].short
+    : b.period === 'paycheck'
+      ? '/paycheck'
+      : FREQUENCIES[b.period].short
 
 function budgetItem(b: LocalBudget, ctx: ItemContext): SearchItem {
   const identity = budgetIdentity(b, ctx.catalog, ctx.nodeById)
