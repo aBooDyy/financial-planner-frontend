@@ -28,6 +28,17 @@ Notifications, Archived, Data & privacy. Each pane is its own route — see
   `buildCalendar`) and `buildGoalsView` take `dateFormat` as a trailing param (default `dmy`),
   threaded reactively from the page/hook. Month-year, week-range, and weekday navigation labels
   stay textual (`fmtMonth`/`fmtShort`); provider email-alert dates are echoed raw, not reformatted.
+- **Preferences › Planning** (`PlanningPrefsCard`, 05): a second card under its own "Planning"
+  label, **synced** (the balance-settings row, `updatePlanningSettings` → one full PATCH per
+  change). *Safe to spend* — Until next payday · End of this month · Next N days (a "Next [14]
+  days" sub-row; typed counts are held to `limits.safeHorizonDaysMin/Max`, 7–90, on blur;
+  choosing it starts at 14). *When your pay arrives* — Review what to set aside · Set aside
+  automatically. *My income* — Steady · Varies; Varies reveals the explainer and "Plan with at
+  least SR [ ] a month" (base currency, saved on blur, empty = no floor), first filled with the
+  lowest month of income among the last six full months (`lowestMonthlyIncome`, from
+  `incomeLookbackStart`). Back to Steady drops the floor (the client normalises like the
+  server). Words and the sums are pure in `data/planningPrefs.ts`. Nothing here changes the
+  default (steady) experience.
   Date _inputs_ use `components/DateField` (goal due/target date, tx date): a native
   `<input type="date">` can't honor a custom format (it renders in the OS locale), so DateField
   overlays the transparent native picker on a styled box that shows `formatDate(value)` — the box

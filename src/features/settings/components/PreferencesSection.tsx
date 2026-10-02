@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select'
+import { PlanningPrefsCard } from './PlanningPrefsCard'
 import { SectionHeader } from './SectionHeader'
 import { SettingRow } from './SettingRow'
 import { Segmented } from './Segmented'
@@ -29,7 +30,7 @@ const SELECT = 'w-auto shrink-0'
 const DEFAULT_ACCOUNT_NONE = '__none__'
 
 export function PreferencesSection() {
-  const { base, nodes } = useWallets()
+  const { base, nodes, rates } = useWallets()
   const preference = useThemeStore((s) => s.preference)
   const setPreference = useThemeStore((s) => s.setPreference)
   const p = usePreferencesStore()
@@ -152,6 +153,7 @@ export function PreferencesSection() {
           />
         </SettingRow>
       </div>
+      <PlanningPrefsCard base={base} rates={rates} />
     </div>
   )
 }
