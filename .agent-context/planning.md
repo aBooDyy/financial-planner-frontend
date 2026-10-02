@@ -95,6 +95,35 @@ paying wallet, one line per wallet / outside label (with the row ids), the total
 currency, and whether "Keep it for next time" applies (a repeating, open bill) with the
 occurrence it would roll to (the next one not settled). Pure — the prompt is the UI's.
 
+## Balance, Set aside, Free to spend — `data/balances.ts`
+
+`balanceFigures({nodes, walletDeltas, setAsides, goals, bills, base, rates})` →
+`{wallets, groups, header}`. Per wallet (its own currency): `balance` (opening amount + ledger
+delta — the bank's number), `setAside` (Σ its live set-aside lines, `walletSetAsides`),
+`free = balance − setAside` (negative = over-committed, `overBy`), its `lines` and the same
+three in base (`inBase`). Groups and the header are Σ of their **active** wallets' `inBase`
+(archived wallets and anything inside an archived group are left out; their own row still
+reads true). Free is derived from the converted Balance and Set aside, so every level adds up
+to the minor unit — the 03 §2 invariants, pinned by a property-style test (random trees,
+set-asides, payments).
+
+## Safe to spend — `data/safeToSpend.ts`
+
+`safeToSpend({header, planned, index, setAsides, bills, settings, calendar, today, base,
+rates})` → `{horizon, end, payday, balance, setAside, free, bills, setAsides, income, safe,
+shortBy}` (base). `Safe = header.free − bills − setAsides + income` over H = `safeHorizonEnd`:
+
+- **bills**: open payment rows due by H — what is still open on them less the live
+  set-asides of that bill occurrence;
+- **setAsides**: open planned set-asides due by H, except a bill's whose occurrence (the
+  first open one due from the row's date) also falls by H — its payment is already counted;
+- **income**: open income rows due after today, by H.
+
+Deviation from 03 §8's "today…H": overdue payments and set-asides are counted too (until
+confirmed, that money is still in Free). Each term lists its rows (`items`) for the
+arithmetic. `payday` is set when the window runs until the next main payday. Budgets are never
+subtracted (D18).
+
 ## Money actions — `actions/`
 
 The anytime actions (02, D23) on top of the planned/set-aside/transaction write paths. Local
@@ -133,7 +162,7 @@ first, each a Dexie write plus outbox entries; errors are `MoneyActionError` wit
 
 ## Tests
 
-`data/{payPeriods,funding,leftover}.test.ts` (leftover + fill); `actions/actions.test.ts`
+`data/{payPeriods,funding,leftover,balances,safeToSpend}.test.ts` (leftover + fill); `actions/actions.test.ts`
 (the testing plan's anytime actions); generation and the runner in
 `planned/data/{generate,reconcile,runner}.test.ts`; payments in
 `planned/data/billPayments.test.ts`.
