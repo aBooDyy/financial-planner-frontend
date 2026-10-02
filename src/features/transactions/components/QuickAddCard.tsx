@@ -5,7 +5,8 @@ import { DELETED_CATEGORY_ID } from '#/features/categories/data/catalog'
 import { useCategoryCatalog } from '#/features/categories/hooks/useCategoryCatalog'
 import type { TxType } from '#/features/transactions/api/types'
 import type { EditorTxType } from '#/features/transactions/hooks/useTxEditor'
-import { createTransaction } from '#/features/transactions/data/mutations'
+import { saveNewTransaction } from '#/features/transactions/data/billPayments'
+import { useLeftoverPromptStore } from '#/features/transactions/stores/leftoverPrompt'
 import { quickAddTarget } from '#/features/transactions/data/quickAddMatch'
 import { useQuickAddMatch } from '#/features/transactions/hooks/useQuickAddMatch'
 import { useQuickChips } from '#/features/transactions/hooks/useQuickChips'
@@ -67,6 +68,7 @@ export function QuickAddCard({
     catalog.fallbackFor(type)?.id ??
     DELETED_CATEGORY_ID
   const match = useQuickAddMatch({ type, amount, currency })
+  const showLeftover = useLeftoverPromptStore((s) => s.show)
 
   const switchTab = (next: EditorTxType) => {
     setTab(next)
@@ -92,7 +94,7 @@ export function QuickAddCard({
       rates: match.rates,
     })
     if (!target) return
-    await createTransaction({
+    const leftover = await saveNewTransaction({
       type,
       ...target,
       categoryId,
@@ -104,6 +106,7 @@ export function QuickAddCard({
     })
     setAmount('')
     setNote('')
+    showLeftover(leftover)
   }
 
   return (

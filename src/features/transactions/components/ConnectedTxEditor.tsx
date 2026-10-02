@@ -68,7 +68,7 @@ export function ConnectedTxEditor({
       onSwapTransfer={editor.swapTransferWallets}
       onResetReceived={editor.resetReceived}
       onCategory={editor.setCategory}
-      onGoal={editor.setGoal}
+      onSpendTarget={editor.setSpendTarget}
       onMerchant={editor.setMerchant}
       onApplySuggestion={editor.applySuggestion}
       onSave={(link) => void editor.save(link)}

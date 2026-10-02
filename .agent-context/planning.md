@@ -204,6 +204,13 @@ first, each a Dexie write plus outbox entries; errors are `MoneyActionError` wit
   occurrence's set-asides in the paying wallet and `nextDue` moves to the first occurrence
   still open (paying ahead leaves it put). Returns `{transactionId, occurrence, status,
   leftover}` — `leftover` is `leftoverFor` after the payment.
+- **`billPaymentTarget(billId, plannedId)` + `settleBillPayment(billId, occurrence, payment)`**
+  — the same path for a payment written elsewhere (the transaction dialog, QuickAdd —
+  `transactions/data/billPayments.ts`): the first picks the open row to settle (the matched one,
+  else the first open occurrence's, generated if missing); after the transaction is written with
+  that `plannedId`, the second releases in the paying wallet, syncs `nextDue` and returns the
+  leftover report. The dialog's amount stays in the wallet's currency (no round trip through the
+  bill's).
 - **`resolveLeftover(report, 'move' | 'free' | 'keep', {payingWalletId, date?})`** — the
   leftover prompt's answers: *move* records a transfer from each holding wallet to the paying
   wallet and releases those set-asides (outside money stays as it is); *free* releases them;

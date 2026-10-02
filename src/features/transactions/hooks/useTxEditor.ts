@@ -29,12 +29,15 @@ import type { RatesMap } from '#/lib/config/rates'
 import { startOfToday, ymd } from '#/features/transactions/data/planning'
 import {
   createBudget,
-  createTransaction,
   deleteBudget,
-  deleteTransaction,
   updateBudget,
-  updateTransaction,
 } from '#/features/transactions/data/mutations'
+import {
+  removeTransaction,
+  saveNewTransaction,
+  saveTransactionEdit,
+} from '#/features/transactions/data/billPayments'
+import { useLeftoverPromptStore } from '#/features/transactions/stores/leftoverPrompt'
 import type { CurrencyCode } from '#/lib/currency'
 import { minorToInputValue, parseAmountToMinor } from '#/lib/currency'
 import { useEntrySession } from '#/features/transactions/stores/entrySession'
@@ -55,7 +58,9 @@ export type TxEditorDraft = {
   categoryId: string
   /** The entry's wallet (a transfer's source); a budget reads it as the account it caps. */
   walletId: string
+  /** A spend's "Counts toward": a goal it uses money from, or a bill it pays — never both. */
   goalId: string | null
+  billId: string | null
   /** The planned item this entry settles (1e's match), or null for an unlinked entry. */
   plannedId: string | null
   merchantId: string | null
@@ -77,6 +82,9 @@ export type TxEditorDraft = {
   /** "Leave out planned bills" — off by default. */
   excludesBills: boolean
 }
+
+/** What a spend counts toward, as picked from the list; null is "Nothing". */
+export type SpendTarget = { kind: 'goal' | 'bill'; id: string } | null
 
 /** What "Counts toward" resolved: the planned item settled and, for a spend, its goal or bill. */
 export type SaveLink = {
@@ -134,6 +142,7 @@ export function useTxEditor(
   )
   const defaults = useEntryDefaults(live)
   const rememberEntry = useEntrySession((s) => s.rememberEntry)
+  const showLeftover = useLeftoverPromptStore((s) => s.show)
 
   const defaultWalletId = defaults.walletId
   const walletCurrency = (walletId: string): CurrencyCode =>
@@ -161,6 +170,7 @@ export function useTxEditor(
     categoryId: firstCategoryOf(catalog, 'spend'),
     walletId: defaultWalletId,
     goalId: null,
+    billId: null,
     plannedId: null,
     merchantId: null,
     merchantName: '',
@@ -192,6 +202,7 @@ export function useTxEditor(
         categoryId: t.categoryId ?? firstCategoryOf(catalog, t.type),
         walletId: t.walletId,
         goalId: t.goalId,
+        billId: t.billId ?? null,
         plannedId: t.plannedId,
         merchantId: t.merchantId,
         merchantName: '',
@@ -305,6 +316,7 @@ export function useTxEditor(
             ...prev.draft,
             type,
             goalId: null,
+            billId: null,
             plannedId: null,
             toWalletId:
               toWalletId && toWalletId !== walletId
@@ -329,22 +341,24 @@ export function useTxEditor(
       prev ? { ...prev, draft: { ...prev.draft, categoryId } } : prev,
     )
 
-  // Paying toward a goal keeps the user's own category (rent paid is Housing, not
-  // Savings). A different goal means a different planned item, so any match is dropped.
-  const setGoal = (goalId: string | null) =>
-    setEditing((prev) =>
-      prev
-        ? {
-            ...prev,
-            draft: {
-              ...prev.draft,
-              goalId,
-              plannedId:
-                goalId === prev.draft.goalId ? prev.draft.plannedId : null,
-            },
-          }
-        : prev,
-    )
+  // Paying toward a goal or bill keeps the user's own category (rent paid is Housing, not
+  // Savings). A different target means a different planned item, so any match is dropped.
+  const setSpendTarget = (target: SpendTarget) =>
+    setEditing((prev) => {
+      if (!prev) return prev
+      const goalId = target?.kind === 'goal' ? target.id : null
+      const billId = target?.kind === 'bill' ? target.id : null
+      const same = goalId === prev.draft.goalId && billId === prev.draft.billId
+      return {
+        ...prev,
+        draft: {
+          ...prev.draft,
+          goalId,
+          billId,
+          plannedId: same ? prev.draft.plannedId : null,
+        },
+      }
+    })
 
   /**
    * Tagging a row with a merchant is where `auto_categorize` is finally read: on, the learned
@@ -457,12 +471,12 @@ export function useTxEditor(
         date: draft.date,
         note: draft.note.trim() || null,
       }
-      if (id) await updateTransaction(id, payload)
-      else {
-        await createTransaction(payload)
-        remember(draft.walletId, undefined, draft.date)
-      }
+      const leftover = id
+        ? await saveTransactionEdit(id, payload)
+        : await saveNewTransaction(payload)
+      if (!id) remember(draft.walletId, undefined, draft.date)
       close()
+      showLeftover(leftover)
       return
     }
 
@@ -493,7 +507,7 @@ export function useTxEditor(
     if (!editing?.id) return
     if (editing.kind === 'tx' && editing.draft.type === 'transfer')
       await deleteTransfer(editing.id)
-    else if (editing.kind === 'tx') await deleteTransaction(editing.id)
+    else if (editing.kind === 'tx') await removeTransaction(editing.id)
     else await deleteBudget(editing.id)
     close()
   }
@@ -510,7 +524,7 @@ export function useTxEditor(
     swapTransferWallets,
     resetReceived,
     setCategory,
-    setGoal,
+    setSpendTarget,
     setMerchant,
     applySuggestion,
     setScopeType,

@@ -10,8 +10,8 @@ import {
 } from '#/features/planned'
 import type { PlannedRole } from '#/features/planned'
 import {
-  rankGoalOptions,
   rankIncomeOptions,
+  rankSpendOptions,
 } from '#/features/transactions/data/countsToward'
 import type { RankedOptions } from '#/features/transactions/data/countsToward'
 import {
@@ -53,10 +53,11 @@ export type CountsToward = ReturnType<typeof useCountsToward>
 
 /**
  * The transaction dialog's "Counts toward" (1e). Untouched, a new entry links itself to the
- * open planned bill or payday its amount and date match. Otherwise a spend picks a goal (the
- * draft's `goalId`: money used from it) and an income entry an income stream — only a way to
- * find its payday — and the entry settles that origin's matching planned item. Every link can
- * be switched off, per item.
+ * open planned bill or payday its amount and date match. Otherwise a spend picks a bill (the
+ * draft's `billId`: a payment for it) or a goal (`goalId`: money used from it), and an income
+ * entry an income stream — only a way to find its payday — and the entry settles that origin's
+ * matching planned item. A bill picked with no payment near the date settles its first open
+ * occurrence when saved. Every link can be switched off, per item.
  *
  * A spend only ever settles a planned *payment*: a set-aside labels money in place, so money
  * put aside for a goal goes through the goal's "Add contribution", not a spend.
@@ -65,6 +66,7 @@ export function useCountsToward(args: {
   type: EditorTxType
   isNew: boolean
   goalId: string | null
+  billId: string | null
   /** The link the entry already has (editing a settled row), or null. */
   plannedId: string | null
   amount: string
@@ -95,7 +97,7 @@ export function useCountsToward(args: {
     !isTransfer &&
     picked === null &&
     args.plannedId === null &&
-    (isIncome || args.goalId === null)
+    (isIncome || (args.goalId === null && args.billId === null))
   const minor = parseAmountToMinor(args.amount, args.currency)
   const autoItem = useMemo(
     () =>
@@ -122,9 +124,11 @@ export function useCountsToward(args: {
         ? streamId
           ? { incomeStreamId: streamId }
           : null
-        : args.goalId
-          ? { goalId: args.goalId }
-          : null
+        : args.billId
+          ? { billId: args.billId }
+          : args.goalId
+            ? { goalId: args.goalId }
+            : null
   const match = usePlannedMatch(ref, isIncome ? 'income' : 'payment', args.date)
 
   const item: LocalPlanned | null = linkedRow ?? autoItem ?? match?.item ?? null
@@ -132,13 +136,21 @@ export function useCountsToward(args: {
   const [unlinkedId, setUnlinkedId] = useState<string | null>(null)
   const linked = item !== null && unlinkedId !== item.id
   const autoGoalId = auto && linked ? goalIdForMatch(item, 'spend') : null
-  const billId =
-    !isIncome && item && linked ? billIdForMatch(item, 'spend') : null
+  const autoBillId = auto && linked ? billIdForMatch(item, 'spend') : null
+  // Switching a found payment off saves regular spending; with none found, a picked bill
+  // still pays its first open occurrence.
+  const billId = isIncome
+    ? null
+    : item
+      ? linked
+        ? billIdForMatch(item, 'spend')
+        : null
+      : args.billId
   const selectedId = isIncome
     ? auto && linked
       ? item.incomeStreamId
       : streamId
-    : (autoGoalId ?? args.goalId)
+    : (autoBillId ?? autoGoalId ?? args.billId ?? args.goalId)
 
   const options: RankedOptions = useMemo(
     () =>
@@ -149,14 +161,24 @@ export function useCountsToward(args: {
             date: args.date,
             selectedId,
           })
-        : rankGoalOptions({
+        : rankSpendOptions({
             goals: args.goals,
+            bills: data.inputs.bills,
             planned,
             date: args.date,
             savedOf: (g) => data.state.progress[g.id]?.progress ?? 0,
             selectedId,
           }),
-    [isIncome, streams, planned, args.date, args.goals, data.state, selectedId],
+    [
+      isIncome,
+      streams,
+      planned,
+      args.date,
+      args.goals,
+      data.inputs.bills,
+      data.state,
+      selectedId,
+    ],
   )
 
   const nothing: CountsFace = {
@@ -213,7 +235,7 @@ export function useCountsToward(args: {
     banner,
     infoHint,
     setLinked: (on: boolean) => setUnlinkedId(on || !item ? null : item.id),
-    /** Records a pick from the list; the caller files a spend's pick as the draft's goal. */
+    /** Records a pick from the list; the caller files a spend's pick as its bill or goal. */
     pick: (id: string | null) => {
       setPick({ type: args.type, id })
       setUnlinkedId(null)

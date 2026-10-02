@@ -29,6 +29,7 @@ import { useQuickChips } from '#/features/transactions/hooks/useQuickChips'
 import type {
   EditorTxType,
   SaveLink,
+  SpendTarget,
   TxEditorDraft,
   TxEditorState,
 } from '#/features/transactions/hooks/useTxEditor'
@@ -62,7 +63,7 @@ type Props = {
   onSwapTransfer: () => void
   onResetReceived: () => void
   onCategory: (categoryId: string) => void
-  onGoal: (id: string | null) => void
+  onSpendTarget: (target: SpendTarget) => void
   onMerchant: (merchant: LocalMerchant | null) => void
   onApplySuggestion: () => void
   onSave: (link?: SaveLink) => void
@@ -90,7 +91,7 @@ export function TransactionDialog({
   onSwapTransfer,
   onResetReceived,
   onCategory,
-  onGoal,
+  onSpendTarget,
   onMerchant,
   onApplySuggestion,
   onSave,
@@ -126,6 +127,7 @@ export function TransactionDialog({
     type: draft.type,
     isNew: id === null,
     goalId: draft.goalId,
+    billId: draft.billId,
     plannedId: draft.plannedId,
     amount: draft.amount,
     currency,
@@ -165,9 +167,17 @@ export function TransactionDialog({
     onType(type)
   }
   const back = () => setPane('form')
+  const spendTargetOf = (optionId: string | null): SpendTarget => {
+    const option = [...counts.options.top, ...counts.options.rest].find(
+      (o) => o.id === optionId,
+    )
+    return option?.kind === 'bill' || option?.kind === 'goal'
+      ? { kind: option.kind, id: option.id }
+      : null
+  }
   const pickCounts = (optionId: string | null) => {
     counts.pick(optionId)
-    if (!counts.isIncome) onGoal(optionId)
+    if (!counts.isIncome) onSpendTarget(spendTargetOf(optionId))
     else if (draft.plannedId) onField('plannedId', null)
     back()
   }

@@ -74,6 +74,7 @@ const draft = (over: Partial<TxEditorDraft>): TxEditorDraft => ({
   categoryId: catId('housing'),
   walletId: 'w1',
   goalId: null,
+  billId: null,
   plannedId: null,
   merchantId: null,
   merchantName: '',
@@ -100,7 +101,7 @@ const renderDialog = (
 ) => {
   const props = {
     onSave: vi.fn(),
-    onGoal: vi.fn(),
+    onSpendTarget: vi.fn(),
     onField: vi.fn(),
   }
   const editing: TxEditorState = { kind: 'tx', id, draft: draft(over) }
@@ -131,7 +132,7 @@ const renderDialog = (
       onSwapTransfer={vi.fn()}
       onResetReceived={vi.fn()}
       onCategory={vi.fn()}
-      onGoal={props.onGoal}
+      onSpendTarget={props.onSpendTarget}
       onMerchant={vi.fn()}
       onApplySuggestion={vi.fn()}
       onSave={props.onSave}
@@ -220,7 +221,7 @@ describe('TransactionDialog · planned links', () => {
   })
 
   it('picks from the list inside the dialog and returns to the form', async () => {
-    const { onGoal } = renderDialog({ amount: '120' })
+    const { onSpendTarget } = renderDialog({ amount: '120' })
     fireEvent.click(
       await screen.findByRole('button', { name: /Counts toward: Nothing/ }),
     )
@@ -228,10 +229,52 @@ describe('TransactionDialog · planned links', () => {
     const umrah = await screen.findByRole('option', { name: /Umrah trip/ })
     expect(umrah.textContent).toContain('Goal · SR 0 of SR 13,000')
     fireEvent.click(umrah)
-    expect(onGoal).toHaveBeenCalledWith('umrah')
+    expect(onSpendTarget).toHaveBeenCalledWith({ kind: 'goal', id: 'umrah' })
     expect(
       screen.getByRole('heading', { name: 'New transaction' }),
     ).toBeTruthy()
+  })
+
+  it('offers bills next to goals and files a picked bill as the spend target', async () => {
+    const { onSpendTarget } = renderDialog({ amount: '120' })
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Counts toward: Nothing/ }),
+    )
+    const rent = await screen.findByRole('option', { name: /Rent/ })
+    expect(rent.textContent).toContain('Bill · SR 3,500 due Oct 1')
+    fireEvent.click(rent)
+    expect(onSpendTarget).toHaveBeenCalledWith({ kind: 'bill', id: 'rent' })
+  })
+
+  it('settles a picked bill’s payment near the date whatever the amount', async () => {
+    const { onSave } = renderDialog({ billId: 'rent', amount: '1000' })
+    expect(
+      await screen.findByRole('button', { name: /Counts toward: Rent/ }),
+    ).toBeTruthy()
+    await screen.findByText(/Settles the planned Oct 1 payment/)
+    fireEvent.click(addButton())
+    expect(onSave).toHaveBeenLastCalledWith({
+      plannedId: 'rent-oct',
+      goalId: null,
+      billId: 'rent',
+    })
+  })
+
+  it('keeps a picked bill with no payment near the date for its first open one', async () => {
+    const { onSave } = renderDialog({
+      billId: 'rent',
+      amount: '1000',
+      date: '2026-06-01',
+    })
+    expect(
+      await screen.findByRole('button', { name: /Counts toward: Rent/ }),
+    ).toBeTruthy()
+    fireEvent.click(addButton())
+    expect(onSave).toHaveBeenLastCalledWith({
+      plannedId: null,
+      goalId: null,
+      billId: 'rent',
+    })
   })
 
   it('points a saving goal to Add contribution instead of linking a set-aside', async () => {

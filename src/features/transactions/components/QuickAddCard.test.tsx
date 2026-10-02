@@ -20,12 +20,16 @@ import {
 } from 'vitest'
 import { db } from '#/db/db'
 import {
+  bill,
   income,
   m,
   planned,
   RATES,
+  setAside,
   wallet,
 } from '#/features/planned/testing/fixtures'
+import { isLiveSetAside } from '#/features/setAsides/data/totals'
+import { useLeftoverPromptStore } from '#/features/transactions/stores/leftoverPrompt'
 import {
   catId,
   defaultCategoryRows,
@@ -145,6 +149,67 @@ describe('QuickAddCard · match hint', () => {
     expect(tx.walletId).toBe('w1')
     expect(tx.note).toBeNull()
     expect((await db.plannedTransactions.get('pay-sep'))?.status).toBe('open')
+  })
+})
+
+describe('QuickAddCard · bill payments', () => {
+  const held = (walletId: string, amount: number) =>
+    setAside({
+      goalId: null,
+      billId: 'gym',
+      occurrence: '2026-09-25',
+      walletId,
+      amount,
+    })
+
+  beforeEach(async () => {
+    useLeftoverPromptStore.setState({ prompt: null })
+    await db.bills.put(
+      bill({
+        id: 'gym',
+        name: 'Gym',
+        amount: m(200),
+        nextDue: '2026-09-25',
+        walletId: 'w2',
+      }),
+    )
+    await db.plannedTransactions.put(
+      planned({
+        id: 'gym-sep',
+        origin: 'bill',
+        role: 'payment',
+        goalId: null,
+        billId: 'gym',
+        walletId: 'w2',
+        name: 'Gym',
+        amount: m(200),
+        occurrence: '2026-09-25',
+      }),
+    )
+    await db.setAsides.bulkPut([held('w2', m(150)), held('w1', m(50))])
+  })
+
+  it('pays a matched bill like Pay now and raises the leftover prompt', async () => {
+    renderCard()
+    typeAmount('200')
+    expect(
+      await screen.findByText('Matches planned Gym (Sep 25) → Main Checking'),
+    ).toBeDefined()
+
+    fireEvent.click(screen.getByTitle('Add'))
+    const tx = await saved()
+    expect(tx).toMatchObject({ billId: 'gym', plannedId: 'gym-sep' })
+    await waitFor(async () =>
+      expect((await db.bills.get('gym'))?.nextDue).toBe('2026-10-25'),
+    )
+    const live = (await db.setAsides.toArray()).filter(isLiveSetAside)
+    expect(live.map((a) => a.walletId)).toEqual(['w1'])
+    await waitFor(() =>
+      expect(useLeftoverPromptStore.getState().prompt).toMatchObject({
+        payingWalletId: 'w2',
+        report: { billId: 'gym', total: m(50) },
+      }),
+    )
   })
 })
 

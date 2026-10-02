@@ -76,6 +76,7 @@ const draft = (over: Partial<TxEditorDraft> = {}): TxEditorDraft => ({
   categoryId: catId('housing'),
   walletId: 'w1',
   goalId: null,
+  billId: null,
   plannedId: null,
   merchantId: null,
   merchantName: '',

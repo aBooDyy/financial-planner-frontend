@@ -65,7 +65,9 @@ own outbox entry (`op: 'close' | 'reopen'`), which the server applies atomically
 - `reopenBill(id)` — clears `closedAt`; what the close released stays released; it files a
   quiet plan rewrite so the planner plans the bill again from today.
 - **Pay now / Add money** are the planning slice's money actions (`planning/actions/payBill`,
-  `addMoney` — [planning.md](planning.md#money-actions--actions)).
+  `addMoney` — [planning.md](planning.md#money-actions--actions)). A payment recorded from the
+  transaction dialog or QuickAdd takes Pay now's path too (release in the paying wallet,
+  `nextDue`, leftover prompt — [transactions.md](transactions.md)).
 - **Pushing an action** goes through `db/itemAction.ts` (`pushItemAction`): the payload holds no
   version — the row's last-synced one is read when it goes out. `409
   planning.bill.already_closed` (close) / `not_closed` (reopen) means the row is already in the

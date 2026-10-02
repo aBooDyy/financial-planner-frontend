@@ -1,17 +1,24 @@
 /**
- * The TxEditor's "Counts toward" choices (1e): the goals a spend can use money from, or the
- * income streams an income entry can be the payday of — the most relevant first.
+ * The TxEditor's "Counts toward" choices (1e): the bills a spend can pay and the goals it can
+ * use money from, or the income streams an income entry can be the payday of — the most
+ * relevant first.
  */
-import type { LocalGoal, LocalIncomeStream, LocalPlanned } from '#/db/types'
+import type {
+  LocalBill,
+  LocalGoal,
+  LocalIncomeStream,
+  LocalPlanned,
+} from '#/db/types'
 import { frequencyMetaOf } from '#/features/goals/data/cadence'
+import { shortDate } from '#/features/planned/data/views'
 import { formatMoneyRounded } from '#/lib/currency'
 
-export type CountsKind = 'goal' | 'income'
+export type CountsKind = 'goal' | 'bill' | 'income'
 
 export type CountsOption = {
   id: string
   name: string
-  /** "Goal · SR 4,000 of 13,000" / "Income · SR 12,000 monthly". */
+  /** "Goal · SR 4,000 of 13,000" / "Bill · SR 3,500 due Oct 1" / "Income · SR 12,000 monthly". */
   sub: string
   color: string
   kind: CountsKind
@@ -89,40 +96,73 @@ export function goalOption(goal: LocalGoal, saved: number): CountsOption {
   }
 }
 
+/** A bill by its next amount and due date ("Bill · due Oct 1" while the amount is unknown). */
+export function billOption(bill: LocalBill): CountsOption {
+  const due = `due ${shortDate(bill.nextDue)}`
+  return {
+    id: bill.id,
+    name: bill.name,
+    sub:
+      bill.amount > 0
+        ? `Bill · ${formatMoneyRounded(bill.amount, bill.currency)} ${due}`
+        : `Bill · ${due}`,
+    color: bill.color,
+    kind: 'bill',
+  }
+}
+
+type Ranked = { option: CountsOption; position: number }
+
 /**
- * Goals for a spend, in tiers: anything with an open planned *payment* near the date (nearest
- * first), then goals with a planned set-aside near the date (nearest first), then the rest by
- * position. `savedOf` is the goal's saved figure.
+ * Bills and goals for a spend, in tiers: anything with an open planned *payment* near the date
+ * (nearest first), then anything with a planned set-aside near the date (nearest first), then
+ * the rest — open bills before goals, each by position. `savedOf` is a goal's saved figure.
  */
-export function rankGoalOptions(args: {
+export function rankSpendOptions(args: {
   goals: ReadonlyArray<LocalGoal>
+  bills: ReadonlyArray<LocalBill>
   planned: ReadonlyArray<LocalPlanned>
   date: string
   savedOf: (goal: LocalGoal) => number
   selectedId: string | null
 }): RankedOptions {
-  const live = args.goals.filter((g) => g.deleted === 0)
+  const ownerOf = (p: LocalPlanned) => p.billId ?? p.goalId
   const payments = nearestOpen(
     args.planned,
     args.date,
-    (p) => p.goalId,
+    ownerOf,
     (p) => p.role === 'payment',
   )
-  const near = nearestOpen(args.planned, args.date, (p) => p.goalId)
+  const near = nearestOpen(args.planned, args.date, ownerOf)
+  const items: Ranked[] = [
+    ...args.bills
+      .filter((b) => b.deleted === 0 && b.closedAt === null)
+      .map((b) => ({ option: billOption(b), position: b.position })),
+    ...args.goals
+      .filter((g) => g.deleted === 0)
+      .map((g) => ({
+        option: goalOption(g, args.savedOf(g)),
+        position: g.position,
+      })),
+  ]
   // A spend only ever settles a payment, so a payment due soon outranks a set-aside due soon.
-  const tierOf = (g: LocalGoal): number =>
-    payments.has(g.id) ? 0 : near.has(g.id) ? 1 : 2
-  const ranked = [...live].sort((a, b) => {
+  const tierOf = ({ option }: Ranked): number =>
+    payments.has(option.id) ? 0 : near.has(option.id) ? 1 : 2
+  const kindOrder = ({ option }: Ranked): number =>
+    option.kind === 'bill' ? 0 : 1
+  const ranked = [...items].sort((a, b) => {
     const ta = tierOf(a)
     const tb = tierOf(b)
     if (ta !== tb) return ta - tb
     const days = ta === 0 ? payments : near
     return (
-      (days.get(a.id) ?? 0) - (days.get(b.id) ?? 0) || a.position - b.position
+      (days.get(a.option.id) ?? 0) - (days.get(b.option.id) ?? 0) ||
+      kindOrder(a) - kindOrder(b) ||
+      a.position - b.position
     )
   })
   return split(
-    ranked.map((g) => goalOption(g, args.savedOf(g))),
+    ranked.map((r) => r.option),
     args.selectedId,
   )
 }

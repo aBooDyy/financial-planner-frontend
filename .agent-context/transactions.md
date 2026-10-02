@@ -47,7 +47,21 @@ and `recurrings` went with the planning rebuild: a repeating payment is a **bill
   `deleteTransaction`, `bulkDeleteTransactions`) calls the planned slice's `closeCovered` /
   `reopenUnderSettled` afterwards, so saving an entry against a planned item closes it and
   deleting it re-opens the item. `TxEditorDraft.plannedId` carries the link through the editor
-  (reset when the goal changes); choosing a goal keeps the user's category (ADR-7).
+  (reset when the goal or bill changes); choosing a goal or bill keeps the user's category (ADR-7).
+- **Bill payments go through Pay now's path** (`data/billPayments.ts`, 03 §5). The dialog
+  (`useTxEditor.save` / `remove`) and QuickAdd save through `saveNewTransaction` /
+  `saveTransactionEdit` / `removeTransaction`, never `createTransaction` directly. A spend with a
+  `billId` settles a payment row — the matched one while it is that bill's and open, else the
+  first open occurrence's, made on the spot (`planning/actions/payBill#billPaymentTarget`) — then
+  `settleBillPayment` releases that occurrence's set-asides **in the paying wallet**, moves
+  `nextDue` on and returns `leftoverFor`. Money the occurrence still holds elsewhere comes back as
+  a `LeftoverPrompt` the caller hands to `stores/leftoverPrompt`; `LeftoverPromptHost` (mounted
+  in `__root.tsx`, since the dialog and QuickAdd close as they save) shows Planning's
+  `LeftoverSheet` on any page. An edit pays only when it **newly** links a bill (an unchanged link
+  just re-syncs `nextDue`); unlinking, cutting or deleting a payment that reopens its occurrence
+  steps `nextDue` back to it (`syncBillNextDue` only moves forward). A bill that is closed or
+  gone saves the row as it is, unpaid. What an unlinked or deleted payment released stays
+  released (no un-release exists).
 - **selectors.ts** — pure view builders ported from the design's `renderVals`. Every builder
   that names a category takes **`catalog: CategoryCatalog` as its required second
   parameter** — `buildCashflow(data, catalog, …)`, and likewise `buildBreakdown`,
@@ -259,11 +273,13 @@ tx/budget editor state machine. Components are dumb (`components/`): page compos
   single-wallet scope shows the bare name. `AdjustmentEditor`: see _Balance adjustments_ below.
 - **Counts toward (1e).** The dialog shows one `CountsTowardRow` ("Counts toward · Nothing ·
   Regular spending ›"); it opens `CountsTowardOptions`: "Nothing", **Suggested** — the top five
-  of `data/countsToward.ts#rankGoalOptions` (in tiers: an open planned **payment** within ±30
-  days of the entry's date, nearest first → goals with a set-aside within ±30 days, nearest
-  first → the rest; ties by goal position. A spend only settles payments, so a near set-aside
-  must not bury a payment. The chosen one always shows; bills are not offered as options yet,
-  but an auto-match links a bill's payment) — and
+  of `data/countsToward.ts#rankSpendOptions` — open **bills** ("Bill · SR 3,500 due Oct 1",
+  `billOption`) and goals, in tiers: an open planned **payment** within ±30 days of the entry's
+  date, nearest first → anything with a set-aside within ±30 days, nearest first → the rest,
+  bills before goals; ties by kind then position. A spend only settles payments, so a near
+  set-aside must not bury a payment. Closed or deleted bills are left out; the chosen one
+  always shows. A pick is filed as `useTxEditor.setSpendTarget({kind: 'goal' | 'bill', id})` —
+  the draft holds `goalId` **or** `billId` — and
   "More…" for the rest; typing searches **names only** across all of them (`commandFilter`; a
   sub-line's figures would match everything). Income lists **income streams** instead
   (`rankIncomeOptions`); a stream is only a way to find its planned payday (a transaction has no
@@ -276,8 +292,10 @@ tx/budget editor state machine. Components are dumb (`components/`): page compos
     spend's auto link also carries the payment's bill (`billIdForMatch`) or goal
     (`goalIdForMatch`); an income auto-match hides the row and offers "Choose another stream".
   - **Picked.** Once the user picks (even "Nothing"), auto-matching stops for that type. A
-    picked goal / stream goes through `usePlannedMatch` (the origin's oldest open item in
-    `MATCH_WINDOW`): "Settles the planned Oct 1 payment (Rent)." with the same Link switch.
+    picked bill / goal / stream goes through `usePlannedMatch` (the origin's oldest open item in
+    `MATCH_WINDOW`): "Settles the planned Oct 1 payment (Rent)." with the same Link switch. A
+    picked bill with no payment in the window still saves with its `billId` (the save pays its
+    first open occurrence); switching a found one off saves regular spending, no bill.
   - An entry **already linked** keeps its link (it is not re-matched, since its item is now
     done) and shows it the same way.
   - `link` = `{ plannedId, goalId, billId }` goes to `useTxEditor.save(link)` (`SaveLink`;
@@ -296,8 +314,8 @@ tx/budget editor state machine. Components are dumb (`components/`): page compos
   typed amount, converted to the item's currency, must **equal its open remainder**; the item's
   date is within **±3 days of today**; several matches → the oldest. `hooks/useQuickAddMatch`
   feeds it from `usePlannedData`; turning the link off holds for that item only. Saving goes
-  through the same `createTransaction({ plannedId })` as the dialog (the core closes the
-  item). A linked entry is written to the **item's planned wallet** when it names a live one
+  through the same `saveNewTransaction` as the dialog (a bill payment releases, moves `nextDue`
+  and may raise the leftover prompt). A linked entry is written to the **item's planned wallet** when it names a live one
   (`plannedWalletOf`; the hint says "→ Main Checking"), even over the account QuickAdd is
   scoped to, with the typed amount converted into that wallet's currency (`quickAddTarget`);
   no planned wallet, or unlinked → QuickAdd's own account. It also carries the payment's bill
