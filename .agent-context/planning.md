@@ -12,8 +12,10 @@ Everything under `data/` is pure and clock-free: `today` is an ISO date passed i
 ## Pay periods — `data/payPeriods.ts`
 
 - **Main paycheck** (`mainPaycheckOf`): the stream the settings name
-  (`mainIncomeStreamId`) while it is active, else the largest by monthly amount in base
-  (position, then id, break ties). None while `incomeVaries` or with no active stream.
+  (`mainIncomeStreamId`) while it is active, else the largest by monthly amount in base. None
+  while `incomeVaries` or with no active stream. Streams within 10 % of the largest
+  (`NEAR_TIE`) are a near tie settled **without exchange rates**, so a rate move cannot flip the
+  pay periods: by native monthly amount when they share a currency, else by position (then id).
 - **`PayCalendar`** (`payCalendarOf`): `{kind: 'paycheck', stream, perYear}` or
   `{kind: 'month', perYear: 12}` — calendar months on the 1st when there is no main paycheck.
   A paycheck calendar keeps stepping on the stream's cadence after its `endsOn` (only its

@@ -44,9 +44,21 @@ export const monthlyIncomeOf = (
     frequencyMetaOf(s, 'monthly').perYear) /
   12
 
+/** Streams within this share of the largest are too close to call on converted amounts. */
+const NEAR_TIE = 0.1
+
+/** Monthly pay in the stream's own currency, on average. */
+const nativeMonthly = (s: LocalIncomeStream): number =>
+  (s.amount * frequencyMetaOf(s, 'monthly').perYear) / 12
+
+const byPosition = (a: LocalIncomeStream, b: LocalIncomeStream): number =>
+  a.position - b.position || a.id.localeCompare(b.id)
+
 /**
  * The stream that sets the pay periods: the one the user picked, else the largest by monthly
- * amount (position breaks ties). None while income varies or no stream is active.
+ * amount. None while income varies or no stream is active. Streams within `NEAR_TIE` of the
+ * largest (in base) are a near tie, settled without exchange rates so a rate move cannot flip
+ * the pay periods: by monthly amount when they share a currency, else by position.
  */
 export function mainPaycheckOf(
   income: ReadonlyArray<LocalIncomeStream>,
@@ -59,11 +71,18 @@ export function mainPaycheckOf(
   const active = income.filter((s) => isStreamActive(s, today))
   const picked = active.find((s) => s.id === settings.mainIncomeStreamId)
   if (picked) return picked
-  const ranked = [...active].sort(
-    (a, b) =>
-      monthlyIncomeOf(b, base, rates) - monthlyIncomeOf(a, base, rates) ||
-      a.position - b.position ||
-      a.id.localeCompare(b.id),
+  const monthly = new Map(
+    active.map((s) => [s.id, monthlyIncomeOf(s, base, rates)]),
+  )
+  const largest = Math.max(0, ...monthly.values())
+  const near = active.filter(
+    (s) => (monthly.get(s.id) ?? 0) >= largest * (1 - NEAR_TIE),
+  )
+  const oneCurrency = new Set(near.map((s) => s.currency)).size === 1
+  const ranked = [...near].sort((a, b) =>
+    oneCurrency
+      ? nativeMonthly(b) - nativeMonthly(a) || byPosition(a, b)
+      : byPosition(a, b),
   )
   return ranked[0] ?? null
 }

@@ -41,6 +41,38 @@ describe('the main paycheck', () => {
     ).toBe('weekly')
   })
 
+  it('does not flip between near-equal streams in different currencies as rates move', () => {
+    const local = income({ id: 'local', amount: m(12000), day: 25 })
+    const abroad = income({
+      id: 'abroad',
+      amount: m(3300),
+      currency: 'USD',
+      day: 10,
+      position: 1,
+    })
+    const pick = (usd: number) =>
+      mainPaycheckOf(
+        [abroad, local],
+        settings(),
+        'SAR',
+        { ...RATES, USD: usd },
+        TODAY,
+      )?.id
+    // 12,375 vs 12,000 at 3.75; 11,880 vs 12,000 at 3.60: the first in the list both times.
+    expect(pick(3.75)).toBe('local')
+    expect(pick(3.6)).toBe('local')
+    // A clear lead still wins.
+    expect(
+      mainPaycheckOf(
+        [local, { ...abroad, amount: m(4000) }],
+        settings(),
+        'SAR',
+        RATES,
+        TODAY,
+      )?.id,
+    ).toBe('abroad')
+  })
+
   it('is the one the user picked, while it is active', () => {
     const picked = settings({ mainIncomeStreamId: 'side' })
     expect(
