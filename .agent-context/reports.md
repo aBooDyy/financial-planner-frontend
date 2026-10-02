@@ -75,7 +75,10 @@ new period loads (state, not a ref), so switching presets never flashes skeleton
   (largest-remainder rounded to exactly 100 unless overspent; null without income);
   `sharesLine`, `pctText` (true minus sign). **`needsWantsSummary({rows, from, to, catalog,
   base, rates})`** → `{totals, shares, line}` is the pure, all-accounts summary any surface can
-  read (Planning Overview's "Last month: Needs 48% · Wants 31% · Savings 21%").
+  read (Planning Overview's "Last month: Needs 48% · Wants 31% · Savings 21%"). Its hook,
+  `hooks/useLastMonthNeedsWants()` → `{loading, summary, reportSearch: {range: 'last_month'}}`,
+  reads last calendar month's rows by the `date` index plus the catalog, base and rates; link
+  to `/reports` with `reportSearch` to show the same month in full.
 - `needsWantsCard.ts` — `buildNeedsWants({cur, prev, goalSetAside, range, today, catalog,
   base})` (fed the rows **with** savings spends): `segments` (needs, wants, not sorted,
   savings as widths of income; overspent → the spends squeezed into income's share and a red
