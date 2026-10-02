@@ -26,8 +26,8 @@ import { GoalsSection } from './GoalsSection'
 import { IncomeSection } from './IncomeSection'
 
 vi.mock('#/db/sync', () => ({ schedulePush: () => undefined }))
-vi.mock('@tanstack/react-router', async (original) => ({
-  ...(await original<typeof import('@tanstack/react-router')>()),
+// Income links to Settings; the route tree is not what is under test here.
+vi.mock('@tanstack/react-router', () => ({
   Link: ({
     to,
     hash,
