@@ -163,7 +163,8 @@ function heldLines(
 const slotDate = (funding: FundingPlan, k: number | null): string | null =>
   k === null ? null : (funding.slots[k]?.date ?? null)
 
-function cycleOf(
+/** Whether one payday covers an occurrence, or it is saved up for over several. */
+export function cycleOf(
   bill: LocalBill,
   track: TrackPlan | undefined,
   funding: FundingPlan,

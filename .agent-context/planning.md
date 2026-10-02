@@ -159,6 +159,35 @@ Plus `progress` / `setAside` / `used` / `target` / `left`, `perPaycheck`,
   had a payday to try — a bill due before the next payday is just paid from free money):
   `shortBy`, `requiredPerPaycheck`, `deadline`, and for a goal `pushOutTo` (+6 months).
 
+## Upcoming, payday review, year ahead
+
+- **`buildUpcoming({inputs, state, nodes, today})`** (`data/upcoming.ts`) → `{due, dueCount,
+  periods, isEmpty}`: the Planned tab's row views (`buildPlannedList`) with Needs confirming
+  first, then grouped by pay period (`periodsBetween`) — `kind` `this` (today to the day before
+  payday) · `next` · `later` — each with `payments` / `setAsides` / `income` rows and
+  `incomeIn`, `paymentsOut`, `setAsideOut`, `left` (base; may be negative). A bill payment row
+  carries `coverage` (`covered` / `partial` / `not_set_aside` + the amount set aside for its
+  occurrence) and `savedUp` (its bill saves up over several paydays — the collapsed summary
+  names these). Calendar months without a main paycheck.
+- **Payday review** (`data/review.ts`): `paydayReview(inputs, state, payday, {today,
+  walletCurrency, waitingOnly?})` → `{payday, period, depositWalletId, groups, total,
+  transfers}` — the period's open set-asides as `ReviewLine`s (owner name and colour,
+  remainder, wallet, the occurrence a bill line goes toward or a goal's date, `waiting` = in
+  the queue), grouped `bills_before_payday` (its occurrence falls within the period) ·
+  `saving_up` · `goals`, each in plan priority with a base total. `transfers` = one per wallet
+  other than the deposit wallet (Σ its lines, in the deposit wallet's currency);
+  `transfersFor(lines, depositWalletId, depositCurrency, rates)` re-totals edited lines
+  (`ticked: false` left out). `waitingReviews(...)` lists every payday with lines waiting
+  (`review: true`, due), oldest first; `reviewCount` is the badge.
+- **`buildYearAhead(inputs, state, today, {months?})`** (`data/yearAhead.ts`) → `{months,
+  ramps, goals}`: 12 months from this one, stretched to the latest goal date. Per month
+  (`YYYY-MM`): `income` (the streams), `monthlyBills` (occurrences of bills covered from each
+  paycheck: total + items), `bigBills` (occurrences of bills saved up for — the markers),
+  `goalTargets`, and `setAside` (the funded plan's set-asides on that month's paydays, stacked
+  per owner with its colour). `ramps`: each saved-up occurrence's run (`from` its first payday,
+  `perPaycheck`, `setAside` now). `goals`: a bar per open goal — `from` its first funded
+  payday, `finish` (or `slipsTo`), `target`, `slips`, `paused`, `perPaycheck`.
+
 ## Money actions — `actions/`
 
 The anytime actions (02, D23) on top of the planned/set-aside/transaction write paths. Local
@@ -197,8 +226,9 @@ first, each a Dexie write plus outbox entries; errors are `MoneyActionError` wit
 
 ## Tests
 
-`data/{payPeriods,funding,leftover,balances,safeToSpend,status,paycheck}.test.ts` (leftover +
-fill; `testing/state.ts` builds a planner state from rows); `actions/actions.test.ts`
+`data/{payPeriods,funding,leftover,balances,safeToSpend,status,paycheck,views}.test.ts`
+(leftover + fill; views = Upcoming, review, year ahead; `testing/state.ts` builds a planner
+state from rows, `plannedScenario` with the planner's rows written); `actions/actions.test.ts`
 (the testing plan's anytime actions); generation and the runner in
 `planned/data/{generate,reconcile,runner}.test.ts`; payments in
 `planned/data/billPayments.test.ts`.

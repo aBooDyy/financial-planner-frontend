@@ -51,3 +51,23 @@ export function scenario(s: Scenario): {
     today: s.today,
   }
 }
+
+/**
+ * The same scenario once the planner has written what the plan calls for: its desired rows
+ * stored (alongside any given), and the state derived again over them.
+ */
+export function plannedScenario(s: Scenario): ReturnType<typeof scenario> {
+  const first = scenario(s)
+  const held = new Set((s.planned ?? []).map((p) => p.id))
+  const written: LocalPlanned[] = first.state.desired
+    .filter((d) => !held.has(d.id))
+    .map((d) => ({
+      ...d,
+      createdAt: '',
+      updatedAt: '',
+      version: '',
+      dirty: 0,
+      deleted: 0,
+    }))
+  return scenario({ ...s, planned: [...(s.planned ?? []), ...written] })
+}
