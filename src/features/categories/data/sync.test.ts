@@ -5,7 +5,7 @@ import type { LocalCategory, OutboxEntry } from '#/db/types'
 import type { Category } from '#/features/categories/api/types'
 import { categoryRow } from '#/features/categories/__fixtures__/categories'
 import { ApiError } from '#/lib/apiError'
-import { localCategoryToCreateWire } from './mappers'
+import { localCategoryToCreateWire, localCategoryToUpdateWire } from './mappers'
 
 const api = vi.hoisted(() => ({
   list: vi.fn(),
@@ -177,6 +177,69 @@ describe('pushing a create whose slug is taken', () => {
     })
     expect(await db.outbox.count()).toBe(0)
     expect(templates.remapTemplateCategories).not.toHaveBeenCalled()
+  })
+})
+
+describe('an edit made before the spend class ever arrived', () => {
+  // A row stored before Dexie v4 has no `spendClass` until the first categories pull.
+  const legacy = () => {
+    const row = categoryRow({ slug: 'food', name: 'Dining' })
+    delete (row as Partial<LocalCategory>).spendClass
+    return row
+  }
+
+  it('leaves the spend class out of the queued update rather than clearing it', () => {
+    expect(localCategoryToUpdateWire(legacy())).not.toHaveProperty(
+      'spend_class',
+    )
+  })
+
+  it('sends the server’s spend class with the edit', async () => {
+    const row = legacy()
+    await db.categories.put({ ...row, dirty: 1 })
+    api.list.mockResolvedValue([asServer(row, { spendClass: 'need' })])
+    api.update.mockImplementation((_id: string, body: object) =>
+      Promise.resolve(asServer(row, { spendClass: 'need', ...body })),
+    )
+    const entry = await queue({
+      op: 'update',
+      entity: 'category',
+      id: row.id,
+      payload: localCategoryToUpdateWire(row),
+    })
+
+    await pushCategoryEntry(entry)
+
+    expect(api.update).toHaveBeenCalledWith(
+      row.id,
+      expect.objectContaining({ name: 'Dining', spend_class: 'NEED' }),
+    )
+  })
+
+  it('keeps the server’s spend class when rebasing the edit', async () => {
+    const row = legacy()
+    await db.categories.put({ ...row, dirty: 1 })
+    api.list.mockResolvedValue([
+      asServer(row, { spendClass: 'want', version: 'v2' }),
+    ])
+    api.update
+      .mockRejectedValueOnce(failure(409, 'common.conflict'))
+      .mockImplementationOnce((_id: string, body: object) =>
+        Promise.resolve(asServer(row, { ...body, version: 'v3' })),
+      )
+    const entry = await queue({
+      op: 'update',
+      entity: 'category',
+      id: row.id,
+      payload: localCategoryToUpdateWire(row),
+    })
+
+    await pushCategoryEntry(entry)
+
+    expect(api.update).toHaveBeenLastCalledWith(
+      row.id,
+      expect.objectContaining({ version: 'v2', spend_class: 'WANT' }),
+    )
   })
 })
 

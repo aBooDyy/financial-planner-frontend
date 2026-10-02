@@ -4,10 +4,7 @@ import type {
   CreateCategoryWire,
   UpdateCategoryWire,
 } from '#/features/categories/api/types'
-import {
-  toWireSpendClass,
-  toWireTxType,
-} from '#/features/categories/api/types'
+import { toWireSpendClass, toWireTxType } from '#/features/categories/api/types'
 
 /** Server category → local record (freshly synced: clean, not deleted). */
 export const serverCategoryToLocal = (c: Category): LocalCategory => ({
@@ -41,16 +38,25 @@ export const localCategoryToCreateWire = (
   position: l.position,
 })
 
+/**
+ * A queued category update. `spend_class` is absent when this device has never been told the
+ * row's class (a row stored before it existed, not pulled since): the push fills in the server's.
+ */
+export type QueuedCategoryUpdate = Omit<UpdateCategoryWire, 'spend_class'> &
+  Partial<Pick<UpdateCategoryWire, 'spend_class'>>
+
 // The update is based on the last-synced `version` (optimistic locking base). `icon` and
-// `spend_class` are replace-on-PATCH: omitting one clears it, so the current value always goes.
+// `spend_class` are replace-on-PATCH: omitting one clears it, so a known value always goes.
 export const localCategoryToUpdateWire = (
   l: LocalCategory,
-): UpdateCategoryWire => ({
+): QueuedCategoryUpdate => ({
   version: l.version,
   name: l.name,
   color: l.color,
   icon: l.icon,
-  spend_class: toWireSpendClass(l.spendClass),
+  ...(l.spendClass === undefined
+    ? {}
+    : { spend_class: toWireSpendClass(l.spendClass) }),
   position: l.position,
   parent: { id: l.parentId },
 })

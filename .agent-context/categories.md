@@ -64,7 +64,12 @@ version and retries once, `404` drops the local row, network errors bubble. Spec
   ([data-layer-and-sync.md](data-layer-and-sync.md#incremental-pull-the-delta-streams)).
   Local edits win until pushed: a row that is `dirty` or `deleted` is left alone.
 - **`icon` and `spend_class` are replace-on-PATCH.** `UpdateCategoryWire` always carries the
-  current value of both, because a PATCH that omits one clears it.
+  current value of both, because a PATCH that omits one clears it. **An unknown spend class is
+  never sent as `null`:** a row stored before the field existed (not pulled since) has
+  `spendClass` undefined, so `localCategoryToUpdateWire` leaves `spend_class` out of the queued
+  payload (`QueuedCategoryUpdate`) and the push fills in the server's (`withSpendClass`; the
+  `409` rebase takes `fresh.spendClass` the same way) — `null` would wipe the tag the server
+  seeded. The mutation must keep an undefined `spendClass` undefined for this to hold.
 - **`spendClass`** (`'need' | 'want' | 'saving' | null`, wire `NEED`/`WANT`/`SAVING`) tags a
   **spend** category for the Needs / Wants / Savings split. `null` on a subcategory inherits its
   root's; `null` on a root means not sorted yet. Income categories never carry one: the mutations

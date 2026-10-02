@@ -10,7 +10,9 @@ import type {
 } from '#/features/categories/api/types'
 import { remapTemplateCategories } from '#/features/import/data/mutations'
 import { ApiError } from '#/lib/apiError'
+import { toWireSpendClass } from '#/features/categories/api/types'
 import { localCategoryToUpdateWire, serverCategoryToLocal } from './mappers'
+import type { QueuedCategoryUpdate } from './mappers'
 import { refileTables, remapLocally } from './refile'
 import { uniqueSlug } from './slug'
 
@@ -92,12 +94,26 @@ async function reslugCreate(
   })
 }
 
+/**
+ * The PATCH replaces `spend_class`, so an update queued without one (the class was never known
+ * here) carries the server's — sending null would wipe the tag the server seeded.
+ */
+async function withSpendClass(
+  id: string,
+  body: QueuedCategoryUpdate,
+): Promise<UpdateCategoryWire> {
+  if (body.spend_class !== undefined)
+    return { ...body, spend_class: body.spend_class }
+  const server = (await categoriesApi.list()).find((c) => c.id === id)
+  return { ...body, spend_class: toWireSpendClass(server?.spendClass) }
+}
+
 async function pushCategoryUpdate(entry: OutboxEntry): Promise<void> {
   const id = entry.id
   try {
     const c = await categoriesApi.update(
       id,
-      entry.payload as UpdateCategoryWire,
+      await withSpendClass(id, entry.payload as QueuedCategoryUpdate),
     )
     await db.transaction('rw', db.categories, db.outbox, async () => {
       await db.categories.put(serverCategoryToLocal(c))
@@ -125,10 +141,12 @@ async function rebaseCategory(entry: OutboxEntry): Promise<void> {
     return
   }
   try {
-    const c = await categoriesApi.update(
-      entry.id,
-      localCategoryToUpdateWire({ ...local, version: fresh.version }),
-    )
+    const spendClass =
+      local.spendClass === undefined ? fresh.spendClass : local.spendClass
+    const c = await categoriesApi.update(entry.id, {
+      ...localCategoryToUpdateWire({ ...local, version: fresh.version }),
+      spend_class: toWireSpendClass(spendClass),
+    })
     await db.transaction('rw', db.categories, db.outbox, async () => {
       await db.categories.put(serverCategoryToLocal(c))
       await db.outbox.delete(entry.seq)
