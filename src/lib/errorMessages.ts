@@ -95,6 +95,12 @@ const MESSAGES: Record<string, string> = {
   'planning.set_aside.planned_invalid':
     'That upcoming set-aside is no longer available.',
   'planning.set_aside.already_released': 'That money was already freed up.',
+  'planning.set_aside.owner_closed':
+    'That bill or goal is done — reopen it to set money aside for it.',
+  'planning.close.too_many_set_asides':
+    'There is too much set aside for this to close in one go. Free or move some of it first.',
+  'spending.transaction.bill_type_mismatch':
+    'Only spending can pay a bill — unlink the bill or make it spending.',
   'planned.bill_invalid': 'That bill is no longer available.',
   'balances.settings.main_income_invalid':
     'That income is no longer available.',

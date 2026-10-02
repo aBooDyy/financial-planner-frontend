@@ -137,6 +137,16 @@ describe('describeSyncFailure', () => {
     expect(text.hint).toBe('Check the amount and save.')
   })
 
+  it.each([
+    ['planning.set_aside.owner_closed', 'Bill or goal is done'],
+    ['planning.close.too_many_set_asides', 'Too much set aside to close at once'],
+    ['spending.transaction.bill_type_mismatch', 'Only spending pays a bill'],
+  ])('words the planning refusal %s plainly', (code, title) => {
+    const text = describeSyncFailure(failure({ code }))
+    expect(text.title).toBe(title)
+    expect(text.detail).not.toBe('No reason was given.')
+  })
+
   it('cannot be fixed by editing a transfer leg on its own', () => {
     expect(
       describeSyncFailure(

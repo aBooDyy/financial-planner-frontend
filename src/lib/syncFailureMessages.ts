@@ -79,6 +79,7 @@ const FIELD_LABEL: Partial<Record<string, string>> = {
   to_wallet_id: 'account it goes into',
   category_id: 'category',
   goal_id: 'goal it counts toward',
+  bill_id: 'bill it pays',
   merchant_id: 'merchant',
   planned_id: 'upcoming item it settles',
   date: 'date',
@@ -175,6 +176,25 @@ const BY_REASON: Partial<Record<string, Rule>> = {
     ),
   validation: (f) =>
     refused(f, 'Some details weren’t accepted', fieldHint(f.field)),
+  owner_closed: (f) =>
+    refused(
+      f,
+      'Bill or goal is done',
+      'Reopen it, or set the money aside for something else.',
+    ),
+  too_many_set_asides: (f) =>
+    refused(
+      f,
+      'Too much set aside to close at once',
+      'Free or move some of what it holds, then close it again.',
+      false,
+    ),
+  bill_type_mismatch: (f) =>
+    refused(
+      f,
+      'Only spending pays a bill',
+      'Unlink the bill or make it spending, and save.',
+    ),
 }
 
 const reasonOf = (code: string): string => code.slice(code.lastIndexOf('.') + 1)
