@@ -14,7 +14,7 @@ pattern changes. Index: [`.agent-context/README.md`](.agent-context/README.md).
 - [architecture.md](.agent-context/architecture.md) — local-first SPA model, layers, folder structure.
 - [data-layer-and-sync.md](.agent-context/data-layer-and-sync.md) — local DB (Dexie/IndexedDB), the sync engine (bulk push, delta pull + watermarks), conflict handling, refresh on `401`.
 - [state-management.md](.agent-context/state-management.md) — Zustand stores vs. server cache vs. local DB; who owns what.
-- [routing.md](.agent-context/routing.md) — TanStack Router structure, feature/page routing, the routed `/settings/*` panes.
+- [routing.md](.agent-context/routing.md) — TanStack Router structure, feature/page routing, the `/planning/$section` and `/transactions/$view` tabs and old-link redirects, the routed `/settings/*` panes.
 - [icons.md](.agent-context/icons.md) — Icons: the generated Phosphor pack, its manifest + generator, the lazy path/search chunks, `<Icon>`/`IconChip`/`IconPicker`, fallbacks, and the chrome-vs-content rule.
 - [styling-and-theming.md](.agent-context/styling-and-theming.md) — Tailwind, the `fp-` design tokens, light/dark, **RTL/LTR** (incl. Radix's direction provider).
 - [pwa-and-mobile.md](.agent-context/pwa-and-mobile.md) — PWA setup, offline, native-like mobile UX, responsive nav.
@@ -23,12 +23,12 @@ pattern changes. Index: [`.agent-context/README.md`](.agent-context/README.md).
 - [bills.md](.agent-context/bills.md) — Bills: once or repeating, must pay / nice to have; entity, sync, mutations, cascades.
 - [set-asides.md](.agent-context/set-asides.md) — Set-asides: labels on money in real wallets for a bill or goal; live vs released, totals.
 - [transactions.md](.agent-context/transactions.md) — Spending: ledger + budgets, derived balances, settlement links, transfers between wallets, balance adjustments.
-- [planning.md](.agent-context/planning.md) — Planning engine: pay periods, two-tier funding, money actions, the pure view models the Planning/Wallets screens read.
-- [planned.md](.agent-context/planned.md) — Planned transactions: generator + reconciler, the app-level planner, deterministic ids, confirm/skip/recalc, the hooks the Planned tab and goal detail read.
+- [planning.md](.agent-context/planning.md) — Planning: the engine (pay periods, two-tier funding, money actions, pure view models) and the Planning page (shell, editors, Overview, Upcoming, review, lists, detail, sheets).
+- [planned.md](.agent-context/planned.md) — Planned transactions: generator + reconciler, the app-level planner, deterministic ids, confirm/skip/recalc, the confirm dialog and the hooks Planning reads.
 - [onboarding.md](.agent-context/onboarding.md) — the `/setup` first-run wizard, `SessionGate`, starter packs, the sessionStorage draft.
 - [settings.md](.agent-context/settings.md) — the Settings page and its routed panes, local preferences.
 - [reports.md](.agent-context/reports.md) — Reports: the period presets + comparison in the URL, the windowed read, the pure report builders.
-- [search.md](.agent-context/search.md) — Search: the top-bar sheet, Everywhere vs. current-tab scope, the on-device index + filters, the `?open=` hand-off to Spending's editors.
+- [search.md](.agent-context/search.md) — Search: the top-bar sheet, Everywhere vs. current-tab scope, the on-device index (incl. bills and goals) + filters, the `?open=` hand-off to Spending's editors and Planning.
 - [categories.md](.agent-context/categories.md) — Categories: the two-level synced tree, `buildCatalog` and the `CategoryCatalog` every surface reads, the Settings editor, the subtree delete.
 - [email-sync.md](.agent-context/email-sync.md) — Email sync: the connect/map wizard, on-demand scans, feeding the review queue.
 - [inbound-imports.md](.agent-context/inbound-imports.md) — the shared review queue (`features/inbound-imports/`): review against the stored body, the delta pull, source-agnostic slots.

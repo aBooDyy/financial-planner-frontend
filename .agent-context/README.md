@@ -16,7 +16,7 @@ root product [`.agent-context/`](../../.agent-context/). Keep
   sync engine, money/derivation, and the recreated UI are realized; the transfer and
   adjust-balance dialogs.
 - [goals.md](goals.md) — goals and income streams: the kind-less goal shape, progress from
-  set-asides, paydays and cadence (the Goals page is a placeholder while Planning is rebuilt).
+  set-asides, paydays and cadence (data only — the screens are Planning's).
 - [bills.md](bills.md) — bills (once or repeating, must pay / nice to have): the entity, its
   full-representation sync, the mutations and the cross-entity cascades.
 - [set-asides.md](set-asides.md) — set-asides: labels on money in real wallets for a bill or
@@ -27,12 +27,14 @@ root product [`.agent-context/`](../../.agent-context/). Keep
   settlement links to planned rows, and transfers between wallets (two linked legs, the `transfer` outbox entity, the
   collapsed activity row and its scope rules, exclusion from totals), and balance adjustments
   (`adjustment_in`/`adjustment_out` rows outside every total).
-- [planning.md](planning.md) — the Planning engine (`features/planning/`): pay periods from
-  the main paycheck, the two-tier funding engine, money actions and the pure view models.
+- [planning.md](planning.md) — Planning (`features/planning/`): pay periods from the main
+  paycheck, the two-tier funding engine, money actions and the pure view models — and the
+  Planning page built on them (`/planning/$section`: shell, chooser, editors, Overview,
+  Upcoming + payday review, Bills/Goals/Income lists, detail panels, anytime-action sheets).
 - [planned.md](planned.md) — Planned transactions: the entity and its derived settled amount,
   deterministic UUIDv5 ids, the generator and reconciler, the app-level planner (fill /
   recalc + undo, orphan resolution), settlement mutations, the id-taken sync branch, the hooks
-  the Planned tab reads, and the Planned tab + confirm dialog components.
+  Planning reads, the confirm dialog and Activity's nudge.
 - [reports.md](reports.md) — Reports: the URL-held period/comparison/accounts, the preset
   periods and comparison windows, the windowed read + pre-period balance, and the pure builders
   (summary, balance strip, trend buckets, category breakdown, largest expenses, the Needs /

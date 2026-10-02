@@ -154,7 +154,7 @@ walletDeltas?, reservations?)` builds the flattened tree (honoring collapse), gr
   in-bank | caption) instead of two columns, so the in-bank figure gets the width the short
   caption leaves, not what the headline amount leaves. Figures are `whitespace-nowrap` and
   `shrink-0`; a line that still runs out of room wraps (the caption or the "≈ base" part drops
-  to the next line); **only the name truncates** — at 320px included. Tapping a pot navigates to `/goals?goal=<id>`, which opens that goal's read view. A
+  to the next line); **only the name truncates** — at 320px included. Tapping a pot navigates to `/goals?goal=<id>`, which redirects to `/planning/goals?open=goal:<id>` (that goal's detail panel). A
   wallet with nothing reserved looks exactly as before. `TotalHeroCard` still shows the overall
   available / "reserved for goals" split when anything is reserved. `ExchangeRatesCard` exists
   but is **not** mounted on the page (FX editing belongs to Settings).

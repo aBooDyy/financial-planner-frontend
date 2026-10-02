@@ -5,11 +5,10 @@ Goals (what the user saves for) and income streams (money coming in). Together w
 **Planning** page is being rebuilt around (working docs: `working.local/planning-model/`). Domain
 terms: root [domain-glossary.md](../../.agent-context/domain-glossary.md).
 
-> **State (2026-10-02): data layer only.** The old Goals page — kind tiles, obligations, the
-> funding view, goal detail, contribution dialogs — is gone. `/goals/*` renders a placeholder
-> ("Planning is being rebuilt", `components/GoalsPage.tsx`); `components/sections.ts` stays so
-> links keep their route params; it renders the shared chrome (`src/components/chrome/`) with
-> `active="goals"`. The Planning page replaces it.
+> **The screens live in Planning.** This slice is data only; goals and income are shown,
+> edited and acted on by the Planning page ([planning.md](planning.md#the-planning-page--components):
+> the Goals and Income sections, the goal and income editors, the goal detail panel and its
+> sheets). `/goals/*` only redirects there ([routing.md](routing.md#planning-and-spending-tabs)).
 
 ## Local DB & sync (extends [data-layer-and-sync.md](data-layer-and-sync.md))
 
