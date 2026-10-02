@@ -231,6 +231,42 @@ describe('undoing a bill payment gives back what it released', () => {
     expect(await nextDue()).toBe('2026-10-05')
   })
 
+  it('un-releases the rows it released rather than writing new ones', async () => {
+    const id = await paid()
+    await removeTransaction(id)
+    const rows = await db.setAsides.where('billId').equals('rent').toArray()
+    expect(rows).toHaveLength(2)
+    expect(rows.every((a) => a.releasedById === null)).toBe(true)
+    const queued = await db.outbox
+      .filter((e) => e.entity === 'setAside' && e.op === 'update')
+      .toArray()
+    expect(queued.map((e) => e.payload)).toContainEqual(
+      expect.objectContaining({ released_at: null, released_by_id: null }),
+    )
+  })
+
+  it('un-releases only the part a split release took, beside its remainder', async () => {
+    const id = await paid({ amount: m(1500), walletId: 'main' })
+    expect(await liveRows()).toEqual([
+      ['main', '2026-10-05', 500],
+      ['savings', '2026-10-05', 1000],
+    ])
+    await removeTransaction(id)
+    expect(await liveRows()).toEqual([
+      ['main', '2026-10-05', 1500],
+      ['main', '2026-10-05', 500],
+      ['savings', '2026-10-05', 1000],
+    ])
+    expect(await db.setAsides.count()).toBe(3)
+  })
+
+  it('leaves the money freed when the bill has been closed since', async () => {
+    const id = await paid()
+    await db.bills.update('rent', { closedAt: '2026-10-06' })
+    await removeTransaction(id)
+    expect(await liveRows()).toEqual([['savings', '2026-10-05', 1000]])
+  })
+
   it('restores it when the payment is unlinked from the bill', async () => {
     const id = await paid()
     await saveTransactionEdit(id, spend({ billId: null, plannedId: null }))
@@ -250,9 +286,10 @@ describe('undoing a bill payment gives back what it released', () => {
     expect(await nextDue()).toBe('2026-10-05')
 
     await saveTransactionEdit(id, spend({ amount: m(1000) }))
-    expect((await liveRows()).filter(([w]) => w === 'main')).toEqual([
-      ['main', '2026-10-05', 1000],
-    ])
+    const heldInMain = (await liveRows())
+      .filter(([w]) => w === 'main')
+      .reduce((sum, [, , amount]) => sum + Number(amount), 0)
+    expect(heldInMain).toBe(1000)
   })
 
   it('releases in the new wallet when the payment moves to another one', async () => {

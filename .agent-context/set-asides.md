@@ -29,9 +29,16 @@ goal allocations and serves bills and goals alike (working docs:
 stream yet — the backend's follow-up if the list grows). PATCH is a full representation; the
 owner is fixed at create and never sent on update; `position` and `date` are kept by the server
 when omitted. Usual `409` / `404` handling, with one exception: **a rebase never touches the
-release.** Releasing rides a batch or a close, never an edit, so `rebaseSetAside` takes
-`released_at`, `released_by_id` and `moved_by_transfer_id` from the server's copy — re-sending
-this device's would un-release money another device paid or freed.
+release** — unless it is this device's own un-release. Releasing rides a batch or a close,
+never an edit, so `rebaseSetAside` takes `released_at`, `released_by_id` and
+`moved_by_transfer_id` from the server's copy — re-sending this device's would un-release money
+another device paid or freed. Every stored server copy keeps its update body on the row as
+`synced` (`fromServer` → `withSynced`, the bills/goals base); when that base, at the row's
+version, was released and the row is live here, the row was un-released on this device
+(`unreleasedHere`) and its release fields are sent as they are. A row with no base at its version
+(none stored yet — the next pull adds it) keeps the old rule. A PATCH refused with
+`422 planning.set_aside.owner_closed` (the bill or goal closed elsewhere, so the money can't be
+live) settles on the server's row (`resyncSetAsides`).
 
 ## Mutations — `data/mutations.ts`
 
@@ -40,6 +47,10 @@ this device's would un-release money another device paid or freed.
   `date` defaults to today. Closes the planned row it settles (`closeCovered`).
 - `updateSetAside(id, patch)` — source/wallet/label normalised, re-derives the old and new
   planned rows' status.
+- `unreleaseSetAside(id)` — takes a release back on the same row (`releasedAt`,
+  `releasedById` cleared; `movedByTransferId` kept), queued as a plain full PATCH — after any
+  batch still queued for the row, like an edit. The server refuses it on a closed owner
+  (`owner_closed`).
 - `deleteSetAside(id)` — for a record made by mistake (releasing is how money stops being set
   aside). Re-opens the planned row it was settling.
 - `dropSetAsidesOf('goalId' | 'billId', id)` — the local mirror of the server's cascade when a
@@ -112,11 +123,14 @@ decides (`planning/data/leftover.leftoverFor`).
 `createSetAside` takes an optional `id` in the draft: an id already held writes nothing, so a
 retried auto-confirm never sets aside twice.
 
-**Taking a payment back** (deleted, unlinked, re-priced — `planning/actions/paymentUndo`) does
-not un-release: `restoreReleasedBy(paymentIds)` writes a **new** live row per row the payment
-released (same owner, wallet, occurrence, amount, date and `plannedId`), under the
-deterministic id `uuidv5('<released id>:restored')`, so restoring twice is a no-op. The released
-row stays as the record, still carrying `releasedById`.
+**Taking a payment back** (deleted, unlinked, re-priced — `planning/actions/paymentUndo`)
+**un-releases**: `restoreReleasedBy(paymentIds)` calls `unreleaseSetAside` on every row the
+payment released, so the money is live on its own row again and nothing still names the payment
+— Reports' goal saving (`countsAsGoalSaving`) and planned settlement (`settlesItsRow`) count it
+once. Running it twice is a no-op (the rows are live). A release that **split** a row released
+only its part, so only that part comes back: it is live again **beside** the remainder the split
+wrote (two rows, same sum — the remainder's id is random, so they are not merged). Rows whose
+bill or goal closed or went, or whose wallet is archived or gone, are skipped and stay released.
 
 ## Totals — `data/totals.ts` (pure)
 

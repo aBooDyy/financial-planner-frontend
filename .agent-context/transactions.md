@@ -62,14 +62,14 @@ and `recurrings` went with the planning rebuild: a repeating payment is a **bill
   just re-syncs `nextDue` — unless the amount, currency, wallet or type changed, which releases
   afresh. **Taking a payment back gives back what it released** (`planning/actions/paymentUndo`):
   deleting it (`removeTransaction`, `bulkDeleteTransactions` — import undo), unlinking it or
-  re-pricing it first `restoreReleasedBy([id])` — one new live set-aside per row the payment
-  released (same owner, wallet, occurrence, amount, date, planned link; id
-  `uuidv5('<released id>:restored')`, so a row is never restored twice; skipped when the owner is
-  closed/gone or the wallet archived/gone) — then a re-pricing edit releases again for the new
-  amount/wallet. A payment that reopens its occurrence steps `nextDue` back to it
-  (`stepNextDueBack`; `syncBillNextDue` only moves forward). A bill that is closed or gone saves
-  the row as it is, unpaid. The released rows keep `releasedById` (the server sets it null when
-  the transaction is deleted, without a version bump).
+  re-pricing it first `restoreReleasedBy([id])` — every row the payment released is
+  **un-released** in place (`unreleaseSetAside`; a split release gives back only its part,
+  beside the remainder; skipped when the owner is closed/gone or the wallet archived/gone) —
+  then a re-pricing edit releases again for the new amount/wallet. A payment that reopens its
+  occurrence steps `nextDue` back to it (`stepNextDueBack`; `syncBillNextDue` only moves
+  forward). A bill that is closed or gone saves the row as it is, unpaid. Skipped rows keep
+  `releasedById` (the server sets it null when the transaction is deleted, without a version
+  bump; the next pull brings that).
 - **Goal spends go through Use it's rule** (same module): a spend saved with a `goalId` (and no
   bill) releases that goal's set-asides **in the paying wallet**, oldest first, up to the amount
   (`releaseForPayment({goalId}, …)`, as `spendFromGoal` does) — never other wallets'. An edit

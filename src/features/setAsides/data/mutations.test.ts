@@ -9,8 +9,13 @@ import { bill, m, planned, setAside } from '#/features/planned/testing/fixtures'
 
 vi.mock('#/db/sync', () => ({ schedulePush: vi.fn() }))
 
-const { createSetAside, deleteSetAside, dropSetAsidesOf, updateSetAside } =
-  await import('./mutations')
+const {
+  createSetAside,
+  deleteSetAside,
+  dropSetAsidesOf,
+  unreleaseSetAside,
+  updateSetAside,
+} = await import('./mutations')
 
 const IN_MAIN = {
   source: 'wallet' as const,
@@ -125,6 +130,61 @@ describe('updateSetAside / deleteSetAside', () => {
     expect((await db.plannedTransactions.get('p1'))?.status).toBe('open')
     // Never synced: nothing goes to the server.
     expect((await queued()).filter((e) => e.entity === 'setAside')).toEqual([])
+  })
+})
+
+describe('unreleaseSetAside', () => {
+  it('makes the released row live again and queues it as an update', async () => {
+    await db.setAsides.put(
+      setAside({
+        id: 'a1',
+        version: 'v1',
+        releasedAt: '2026-10-04',
+        releasedById: 't1',
+        movedByTransferId: 'x1',
+      }),
+    )
+
+    await unreleaseSetAside('a1')
+
+    expect(await db.setAsides.get('a1')).toMatchObject({
+      releasedAt: null,
+      releasedById: null,
+      movedByTransferId: 'x1',
+      dirty: 1,
+    })
+    const [entry] = await queued()
+    expect(entry).toMatchObject({ op: 'update', baseVersion: 'v1' })
+    expect(entry.payload).toMatchObject({
+      version: 'v1',
+      released_at: null,
+      released_by_id: null,
+    })
+  })
+
+  it('goes after a queued batch that released the row', async () => {
+    await db.setAsides.put(
+      setAside({ id: 'a1', releasedAt: '2026-10-04', releasedById: 't1' }),
+    )
+    await db.outbox.add({
+      op: 'release',
+      entity: 'setAside',
+      id: 'a1',
+      alsoRows: [],
+      payload: { items: [{ id: 'a1' }] },
+      baseVersion: null,
+      createdAt: '',
+    })
+
+    await unreleaseSetAside('a1')
+
+    expect((await queued()).map((e) => e.op)).toEqual(['release', 'update'])
+  })
+
+  it('leaves a live row alone', async () => {
+    await db.setAsides.put(setAside({ id: 'a1' }))
+    await unreleaseSetAside('a1')
+    expect(await queued()).toEqual([])
   })
 })
 

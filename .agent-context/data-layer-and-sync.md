@@ -474,7 +474,9 @@ many times the server has _rejected_ it) and `nextAttemptAt` (no automatic retry
     on the row as `synced` (`withSynced`); `rebasedBody` diffs the user's row against it and
     lays the differing fields over the fresh copy. A row with no base at its version (stored by
     a path that keeps none) rebases whole, as before. `storeAnswer` moves the base along with
-    the version.
+    the version. Set-asides keep the base too, but rebase whole except for the release, which
+    is the server's unless the base shows this device took it back
+    ([set-asides.md](set-asides.md#sync--datasyncts)).
   - Whole-record LWW: a local delete still wins over a server update, and vice versa.
   - This never silently discards the user's own latest intent. If the retry conflicts
     again, the server copy is accepted rather than looping; if it fails any other way, the

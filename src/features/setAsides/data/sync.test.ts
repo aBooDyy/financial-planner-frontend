@@ -15,8 +15,10 @@ const api = vi.hoisted(() => ({
 vi.mock('#/features/setAsides/api/setAsidesApi', () => ({
   setAsidesApi: api,
 }))
+vi.mock('#/db/sync', () => ({ schedulePush: () => undefined }))
 
 const { pullSetAsides, pushSetAsidesEntry } = await import('./sync')
+const { unreleaseSetAside } = await import('./mutations')
 
 const asServer = (row: LocalSetAside, version: string): SetAside => {
   const { dirty, deleted, ...rest } = row
@@ -173,6 +175,72 @@ describe('pushSetAsidesEntry', () => {
       released_by_id: 't9',
       moved_by_transfer_id: 'x1',
     })
+    expect(await db.setAsides.get('a1')).toMatchObject({
+      releasedAt: '2026-10-01',
+      dirty: 0,
+    })
+  })
+
+  it('keeps this device’s un-release while rebasing it onto another device’s edit', async () => {
+    const released = setAside({
+      id: 'a1',
+      releasedAt: '2026-10-01',
+      releasedById: 't9',
+    })
+    api.list.mockResolvedValueOnce([asServer(released, 'v1')])
+    await pullSetAsides()
+    await unreleaseSetAside('a1')
+    const [entry] = await db.outbox.toArray()
+    const fresh = asServer({ ...released, note: 'theirs' }, 'v2')
+    api.list.mockResolvedValue([fresh])
+    api.update
+      .mockRejectedValueOnce(
+        new ApiError({ status: 409, code: 'common.conflict', message: '' }),
+      )
+      .mockImplementationOnce((_id: string, body: Record<string, unknown>) =>
+        Promise.resolve({
+          ...fresh,
+          releasedAt: body.released_at,
+          releasedById: body.released_by_id,
+          version: 'v3',
+        }),
+      )
+
+    await pushSetAsidesEntry(entry)
+
+    expect(api.update.mock.calls[1][1]).toMatchObject({
+      version: 'v2',
+      released_at: null,
+      released_by_id: null,
+    })
+    expect(await db.setAsides.get('a1')).toMatchObject({
+      releasedAt: null,
+      dirty: 0,
+    })
+  })
+
+  it('settles an un-release the server refuses because the owner closed', async () => {
+    const released = setAside({ id: 'a1', releasedAt: '2026-10-01' })
+    await db.setAsides.put({ ...released, releasedAt: null, dirty: 1 })
+    api.update.mockRejectedValue(
+      new ApiError({
+        status: 422,
+        code: 'planning.set_aside.owner_closed',
+        message: '',
+      }),
+    )
+    api.list.mockResolvedValue([asServer(released, 'v2')])
+    const entry = await queue({
+      op: 'update',
+      entity: 'setAside',
+      id: 'a1',
+      payload: {},
+      baseVersion: 'v1',
+    })
+
+    await pushSetAsidesEntry(entry)
+
+    expect(await db.outbox.count()).toBe(0)
     expect(await db.setAsides.get('a1')).toMatchObject({
       releasedAt: '2026-10-01',
       dirty: 0,

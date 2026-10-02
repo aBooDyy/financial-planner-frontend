@@ -144,9 +144,37 @@ export async function updateSetAside(
     updatedAt: now(),
     dirty: 1,
   }
+  await writeUpdate(row)
+  await reopenUnderSettled([existing.plannedId])
+  await closeCovered([row.plannedId])
+  schedulePush()
+}
+
+/**
+ * Take back a release: the same row is live again, so the money is never counted both as set
+ * aside and as used. A partial release only ever released its own part, so that part is what
+ * comes back — the remainder it split off stayed live all along.
+ */
+export async function unreleaseSetAside(id: string): Promise<void> {
+  const existing = await db.setAsides.get(id)
+  if (!existing || existing.deleted !== 0 || existing.releasedAt === null)
+    return
+  const row: LocalSetAside = {
+    ...existing,
+    releasedAt: null,
+    releasedById: null,
+    updatedAt: now(),
+    dirty: 1,
+  }
+  await writeUpdate(row)
+  await closeCovered([row.plannedId])
+  schedulePush()
+}
+
+async function writeUpdate(row: LocalSetAside): Promise<void> {
   await db.transaction('rw', db.setAsides, db.outbox, async () => {
     await db.setAsides.put(row)
-    if (await touchedByBatch(id)) {
+    if (await touchedByBatch(row.id)) {
       // Folding this edit into a write queued before the batch would send the batch's own
       // effect ahead of it; it goes after instead.
       await enqueueUpdateAfter(row)
@@ -154,15 +182,12 @@ export async function updateSetAside(
     }
     await enqueueUpsert(
       'setAside',
-      id,
+      row.id,
       row.version,
       localSetAsideToCreateWire(row),
       localSetAsideToUpdateWire(row),
     )
   })
-  await reopenUnderSettled([existing.plannedId])
-  await closeCovered([row.plannedId])
-  schedulePush()
 }
 
 async function enqueueUpdateAfter(row: LocalSetAside): Promise<void> {

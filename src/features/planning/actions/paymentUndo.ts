@@ -6,27 +6,16 @@
 import { db } from '#/db/db'
 import type { LocalSetAside } from '#/db/types'
 import { setBillNextDue } from '#/features/bills/data/mutations'
-import { PLANNED_NAMESPACE, uuidv5 } from '#/features/planned/data/ids'
-import { createSetAside } from '#/features/setAsides/data/mutations'
-import type { SetAsideOwner } from '#/features/setAsides/data/mutations'
+import { unreleaseSetAside } from '#/features/setAsides/data/mutations'
 
-/** One restore per released row, so restoring twice never sets the money aside twice. */
-const restoredIdOf = (releasedId: string): string =>
-  uuidv5(`${releasedId}:restored`, PLANNED_NAMESPACE)
-
-/** The row's owner while it can still hold money: open, not deleted. */
-async function liveOwner(row: LocalSetAside): Promise<SetAsideOwner | null> {
-  if (row.goalId) {
-    const goal = await db.goals.get(row.goalId)
-    return goal && goal.deleted === 0 && goal.closedAt === null
-      ? { goalId: goal.id }
-      : null
-  }
-  if (!row.billId) return null
-  const bill = await db.bills.get(row.billId)
-  return bill && bill.deleted === 0 && bill.closedAt === null
-    ? { billId: bill.id, occurrence: row.occurrence }
-    : null
+/** Whether the row's bill or goal can still hold money: open, not deleted. */
+async function ownerIsOpen(row: LocalSetAside): Promise<boolean> {
+  const owner = row.goalId
+    ? await db.goals.get(row.goalId)
+    : row.billId
+      ? await db.bills.get(row.billId)
+      : undefined
+  return owner !== undefined && owner.deleted === 0 && owner.closedAt === null
 }
 
 async function liveWallet(walletId: string | null): Promise<boolean> {
@@ -41,10 +30,9 @@ async function liveWallet(walletId: string | null): Promise<boolean> {
 }
 
 /**
- * Set aside again what these payments released: a new live row per released one, with its
- * owner, wallet, occurrence, amount, date and planned link. Money whose bill or goal has since
- * closed or gone, or whose wallet is archived or gone, stays free — as closing or archiving
- * would have left it.
+ * Set aside again what these payments released, by taking each release back on its own row
+ * (`unreleaseSetAside`). Money whose bill or goal has since closed or gone, or whose wallet is
+ * archived or gone, stays free — as closing or archiving would have left it.
  */
 export async function restoreReleasedBy(
   paymentIds: ReadonlyArray<string>,
@@ -61,19 +49,8 @@ export async function restoreReleasedBy(
     )
     .toArray()
   for (const row of released) {
-    const owner = await liveOwner(row)
-    if (!owner || !(await liveWallet(row.walletId))) continue
-    await createSetAside(owner, {
-      id: restoredIdOf(row.id),
-      source: 'wallet',
-      walletId: row.walletId,
-      externalLabel: null,
-      amount: row.amount,
-      currency: row.currency,
-      note: row.note,
-      date: row.date,
-      plannedId: row.plannedId,
-    })
+    if (!(await ownerIsOpen(row)) || !(await liveWallet(row.walletId))) continue
+    await unreleaseSetAside(row.id)
   }
 }
 

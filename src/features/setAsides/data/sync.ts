@@ -1,5 +1,6 @@
 import { db } from '#/db/db'
 import { pendingFor } from '#/db/enqueue'
+import { syncedOf, withSynced } from '#/db/rebase'
 import { storeAnswer } from '#/db/storeAnswer'
 import { settleTakenCreate } from '#/db/takenCreate'
 import type { LocalSetAside, OutboxEntry } from '#/db/types'
@@ -26,6 +27,10 @@ import { hasQueuedWrites } from './queue'
 
 const statusOf = (e: unknown): number => (e instanceof ApiError ? e.status : -1)
 
+/** The server's set-aside as a local row, with the base a later rebase reads (`onServer`). */
+const fromServer = (row: SetAside): LocalSetAside =>
+  withSynced(serverSetAsideToLocal(row), localSetAsideToUpdateWire)
+
 /**
  * Store rows an action answered with (a close, a release, a move) as the server now holds them —
  * except a row with writes still queued behind the action: it keeps the user's newer edit, and
@@ -37,7 +42,7 @@ export async function storeServerSetAsides(
   for (const row of rows) {
     await storeAnswer(
       db.setAsides,
-      serverSetAsideToLocal(row),
+      fromServer(row),
       await hasQueuedWrites(row.id),
     )
   }
@@ -51,7 +56,7 @@ async function storeAndSettle(
     await db.outbox.delete(entry.seq)
     await storeAnswer(
       db.setAsides,
-      serverSetAsideToLocal(row),
+      fromServer(row),
       await hasQueuedWrites(row.id),
     )
   })
@@ -69,7 +74,7 @@ async function pushSetAsideCreate(entry: OutboxEntry): Promise<void> {
       table: db.setAsides,
       find: async () =>
         (await setAsidesApi.list()).find((a) => a.id === entry.id),
-      toLocal: serverSetAsideToLocal,
+      toLocal: fromServer,
       rebased: (local, server) =>
         localSetAsideToUpdateWire(onServer(local, server)),
       update: (body) =>
@@ -88,6 +93,10 @@ async function pushSetAsideUpdate(entry: OutboxEntry): Promise<void> {
   } catch (e) {
     const status = statusOf(e)
     if (status === 409) return rebaseSetAside(entry)
+    if (e instanceof ApiError && e.code === OWNER_CLOSED) {
+      await db.outbox.delete(entry.seq)
+      return resyncSetAsides([entry.id])
+    }
     if (status === 404) {
       await db.transaction('rw', db.setAsides, db.outbox, async () => {
         await db.setAsides.delete(entry.id)
@@ -100,17 +109,41 @@ async function pushSetAsideUpdate(entry: OutboxEntry): Promise<void> {
 }
 
 /**
- * The local row on the server's version. Releasing is never an edit — it rides a batch or a
- * close — so the release fields are the server's: re-sending ours would un-release money another
- * device paid or freed, counting it as both spent and set aside.
+ * Money can't be live on a done bill or goal: an edit leaving it live there (an un-release
+ * after the owner closed elsewhere) is settled by the server's row, still released.
  */
-const onServer = (local: LocalSetAside, server: SetAside): LocalSetAside => ({
-  ...local,
-  version: server.version,
-  releasedAt: server.releasedAt,
-  releasedById: server.releasedById,
-  movedByTransferId: server.movedByTransferId,
-})
+const OWNER_CLOSED = 'planning.set_aside.owner_closed'
+
+/**
+ * Whether this device took the row's release back (`unreleaseSetAside`): it was released when
+ * last synced, at the version it still builds on, and is live here.
+ */
+const unreleasedHere = (local: LocalSetAside): boolean => {
+  const base = syncedOf(local)
+  return (
+    base !== undefined &&
+    base.version === local.version &&
+    base.released_at !== null &&
+    local.releasedAt === null
+  )
+}
+
+/**
+ * The local row on the server's version. Releasing rides a batch or a close, never an edit, so
+ * the release fields are the server's — re-sending ours would un-release money another device
+ * paid or freed, counting it as both spent and set aside. The one exception is this device's
+ * own un-release, which is the change being sent.
+ */
+const onServer = (local: LocalSetAside, server: SetAside): LocalSetAside =>
+  unreleasedHere(local)
+    ? { ...local, version: server.version }
+    : {
+        ...local,
+        version: server.version,
+        releasedAt: server.releasedAt,
+        releasedById: server.releasedById,
+        movedByTransferId: server.movedByTransferId,
+      }
 
 async function rebaseSetAside(entry: OutboxEntry): Promise<void> {
   const fresh = (await setAsidesApi.list()).find((a) => a.id === entry.id)
@@ -301,7 +334,7 @@ export async function pullSetAsides(): Promise<void> {
     for (const a of server) {
       const local = await db.setAsides.get(a.id)
       if (!local || (local.dirty === 0 && local.deleted === 0)) {
-        await db.setAsides.put(serverSetAsideToLocal(a))
+        await db.setAsides.put(fromServer(a))
       }
     }
     for (const l of await db.setAsides.toArray()) {
