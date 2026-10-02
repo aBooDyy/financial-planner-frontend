@@ -14,7 +14,7 @@ export function Dot({ color, size = 8 }: { color: string; size?: number }) {
   return (
     <span
       aria-hidden
-      className="flex-none rounded-full"
+      className="inline-block flex-none rounded-full"
       style={{ background: color, width: size, height: size }}
     />
   )
