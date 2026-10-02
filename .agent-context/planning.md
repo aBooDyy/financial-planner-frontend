@@ -187,7 +187,10 @@ Plus `progress` / `setAside` / `used` / `target` / `left`, `perPaycheck`,
   periods, isEmpty}`: the Planned tab's row views (`buildPlannedList`) with Needs confirming
   first, then grouped by pay period (`periodsBetween`) — `kind` `this` (today to the day before
   payday) · `next` · `later` — each with `payments` / `setAsides` / `income` rows and
-  `incomeIn`, `paymentsOut`, `setAsideOut`, `left` (base; may be negative). A bill payment row
+  `incomeIn`, `paymentsOut`, `setAsideOut`, `left` (base; may be negative). `left` counts like
+  Safe to spend: income less each payment's part nothing is set aside for yet, less the
+  set-asides for what falls due **after** the period (one paying a bill inside it is that bill,
+  counted once) — so it is not `incomeIn − paymentsOut − setAsideOut`. A bill payment row
   carries `coverage` (`covered` / `partial` / `not_set_aside` + the amount set aside for its
   occurrence) and `savedUp` (its bill saves up over several paydays — the collapsed summary
   names these). Calendar months without a main paycheck.

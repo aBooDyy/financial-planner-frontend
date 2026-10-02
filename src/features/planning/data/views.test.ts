@@ -196,7 +196,27 @@ describe('Upcoming by payday', () => {
     expect(next.incomeIn).toBe(m(12000))
     expect(next.payments.map((r) => r.name)).toEqual(['Rent', 'Internet'])
     expect(next.setAsideOut).toBe(m(5740))
-    expect(next.left).toBe(m(12000 - 3200 - 5740))
+    // Rent's and Internet's set-asides on this payday pay their bills in the same period:
+    // the bills count once, and only the set-asides for later come out on top.
+    expect(next.left).toBe(m(12000 - 3200 - 240 - 2300))
+  })
+
+  it('leaves for spending what pay leaves after the bills nothing set aside covers', () => {
+    const { inputs, state, today } = world({
+      today: '2026-10-02',
+      setAsides: [
+        setAside({
+          goalId: null,
+          billId: 'rent',
+          occurrence: '2026-11-01',
+          amount: m(3000),
+        }),
+      ],
+    })
+    const next = buildUpcoming({ inputs, state, nodes, today }).periods[1]
+    expect(next.payments.map((r) => r.name)).toEqual(['Rent', 'Internet'])
+    // Rent was set aside before this paycheck: none of it comes out of it.
+    expect(next.left).toBe(m(12000 - 200 - 240 - 2300))
   })
 
   it('says whether a bill payment is set aside', () => {

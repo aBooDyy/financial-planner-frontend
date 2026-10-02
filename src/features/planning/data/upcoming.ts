@@ -11,6 +11,7 @@ import type { PlannerInputs, PlannerState } from '#/features/planned/data/state'
 import { isLiveSetAside } from '#/features/setAsides/data/totals'
 import { convertMinor } from '#/lib/currency'
 import { tracksOf } from './funding'
+import { occurrenceFrom, paymentRowsByBill } from './occurrences'
 import { periodsBetween } from './payPeriods'
 import type { PayPeriod } from './payPeriods'
 import { cycleOf } from './status'
@@ -41,7 +42,11 @@ export type UpcomingPeriod = {
   incomeIn: number
   paymentsOut: number
   setAsideOut: number
-  /** `incomeIn − paymentsOut − setAsideOut`; may be negative. */
+  /**
+   * What pay leaves for spending, as Safe to spend counts it: `incomeIn` less the payments'
+   * parts nothing is set aside for yet, less the set-asides for what falls due after the
+   * period (one for a payment inside it is that payment, counted once). May be negative.
+   */
   left: number
 }
 
@@ -116,6 +121,30 @@ export function buildUpcoming(args: {
   const inBase = (r: UpcomingRow) =>
     convertMinor(r.remainder, r.currency, base, rates)
   const sum = (rows: UpcomingRow[]) => rows.reduce((a, r) => a + inBase(r), 0)
+  const uncovered = (rows: UpcomingRow[]) =>
+    rows.reduce(
+      (a, r) =>
+        a +
+        convertMinor(
+          Math.max(0, r.remainder - (r.coverage?.setAside ?? 0)),
+          r.currency,
+          base,
+          rates,
+        ),
+      0,
+    )
+  const paymentRows = paymentRowsByBill(inputs.planned)
+  /** The occurrence a bill set-aside row goes toward; null for a goal's. */
+  const coversOf = (r: UpcomingRow): string | null => {
+    const bill = r.item.billId ? bills.get(r.item.billId) : undefined
+    return bill
+      ? occurrenceFrom(
+          bill,
+          r.item.date,
+          paymentRows.get(bill.id) ?? new Map(),
+        )
+      : null
+  }
 
   const periods = periodsBetween(state.funding.calendar, today, last).map(
     (period, i): UpcomingPeriod => {
@@ -128,6 +157,10 @@ export function buildUpcoming(args: {
       const incomeIn = sum(income)
       const paymentsOut = sum(payments)
       const setAsideOut = sum(setAsides)
+      const forLater = setAsides.filter((r) => {
+        const covers = coversOf(r)
+        return covers === null || covers > period.end
+      })
       return {
         period,
         kind: i === 0 ? 'this' : i === 1 ? 'next' : 'later',
@@ -138,7 +171,7 @@ export function buildUpcoming(args: {
         incomeIn,
         paymentsOut,
         setAsideOut,
-        left: incomeIn - paymentsOut - setAsideOut,
+        left: incomeIn - uncovered(payments) - sum(forLater),
       }
     },
   )
