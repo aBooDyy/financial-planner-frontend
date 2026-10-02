@@ -20,6 +20,7 @@ import { ItemRow } from './ItemRow'
 import { SectionHeading } from './SectionHeading'
 import { TierCard } from './TierCard'
 import { useTierDrag } from './useTierDrag'
+import { useIsDesktop } from '#/hooks/useMediaQuery'
 
 const TIER_TITLE: Record<TierKey, string> = {
   must: 'Must pay',
@@ -39,6 +40,8 @@ export function BillsSection() {
   const openSheet = usePlanningUi((s) => s.openSheet)
   const openDetail = usePlanningUi((s) => s.openDetail)
   const actions = useItemActions()
+  // Touch screens can't drag rows, so moving is offered in each row's ⋯ menu instead.
+  const desktop = useIsDesktop()
   const { calendar } = planning
   const base = inputs.base
   const toBase = (amount: number, currency: string) =>
@@ -146,7 +149,12 @@ export function BillsSection() {
                       />
                     ) : undefined
                   }
-                  menu={actions.billMenu(b)}
+                  menu={[
+                    ...actions.billMenu(b),
+                    ...(desktop
+                      ? []
+                      : drag.moveActions(b.id, tier, TIER_TITLE)),
+                  ]}
                   onOpen={() => openDetail(billOwner(b.id))}
                   drag={drag.rowProps(b.id, tier)}
                   onGripKey={drag.gripKeys(b.id, tier)}

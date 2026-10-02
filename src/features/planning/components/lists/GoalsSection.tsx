@@ -25,6 +25,7 @@ import { ItemRow } from './ItemRow'
 import { SectionHeading } from './SectionHeading'
 import { TierCard } from './TierCard'
 import { useTierDrag } from './useTierDrag'
+import { useIsDesktop } from '#/hooks/useMediaQuery'
 
 const TIER_TITLE: Record<TierKey, string> = {
   must: 'Must have',
@@ -46,6 +47,8 @@ export function GoalsSection() {
   const openSheet = usePlanningUi((s) => s.openSheet)
   const openDetail = usePlanningUi((s) => s.openDetail)
   const actions = useItemActions()
+  // Touch screens can't drag rows, so moving is offered in each row's ⋯ menu instead.
+  const desktop = useIsDesktop()
   const { calendar } = planning
   const base = inputs.base
   const suggestion = useMemo(
@@ -158,7 +161,12 @@ export function GoalsSection() {
                       />
                     ) : undefined
                   }
-                  menu={actions.goalMenu(g)}
+                  menu={[
+                    ...actions.goalMenu(g),
+                    ...(desktop
+                      ? []
+                      : drag.moveActions(g.id, tier, TIER_TITLE)),
+                  ]}
                   onOpen={() => openDetail(goalOwner(g.id))}
                   drag={drag.rowProps(g.id, tier)}
                   onGripKey={drag.gripKeys(g.id, tier)}

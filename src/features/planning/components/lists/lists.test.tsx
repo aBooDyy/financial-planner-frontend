@@ -140,6 +140,55 @@ describe('Bills', () => {
     })
   })
 
+  it('moves bills from the row menu on a phone, where there is no drag', async () => {
+    const desktopMedia = window.matchMedia
+    window.matchMedia = ((query: string) => ({
+      ...desktopMedia(query),
+      matches: false,
+    }))
+    try {
+      render(<BillsSection />)
+      const open = async (name: string) =>
+        fireEvent.keyDown(
+          await screen.findByRole('button', { name: `More for ${name}` }),
+          { key: 'Enter' },
+        )
+      await open('Rent')
+      expect(screen.queryByRole('menuitem', { name: 'Move up' })).toBeNull()
+      fireEvent.click(
+        await screen.findByRole('menuitem', { name: 'Move down' }),
+      )
+      await waitFor(async () =>
+        expect((await db.bills.get('rent'))?.position).toBe(1),
+      )
+      expect((await db.bills.get('ins'))?.position).toBe(0)
+
+      await open('Car insurance')
+      fireEvent.click(
+        await screen.findByRole('menuitem', { name: 'Move to Nice to have' }),
+      )
+      await waitFor(async () =>
+        expect(await db.bills.get('ins')).toMatchObject({
+          mustPay: false,
+          position: 0,
+        }),
+      )
+      expect((await db.bills.get('gym'))?.position).toBe(1)
+    } finally {
+      window.matchMedia = desktopMedia
+    }
+  })
+
+  it('keeps the move items out of the menu on desktop, where rows drag', async () => {
+    render(<BillsSection />)
+    fireEvent.keyDown(
+      await screen.findByRole('button', { name: 'More for Gym' }),
+      { key: 'Enter' },
+    )
+    await screen.findByRole('menuitem', { name: 'Pay now' })
+    expect(screen.queryByRole('menuitem', { name: /^Move/ })).toBeNull()
+  })
+
   it('says what goes here when there are no bills', async () => {
     await db.bills.clear()
     render(<BillsSection />)

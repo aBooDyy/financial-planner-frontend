@@ -409,7 +409,10 @@ confirming). Unticked lines are left alone. The Automatic-mode notice
 - **Reorder**: `useTierDrag` over `view/reorder.ts` — HTML drag and drop (dropping on a row of
   the other tier moves the item into that tier: `mustPay` / `mustHave` flips) and ↑ / ↓ on the
   grip button for keyboards. Both tiers are renumbered from 0 and only moved rows are written
-  (`updateBill` / `updateGoal` with `position`, which `updateGoal` now accepts).
+  (`updateBill` / `updateGoal` with `position`, which `updateGoal` now accepts). Phones have
+  no drag (the grip is hidden below `md`), so there `useTierDrag().moveActions` adds **Move up ·
+  Move down · Move to {other tier}** to each row's ⋯ menu (`useIsDesktop` decides); the other
+  tier is entered at its nearest edge (top of Nice to have, bottom of Must pay / Must have).
 - **Income**: one card, every stream (ended ones dimmed) — label + **Sets my pay periods** on
   the main paycheck, "Monthly · 25th · into Main bank", the amount with its cadence's short
   suffix, ⋯ **Edit · Use for my pay periods · Delete**; a row opens its editor. Header:
