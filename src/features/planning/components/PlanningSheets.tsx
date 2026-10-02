@@ -8,6 +8,7 @@ import { BillEditor } from './editors/BillEditor'
 import { GoalEditor } from './editors/GoalEditor'
 import { IncomeEditor } from './editors/IncomeEditor'
 import { ConfirmPlannedDialog } from '#/features/planned/components/ConfirmPlannedDialog'
+import { PaydayReviewSheet } from './review/PaydayReviewSheet'
 import { AddMoneySheet } from './sheets/AddMoneySheet'
 import { DeleteItemConfirm } from './sheets/DeleteItemConfirm'
 import { LeftoverSheet } from './sheets/LeftoverSheet'
@@ -122,6 +123,8 @@ export function PlanningSheets() {
           }}
         />
       )
+    case 'review':
+      return <PaydayReviewSheet payday={sheet.payday} onClose={closeSheet} />
     case 'delete':
       return (
         <DeleteItemConfirm

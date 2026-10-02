@@ -354,6 +354,22 @@ review for the oldest waiting payday, else the next one), then the view.
   *Overdue*, *Due in N days* (≤ 10), else the date. A row opens its bill's or goal's detail
   (income: the confirm dialog).
 
+### Payday review — `components/review/PaydayReviewSheet.tsx`
+
+The one-sheet variant (design default, 03 §4, D31): `paydayReview` for the requested payday
+(the oldest waiting one from **Review**, else the next payday), groups **Bills due before next
+payday** · **Saving up for bills** · **Goals** (each with its base total). Each line: tick, name
++ "Due Nov 1" / "By Jun 2027" / "Ongoing", a wallet select, an amount field (its own
+currency). Per destination other than the deposit wallet a ticked-by-default **"I've moved SR X
+to Savings"** card (`transfersFor` over the ticked, edited lines). The over-commit guardrail
+reads free money after those transfers and turns the button into **Set aside anyway**.
+**Set aside SR X** → `actions/confirmReview.ts#confirmReview`: one transfer per ticked
+destination (`createTransfer`), then `confirmPlanned` per ticked line at its amount and wallet;
+**Not now** → `postponeReview` (`dismissFromReview` on the waiting lines: they stay in Needs
+confirming). Unticked lines are left alone. The Automatic-mode notice
+(`usePaydayNoticeStore`) becomes a Planning toast with a **Review** action
+(`usePaydayNoticeToast`, mounted by `PlanningPage` — so only while Planning is open).
+
 ### Bills, Goals, Income — `components/lists/`
 
 - **Bills** / **Goals**: a `SectionHeading` ("Bills 8", a summary line, **+ Add bill / goal**),
