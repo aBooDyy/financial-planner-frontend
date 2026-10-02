@@ -144,6 +144,79 @@ describe('moveSetAsides', () => {
     )
   })
 
+  it('sends a move within the same goal as a wallet move, keeping the planned link', async () => {
+    await moveSetAsides([
+      { id: 'a1', to: { walletId: 'w2', owner: { goalId: 'g1' } } },
+    ])
+
+    const [item] = ((await onlyEntry()).payload as MoveWire).items
+    expect(item.to).toEqual({ wallet_id: 'w2' })
+    expect(await db.setAsides.get(item.new_id)).toMatchObject({
+      goalId: 'g1',
+      walletId: 'w2',
+      plannedId: 'p1',
+    })
+  })
+
+  it('sends a move within the same bill occurrence as a wallet move, keeping the planned link', async () => {
+    await db.setAsides.put(
+      setAside({
+        id: 'b-a',
+        goalId: null,
+        billId: 'rent',
+        occurrence: '2026-11-01',
+        plannedId: 'p9',
+        version: 'v1',
+      }),
+    )
+
+    await moveSetAsides([
+      {
+        id: 'b-a',
+        to: {
+          walletId: 'w2',
+          owner: { billId: 'rent', occurrence: '2026-11-01' },
+        },
+      },
+    ])
+
+    const [item] = ((await onlyEntry()).payload as MoveWire).items
+    expect(item.to).toEqual({ wallet_id: 'w2' })
+    expect(await db.setAsides.get(item.new_id)).toMatchObject({
+      billId: 'rent',
+      occurrence: '2026-11-01',
+      plannedId: 'p9',
+    })
+  })
+
+  it('moves a row to another occurrence of its bill, dropping the planned link', async () => {
+    await db.setAsides.put(
+      setAside({
+        id: 'b-a',
+        goalId: null,
+        billId: 'rent',
+        occurrence: '2026-11-01',
+        plannedId: 'p9',
+        version: 'v1',
+      }),
+    )
+
+    await moveSetAsides([
+      {
+        id: 'b-a',
+        to: { owner: { billId: 'rent', occurrence: '2026-12-01' } },
+      },
+    ])
+
+    const [item] = ((await onlyEntry()).payload as MoveWire).items
+    expect(item.to).toEqual({ bill_id: 'rent', occurrence: '2026-12-01' })
+    expect(await db.setAsides.get(item.new_id)).toMatchObject({
+      billId: 'rent',
+      occurrence: '2026-12-01',
+      plannedId: null,
+    })
+  })
+
   it('moves a row to a bill, dropping the planned link and covering its next due', async () => {
     await db.bills.put(bill({ id: 'rent', nextDue: '2026-12-01' }))
 

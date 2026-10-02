@@ -32,7 +32,7 @@ export type SetAsidePart = { id: string; amount?: number }
 export type MoveTarget = {
   /** Into another wallet (it becomes a wallet set-aside). */
   walletId?: string
-  /** For another bill or goal; the planned link is dropped. */
+  /** For another bill or goal (the planned link is dropped); its own keeps the link. */
   owner?: SetAsideOwner
 }
 
@@ -174,7 +174,46 @@ export async function releaseSetAsides(
   schedulePush()
 }
 
-/** A move's new row: the source's money, now for the target. */
+type NewOwner = Pick<LocalSetAside, 'goalId' | 'billId' | 'occurrence'>
+
+/** What a move names for its owner on the wire: a bill's occurrence only when one was asked for. */
+const ownerWire = (owner: SetAsideOwner): MoveTargetWire =>
+  'goalId' in owner
+    ? { goal_id: owner.goalId }
+    : {
+        bill_id: owner.billId,
+        ...(owner.occurrence ? { occurrence: owner.occurrence } : {}),
+      }
+
+/**
+ * The owner a moved row lands on, or null when the move keeps the source's — no owner named,
+ * or the source's own goal, or its own bill and occurrence. Keeping the owner keeps the planned
+ * link; another owner (another occurrence included) drops it. A bill target covers the
+ * occurrence named, else the source's on the same bill, else the bill's `nextDue`.
+ */
+async function ownerAfterMove(
+  source: LocalSetAside,
+  owner: SetAsideOwner | undefined,
+): Promise<NewOwner | null> {
+  if (!owner) return null
+  if ('goalId' in owner) {
+    if (owner.goalId === source.goalId) return null
+    return { goalId: owner.goalId, billId: null, occurrence: null }
+  }
+  const sameBill = owner.billId === source.billId
+  const occurrence =
+    owner.occurrence ??
+    (sameBill
+      ? source.occurrence
+      : ((await db.bills.get(owner.billId))?.nextDue ?? null))
+  if (sameBill && occurrence === source.occurrence) return null
+  return { goalId: null, billId: owner.billId, occurrence }
+}
+
+/**
+ * A move's new row: the source's money, now for the target. A move that keeps the owner names
+ * only the wallet on the wire, so the server keeps the planned link exactly as this row does.
+ */
 async function movedCopy(
   source: LocalSetAside,
   amount: number,
@@ -183,35 +222,21 @@ async function movedCopy(
   transferId: string | null,
   ts: string,
 ): Promise<{ row: LocalSetAside; to: MoveTargetWire }> {
-  const owner = to.owner
-  const sameOwner =
-    !owner ||
-    ('goalId' in owner
-      ? owner.goalId === source.goalId
-      : owner.billId === source.billId)
-  const toWire: MoveTargetWire = {}
-  let occurrence = source.occurrence
-  if (owner && 'goalId' in owner) {
-    toWire.goal_id = owner.goalId
-    occurrence = null
-  } else if (owner) {
-    toWire.bill_id = owner.billId
-    if (owner.occurrence) toWire.occurrence = owner.occurrence
-    occurrence =
-      owner.occurrence ??
-      (owner.billId === source.billId
-        ? source.occurrence
-        : ((await db.bills.get(owner.billId))?.nextDue ?? null))
+  const owner = await ownerAfterMove(source, to.owner)
+  const toWire: MoveTargetWire = {
+    ...(owner && to.owner ? ownerWire(to.owner) : {}),
+    ...(to.walletId ? { wallet_id: to.walletId } : {}),
   }
-  if (to.walletId) toWire.wallet_id = to.walletId
   return {
-    to: toWire,
+    // A move naming nothing but its own owner still has to name something.
+    to:
+      Object.keys(toWire).length === 0 && to.owner
+        ? ownerWire(to.owner)
+        : toWire,
     row: {
       ...source,
       id: newId(),
-      goalId: owner ? ('goalId' in owner ? owner.goalId : null) : source.goalId,
-      billId: owner ? ('billId' in owner ? owner.billId : null) : source.billId,
-      occurrence,
+      ...(owner ?? {}),
       ...(to.walletId
         ? {
             source: 'wallet' as const,
@@ -221,7 +246,7 @@ async function movedCopy(
         : {}),
       amount,
       date,
-      plannedId: sameOwner ? source.plannedId : null,
+      plannedId: owner ? null : source.plannedId,
       releasedAt: null,
       releasedById: null,
       movedByTransferId: transferId,
