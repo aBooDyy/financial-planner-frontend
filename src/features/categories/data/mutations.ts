@@ -172,7 +172,7 @@ export async function updateCategory(
         ? null
         : patch.spendClass !== undefined
           ? patch.spendClass
-          : (existing.spendClass ?? null),
+          : existing.spendClass,
     parentId,
     position:
       patch.position ??

@@ -239,6 +239,22 @@ describe('updateCategory', () => {
     expect(payload.spend_class).toBe('WANT')
   })
 
+  it('leaves a spend class this device was never told unknown, for the push to fill in', async () => {
+    const id = await createCategory({
+      name: 'Dining',
+      type: 'spend',
+      color: '#1F9D6B',
+    })
+    await markSynced(id)
+    await db.categories.update(id, { spendClass: undefined })
+
+    await updateCategory(id, { name: 'Eating out' })
+
+    expect((await db.categories.get(id))?.spendClass).toBeUndefined()
+    const [entry] = await outbox().toArray()
+    expect('spend_class' in (entry.payload as object)).toBe(false)
+  })
+
   it('tags a spend category and clears the tag again', async () => {
     const id = await createCategory({
       name: 'Rent',
