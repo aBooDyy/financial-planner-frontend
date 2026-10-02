@@ -45,6 +45,8 @@ import {
 import { dueList, indexSettlements, settledOf } from './settle'
 import { newId } from '#/lib/uuid'
 import { PLANNED_NAMESPACE, uuidv5 } from './ids'
+import { billOwner } from './owners'
+import { requestPlanRecalc } from './recalcRequests'
 
 export type PlannedActionCode =
   | 'not_found'
@@ -116,6 +118,23 @@ const isBillPayment = (
 
 const syncNextDueOf = async (item: LocalPlanned): Promise<void> => {
   if (isBillPayment(item)) await syncBillNextDue(item.billId)
+}
+
+/**
+ * Once a payment settles a bill occurrence — early, or a big one-off ahead of its saving-up run
+ * — the set-asides still planned for it would be set aside again for nothing: the bill's plan
+ * is rewritten quietly on the planner's next run. A part payment changes nothing yet. Returns
+ * whether it asked. For any path that writes a bill payment (`confirmPlanned` calls it).
+ */
+export async function replanSettledOccurrence(
+  billId: string,
+  occurrence: string,
+): Promise<boolean> {
+  const rows = await db.plannedTransactions.where('billId').equals(billId).toArray()
+  if (!isSettledOccurrence(paymentRowsOf(billId, rows), occurrence))
+    return false
+  requestPlanRecalc(billOwner(billId), { quiet: true })
+  return true
 }
 
 /**
@@ -297,6 +316,8 @@ export async function confirmPlanned(
 
   const after = await db.plannedTransactions.get(item.id)
   await syncNextDueOf(item)
+  if (isBillPayment(item))
+    await replanSettledOccurrence(item.billId, item.occurrence)
   schedulePush()
   return {
     settlementId: settlementIds[0],

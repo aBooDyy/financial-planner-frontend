@@ -205,6 +205,11 @@ result carries `settlementId` and every row written (`settlementIds`).
   from the first open occurrence due on or after the row's date, each up to what it still
   needs, the rest spilling into the next — one set-aside per occurrence reached, all linked to
   the row. (A weekly bill's payday set-aside covers several occurrences.)
+- **A payment that settles an occurrence rewrites the bill's plan quietly**
+  (`replanSettledOccurrence(billId, occurrence)` — `confirmPlanned` calls it; any other path that
+  writes a bill payment, e.g. `settleBillPayment`, should too). Paying early would otherwise
+  leave the set-asides still planned for that occurrence to be set aside again. A part payment
+  files nothing.
 - **`nextDue`** (`syncBillNextDue`): after a payment, a close-the-rest or a skip it moves to the
   bill's first occurrence whose payment row is still open — paying a later one ahead leaves it
   put; reopening an earlier occurrence moves it back. Bookkeeping (`setBillNextDue`), not a

@@ -15,9 +15,12 @@ import {
 import {
   closeRest,
   confirmPlanned,
+  replanSettledOccurrence,
   reopenPlanned,
   skipPlanned,
 } from './mutations'
+import { billOwner } from './owners'
+import { takePlanRecalcRequests } from './recalcRequests'
 
 vi.mock('#/db/sync', () => ({ schedulePush: () => undefined }))
 
@@ -275,6 +278,35 @@ describe('a goal payment', () => {
     expect(rows).toEqual([
       ['main', 200],
       ['savings', 500],
+    ])
+  })
+})
+
+describe('a payment that settles an occurrence rewrites the bill’s plan', () => {
+  beforeEach(async () => {
+    takePlanRecalcRequests()
+    await db.plannedTransactions.put(payment(INSURANCE, '2027-03-01'))
+  })
+
+  it('quietly, once the occurrence is paid in full — not for a part payment', async () => {
+    await confirmPlanned('ins:2027-03-01', {
+      walletId: 'main',
+      amount: m(200),
+    })
+    expect(takePlanRecalcRequests()).toEqual([])
+    await confirmPlanned('ins:2027-03-01', { walletId: 'main' })
+    expect(takePlanRecalcRequests()).toEqual([
+      { owner: billOwner('ins'), quiet: true },
+    ])
+  })
+
+  it('files the same request for a payment written elsewhere, once it settles', async () => {
+    expect(await replanSettledOccurrence('ins', '2027-03-01')).toBe(false)
+    expect(takePlanRecalcRequests()).toEqual([])
+    await db.plannedTransactions.update('ins:2027-03-01', { status: 'done' })
+    expect(await replanSettledOccurrence('ins', '2027-03-01')).toBe(true)
+    expect(takePlanRecalcRequests()).toEqual([
+      { owner: billOwner('ins'), quiet: true },
     ])
   })
 })

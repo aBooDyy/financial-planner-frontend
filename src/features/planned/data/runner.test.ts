@@ -686,3 +686,39 @@ describe('runPlanner — a one-off marked as paid', () => {
     expect(await payment()).toEqual(['skipped'])
   })
 })
+
+describe('runPlanner — a bill paid early', () => {
+  it('drops the set-asides still planned for the occurrence it paid', async () => {
+    await db.goals.clear()
+    await db.bills.put(
+      bill({
+        id: 'tax',
+        name: 'Tax',
+        amount: m(1200),
+        frequency: 'semi',
+        nextDue: '2026-12-15',
+        walletId: 'w1',
+      }),
+    )
+    await runPlanner(USER, SEP_24)
+    const open = async () =>
+      (await db.plannedTransactions.where('billId').equals('tax').toArray())
+        .filter((p) => p.role === 'set_aside' && p.status === 'open')
+        .sort((a, b) => a.date.localeCompare(b.date))
+    expect((await open()).map((p) => [p.date, p.amount / 100])).toEqual([
+      ['2026-10-01', 400],
+      ['2026-11-01', 400],
+      ['2026-12-01', 400],
+    ])
+
+    const due = (
+      await db.plannedTransactions.where('billId').equals('tax').toArray()
+    ).find((p) => p.role === 'payment' && p.occurrence === '2026-12-15')
+    await confirmPlanned(due?.id ?? '', { walletId: 'w1', date: '2026-09-24' })
+    await runPlanner(USER, SEP_24)
+
+    // December is paid: what is planned saves up for June alone, once.
+    const total = (await open()).reduce((sum, p) => sum + p.amount, 0)
+    expect(total).toBe(m(1200))
+  })
+})
