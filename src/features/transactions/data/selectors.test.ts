@@ -303,6 +303,27 @@ describe('buildBudgetsView', () => {
     expect(view.rows[0].spentStr).toBe('SR 1,700')
   })
 
+  it('leaves bill payments out of a budget that excludes planned bills', () => {
+    const txns = [
+      tx({ categoryId: 'cat-groceries', amount: 90_000 }),
+      tx({ categoryId: 'cat-groceries', amount: 40_000, billId: 'b-rent' }),
+    ]
+    const view = buildBudgetsView(
+      data({
+        txns,
+        budgets: [
+          budget({ id: 'leaves-out', excludesBills: true }),
+          budget({ id: 'counts-all' }),
+        ],
+      }),
+      CATALOG,
+      ALL,
+      TODAY,
+    )
+    expect(view.rows.map((r) => r.spentStr)).toEqual(['SR 900', 'SR 1,300'])
+    expect(view.health.spentStr).toBe('SR 2,200')
+  })
+
   it('measures a per-paycheck budget over the pay period, and says so', () => {
     const txns = [
       tx({ categoryId: 'cat-groceries', amount: 10_000, date: '2026-05-24' }),

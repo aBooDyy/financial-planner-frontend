@@ -88,7 +88,10 @@ and `recurrings` went with the planning rebuild: a repeating payment is a **bill
   days", from `budgetWindowLabel`) — and `windowStr` ("Oct 25 – Nov 24"), drawn as the pill and
   after the scope line; the health rail's `periodStr` names the overall cap's window (or the
   one all caps share; "across their periods" when they differ). `budgetPeriodLabel` stays the
-  cadence name ("Per paycheck") and search shows "/paycheck". `excludesBills` (wire `excludes_bills`, default off) marks a
+  cadence name ("Per paycheck") and search shows "/paycheck". **`excludesBills`** is applied in
+  `budgetSpentMinor` — the one place a budget's burn is summed, so the Budgets rows, the health
+  rail's totals and on-track/over counts all follow it: a budget with it on skips every spend
+  carrying a `billId` (a bill's payment, however it was recorded). `excludesBills` (wire `excludes_bills`, default off) marks a
   budget that skips payments for a bill (rows with a `billId`); it is stored and synced, and
   `BudgetDraft.excludesBills` left undefined keeps the stored choice. It is optional on
   `LocalBudget` because rows stored before it existed lack it (read as off).

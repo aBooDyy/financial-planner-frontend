@@ -1336,6 +1336,8 @@ function budgetSpentMinor(
   let sum = 0
   for (const t of data.txns) {
     if (t.deleted || t.type !== 'spend') continue // transfers aren't budget spend
+    // "Leave out planned bills": a bill's payment was planned, so it doesn't eat the cap.
+    if (budget.excludesBills && t.billId) continue
     if (!matcher(t.walletId)) continue
     if (!inWindow(t.date, win)) continue
     // Caps are root-scoped: a row filed under a child counts against its parent's cap.
