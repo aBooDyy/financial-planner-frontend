@@ -1,6 +1,7 @@
 import 'fake-indexeddb/auto'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '#/db/db'
+import { SETTINGS_KEY } from '#/db/types'
 import type { LocalPlanned } from '#/db/types'
 import { closeBill } from '#/features/bills/data/actions'
 import { updateBill } from '#/features/bills/data/mutations'
@@ -720,5 +721,47 @@ describe('runPlanner — a bill paid early', () => {
     // December is paid: what is planned saves up for June alone, once.
     const total = (await open()).reduce((sum, p) => sum + p.amount, 0)
     expect(total).toBe(m(1200))
+  })
+})
+
+describe('runPlanner — the pay periods change', () => {
+  afterEach(() => db.balanceSettings.clear())
+  const umrahDates = async () =>
+    (await db.plannedTransactions.where('goalId').equals('umrah').toArray())
+      .filter((p) => p.status === 'open' && p.role === 'set_aside')
+      .map((p) => p.date)
+      .sort()
+
+  it('moves every plan onto the new paydays when the main paycheck moves', async () => {
+    await runPlanner(USER, SEP_24)
+    expect((await umrahDates())[0]).toBe('2026-10-01')
+
+    await db.incomeStreams.put({ ...SALARY, day: 15 })
+    await runPlanner(USER, SEP_24)
+
+    const dates = await umrahDates()
+    expect(dates.length).toBeGreaterThan(0)
+    expect(dates.every((d) => d.endsWith('-15'))).toBe(true)
+    // Quietly: nothing the user typed into the goal changed.
+    expect(useRecalcUndoStore.getState().byOwner).toEqual({})
+  })
+
+  it('moves them onto calendar months when income starts to vary', async () => {
+    await db.incomeStreams.put({ ...SALARY, day: 20 })
+    await runPlanner(USER, SEP_24)
+    expect((await umrahDates())[0]).toBe('2026-10-20')
+
+    await db.balanceSettings.put({
+      id: SETTINGS_KEY,
+      baseCurrency: 'SAR',
+      incomeVaries: true,
+      createdAt: '',
+      updatedAt: '',
+      version: '',
+      dirty: 0,
+    })
+    await runPlanner(USER, SEP_24)
+
+    expect((await umrahDates()).every((d) => d.endsWith('-01'))).toBe(true)
   })
 })

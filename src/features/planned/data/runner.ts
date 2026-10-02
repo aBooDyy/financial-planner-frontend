@@ -15,6 +15,7 @@ import { setBillPlanSnapshot } from '#/features/bills/data/mutations'
 import { DEFAULT_BASE_CURRENCY } from '#/features/goals/constants'
 import { setGoalPlanSnapshot } from '#/features/goals/data/mutations'
 import { isPlannableGoal } from '#/features/planning/data/funding'
+import type { PayCalendar } from '#/features/planning/data/payPeriods'
 import { paymentRowsByBill } from '#/features/planning/data/occurrences'
 import { strandedSetAsides } from '#/features/planning/data/rekey'
 import { usePaydayNoticeStore } from '#/features/planned/stores/paydayNotice'
@@ -464,6 +465,42 @@ async function runAuto(
   return summary
 }
 
+/** Every goal and bill being planned. */
+const plannedOwners = (inputs: PlannerInputs): PlanOwner[] => [
+  ...inputs.goals.filter(isPlannableGoal).map((g) => goalOwner(g.id)),
+  ...inputs.bills
+    .filter((b) => b.closedAt === null)
+    .map((b) => billOwner(b.id)),
+]
+
+/** What the paydays hang on: the main paycheck and its schedule, or calendar months. */
+const calendarKey = (calendar: PayCalendar): string =>
+  calendar.kind === 'month'
+    ? 'month'
+    : JSON.stringify([
+        calendar.stream.id,
+        calendar.stream.frequency,
+        calendar.stream.customInterval,
+        calendar.stream.customUnit,
+        calendar.stream.day,
+        calendar.stream.anchorDate,
+      ])
+
+/** The pay calendar each user's last run planned on, this session. */
+const lastCalendar = new Map<string, string>()
+
+/**
+ * Whether the paydays moved since this session's last run (the main paycheck's schedule, the
+ * main paycheck itself, income starting or stopping to vary): every stored plan sits on the old
+ * paydays then, and is rewritten quietly.
+ */
+function paydaysMoved(userId: string, calendar: PayCalendar): boolean {
+  const key = calendarKey(calendar)
+  const before = lastCalendar.get(userId)
+  lastCalendar.set(userId, key)
+  return before !== undefined && before !== key
+}
+
 /** Owners that are being planned but have never had a plan written. */
 const unplanned = (inputs: PlannerInputs): PlanOwner[] => [
   ...inputs.goals
@@ -490,6 +527,9 @@ async function runOnce(
     if (!request.quiet) loud.add(ownerKey(request.owner))
   }
   for (const owner of unplanned(inputs)) owners.set(ownerKey(owner), owner)
+  if (paydaysMoved(userId, state.funding.calendar))
+    for (const owner of plannedOwners(inputs))
+      if (!owners.has(ownerKey(owner))) owners.set(ownerKey(owner), owner)
 
   const summary: PlannerRunSummary = {
     created: 0,

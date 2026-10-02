@@ -121,7 +121,11 @@ varies), each pull, each plan-rewrite request, and day rollover.
 1. Goals and bills being planned with no stored plan (`plannedAt === null`, i.e. new) and
    owners whose plan was asked to be rewritten are rewritten in `recalc` mode and get a
    snapshot (`plannedAt/planAmount/planCount/planStart` on the goal or bill — the headline of
-   the rows from today; `setGoalPlanSnapshot` / `setBillPlanSnapshot`).
+   the rows from today; `setGoalPlanSnapshot` / `setBillPlanSnapshot`). When the **paydays
+   moved** since this session's last run — the main paycheck's schedule, which stream is the
+   main paycheck, income starting or stopping to vary (`calendarKey` of the funding plan's
+   calendar) — every goal and bill being planned is rewritten too, quietly: their stored rows
+   sit on the old paydays. The settings and income mutations file nothing for this.
 2. Everything else gets `fill`.
 3. Open rows whose origin is gone (link null or the goal / stream / bill deleted) are
    resolved, so they never wait in Needs confirming for nothing: **skipped** when unsettled,
