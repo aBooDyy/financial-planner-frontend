@@ -87,11 +87,14 @@ function alertFor(
   let held = setAside
   let dips: string | null = null
   for (const { row, delta, release } of steps) {
+    const freeBefore = balance - held
     balance += delta
     held -= release
     const when = whenOf(row.item.date, today)
     if (balance < 0) return { kind: 'short', text: `Goes below zero ${when}` }
-    if (dips === null && balance - held < 0) dips = when
+    // Only a step that takes Free lower, below zero, eats into set-aside money.
+    const free = balance - held
+    if (dips === null && free < 0 && free < freeBefore) dips = when
   }
   return dips
     ? { kind: 'setAside', text: `Dips into set-aside money ${dips}` }

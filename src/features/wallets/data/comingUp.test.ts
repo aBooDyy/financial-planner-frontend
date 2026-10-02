@@ -156,6 +156,23 @@ describe('buildComingUp', () => {
     expect(w.afterStr).toBe('SR 500.00')
   })
 
+  it('does not blame a covered payment for a wallet already over-committed', () => {
+    const v = view(
+      [bill({ billId: 'gym', occurrence: '2026-10-01', amount: m(150) })],
+      [
+        setAside({
+          walletId: 'w1',
+          goalId: null,
+          billId: 'gym',
+          occurrence: '2026-10-01',
+          amount: m(2100),
+        }),
+      ],
+    )
+    expect(v.wallets[0].nowStr).toBe('SR -100.00')
+    expect(v.wallets[0].alert).toBeNull()
+  })
+
   it('releases only what is held in the paying wallet, for that occurrence', () => {
     const v = view(
       [bill({ billId: 'rent', occurrence: '2026-10-01', amount: m(1500) })],
