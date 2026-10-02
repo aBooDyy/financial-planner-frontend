@@ -68,6 +68,22 @@ export function heldIn(
   )
 }
 
+/** "SR 1,900.00": what these wallets hold set aside, in base — null when nothing. */
+export function heldTotalStr(
+  rows: ReadonlyArray<LocalSetAside>,
+  walletIds: ReadonlySet<string>,
+  base: CurrencyCode,
+  rates: RatesMap,
+): string | null {
+  const held = heldIn(rows, walletIds)
+  if (held.length === 0) return null
+  const total = held.reduce(
+    (sum, a) => sum + convertMinor(a.amount, a.currency, base, rates),
+    0,
+  )
+  return formatMoney(total, base)
+}
+
 /**
  * The live rows behind the picks — each owner's in the wallet, oldest first, the last one cut
  * to what is left — as the parts a move or release acts on (amounts in each row's currency).

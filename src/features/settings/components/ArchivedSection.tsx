@@ -12,7 +12,7 @@ const CARD =
 
 /** Wallets and groups put away from the Wallets page — restore one, or delete it for good. */
 export function ArchivedSection() {
-  const { loading, items } = useArchivedNodes()
+  const { loading, items, heldStrOf } = useArchivedNodes()
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const deleting = items.find((i) => i.id === deletingId) ?? null
 
@@ -51,6 +51,7 @@ export function ArchivedSection() {
       <DeleteNodeDialog
         target={deleting}
         archived
+        heldStr={heldStrOf(deletingId)}
         onClose={() => setDeletingId(null)}
         onConfirm={confirmDelete}
       />

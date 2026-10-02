@@ -3,7 +3,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { useLogout } from '#/features/auth/hooks/useLogout'
 import { usePreferencesStore } from '#/stores/preferences'
 import { useSessionStore } from '#/stores/session'
-import { convertMinor, formatMoney } from '#/lib/currency'
+import { formatMoney } from '#/lib/currency'
 import {
   archiveNode,
   deleteNode,
@@ -23,7 +23,7 @@ import {
   moveSetAsidesOutOf,
   walletIdsUnder,
 } from '#/features/wallets/data/heldMoney'
-import { heldIn } from '#/features/wallets/data/setAsideMoves'
+import { heldTotalStr } from '#/features/wallets/data/setAsideMoves'
 import { useComingUp } from '#/features/wallets/hooks/useComingUp'
 import { useMonthlyFlow } from '#/features/wallets/hooks/useMonthlyFlow'
 import { useWallets } from '#/features/wallets/hooks/useWallets'
@@ -102,18 +102,10 @@ export function WalletsPage() {
     id ? archiveTarget(nodes, id, { deltas, base, rates }) : null
   const archiving = targetOf(archivingId)
   const deleting = targetOf(deletingId)
-  const heldStrOf = (id: string | null): string | null => {
-    if (!id) return null
-    const held = heldIn(setAsideRows, walletIdsUnder(nodes, id))
-    if (held.length === 0) return null
-    return formatMoney(
-      held.reduce(
-        (sum, a) => sum + convertMinor(a.amount, a.currency, base, rates),
-        0,
-      ),
-      base,
-    )
-  }
+  const heldStrOf = (id: string | null): string | null =>
+    id
+      ? heldTotalStr(setAsideRows, walletIdsUnder(nodes, id), base, rates)
+      : null
   const leaving = archivingId ? walletIdsUnder(nodes, archivingId) : null
   const moveTargets = wallets.filter((w) => !leaving?.has(w.id))
 

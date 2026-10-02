@@ -257,8 +257,9 @@ see backend `balances.md`). Archiving is **view-level**: nothing is moved or rew
   only Free. Its `onConfirm(choice)` runs that batch, then `archiveNode`. **Deleting frees
   them**: `deleteNode` calls `freeSetAsidesUnder` first (one release batch queued ahead of the
   node delete — the server releases them on delete too, so either order settles), and
-  `DeleteNodeDialog` (`heldStr`) says so. Both in `data/heldMoney.ts` (tested); the amount is
-  `heldIn(setAsideRows, walletIdsUnder(nodes, id))` in base.
+  `DeleteNodeDialog` (`heldStr`) says so — on Wallets and in Settings › Archived alike. Both in
+  `data/heldMoney.ts` (tested); the amount is `heldTotalStr(setAsideRows, walletIdsUnder(nodes,
+  id), base, rates)` (`data/setAsideMoves.ts`), in base.
 - **Restore** (`restoreNode`) clears `archivedAt`; a node whose group is still archived would
   stay hidden, so it comes back at the **top level** instead. Settings › Archived is described
   in [settings.md](settings.md).

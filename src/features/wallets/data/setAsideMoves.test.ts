@@ -3,6 +3,7 @@ import { RATES, m, setAside } from '#/features/planned/testing/fixtures'
 import {
   adjustWarning,
   heldIn,
+  heldTotalStr,
   partsForPicks,
   pickHeld,
   setAsideShare,
@@ -106,5 +107,28 @@ describe('adjustWarning', () => {
     )
     expect(adjustWarning('Main bank', m(2000), m(1900), 'SAR')).toBeNull()
     expect(adjustWarning('Main bank', m(-5), 0, 'SAR')).toBeNull()
+  })
+})
+
+describe('heldTotalStr', () => {
+  it('adds up what the wallets hold set aside, in base', () => {
+    const rows = [
+      setAside({ id: 'a', walletId: 'w1', amount: m(300) }),
+      setAside({ id: 'b', walletId: 'w2', amount: m(100), currency: 'USD' }),
+      setAside({ id: 'c', walletId: 'w3', amount: m(999) }),
+      setAside({
+        id: 'd',
+        walletId: 'w1',
+        amount: m(50),
+        releasedAt: '2026-09-02',
+      }),
+    ]
+    expect(heldTotalStr(rows, new Set(['w1', 'w2']), 'SAR', RATES)).toBe(
+      'SR 675.00',
+    )
+  })
+
+  it('is null when they hold nothing', () => {
+    expect(heldTotalStr([], new Set(['w1']), 'SAR', RATES)).toBeNull()
   })
 })

@@ -72,7 +72,9 @@ Notifications, Archived, Data & privacy. Each pane is its own route — see
   deltas from the stored ledger totals via `readWalletDeltas`), wallet
   count, archive date (honours `dateFormat`), former group, and a "stranded" note when that
   group is archived too. **Restore** is one tap (`restoreNode`); **Delete** confirms first,
-  because it is the ordinary `deleteNode` and takes the ledger with it. See
+  because it is the ordinary `deleteNode` and takes the ledger with it; when the node's
+  wallets still hold set-asides the prompt says they're freed (`useArchivedNodes().heldStrOf`,
+  same `heldStr` wording as Wallets). See
   [wallets.md](wallets.md#archiving).
 - **Notifications**: five toggles → `usePreferencesStore`.
 - **Import** (`features/import/components/ImportSection`): the import hub — inbox + file
