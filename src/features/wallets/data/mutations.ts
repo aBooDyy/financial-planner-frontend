@@ -14,6 +14,7 @@ import type {
   PlanningSettings,
 } from '#/features/wallets/api/types'
 import { hasArchivedAncestor } from './archive'
+import { freeSetAsidesUnder } from './heldMoney'
 import {
   localNodeToCreateWire,
   localNodeToUpdateWire,
@@ -200,7 +201,9 @@ export async function toggleCollapse(id: string): Promise<void> {
   await updateNode(id, { collapsed: !node.collapsed })
 }
 
+/** Delete a node and its subtree; what its wallets held set aside is freed first (03 §6). */
 export async function deleteNode(id: string): Promise<void> {
+  await freeSetAsidesUnder(id)
   const all = await liveNodes()
   const childrenOf = new Map<string | null, LocalBalanceNode[]>()
   for (const n of all) {

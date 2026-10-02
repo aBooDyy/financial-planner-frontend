@@ -248,6 +248,15 @@ see backend `balances.md`). Archiving is **view-level**: nothing is moved or rew
   the adjust, archive and delete dialogs **inside** the open editor's children (else at page
   level) so answering one never dismisses the editor. `WalletsGroupsCard` ends with an "N
   archived" link to `/settings/archived` when there are any.
+- **Set-asides leave with it (03 §6).** Archived wallets never hold set-asides. When the node
+  (a wallet, or any wallet under a group) holds some, `ArchiveNodeDialog` says how much and
+  asks: **Move them to [wallet]** (default, the first other active wallet — a label move,
+  `moveSetAsidesOutOf`) or **Free them up** (`freeSetAsidesUnder`); with nowhere to move them,
+  only Free. Its `onConfirm(choice)` runs that batch, then `archiveNode`. **Deleting frees
+  them**: `deleteNode` calls `freeSetAsidesUnder` first (one release batch queued ahead of the
+  node delete — the server releases them on delete too, so either order settles), and
+  `DeleteNodeDialog` (`heldStr`) says so. Both in `data/heldMoney.ts` (tested); the amount is
+  `heldIn(setAsideRows, walletIdsUnder(nodes, id))` in base.
 - **Restore** (`restoreNode`) clears `archivedAt`; a node whose group is still archived would
   stay hidden, so it comes back at the **top level** instead. Settings › Archived is described
   in [settings.md](settings.md).

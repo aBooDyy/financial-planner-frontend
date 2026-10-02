@@ -11,15 +11,22 @@ type Props = {
   target: DeleteNodeTarget | null
   /** Already archived: deleting is what's left, so there is no archive to suggest instead. */
   archived?: boolean
+  /** "SR 1,900.00" set aside in it, freed by the delete; null when it holds none. */
+  heldStr?: string | null
   onClose: () => void
   onConfirm: () => void
 }
 
-function consequences(t: DeleteNodeTarget): string[] {
+function consequences(t: DeleteNodeTarget, heldStr: string | null): string[] {
   const inside = walletsInsideLine(t.walletCount)
   return [
     ...(inside ? [inside] : []),
     `Every transaction recorded against ${inside ? 'them' : 'it'} is deleted too.`,
+    ...(heldStr
+      ? [
+          `The ${heldStr} set aside in ${inside ? 'them' : 'it'} is freed; its bills and goals plan for it again.`,
+        ]
+      : []),
     'This can’t be undone.',
   ]
 }
@@ -28,6 +35,7 @@ function consequences(t: DeleteNodeTarget): string[] {
 export function DeleteNodeDialog({
   target,
   archived,
+  heldStr = null,
   onClose,
   onConfirm,
 }: Props) {
@@ -41,7 +49,7 @@ export function DeleteNodeDialog({
       title={
         target ? `Delete “${target.name}”${archived ? ' for good' : ''}?` : ''
       }
-      bullets={target ? consequences(target) : undefined}
+      bullets={target ? consequences(target, heldStr) : undefined}
       note={archived ? undefined : 'To keep its history, archive it instead.'}
       confirmLabel={
         archived ? 'Delete forever' : `Delete ${target?.kind ?? ''}`

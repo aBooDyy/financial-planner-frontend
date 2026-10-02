@@ -3,7 +3,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { useLogout } from '#/features/auth/hooks/useLogout'
 import { usePreferencesStore } from '#/stores/preferences'
 import { useSessionStore } from '#/stores/session'
-import { formatMoney } from '#/lib/currency'
+import { convertMinor, formatMoney } from '#/lib/currency'
 import {
   archiveNode,
   deleteNode,
@@ -18,6 +18,12 @@ import type { SafeLineLink } from '#/features/wallets/data/safeHeader'
 import type { SetAsideLineRow } from '#/features/wallets/data/selectors'
 import { useAdjustBalance } from '#/features/wallets/hooks/useAdjustBalance'
 import { useBudgetsLeft } from '#/features/wallets/hooks/useBudgetsLeft'
+import {
+  freeSetAsidesUnder,
+  moveSetAsidesOutOf,
+  walletIdsUnder,
+} from '#/features/wallets/data/heldMoney'
+import { heldIn } from '#/features/wallets/data/setAsideMoves'
 import { useComingUp } from '#/features/wallets/hooks/useComingUp'
 import { useMonthlyFlow } from '#/features/wallets/hooks/useMonthlyFlow'
 import { useWallets } from '#/features/wallets/hooks/useWallets'
@@ -29,6 +35,7 @@ import { MobileTabBar } from '#/components/chrome/MobileTabBar'
 import { TopNav } from '#/components/chrome/TopNav'
 import { AdjustBalanceDialog } from './AdjustBalanceDialog'
 import { ArchiveNodeDialog } from './ArchiveNodeDialog'
+import type { HeldChoice } from './ArchiveNodeDialog'
 import { ComingUpCard } from './ComingUpCard'
 import { DeleteNodeDialog } from './DeleteNodeDialog'
 import { MonthlyFlowCard } from './MonthlyFlowCard'
@@ -95,6 +102,20 @@ export function WalletsPage() {
     id ? archiveTarget(nodes, id, { deltas, base, rates }) : null
   const archiving = targetOf(archivingId)
   const deleting = targetOf(deletingId)
+  const heldStrOf = (id: string | null): string | null => {
+    if (!id) return null
+    const held = heldIn(setAsideRows, walletIdsUnder(nodes, id))
+    if (held.length === 0) return null
+    return formatMoney(
+      held.reduce(
+        (sum, a) => sum + convertMinor(a.amount, a.currency, base, rates),
+        0,
+      ),
+      base,
+    )
+  }
+  const leaving = archivingId ? walletIdsUnder(nodes, archivingId) : null
+  const moveTargets = wallets.filter((w) => !leaving?.has(w.id))
 
   if (!user) return null
 
@@ -131,9 +152,14 @@ export function WalletsPage() {
       search: { open: `${line.owner}:${line.ownerId}` },
     })
 
-  const confirmArchive = () => {
+  const confirmArchive = (choice: HeldChoice | null) => {
     if (!archiving) return
-    void archiveNode(archiving.id)
+    const id = archiving.id
+    void (async () => {
+      if (choice?.kind === 'move') await moveSetAsidesOutOf(id, choice.walletId)
+      else if (choice?.kind === 'free') await freeSetAsidesUnder(id)
+      await archiveNode(id)
+    })()
     if (editor.editing?.id === archiving.id) editor.close()
     setArchivingId(null)
   }
@@ -154,11 +180,14 @@ export function WalletsPage() {
       />
       <ArchiveNodeDialog
         target={archiving}
+        heldStr={heldStrOf(archivingId)}
+        moveTargets={moveTargets}
         onClose={() => setArchivingId(null)}
         onConfirm={confirmArchive}
       />
       <DeleteNodeDialog
         target={deleting}
+        heldStr={heldStrOf(deletingId)}
         onClose={() => setDeletingId(null)}
         onConfirm={confirmDelete}
       />
