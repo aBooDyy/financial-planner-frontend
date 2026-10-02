@@ -44,7 +44,7 @@ export function ConfirmPlannedDialog({
           {f.headerLine}
         </span>
       ) : null}
-      <span className="truncate">{f.item?.name ?? 'Planned item'}</span>
+      <span className="truncate">{f.item?.name ?? 'Upcoming item'}</span>
     </span>
   )
 
