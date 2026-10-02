@@ -12,7 +12,9 @@ import { db } from '#/db/db'
 import type { LocalSetAside } from '#/db/types'
 import { dropOpenPlannedAfter } from '#/features/planned/data/rows'
 import type { CloseWire } from '#/features/setAsides/api/types'
+import { configLimits } from '#/lib/config/appConfig'
 import { newId } from '#/lib/uuid'
+import { moveSetAsides, releaseSetAsides } from './batches'
 import type { SetAsideOwner } from './mutations'
 import { isLiveSetAside } from './totals'
 
@@ -91,10 +93,35 @@ export async function applyLeftoverLocally(
 }
 
 /**
+ * The server refuses to close an item holding more live set-asides than one batch takes
+ * (`planning.close.too_many_set_asides`). The ones beyond that are freed or moved first, in
+ * batches of their own queued ahead of the close, on the close date — as the close would have.
+ */
+async function sendOverflowAhead(
+  closing: Closing,
+  closedAt: string,
+  leftover: Leftover,
+): Promise<void> {
+  const cap = Math.max(1, configLimits().setAsideBatchMax)
+  const overflow = (await ownedBy(closing))
+    .filter(isLiveSetAside)
+    .slice(cap)
+    .map((a) => ({ id: a.id }))
+  if (overflow.length === 0) return
+  if (leftover.kind === 'free')
+    await releaseSetAsides(overflow, { releasedAt: closedAt })
+  else
+    await moveSetAsides(
+      overflow.map((part) => ({ ...part, to: { owner: leftover.to } })),
+      { date: closedAt },
+    )
+}
+
+/**
  * Mark a bill or goal done on this device, as the server's close does it in one go: write the
  * item's own change (`markClosed`), release (and maybe move) its set-asides, drop its open
  * unsettled planned rows after the close date, and queue the close. One Dexie transaction, so
- * a failure leaves nothing half-closed.
+ * a failure leaves nothing half-closed — after any overflow beyond the server's cap went ahead.
  */
 export async function queueClose(
   item: { entity: 'bill'; id: string } | { entity: 'goal'; id: string },
@@ -104,6 +131,7 @@ export async function queueClose(
 ): Promise<void> {
   const owner =
     item.entity === 'bill' ? { billId: item.id } : { goalId: item.id }
+  await sendOverflowAhead(owner, closedAt, leftover)
   await db.transaction(
     'rw',
     [

@@ -63,7 +63,10 @@ own outbox entry (`op: 'close' | 'reopen'`), which the server applies atomically
   queues `{closed_at, leftover: 'FREE' | 'MOVE', move_to?: {goal_id | bill_id, occurrence?,
   new_ids}}`. The moved copies get ids minted here and sent as `new_ids`, so the server's rows
   are the local ones. The touched set-asides are marked dirty with no entries of their own; the
-  close carries them. Closing a closed bill is a no-op.
+  close carries them. Closing a closed bill is a no-op. The server closes an item holding at
+  most `limits.setAsideBatchMax` (200) live set-asides (`422 planning.close.too_many_set_asides`),
+  so any beyond that are first freed or moved — the same way, on the close date — as release /
+  move batches queued ahead of the close (`sendOverflowAhead`), outside its transaction.
 - `reopenBill(id)` — clears `closedAt`; what the close released stays released; it files a
   quiet plan rewrite so the planner plans the bill again from today. A repeating bill picks up
   at its **first open occurrence from today** (`openOccurrenceFrom`): `nextDue` is PATCHed —

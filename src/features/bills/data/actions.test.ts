@@ -13,6 +13,7 @@ import {
   tx,
 } from '#/features/planned/testing/fixtures'
 import { ApiError } from '#/lib/apiError'
+import { useAppConfigStore } from '#/lib/config/appConfig'
 
 vi.mock('#/db/sync', () => ({ schedulePush: vi.fn() }))
 const billsApi = vi.hoisted(() => ({
@@ -170,6 +171,59 @@ describe('closeBill', () => {
     const payload = (await closeEntry()).payload as CloseWire
     const newId = payload.move_to?.new_ids?.['a-live'] as string
     expect((await db.setAsides.get(newId))?.occurrence).toBe('2027-03-01')
+  })
+
+  describe('with more live set-asides than one batch takes', () => {
+    const limits = useAppConfigStore.getState().config.limits
+    beforeEach(async () => {
+      useAppConfigStore.setState((st) => ({
+        config: { ...st.config, limits: { ...limits, setAsideBatchMax: 2 } },
+      }))
+      await db.setAsides.bulkPut(
+        ['a-2', 'a-3', 'a-4', 'a-5'].map((id) =>
+          setAside({ id, goalId: null, billId: 'rent', version: 'v1' }),
+        ),
+      )
+    })
+    afterEach(() => {
+      useAppConfigStore.setState((st) => ({ config: { ...st.config, limits } }))
+    })
+
+    it('frees the overflow in batches the server takes before sending the close', async () => {
+      await closeBill('rent', { closedAt: CLOSED })
+
+      const entries = await queued()
+      expect(entries.map((e) => e.op)).toEqual(['release', 'release', 'close'])
+      expect(
+        entries
+          .slice(0, 2)
+          .map((e) => (e.payload as { items: unknown[] }).items.length),
+      ).toEqual([2, 1])
+      expect(entries[0].payload).toMatchObject({ released_at: CLOSED })
+      const live = (await db.setAsides.toArray()).filter(
+        (a) => a.billId === 'rent' && a.releasedAt === null,
+      )
+      expect(live).toEqual([])
+    })
+
+    it('moves the overflow ahead of the close when the leftover moves', async () => {
+      await db.goals.put(goal({ id: 'trip' }))
+
+      await closeBill('rent', {
+        closedAt: CLOSED,
+        leftover: { kind: 'move', to: { goalId: 'trip' } },
+      })
+
+      const entries = await queued()
+      expect(entries.map((e) => e.op)).toEqual(['move', 'move', 'close'])
+      const payload = entries[2].payload as CloseWire
+      expect(Object.keys(payload.move_to?.new_ids ?? {})).toHaveLength(2)
+      const forTrip = (await db.setAsides.toArray()).filter(
+        (a) => a.goalId === 'trip' && a.releasedAt === null,
+      )
+      expect(forTrip).toHaveLength(5)
+      expect(forTrip.every((a) => a.date === CLOSED)).toBe(true)
+    })
   })
 
   it('does nothing for a bill that is already closed', async () => {
