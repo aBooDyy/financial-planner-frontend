@@ -1,4 +1,5 @@
 import type { LocalCategory } from '#/db/types'
+import type { SpendClass } from '#/features/categories/api/types'
 import type { TxType } from '#/features/transactions/api/types'
 import type { IconId } from '#/lib/icons/catalog.gen'
 import { defaultCategory, defaultSubcategory } from './defaults'
@@ -13,6 +14,8 @@ type Entry = {
   color: string
   icon: IconId
   position: number
+  /** The row's own tag; null on a subcategory inherits, on a root means not sorted yet. */
+  spendClass: SpendClass | null
 }
 
 export type ResolvedSub = Entry & { parentId: string }
@@ -46,6 +49,11 @@ export type CategoryCatalog = {
    * `other_income` root, else the type's first root. Null only while nothing is loaded.
    */
   fallbackFor: (type: TxType) => ResolvedCategory | null
+  /**
+   * Needs, wants or savings for a spend row filed under `id`: a subcategory's own tag, else
+   * its root's. Null for a root not sorted yet, an income category or an unknown id.
+   */
+  classOf: (id: string) => SpendClass | null
 }
 
 export const DELETED_CATEGORY_ID = 'deleted-category'
@@ -65,6 +73,7 @@ export const DELETED_CATEGORY: ResolvedCategory = {
   color: GENERIC_COLOR,
   icon: CATEGORY_ICON_FALLBACK.spend,
   position: Number.MAX_SAFE_INTEGER,
+  spendClass: null,
   subs: [],
 }
 
@@ -75,6 +84,10 @@ const FALLBACK_SLUG: Record<TxType, string> = {
 
 const byPosition = (a: LocalCategory, b: LocalCategory): number =>
   a.position - b.position || a.createdAt.localeCompare(b.createdAt)
+
+/** Rows stored before the tag existed lack it; income categories never carry one. */
+const ownClass = (row: LocalCategory, type: TxType): SpendClass | null =>
+  type === 'spend' ? (row.spendClass ?? null) : null
 
 const resolveRoot = (
   row: LocalCategory,
@@ -94,6 +107,7 @@ const resolveRoot = (
     color,
     icon,
     position: row.position,
+    spendClass: ownClass(row, row.type),
     subs: children.sort(byPosition).map((child) => ({
       id: child.id,
       parentId: row.id,
@@ -106,6 +120,7 @@ const resolveRoot = (
         defaultSubcategory(row.slug, child.slug)?.icon ?? icon,
       ),
       position: child.position,
+      spendClass: ownClass(child, row.type),
     })),
   }
 }
@@ -188,6 +203,11 @@ export function buildCatalog(rows: LocalCategory[]): CategoryCatalog {
       const required = rootBySlug.get(FALLBACK_SLUG[type])
       if (required?.type === type) return required
       return byType(type)[0] ?? null
+    },
+    classOf: (id) => {
+      const entry = byId.get(id)
+      if (!entry) return null
+      return entry.spendClass ?? rootOf(id).spendClass
     },
   }
 }

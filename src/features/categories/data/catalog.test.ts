@@ -224,4 +224,61 @@ describe('buildCatalog', () => {
     expect(catalog.all.map((c) => c.slug)).toEqual(CATEGORIES.map((c) => c.id))
     expect(catalog.labelOf(catId('cafes', 'dining'))).toBe('Dining · Cafés')
   })
+
+  describe('classOf', () => {
+    const transport = row({ slug: 'transport', spendClass: 'need' })
+    const fuel = row({
+      id: 'fuel-id',
+      slug: 'fuel',
+      parentId: transport.id,
+    })
+    const taxi = row({
+      id: 'taxi-id',
+      slug: 'taxi',
+      parentId: transport.id,
+      spendClass: 'want',
+    })
+    const other = row({ slug: 'other' })
+    const salary = row({
+      slug: 'salary',
+      type: 'income',
+      spendClass: 'need',
+    })
+    const catalog = buildCatalog([transport, fuel, taxi, other, salary])
+
+    it('reads a root its own tag', () => {
+      expect(catalog.classOf(transport.id)).toBe('need')
+    })
+
+    it('lets an untagged subcategory inherit its root', () => {
+      expect(catalog.classOf('fuel-id')).toBe('need')
+    })
+
+    it('keeps a subcategory override', () => {
+      expect(catalog.classOf('taxi-id')).toBe('want')
+    })
+
+    it('leaves an untagged root not sorted', () => {
+      expect(catalog.classOf(other.id)).toBeNull()
+    })
+
+    it('never tags an income category or an unknown id', () => {
+      expect(catalog.classOf(salary.id)).toBeNull()
+      expect(catalog.classOf('missing')).toBeNull()
+    })
+
+    it('treats a row stored before the tag existed as untagged', () => {
+      const legacy = { ...row({ slug: 'legacy' }) }
+      delete legacy.spendClass
+      expect(buildCatalog([legacy]).classOf(legacy.id)).toBeNull()
+    })
+
+    it('starts the seeded catalog on the defaults', () => {
+      const seeded = defaultCatalog()
+      expect(seeded.classOf(catId('cafes', 'dining'))).toBe('want')
+      expect(seeded.classOf(catId('rent', 'housing'))).toBe('need')
+      expect(seeded.classOf(catId('savings'))).toBe('saving')
+      expect(seeded.classOf(catId('other'))).toBeNull()
+    })
+  })
 })

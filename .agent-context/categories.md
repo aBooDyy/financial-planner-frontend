@@ -119,7 +119,7 @@ A **pure function of rows**: no React, no async, no IO, which is what keeps the 
 selectors pure and unit-testable. **Keyed by id.**
 
 ```ts
-type Entry = { id; slug; name; type: TxType; color; icon: IconId; position }
+type Entry = { id; slug; name; type: TxType; color; icon: IconId; position; spendClass } // own tag
 type ResolvedSub = Entry & { parentId: string } // `type` is the parent's
 type ResolvedCategory = Entry & { parentId: null; subs: ResolvedSub[] }
 type CatalogEntry = ResolvedCategory | ResolvedSub
@@ -136,6 +136,7 @@ type CategoryCatalog = {
   labelOf: (id: string) => string // "Dining · Cafés" | "Dining"
   bySlug: (slug: string, parentSlug?: string) => CatalogEntry | null
   fallbackFor: (type: TxType) => ResolvedCategory | null
+  classOf: (id: string) => SpendClass | null // needs / wants / savings, inherited
 }
 ```
 
@@ -162,6 +163,10 @@ What it guarantees:
   `other_income` for income (the required roots), else the type's first root; null only while
   the catalog is empty. Hard-coded slug literals (`'other'`, `'salary'`…) go through this or
   `bySlug`, never straight into a row.
+- **`classOf(id)` resolves the Needs / Wants / Savings tag**: a subcategory's own tag, else its
+  root's; null for a root not sorted yet, an income category (whatever its row says) or an
+  unknown id. `Entry.spendClass` is the row's **own** tag (null on a child = inherits), which
+  is what the Settings chip edits. Every report and summary reads `classOf`, never the raw row.
 - **A blank `color` on a child means "the parent's"** — resolved here, and mirrored by the
   mutations, because that is what the create service stores server-side.
 
@@ -225,7 +230,10 @@ whose own is unset, plus the test fixtures. Slugs and icons must match the backe
 set (2026-09-25) targets a wide general audience: one root per kind of spend so reports never
 split the same money across two parents (e.g. Family & kids holds childcare/kids/support, not
 family groceries), 3–5 children each, and the mainstream roots Pets, Debt & loans and Taxes &
-fees. Required roots are `savings` + `other` + `other_income`. Onboarding's starter packs must
+fees. Required roots are `savings` + `other` + `other_income`. `SPEND_CLASS_DEFAULTS` /
+`defaultSpendClass(slug)` mirror the backend's seeded Needs / Wants / Savings tags (roots only;
+`other` and income roots untagged) — `defaults.test.ts` pins that, and the fixtures seed them.
+Onboarding's starter packs must
 list only these root slugs ([onboarding.md](onboarding.md#packs--datapacksts)).
 
 **Importing it from outside this slice is a lint error.** `eslint.config.js` carries a

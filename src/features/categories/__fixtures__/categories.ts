@@ -1,7 +1,10 @@
 import type { LocalCategory } from '#/db/types'
 import { buildCatalog } from '#/features/categories/data/catalog'
 import type { CategoryCatalog } from '#/features/categories/data/catalog'
-import { CATEGORIES } from '#/features/categories/data/defaults'
+import {
+  CATEGORIES,
+  defaultSpendClass,
+} from '#/features/categories/data/defaults'
 
 /** The id a fixture row gets: `cat-dining`, `cat-dining-cafes`. */
 export const catId = (slug: string, parentSlug?: string): string =>
@@ -37,6 +40,7 @@ export const defaultCategoryRows = (): LocalCategory[] =>
       name: c.name,
       type: c.type,
       color: c.color,
+      spendClass: c.type === 'spend' ? defaultSpendClass(c.id) : null,
       position: i,
     }),
     ...c.subs.map((s, j) =>

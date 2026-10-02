@@ -1,5 +1,6 @@
 import type { IconId } from '#/lib/icons/catalog.gen'
 import type { TxType } from '#/features/transactions/api/types'
+import type { SpendClass } from '#/features/categories/api/types'
 
 /**
  * The built-in two-level catalog the server seeds a new user's rows from. Here it only
@@ -354,3 +355,33 @@ export const defaultSubcategory = (
   slug: string,
 ): DefaultSubcategory | undefined =>
   BY_SLUG.get(parentSlug)?.subs.find((s) => s.id === slug)
+
+/**
+ * The Needs / Wants / Savings tag each spending root is seeded with — must match the
+ * backend's `SPEND_CLASS_DEFAULTS`. Subcategories start untagged and inherit; `other` starts
+ * not sorted; income roots never carry one.
+ */
+export const SPEND_CLASS_DEFAULTS: Readonly<Record<string, SpendClass>> = {
+  groceries: 'need',
+  housing: 'need',
+  utilities: 'need',
+  transport: 'need',
+  health: 'need',
+  insurance: 'need',
+  debt: 'need',
+  taxes: 'need',
+  education: 'need',
+  family: 'need',
+  dining: 'want',
+  shopping: 'want',
+  personal_care: 'want',
+  pets: 'want',
+  entertainment: 'want',
+  subscriptions: 'want',
+  travel: 'want',
+  giving: 'want',
+  savings: 'saving',
+}
+
+export const defaultSpendClass = (slug: string): SpendClass | null =>
+  SPEND_CLASS_DEFAULTS[slug] ?? null
