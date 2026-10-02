@@ -61,6 +61,32 @@ describe('usePlannedRunner', () => {
     await waitFor(() => expect(runPlanner).toHaveBeenCalledTimes(1))
   })
 
+  it('holds the auto pass until this launch’s pull while online — another device may have paid', async () => {
+    signIn()
+    await recordPlannerInputsPulled()
+    resetPullState()
+
+    renderHook(() => usePlannedRunner())
+    await waitFor(() => expect(runPlanner).toHaveBeenCalledTimes(1))
+    expect(runPlanner.mock.calls[0][2]).toEqual({ auto: false })
+
+    act(() => notePlannerInputsPulled())
+    await waitFor(() => expect(runPlanner).toHaveBeenCalledTimes(2))
+    expect(runPlanner.mock.calls[1][2]).toEqual({ auto: true })
+  })
+
+  it('runs the auto pass offline on what the device already has', async () => {
+    const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    signIn()
+    await recordPlannerInputsPulled()
+    resetPullState()
+
+    renderHook(() => usePlannedRunner())
+    await waitFor(() => expect(runPlanner).toHaveBeenCalledTimes(1))
+    expect(runPlanner.mock.calls[0][2]).toEqual({ auto: true })
+    online.mockRestore()
+  })
+
   it('remembers a pull per user, on this device', async () => {
     signIn()
     expect(await plannerInputsOnDevice('u1')).toBe(false)

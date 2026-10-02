@@ -111,7 +111,11 @@ device has pulled the planner's inputs (`db/plannerInputs.ts` — `pullAll` reco
 and income, bills, set-asides, spending and planned all came home: an in-memory counter in `db/pullState.ts` plus a per-user
 `syncState` marker that outlives the tab). A device that pulled them on an earlier launch does
 not wait for this launch's pull, so an app opened offline still generates and auto-posts what
-came due. Then it runs debounced 500 ms on origin changes (a
+came due. **Online, the auto pass waits for this launch's pull** (`runPlanner(…, {auto})`,
+`auto = pulled > 0 || !navigator.onLine`): another device may already have paid an
+occurrence with Pay now (a random transaction id), and the pass only sees that payment — a
+transaction carrying the occurrence's deterministic `plannedId` — once it is pulled; then the row
+is settled and auto-pay skips it. Then it runs debounced 500 ms on origin changes (a
 stamp of goals / income / bills and the settings row — payday mode, main paycheck, income
 varies), each pull, each plan-rewrite request, and day rollover.
 `runPlanner` is single-flight through one queue shared with recalc and undo:

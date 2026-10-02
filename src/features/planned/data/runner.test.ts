@@ -765,3 +765,24 @@ describe('runPlanner — the pay periods change', () => {
     expect((await umrahDates()).every((d) => d.endsWith('-01'))).toBe(true)
   })
 })
+
+describe('runPlanner — without the auto pass', () => {
+  it('plans but confirms nothing on its own', async () => {
+    await db.goals.clear()
+    await db.bills.put(
+      bill({
+        id: 'gym',
+        autopay: true,
+        amount: m(100),
+        nextDue: '2026-09-20',
+        walletId: 'w1',
+      }),
+    )
+    const held = await runPlanner(USER, SEP_24, { auto: false })
+    expect(held.auto.payments).toBe(0)
+    expect(await db.transactions.count()).toBe(0)
+
+    const run = await runPlanner(USER, SEP_24)
+    expect(run.auto.payments).toBe(1)
+  })
+})

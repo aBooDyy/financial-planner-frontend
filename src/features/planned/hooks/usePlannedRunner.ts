@@ -23,9 +23,11 @@ const stamp = (rows: ReadonlyArray<Stampable>): string =>
  * It waits until this device has pulled the planner's inputs: on a fresh device, generating
  * before the server's rows arrive would only re-create them (harmless with deterministic ids,
  * but noise). A device that pulled them on an earlier launch does not wait for this one's pull,
- * so an app opened offline still plans what came due. After that it runs, debounced, whenever
- * an origin or the planning settings change, a pull lands, a plan rewrite is requested, or the
- * day turns.
+ * so an app opened offline still plans what came due. Its auto pass (auto-pay, auto-logged pay)
+ * waits for this launch's pull while the device is online — another device may have paid what
+ * came due already — and runs offline on what the device has. After that it runs, debounced,
+ * whenever an origin or the planning settings change, a pull lands, a plan rewrite is requested,
+ * or the day turns.
  */
 export function usePlannedRunner(): void {
   const authenticated = useSessionStore((s) => s.status === 'authenticated')
@@ -67,7 +69,8 @@ export function usePlannedRunner(): void {
   useEffect(() => {
     if (!authenticated || !userId || (pulled === 0 && !pulledBefore)) return
     const timer = setTimeout(() => {
-      void runPlanner(userId, startOfToday()).catch(() => undefined)
+      const auto = pulled > 0 || !navigator.onLine
+      void runPlanner(userId, startOfToday(), { auto }).catch(() => undefined)
     }, DEBOUNCE_MS)
     return () => clearTimeout(timer)
   }, [authenticated, userId, pulled, pulledBefore, origins, day, requests])

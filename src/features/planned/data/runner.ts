@@ -511,9 +511,18 @@ const unplanned = (inputs: PlannerInputs): PlanOwner[] => [
     .map((b) => billOwner(b.id)),
 ]
 
+export type RunOptions = {
+  /**
+   * Run the auto pass (auto-pay, auto-logged pay, Automatic set-asides). Off until this launch
+   * has pulled while online: another device may already have paid what came due.
+   */
+  auto?: boolean
+}
+
 async function runOnce(
   userId: string,
   todayDate: Date,
+  options: RunOptions,
 ): Promise<PlannerRunSummary> {
   const today = isoOf(todayDate)
   let inputs = await loadPlannerInputs()
@@ -562,7 +571,7 @@ async function runOnce(
   summary.removed += fill.remove.length
 
   summary.orphansResolved = await resolveOrphans(inputs, state)
-  summary.auto = await runAuto(inputs, state, today)
+  if (options.auto ?? true) summary.auto = await runAuto(inputs, state, today)
   schedulePush()
   return summary
 }
@@ -576,11 +585,12 @@ let waiting: Promise<PlannerRunSummary> | null = null
 export function runPlanner(
   userId: string,
   today: Date = new Date(),
+  options: RunOptions = {},
 ): Promise<PlannerRunSummary> {
   if (waiting) return waiting
   const run = serialized(() => {
     waiting = null
-    return runOnce(userId, today)
+    return runOnce(userId, today, options)
   })
   waiting = run
   return run
