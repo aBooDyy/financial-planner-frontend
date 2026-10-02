@@ -124,6 +124,41 @@ confirmed, that money is still in Free). Each term lists its rows (`items`) for 
 arithmetic. `payday` is set when the window runs until the next main payday. Budgets are never
 subtracted (D18).
 
+## Bill and goal status — `data/status.ts`
+
+`billStatusOf(bill, inputs, state, today)` / `billStatuses(...)` → `BillStatus`, about the
+bill's **first open occurrence** (bill currency): `state` — first match of
+`done` (closed) · `paid` (no open occurrence left: a settled one-off, an ended bill) · `due`
+(its date has come, payment not confirmed) · `covered` (set aside + paid ≥ amount) ·
+`not_set_aside` (no payday before it is due) · `short` (`shortBy`: the funded plan can't cover
+it by then) · `behind` (`behindBy`: planned set-asides for this occurrence — rows dated after
+the previous occurrence — came due and were not made) · `saving_up` (with `coveredOn`, the
+payday the plan finishes it). Plus `setAside`, `cycle` (`each_paycheck` when one payday covers
+an occurrence, else `save_up`), `perPaycheck` / `requiredPerPaycheck` (the next payday's
+funded / unlimited set-aside), `heldIn` (per wallet / outside) and `next` (three open
+occurrences with what each holds).
+
+`goalStatusOf(goal, …)` / `goalStatuses(...)` → `GoalStatus` (goal currency): `state` —
+`done` · `paused` · `reached` · `short` (`shortBy`, `slipsTo` ≈ the payday it would get there at
+the pace it was getting) · `behind` (`behindBy`) · `saving_up` (`ongoing` without a target).
+Plus `progress` / `setAside` / `used` / `target` / `left`, `perPaycheck`,
+`requiredPerPaycheck`, `finish` (the payday the plan reaches the target) and `heldIn`.
+
+## Each paycheck, verdict, Needs a decision — `data/paycheck.ts`
+
+- `eachPaycheck(inputs, state)` → `{payday, income, bills, savingUp, goals, planned, left}`
+  (base) for the **next payday**, from the `required` (unlimited) run so a shortfall shows:
+  tracks funded whole that payday are `bills`, tracks saving up over several are `savingUp`,
+  goals are `goals` (each a `{total, count, items}`). `income` is that slot's capacity (null
+  with no income); `left = income − planned` may be negative.
+- `verdictOf(inputs, state, paycheck?)` → `start` (`empty`: nothing planned · `no_income`) ·
+  `short` (`per: 'paycheck'` when `left < 0`; `per: 'total'` when this paycheck fits but some
+  date can't be met — Σ funded shortfalls) · `tight` (left < `TIGHT_SHARE` = 10 % of pay) ·
+  `covered`.
+- `needsDecision(state)` → per owner, its first track the funded plan leaves short (one that
+  had a payday to try — a bill due before the next payday is just paid from free money):
+  `shortBy`, `requiredPerPaycheck`, `deadline`, and for a goal `pushOutTo` (+6 months).
+
 ## Money actions — `actions/`
 
 The anytime actions (02, D23) on top of the planned/set-aside/transaction write paths. Local
@@ -162,7 +197,8 @@ first, each a Dexie write plus outbox entries; errors are `MoneyActionError` wit
 
 ## Tests
 
-`data/{payPeriods,funding,leftover,balances,safeToSpend}.test.ts` (leftover + fill); `actions/actions.test.ts`
+`data/{payPeriods,funding,leftover,balances,safeToSpend,status,paycheck}.test.ts` (leftover +
+fill; `testing/state.ts` builds a planner state from rows); `actions/actions.test.ts`
 (the testing plan's anytime actions); generation and the runner in
 `planned/data/{generate,reconcile,runner}.test.ts`; payments in
 `planned/data/billPayments.test.ts`.
