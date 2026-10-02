@@ -1,5 +1,7 @@
 import { db } from '#/db/db'
+import { queuedBesides } from '#/db/enqueue'
 import { pushItemAction } from '#/db/itemAction'
+import { storeAnswer } from '#/db/storeAnswer'
 import type { OutboxEntry } from '#/db/types'
 import { billsApi } from '#/features/bills/api/billsApi'
 import type { CreateBillWire, UpdateBillWire } from '#/features/bills/api/types'
@@ -24,7 +26,11 @@ async function storeBill(
   bill: Parameters<typeof serverBillToLocal>[0],
 ): Promise<void> {
   await db.transaction('rw', db.bills, db.outbox, async () => {
-    await db.bills.put(serverBillToLocal(bill))
+    await storeAnswer(
+      db.bills,
+      serverBillToLocal(bill),
+      await queuedBesides(entry),
+    )
     await db.outbox.delete(entry.seq)
   })
 }
@@ -106,10 +112,15 @@ const serverVersionOf = async (id: string): Promise<string | undefined> =>
   (await billsApi.list()).find((b) => b.id === id)?.version
 
 /** Take the server's copy of the bill, or drop it when the server no longer has it. */
-async function adoptServerBill(id: string): Promise<void> {
-  const fresh = (await billsApi.list()).find((b) => b.id === id)
-  if (fresh) await db.bills.put(serverBillToLocal(fresh))
-  else await db.bills.delete(id)
+async function adoptServerBill(entry: OutboxEntry): Promise<void> {
+  const fresh = (await billsApi.list()).find((b) => b.id === entry.id)
+  if (fresh)
+    await storeAnswer(
+      db.bills,
+      serverBillToLocal(fresh),
+      await queuedBesides(entry),
+    )
+  else await db.bills.delete(entry.id)
 }
 
 async function pushBillClose(entry: OutboxEntry): Promise<void> {
@@ -119,7 +130,11 @@ async function pushBillClose(entry: OutboxEntry): Promise<void> {
     freshVersion: () => serverVersionOf(entry.id),
     send: (version) => billsApi.close(entry.id, { ...payload, version }),
     store: async ({ bill, released, created }) => {
-      await db.bills.put(serverBillToLocal(bill))
+      await storeAnswer(
+        db.bills,
+        serverBillToLocal(bill),
+        await queuedBesides(entry),
+      )
       await storeServerSetAsides([...released, ...created])
     },
     adopt: async () => {
@@ -127,7 +142,7 @@ async function pushBillClose(entry: OutboxEntry): Promise<void> {
         .where('billId')
         .equals(entry.id)
         .primaryKeys()
-      await adoptServerBill(entry.id)
+      await adoptServerBill(entry)
       await resyncSetAsides([
         ...own,
         ...Object.values(payload.move_to?.new_ids ?? {}),
@@ -144,9 +159,13 @@ async function pushBillReopen(entry: OutboxEntry): Promise<void> {
     freshVersion: () => serverVersionOf(entry.id),
     send: (version) => billsApi.reopen(entry.id, { version }),
     store: async (bill) => {
-      await db.bills.put(serverBillToLocal(bill))
+      await storeAnswer(
+        db.bills,
+        serverBillToLocal(bill),
+        await queuedBesides(entry),
+      )
     },
-    adopt: () => adoptServerBill(entry.id),
+    adopt: () => adoptServerBill(entry),
     gone: () => db.bills.delete(entry.id),
     doneCodes: ['planning.bill.not_closed'],
   })

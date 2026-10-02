@@ -11,6 +11,8 @@ const api = vi.hoisted(() => ({
   create: vi.fn(),
   update: vi.fn(),
   del: vi.fn(),
+  close: vi.fn(),
+  reopen: vi.fn(),
 }))
 vi.mock('#/features/bills/api/billsApi', () => ({ billsApi: api }))
 
@@ -83,6 +85,72 @@ describe('pushBillsEntry', () => {
       amount: 50,
       version: 'v3',
       dirty: 0,
+    })
+  })
+
+  it('keeps a close queued behind an edit on the row when the edit lands', async () => {
+    const local = bill({
+      id: 'b1',
+      name: 'Rent',
+      closedAt: '2026-10-01',
+      dirty: 1,
+      version: 'v1',
+    })
+    await db.bills.put(local)
+    api.update.mockResolvedValue(asServer({ ...local, closedAt: null }, 'v2'))
+    const edit = await queue({
+      op: 'update',
+      entity: 'bill',
+      id: 'b1',
+      payload: {},
+      baseVersion: 'v1',
+    })
+    await queue({
+      op: 'close',
+      entity: 'bill',
+      id: 'b1',
+      payload: { leftover: 'FREE' },
+      baseVersion: null,
+    })
+
+    await pushBillsEntry(edit)
+
+    expect(await db.bills.get('b1')).toMatchObject({
+      closedAt: '2026-10-01',
+      version: 'v2',
+      dirty: 1,
+    })
+  })
+
+  it('keeps a reopen queued behind a close when the close lands', async () => {
+    const local = bill({ id: 'b1', closedAt: null, dirty: 1, version: 'v1' })
+    await db.bills.put(local)
+    api.close.mockResolvedValue({
+      bill: asServer({ ...local, closedAt: '2026-10-01' }, 'v2'),
+      released: [],
+      created: [],
+    })
+    const close = await queue({
+      op: 'close',
+      entity: 'bill',
+      id: 'b1',
+      payload: { leftover: 'FREE' },
+      baseVersion: null,
+    })
+    await queue({
+      op: 'reopen',
+      entity: 'bill',
+      id: 'b1',
+      payload: null,
+      baseVersion: null,
+    })
+
+    await pushBillsEntry(close)
+
+    expect(await db.bills.get('b1')).toMatchObject({
+      closedAt: null,
+      version: 'v2',
+      dirty: 1,
     })
   })
 

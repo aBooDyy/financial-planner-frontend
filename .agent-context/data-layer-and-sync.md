@@ -227,7 +227,14 @@ backing-off write of any of its rows, and any later write of them waits behind t
     2 608-row undo spent ~75 s in continuous HTTP as 2 608 `DELETE`s, and now costs 3 requests
     and 4.0 s**; a 2 603-row import commit is **3 requests, down from 5**. A test drains a
     2 608-row undo and asserts the batch sizes are `[1000, 1000, 608]`.
-  - `2xx` → store the returned record + new `version`, clear `dirty`, remove from outbox.
+  - `2xx` → store the returned record + new `version`, clear `dirty`, remove from outbox —
+    **unless more writes for the row are still queued** (an edit behind a close, a reopen behind
+    a close, a release behind an edit): then the local row already shows them, so it keeps its
+    fields, stays `dirty` and takes only the server's `version` (`db/storeAnswer.ts`,
+    `queuedBesides` in `db/enqueue.ts`; set-asides ask `hasQueuedWrites`, which counts batches).
+    Storing the answer whole briefly undid the queued change — a closed bill shown open again —
+    and for as long as the server kept refusing it. Bills, goals, income and set-asides use it,
+    for actions' answers and adopts too.
   - **`409` conflict** → the server row moved on. Reconcile (see below).
   - Anything else → keep in the outbox and **flag** it; see
     [Failed pushes](#failed-pushes-flag-hold-retry--never-drop).

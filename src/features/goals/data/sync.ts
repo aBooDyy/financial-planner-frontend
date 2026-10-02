@@ -1,5 +1,7 @@
 import { db } from '#/db/db'
+import { queuedBesides } from '#/db/enqueue'
 import { pushItemAction } from '#/db/itemAction'
+import { storeAnswer } from '#/db/storeAnswer'
 import type { OutboxEntry } from '#/db/types'
 import { goalsApi } from '#/features/goals/api/goalsApi'
 import type {
@@ -39,7 +41,11 @@ async function pushIncomeCreate(entry: OutboxEntry): Promise<void> {
       entry.payload as CreateIncomeWire,
     )
     await db.transaction('rw', db.incomeStreams, db.outbox, async () => {
-      await db.incomeStreams.put(serverIncomeToLocal(stream))
+      await storeAnswer(
+        db.incomeStreams,
+        serverIncomeToLocal(stream),
+        await queuedBesides(entry),
+      )
       await db.outbox.delete(entry.seq)
     })
   } catch (e) {
@@ -60,7 +66,11 @@ async function pushIncomeUpdate(entry: OutboxEntry): Promise<void> {
       entry.payload as UpdateIncomeWire,
     )
     await db.transaction('rw', db.incomeStreams, db.outbox, async () => {
-      await db.incomeStreams.put(serverIncomeToLocal(stream))
+      await storeAnswer(
+        db.incomeStreams,
+        serverIncomeToLocal(stream),
+        await queuedBesides(entry),
+      )
       await db.outbox.delete(entry.seq)
     })
   } catch (e) {
@@ -93,13 +103,21 @@ async function rebaseIncome(entry: OutboxEntry): Promise<void> {
       localIncomeToUpdateWire({ ...local, version: fresh.version }),
     )
     await db.transaction('rw', db.incomeStreams, db.outbox, async () => {
-      await db.incomeStreams.put(serverIncomeToLocal(stream))
+      await storeAnswer(
+        db.incomeStreams,
+        serverIncomeToLocal(stream),
+        await queuedBesides(entry),
+      )
       await db.outbox.delete(entry.seq)
     })
   } catch (e) {
     if (statusOf(e) !== 409) throw e
     await db.transaction('rw', db.incomeStreams, db.outbox, async () => {
-      await db.incomeStreams.put(serverIncomeToLocal(fresh))
+      await storeAnswer(
+        db.incomeStreams,
+        serverIncomeToLocal(fresh),
+        await queuedBesides(entry),
+      )
       await db.outbox.delete(entry.seq)
     })
   }
@@ -123,7 +141,11 @@ async function pushGoalCreate(entry: OutboxEntry): Promise<void> {
   try {
     const goal = await goalsApi.createGoal(entry.payload as CreateGoalWire)
     await db.transaction('rw', db.goals, db.outbox, async () => {
-      await db.goals.put(serverGoalToLocal(goal))
+      await storeAnswer(
+        db.goals,
+        serverGoalToLocal(goal),
+        await queuedBesides(entry),
+      )
       await db.outbox.delete(entry.seq)
     })
   } catch (e) {
@@ -141,7 +163,11 @@ async function pushGoalUpdate(entry: OutboxEntry): Promise<void> {
   try {
     const goal = await goalsApi.updateGoal(id, entry.payload as UpdateGoalWire)
     await db.transaction('rw', db.goals, db.outbox, async () => {
-      await db.goals.put(serverGoalToLocal(goal))
+      await storeAnswer(
+        db.goals,
+        serverGoalToLocal(goal),
+        await queuedBesides(entry),
+      )
       await db.outbox.delete(entry.seq)
     })
   } catch (e) {
@@ -174,13 +200,21 @@ async function rebaseGoal(entry: OutboxEntry): Promise<void> {
       localGoalToUpdateWire({ ...local, version: fresh.version }),
     )
     await db.transaction('rw', db.goals, db.outbox, async () => {
-      await db.goals.put(serverGoalToLocal(goal))
+      await storeAnswer(
+        db.goals,
+        serverGoalToLocal(goal),
+        await queuedBesides(entry),
+      )
       await db.outbox.delete(entry.seq)
     })
   } catch (e) {
     if (statusOf(e) !== 409) throw e
     await db.transaction('rw', db.goals, db.outbox, async () => {
-      await db.goals.put(serverGoalToLocal(fresh))
+      await storeAnswer(
+        db.goals,
+        serverGoalToLocal(fresh),
+        await queuedBesides(entry),
+      )
       await db.outbox.delete(entry.seq)
     })
   }
@@ -204,10 +238,15 @@ const goalVersionOf = async (id: string): Promise<string | undefined> =>
   (await goalsApi.listGoals()).find((g) => g.id === id)?.version
 
 /** Take the server's copy of the goal, or drop it when the server no longer has it. */
-async function adoptServerGoal(id: string): Promise<void> {
-  const fresh = (await goalsApi.listGoals()).find((g) => g.id === id)
-  if (fresh) await db.goals.put(serverGoalToLocal(fresh))
-  else await db.goals.delete(id)
+async function adoptServerGoal(entry: OutboxEntry): Promise<void> {
+  const fresh = (await goalsApi.listGoals()).find((g) => g.id === entry.id)
+  if (fresh)
+    await storeAnswer(
+      db.goals,
+      serverGoalToLocal(fresh),
+      await queuedBesides(entry),
+    )
+  else await db.goals.delete(entry.id)
 }
 
 /** The shared shape of the four goal actions; only the call and its "already done" codes vary. */
@@ -221,9 +260,13 @@ async function pushGoalAction(
     freshVersion: () => goalVersionOf(entry.id),
     send,
     store: async (goal) => {
-      await db.goals.put(serverGoalToLocal(goal))
+      await storeAnswer(
+        db.goals,
+        serverGoalToLocal(goal),
+        await queuedBesides(entry),
+      )
     },
-    adopt: () => adoptServerGoal(entry.id),
+    adopt: () => adoptServerGoal(entry),
     gone: () => db.goals.delete(entry.id),
     doneCodes,
   })
@@ -236,7 +279,11 @@ async function pushGoalClose(entry: OutboxEntry): Promise<void> {
     freshVersion: () => goalVersionOf(entry.id),
     send: (version) => goalsApi.closeGoal(entry.id, { ...payload, version }),
     store: async ({ goal, released, created }) => {
-      await db.goals.put(serverGoalToLocal(goal))
+      await storeAnswer(
+        db.goals,
+        serverGoalToLocal(goal),
+        await queuedBesides(entry),
+      )
       await storeServerSetAsides([...released, ...created])
     },
     adopt: async () => {
@@ -244,7 +291,7 @@ async function pushGoalClose(entry: OutboxEntry): Promise<void> {
         .where('goalId')
         .equals(entry.id)
         .primaryKeys()
-      await adoptServerGoal(entry.id)
+      await adoptServerGoal(entry)
       await resyncSetAsides([
         ...own,
         ...Object.values(payload.move_to?.new_ids ?? {}),

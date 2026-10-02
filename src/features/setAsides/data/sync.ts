@@ -1,4 +1,5 @@
 import { db } from '#/db/db'
+import { storeAnswer } from '#/db/storeAnswer'
 import type { OutboxEntry } from '#/db/types'
 import { setAsidesApi } from '#/features/setAsides/api/setAsidesApi'
 import type {
@@ -25,14 +26,17 @@ const statusOf = (e: unknown): number => (e instanceof ApiError ? e.status : -1)
 /**
  * Store rows an action answered with (a close, a release, a move) as the server now holds them —
  * except a row with writes still queued behind the action: it keeps the user's newer edit, and
- * its own push (a `409` rebase onto the server's version) settles it.
+ * its own push settles it.
  */
 export async function storeServerSetAsides(
   rows: ReadonlyArray<SetAside>,
 ): Promise<void> {
   for (const row of rows) {
-    if (!(await hasQueuedWrites(row.id)))
-      await db.setAsides.put(serverSetAsideToLocal(row))
+    await storeAnswer(
+      db.setAsides,
+      serverSetAsideToLocal(row),
+      await hasQueuedWrites(row.id),
+    )
   }
 }
 
@@ -41,8 +45,12 @@ async function storeAndSettle(
   row: SetAside,
 ): Promise<void> {
   await db.transaction('rw', db.setAsides, db.outbox, async () => {
-    await db.setAsides.put(serverSetAsideToLocal(row))
     await db.outbox.delete(entry.seq)
+    await storeAnswer(
+      db.setAsides,
+      serverSetAsideToLocal(row),
+      await hasQueuedWrites(row.id),
+    )
   })
 }
 

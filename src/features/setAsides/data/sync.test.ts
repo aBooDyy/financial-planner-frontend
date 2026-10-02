@@ -107,6 +107,41 @@ describe('pushSetAsidesEntry', () => {
     })
   })
 
+  it('keeps a release queued behind an edit on the row when the edit lands', async () => {
+    const local = setAside({
+      id: 'a1',
+      note: 'mine',
+      releasedAt: '2026-10-01',
+      dirty: 1,
+      version: 'v1',
+    })
+    await db.setAsides.put(local)
+    api.update.mockResolvedValue(asServer({ ...local, releasedAt: null }, 'v2'))
+    const edit = await queue({
+      op: 'update',
+      entity: 'setAside',
+      id: 'a1',
+      payload: {},
+      baseVersion: 'v1',
+    })
+    await queue({
+      op: 'release',
+      entity: 'setAside',
+      id: 'a1',
+      alsoRows: [],
+      payload: { items: [{ id: 'a1' }] },
+      baseVersion: null,
+    })
+
+    await pushSetAsidesEntry(edit)
+
+    expect(await db.setAsides.get('a1')).toMatchObject({
+      releasedAt: '2026-10-01',
+      version: 'v2',
+      dirty: 1,
+    })
+  })
+
   it('treats a delete the server already applied as done', async () => {
     await db.setAsides.put(setAside({ id: 'a1' }))
     api.del.mockRejectedValue(

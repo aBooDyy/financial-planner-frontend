@@ -5,7 +5,7 @@
  */
 import { db } from './db'
 import { requeued } from './syncFailure'
-import type { OutboxEntity } from './types'
+import type { OutboxEntity, OutboxEntry } from './types'
 
 const now = () => new Date().toISOString()
 
@@ -86,4 +86,12 @@ export async function enqueueDelete(
     createdAt: now(),
   })
   return true
+}
+
+/** Whether the row has queued entries other than `entry` — writes still waiting behind it. */
+export async function queuedBesides(entry: OutboxEntry): Promise<boolean> {
+  const others = await pendingFor(entry.entity, entry.id)
+    .filter((e) => e.seq !== entry.seq)
+    .count()
+  return others > 0
 }
