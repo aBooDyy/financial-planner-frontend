@@ -4,6 +4,7 @@
  * Test-only: nothing in the app imports this.
  */
 import { db } from '#/db/db'
+import { SETTINGS_KEY } from '#/db/types'
 import { defaultCategoryRows } from '#/features/categories/__fixtures__/categories'
 import { income, m, wallet } from '#/features/planned/testing/fixtures'
 import { useSessionStore } from '#/stores/session'
@@ -42,6 +43,14 @@ export async function seedPlanningDb(): Promise<void> {
   } as never)
   await Promise.all(db.tables.map((t) => t.clear()))
   await db.categories.bulkPut(defaultCategoryRows())
+  await db.balanceSettings.put({
+    id: SETTINGS_KEY,
+    baseCurrency: 'SAR',
+    createdAt: '',
+    updatedAt: '',
+    version: '',
+    dirty: 0,
+  })
   await db.balanceNodes.put(
     wallet({ id: 'main', name: 'Main bank', amount: m(20000) }),
   )

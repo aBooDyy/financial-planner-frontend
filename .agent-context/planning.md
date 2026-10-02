@@ -301,6 +301,14 @@ Nice to have for bills, **Must have** / Nice to have for goals, "Left for spendi
   the paydays to the date), *Set aside SR X a month. Done around Aug 2027.*, *…with no end
   date.*, or what is missing. The emergency fund suggestion opens it pre-filled
   (`GoalPreset`).
+- **Income** (`IncomeEditor`, not in the design — built in its language from 02 Income): What is
+  it? · How much comes in? (+ "Paid into" pill) · How often? (no Just once) · *Paid on [25] of
+  each month* (monthly) or *Next payday* (any other cadence: the anchor every payday steps
+  from) · the preview (*SR 12,000 monthly · next payday Oct 25.* — the picked payday when it is
+  still ahead) · the main paycheck: a **Sets my pay periods** tag on it, else (while one exists)
+  a **Use for my pay periods** switch that saves `mainIncomeStreamId` · More options: Category
+  (default **Salary**, required on create), Log it automatically when it arrives, Ends, Note,
+  Colour.
 
 ## Tests
 

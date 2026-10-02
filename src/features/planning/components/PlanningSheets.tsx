@@ -5,6 +5,7 @@ import { emergencyFundPreset } from '#/features/planning/view/emergencyFund'
 import { PlanChooser } from './chooser/PlanChooser'
 import { BillEditor } from './editors/BillEditor'
 import { GoalEditor } from './editors/GoalEditor'
+import { IncomeEditor } from './editors/IncomeEditor'
 import { DeleteItemConfirm } from './sheets/DeleteItemConfirm'
 
 /** The one sheet the Planning page has open, by kind. */
@@ -60,6 +61,17 @@ export function PlanningSheets() {
           onClose={closeSheet}
           onDelete={(id) =>
             openSheet({ kind: 'delete', target: { kind: 'goal', id } })
+          }
+        />
+      )
+    case 'income':
+      return (
+        <IncomeEditor
+          key={sheet.id ?? 'new'}
+          id={sheet.id}
+          onClose={closeSheet}
+          onDelete={(id) =>
+            openSheet({ kind: 'delete', target: { kind: 'income', id } })
           }
         />
       )
