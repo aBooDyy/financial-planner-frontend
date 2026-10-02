@@ -48,8 +48,10 @@ Local row + outbox entry in one Dexie transaction (`db/enqueue.ts`), then `sched
 - **Actions (`data/actions.ts`)** — the bills' pattern ([bills.md](bills.md#actions--dataactionsts)):
   `closeGoal(id, {closedAt?, leftover?})` (also ends a pause; "I spent it" is a spend with the
   goal and its `useCategoryId`, then a close with the default free leftover — not atomic, and
-  harmless if the close fails), `reopenGoal(id)` (clears `closedAt` and `pausedAt`),
-  `pauseGoal(id, pausedAt?)` (no-op on a closed or paused goal) and `resumeGoal(id)`. Each writes
+  harmless if the close fails; `planning/actions/goalMoney.markGoalSpent` does both),
+  `reopenGoal(id)` (clears `closedAt` and `pausedAt`), `pauseGoal(id, pausedAt?)` (no-op on a
+  closed or paused goal) and `resumeGoal(id)`. Reopen and resume file a quiet plan rewrite.
+  "Use it" and Add money are `planning/actions` ([planning.md](planning.md#money-actions--actions)). Each writes
   the goal and queues `op: 'close' | 'reopen' | 'pause' | 'resume'`; the "already done" codes are
   `goals.goal.already_closed`, `not_closed`, `already_paused` (and `already_closed` for a
   pause), `not_paused`. A paused goal plans no set-asides (`isPlannable`), so the planner's next

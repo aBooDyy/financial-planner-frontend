@@ -13,7 +13,10 @@ import type { LocalBill, LocalPlanned } from '#/db/types'
 import { setBillNextDue } from '#/features/bills/data/mutations'
 import { buildCatalog } from '#/features/categories/data/catalog'
 import { occurrenceNeeds, spill } from '#/features/planning/data/fill'
-import type { OccurrenceChunk } from '#/features/planning/data/fill'
+import type {
+  OccurrenceChunk,
+  OccurrenceNeed,
+} from '#/features/planning/data/fill'
 import {
   billOccurrences,
   firstOpenOccurrence,
@@ -141,16 +144,11 @@ async function rollToNextOccurrence(item: LocalPlanned): Promise<void> {
   )
 }
 
-/**
- * Money set aside for a bill, filled into its open occurrences in order — those due on or
- * after `from` when given.
- */
-export async function chunksFor(
+/** A bill's open occurrences and what each still needs, as stored right now. */
+export async function readBillNeeds(
   bill: LocalBill,
-  amount: number,
   rates: RatesMap,
-  from?: string,
-): Promise<OccurrenceChunk[]> {
+): Promise<OccurrenceNeed[]> {
   const [payments, setAsides, txns] = await Promise.all([
     billPayments(bill),
     db.setAsides.where('billId').equals(bill.id).toArray(),
@@ -160,8 +158,24 @@ export async function chunksFor(
     txns.filter((t) => t.deleted === 0),
     setAsides.filter((a) => a.deleted === 0),
   )
-  const needs = occurrenceNeeds(bill, payments, setAsides, index, rates)
-  return spill(from ? needs.filter((n) => n.occurrence >= from) : needs, amount)
+  return occurrenceNeeds(bill, payments, setAsides, index, rates)
+}
+
+/**
+ * Money set aside for a bill, filled into its open occurrences in order — those due on or
+ * after `from`.
+ */
+async function chunksFor(
+  bill: LocalBill,
+  amount: number,
+  rates: RatesMap,
+  from: string,
+): Promise<OccurrenceChunk[]> {
+  const needs = await readBillNeeds(bill, rates)
+  return spill(
+    needs.filter((n) => n.occurrence >= from),
+    amount,
+  )
 }
 
 type SetAsideTarget =
@@ -199,7 +213,10 @@ async function categoryFor(
   throw new PlannedActionError('category_invalid')
 }
 
-async function walletCurrency(walletId: string): Promise<CurrencyCode | null> {
+/** A live wallet's currency; null for a group, a deleted or an unknown node. */
+export async function walletCurrency(
+  walletId: string,
+): Promise<CurrencyCode | null> {
   const node = await db.balanceNodes.get(walletId)
   return node && node.deleted === 0 && node.kind === 'wallet'
     ? (node.currency ?? null)

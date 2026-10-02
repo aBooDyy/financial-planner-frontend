@@ -62,8 +62,10 @@ own outbox entry (`op: 'close' | 'reopen'`), which the server applies atomically
   new_ids}}`. The moved copies get ids minted here and sent as `new_ids`, so the server's rows
   are the local ones. The touched set-asides are marked dirty with no entries of their own; the
   close carries them. Closing a closed bill is a no-op.
-- `reopenBill(id)` — clears `closedAt`; what the close released stays released; the planner
-  plans the bill again.
+- `reopenBill(id)` — clears `closedAt`; what the close released stays released; it files a
+  quiet plan rewrite so the planner plans the bill again from today.
+- **Pay now / Add money** are the planning slice's money actions (`planning/actions/payBill`,
+  `addMoney` — [planning.md](planning.md#money-actions--actions)).
 - **Pushing an action** goes through `db/itemAction.ts` (`pushItemAction`): the payload holds no
   version — the row's last-synced one is read when it goes out. `409
   planning.bill.already_closed` (close) / `not_closed` (reopen) means the row is already in the

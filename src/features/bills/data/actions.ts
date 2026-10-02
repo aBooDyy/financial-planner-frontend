@@ -6,6 +6,8 @@
 import { db } from '#/db/db'
 import { schedulePush } from '#/db/sync'
 import { isoOf } from '#/features/planned/data/dates'
+import { billOwner } from '#/features/planned/data/owners'
+import { requestPlanRecalc } from '#/features/planned/data/recalcRequests'
 import { queueClose } from '#/features/setAsides/data/leftover'
 import type { Leftover } from '#/features/setAsides/data/leftover'
 
@@ -41,7 +43,10 @@ export async function closeBill(
   schedulePush()
 }
 
-/** Undo a close: the bill plans again from today. What the close released stays released. */
+/**
+ * Undo a close: the bill's plan is rewritten from today. What the close released stays
+ * released.
+ */
 export async function reopenBill(id: string): Promise<void> {
   const bill = await db.bills.get(id)
   if (!bill || bill.deleted !== 0 || bill.closedAt === null) return
@@ -56,5 +61,6 @@ export async function reopenBill(id: string): Promise<void> {
       createdAt: now(),
     })
   })
+  requestPlanRecalc(billOwner(id), { quiet: true })
   schedulePush()
 }

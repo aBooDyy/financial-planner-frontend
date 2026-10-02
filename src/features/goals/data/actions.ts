@@ -7,6 +7,8 @@ import { db } from '#/db/db'
 import { schedulePush } from '#/db/sync'
 import type { LocalGoal, OutboxOp } from '#/db/types'
 import { isoOf } from '#/features/planned/data/dates'
+import { goalOwner } from '#/features/planned/data/owners'
+import { requestPlanRecalc } from '#/features/planned/data/recalcRequests'
 import { queueClose } from '#/features/setAsides/data/leftover'
 import type { Leftover } from '#/features/setAsides/data/leftover'
 
@@ -76,11 +78,14 @@ export async function closeGoal(
   schedulePush()
 }
 
-/** Undo a close: the goal plans again from today. A pause it had before stays ended. */
+/**
+ * Undo a close: the goal's plan is rewritten from today. A pause it had before stays ended.
+ */
 export async function reopenGoal(id: string): Promise<void> {
   const goal = await liveGoal(id)
   if (!goal || goal.closedAt === null) return
   await queueAction(goal, { closedAt: null, pausedAt: null }, 'reopen', null)
+  requestPlanRecalc(goalOwner(id), { quiet: true })
 }
 
 /**
@@ -96,9 +101,10 @@ export async function pauseGoal(
   await queueAction(goal, { pausedAt }, 'pause', { paused_at: pausedAt })
 }
 
-/** Resume a paused goal: it plans again from today. */
+/** Resume a paused goal: its plan is rewritten from today. */
 export async function resumeGoal(id: string): Promise<void> {
   const goal = await liveGoal(id)
   if (!goal || goal.pausedAt === null) return
   await queueAction(goal, { pausedAt: null }, 'resume', null)
+  requestPlanRecalc(goalOwner(id), { quiet: true })
 }

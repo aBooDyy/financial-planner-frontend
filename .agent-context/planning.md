@@ -95,8 +95,45 @@ paying wallet, one line per wallet / outside label (with the row ids), the total
 currency, and whether "Keep it for next time" applies (a repeating, open bill) with the
 occurrence it would roll to (the next one not settled). Pure — the prompt is the UI's.
 
+## Money actions — `actions/`
+
+The anytime actions (02, D23) on top of the planned/set-aside/transaction write paths. Local
+first, each a Dexie write plus outbox entries; errors are `MoneyActionError` with a stable
+`code` (`not_found`, `closed`, `no_wallet`, `bad_amount`, `category_required`,
+`no_next_occurrence`, `signed_out`).
+
+- **`payBill(billId, {occurrence?, amount?, walletId?, date?, note?})`** — Pay now: any open
+  occurrence (default the first open one), in full (default) or in part, early or on time. It
+  confirms the occurrence's planned payment row — generating it under its deterministic id
+  when the occurrence is beyond the planner's horizon — so the payment releases that
+  occurrence's set-asides in the paying wallet and `nextDue` moves to the first occurrence
+  still open (paying ahead leaves it put). Returns `{transactionId, occurrence, status,
+  leftover}` — `leftover` is `leftoverFor` after the payment.
+- **`resolveLeftover(report, 'move' | 'free' | 'keep', {payingWalletId, date?})`** — the
+  leftover prompt's answers: *move* records a transfer from each holding wallet to the paying
+  wallet and releases those set-asides (outside money stays as it is); *free* releases them;
+  *keep* moves them to `report.nextOccurrence` (repeating bills only).
+- **`addMoney(owner, parts, {date?, note?})`** — Add money / Split: `parts` are
+  `{walletId, amount}` or `{externalLabel, amount}` in the owner's currency. A goal gets one
+  set-aside per part; a bill's parts fill its open occurrences in order (`fill.spill`, the
+  needs shared across parts) — one set-aside per part and occurrence. Each links to the
+  owner's oldest planned set-aside still waiting (so it settles the plan instead of sitting
+  beside it), and the owner's plan is rewritten **quietly** afterwards: being ahead lowers
+  what later paydays set aside. The over-commit guardrail is the UI's (03 §3).
+- **`spendFromGoal(goalId, {amount, walletId, categoryId?, date?, note?})`** — Use it: a spend
+  with the goal's id under `categoryId ?? goal.useCategoryId` (required the first time, then
+  remembered on the goal), releasing the goal's set-asides in the paying wallet.
+- **`markGoalSpent(goalId, {walletId, categoryId?, date?, amount?})`** — I spent it (D30): a
+  spend of everything still set aside (or `amount`), then `closeGoal` with the leftover freed.
+  Not atomic; a failure in between leaves an open goal with a payment, which is harmless.
+- **Close / reopen / pause / resume** stay in their slices (`bills/data/actions`,
+  `goals/data/actions`). Close drops the open unsettled rows after the close date and pause
+  stops the plan (the planner's fill removes future set-asides); reopen and resume file a
+  quiet plan rewrite, so the owner is planned again from today.
+
 ## Tests
 
-`data/{payPeriods,funding,leftover}.test.ts` (leftover + fill); generation and the runner in
+`data/{payPeriods,funding,leftover}.test.ts` (leftover + fill); `actions/actions.test.ts`
+(the testing plan's anytime actions); generation and the runner in
 `planned/data/{generate,reconcile,runner}.test.ts`; payments in
 `planned/data/billPayments.test.ts`.
