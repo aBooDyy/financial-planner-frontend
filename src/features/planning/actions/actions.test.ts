@@ -260,6 +260,26 @@ describe('Pay now', () => {
   })
 })
 
+describe('the leftover’s free answer', () => {
+  it('releases what other wallets held, where it is', async () => {
+    await db.setAsides.put(
+      setAside({
+        goalId: null,
+        billId: 'ins',
+        occurrence: '2027-03-01',
+        walletId: 'savings',
+        amount: m(300),
+      }),
+    )
+    const { leftover } = await payBill('ins', { walletId: 'main' })
+    await resolveLeftover(leftover, 'free', { payingWalletId: 'main' })
+    expect(await liveOf('ins')).toEqual([])
+    expect((await db.transactions.toArray()).some((t) => t.transferId)).toBe(
+      false,
+    )
+  })
+})
+
 describe('Use it and I spent it', () => {
   const TRIP = goal({ id: 'trip', name: 'Trip', target: m(5000) })
 
