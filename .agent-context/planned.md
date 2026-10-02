@@ -223,7 +223,11 @@ awaiting segment, contributions timeline + `collapseContributions`, `recalc()`, 
 with its undo, `addContribution`), `useConfirmPlanned(id, walletId)` (dialog defaults + `preview(amount, date)` —
 the effect line re-derives the plan with the settlement added), `usePlannedMatch(ref, roles,
 date)` (the transaction dialog's "Counts toward" banner; `findMatch`: oldest open item of the origin and role
-within −45/+15 days), `useRecalcAll()`. QuickAdd's stricter hint (exact open amount, ±3 days,
+within −45/+15 days), `useRecalcAll()` (`offPlan`: every open goal and bill whose stored plan
+today's numbers disagree with, and `recalcAll`), `useBillPlan(billId)` (a bill's
+`comparePlan` + `behind`, `recalc`, `lastRecalc` with its undo). `comparePlan({owner,
+snapshot, …})` in `data/views.ts` is the stored-vs-live comparison both owners share (the goal
+view spreads it). QuickAdd's stricter hint (exact open amount, ±3 days,
 no origin chosen) is the Spending slice's own `transactions/data/quickAddMatch.ts`, fed by
 `usePlannedData` + `remainderOf` — see [transactions.md](transactions.md). They all sit on
 `usePlannedData()`, which derives `PlannerState` (`data/state.ts`) — the same derivation the

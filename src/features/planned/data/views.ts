@@ -19,7 +19,8 @@ import { behindOf, remainderOf, settledOf, settlementsFor } from './settle'
 import type { Behind, SettlementIndex } from './settle'
 import { fitPlanFrom } from './fit'
 import { goalOwner } from './owners'
-import type { PlanHeader } from './snapshot'
+import type { PlanOwner } from './owners'
+import type { PlanHeader, PlanSnapshot } from './snapshot'
 
 /** "Sep 1". */
 export const shortDate = (iso: string): string =>
@@ -246,22 +247,61 @@ export type ContributionRun = {
   entries: ContributionEntry[]
 }
 
-export type GoalPlanView = {
-  goalId: string
-  currency: CurrencyCode
-  /** What the user committed to (the snapshot on the goal); null before the first plan. */
+/** A goal's or bill's stored plan next to what the engine makes of it today. */
+export type PlanCompare = {
+  /** What the user committed to (the snapshot on the owner); null before the first plan. */
   stored: {
     plannedAt: string
     amount: number
     count: number
     start: string | null
   } | null
-  /** What the engine makes of the goal from today. */
+  /** What the engine makes of it from today — exactly what a recalc would write. */
   live: PlanHeader
   /** `live.amount − stored.amount` — the drift a Recalculate would apply. */
   offBy: number
   /** A stored plan exists and today's numbers disagree with it. */
   isOffPlan: boolean
+}
+
+export function comparePlan(args: {
+  owner: PlanOwner
+  snapshot: PlanSnapshot
+  desired: ReadonlyArray<DesiredPlanned>
+  planned: ReadonlyArray<LocalPlanned>
+  index: SettlementIndex
+  rates: RatesMap
+  today: string
+}): PlanCompare {
+  const live = fitPlanFrom(
+    args.owner,
+    args.desired,
+    args.planned,
+    args.index,
+    args.rates,
+    args.today,
+  ).header
+  const { snapshot } = args
+  const stored =
+    snapshot.plannedAt !== null
+      ? {
+          plannedAt: snapshot.plannedAt,
+          amount: snapshot.planAmount ?? 0,
+          count: snapshot.planCount ?? 0,
+          start: snapshot.planStart,
+        }
+      : null
+  return {
+    stored,
+    live,
+    offBy: stored ? live.amount - stored.amount : 0,
+    isOffPlan: stored !== null && live.amount !== stored.amount,
+  }
+}
+
+export type GoalPlanView = PlanCompare & {
+  goalId: string
+  currency: CurrencyCode
   behind: Behind & {
     kind: 'behind' | 'ahead' | 'on_plan'
     /** What the band leads with: something skipped, or something unconfirmed. */
@@ -309,23 +349,15 @@ export function buildGoalPlanView(input: GoalPlanInput): GoalPlanView {
   )
 
   // Exactly what a recalc would write today — so after one, stored and live agree.
-  const live = fitPlanFrom(
-    goalOwner(goal.id),
-    input.desired,
-    input.planned,
+  const compare = comparePlan({
+    owner: goalOwner(goal.id),
+    snapshot: goal,
+    desired: input.desired,
+    planned: input.planned,
     index,
     rates,
     today,
-  ).header
-  const stored =
-    goal.plannedAt !== null
-      ? {
-          plannedAt: goal.plannedAt,
-          amount: goal.planAmount ?? 0,
-          count: goal.planCount ?? 0,
-          start: goal.planStart,
-        }
-      : null
+  })
 
   const behind = behindOf(goalOwner(goal.id), mine, index, rates, today)
   const awaiting = mine
@@ -402,10 +434,7 @@ export function buildGoalPlanView(input: GoalPlanInput): GoalPlanView {
   return {
     goalId: goal.id,
     currency: goal.currency,
-    stored,
-    live,
-    offBy: stored ? live.amount - stored.amount : 0,
-    isOffPlan: stored !== null && live.amount !== stored.amount,
+    ...compare,
     behind: {
       ...behind,
       kind:

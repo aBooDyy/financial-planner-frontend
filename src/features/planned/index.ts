@@ -18,6 +18,8 @@ export type { PlannedMatch } from './hooks/usePlannedMatch'
 export { useConfirmPlanned } from './hooks/useConfirmPlanned'
 export type { UseConfirmPlanned } from './hooks/useConfirmPlanned'
 export { useRecalcAll } from './hooks/useRecalcAll'
+export { useBillPlan } from './hooks/useBillPlan'
+export type { UseBillPlan } from './hooks/useBillPlan'
 export type { UseRecalcAll } from './hooks/useRecalcAll'
 export { usePlannedData } from './hooks/usePlannedData'
 export type { PlannedData } from './hooks/usePlannedData'
@@ -66,6 +68,7 @@ export type { Behind, MatchRef, SettlementIndex } from './data/settle'
 export {
   buildGoalPlanView,
   buildPlannedList,
+  comparePlan,
   collapseContributions,
   NEXT_DAYS,
   relativeDue,
@@ -77,6 +80,7 @@ export type {
   ContributionRun,
   ContributionState,
   GoalPlanView,
+  PlanCompare,
   PlannedListView,
   PlannedRowView,
   PlannedTag,

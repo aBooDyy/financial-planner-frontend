@@ -20,10 +20,10 @@ import {
   movePlanned,
   skipPlanned,
 } from './mutations'
-import { goalOwner } from './owners'
+import { billOwner, goalOwner } from './owners'
 import { loadPlannerInputs, recalcPlan, runPlanner } from './runner'
 import { derivePlannerState } from './state'
-import { buildGoalPlanView } from './views'
+import { buildGoalPlanView, comparePlan } from './views'
 
 vi.mock('#/db/sync', () => ({ schedulePush: () => undefined }))
 
@@ -577,6 +577,33 @@ describe('runPlanner — bills', () => {
     expect((await rentRows('set_aside')).map(([, a]) => a)).toEqual([
       3000, 3000, 3000,
     ])
+  })
+
+  it('reads off its stored plan when the live one drifts, until recalculated', async () => {
+    await runPlanner(USER, SEP_24)
+    // Changed behind the planner's back (e.g. synced from another device mid-run).
+    await db.bills.update('rent', { amount: m(3200) })
+    const compare = async () => {
+      const inputs = await loadPlannerInputs()
+      const state = derivePlannerState(inputs, USER, SEP_24)
+      return comparePlan({
+        owner: billOwner('rent'),
+        snapshot: inputs.bills[0],
+        desired: state.desired,
+        planned: inputs.planned,
+        index: state.index,
+        rates: inputs.rates,
+        today: '2026-09-24',
+      })
+    }
+    expect(await compare()).toMatchObject({
+      stored: { amount: m(3000), count: 3 },
+      live: { amount: m(3200) },
+      offBy: m(200),
+      isOffPlan: true,
+    })
+    await recalcPlan(billOwner('rent'), USER, SEP_24)
+    expect((await compare()).isOffPlan).toBe(false)
   })
 
   it('leaves the plan alone for a rename', async () => {
