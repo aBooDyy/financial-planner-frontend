@@ -63,7 +63,12 @@ own outbox entry (`op: 'close' | 'reopen'`), which the server applies atomically
   are the local ones. The touched set-asides are marked dirty with no entries of their own; the
   close carries them. Closing a closed bill is a no-op.
 - `reopenBill(id)` — clears `closedAt`; what the close released stays released; it files a
-  quiet plan rewrite so the planner plans the bill again from today.
+  quiet plan rewrite so the planner plans the bill again from today. A repeating bill picks up
+  at its **first open occurrence from today** (`openOccurrenceFrom`): `nextDue` is PATCHed —
+  queued *before* the reopen, so it goes out on the version the server holds — and the
+  occurrences that fell due while it was closed are not owed (their stale rows are resolved by
+  the planner). A one-off keeps its date, and its payment row — skipped by the planner when the
+  bill closed — opens again unless something settles it.
 - **Pay now / Add money** are the planning slice's money actions (`planning/actions/payBill`,
   `addMoney` — [planning.md](planning.md#money-actions--actions)). A payment recorded from the
   transaction dialog or QuickAdd takes Pay now's path too (release in the paying wallet,

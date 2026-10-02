@@ -182,6 +182,26 @@ export const occurrenceFrom = (
     (o) => o >= date && !isSettledOccurrence(rows, o),
   ) ?? null
 
+/**
+ * The first open occurrence on or after `date` — where a bill picks up again after a break;
+ * `nextDue` when there is none (an ended bill, a one-off).
+ */
+export function openOccurrenceFrom(
+  bill: LocalBill,
+  rows: ReadonlyMap<string, LocalPlanned>,
+  date: string,
+): string {
+  if (bill.frequency === null) return bill.nextDue
+  const schedule = scheduleOf(bill, rows)
+  const last = bill.endsOn ?? '9999-12-31'
+  for (let n = 0; n < MAX_OCCURRENCES * 10; n++) {
+    const at = occurrenceAt(bill, schedule, n)
+    if (at > last) break
+    if (at >= date && !isSettledOccurrence(rows, at)) return at
+  }
+  return bill.nextDue
+}
+
 /** The bill's open occurrences through `through`, in date order. */
 export const openOccurrences = (
   bill: LocalBill,

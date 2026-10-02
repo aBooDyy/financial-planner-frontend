@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '#/db/db'
 import type { LocalBill, LocalSetAside, OutboxEntry } from '#/db/types'
 import type { Bill } from '#/features/bills/api/types'
@@ -272,7 +272,9 @@ describe('pushing a close', () => {
 
 describe('reopenBill', () => {
   it('reopens locally and settles as done when the server says it is not closed', async () => {
-    await db.bills.put(bill({ id: 'rent', version: 'v1', closedAt: CLOSED }))
+    await db.bills.put(
+      bill({ id: 'rent', version: 'v1', closedAt: CLOSED, nextDue: '2099-01-01' }),
+    )
 
     await reopenBill('rent')
     expect(await db.bills.get('rent')).toMatchObject({
@@ -294,5 +296,66 @@ describe('reopenBill', () => {
       version: 'v2',
       dirty: 0,
     })
+  })
+})
+
+describe('reopenBill — where it picks up', () => {
+  const payment = (occurrence: string, status: 'open' | 'skipped') =>
+    planned({
+      origin: 'bill',
+      role: 'payment',
+      goalId: null,
+      billId: 'rent',
+      occurrence,
+      status,
+    })
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 9, 2))
+  })
+  afterEach(() => vi.useRealTimers())
+
+  it('moves next due to the first occurrence from today, so the months it was closed are not owed', async () => {
+    await db.bills.put(
+      bill({ id: 'rent', version: 'v1', nextDue: '2026-07-01', closedAt: CLOSED }),
+    )
+
+    await reopenBill('rent')
+
+    expect(await db.bills.get('rent')).toMatchObject({
+      closedAt: null,
+      nextDue: '2026-11-01',
+    })
+    // The new next due goes out before the reopen, on the version the server holds.
+    expect((await queued()).map((e) => e.op)).toEqual(['update', 'reopen'])
+  })
+
+  it('keeps a next due that is still ahead', async () => {
+    await db.bills.put(
+      bill({ id: 'rent', version: 'v1', nextDue: '2026-12-01', closedAt: CLOSED }),
+    )
+    await reopenBill('rent')
+    expect((await db.bills.get('rent'))?.nextDue).toBe('2026-12-01')
+    expect((await queued()).map((e) => e.op)).toEqual(['reopen'])
+  })
+
+  it('puts a one-off’s payment back in Needs confirming when closing had resolved it', async () => {
+    await db.bills.put(
+      bill({
+        id: 'rent',
+        version: 'v1',
+        frequency: null,
+        nextDue: '2026-09-20',
+        closedAt: CLOSED,
+      }),
+    )
+    const row = payment('2026-09-20', 'skipped')
+    await db.plannedTransactions.put(row)
+
+    await reopenBill('rent')
+
+    expect((await db.bills.get('rent'))?.nextDue).toBe('2026-09-20')
+    expect((await db.plannedTransactions.get(row.id))?.status).toBe('open')
   })
 })
