@@ -233,7 +233,7 @@ function PaydayReviewBody({ payday, onClose }: Props) {
         : 'Bill'
       : l.dueDate
         ? `By ${monthYear(l.dueDate)}`
-        : 'Ongoing'
+        : 'Goal'
 
   return (
     <ResponsiveDialog

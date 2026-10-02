@@ -61,6 +61,11 @@ applies all-or-nothing (`POST /set-asides/release`, `/move`).
   another bill or goal (planned link dropped; a bill target's occurrence = the one named, else
   the source's when it is the same bill, else the target's `nextDue`; a goal's is null).
   Anything not named keeps the source's. `transferId` is stamped on the released and new rows.
+  **A move to the source's own owner** — its goal, or its bill and occurrence — is a wallet
+  move: it keeps the planned link and `to` carries only `wallet_id` (`ownerAfterMove`), so the
+  server keeps the link too, whether or not it reads a named same owner as "keep" (it does since
+  the backend fix; before it, naming the owner dropped the link server-side only). Another
+  occurrence of the same bill is another owner and drops the link on both sides.
 - Both refuse (throw `SetAsideBatchError`, writing nothing) a row that is not live here.
 - **The entry holds every row it writes.** It is keyed by the first source, and `alsoRows`
   lists the others — sources, remainders, new rows — so the drain holds it behind any earlier

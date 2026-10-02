@@ -19,7 +19,7 @@ export function SearchInputRow({ query, onQuery, onCancel }: Props) {
       <input
         value={query}
         onChange={(e) => onQuery(e.target.value)}
-        placeholder="Search transactions, budgets, planned, accounts"
+        placeholder="Search transactions, bills, goals, accounts"
         aria-label="Search"
         autoComplete="off"
         enterKeyHint="search"

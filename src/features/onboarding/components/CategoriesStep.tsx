@@ -59,8 +59,8 @@ export function CategoriesStep() {
       />
 
       <p className="mt-[22px] text-[13px] text-fp-text-3">
-        Savings and Other are always included — goal contributions and anything
-        uncategorised land there. Add your own categories anytime in Settings.
+        Savings and Other are always included, so savings and anything
+        uncategorised have a home. Add your own categories anytime in Settings.
       </p>
     </>
   )

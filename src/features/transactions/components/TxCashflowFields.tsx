@@ -102,7 +102,7 @@ export function TxCashflowFields({
       {infoHint === 'saving-goal' ? (
         <p className={HINT}>
           Counts as spending this goal’s money. To put money aside, use{' '}
-          <b className="text-fp-text">Add contribution</b> on the goal.
+          <b className="text-fp-text">Add money</b> on the goal.
         </p>
       ) : null}
       {infoHint === 'no-payday' ? (

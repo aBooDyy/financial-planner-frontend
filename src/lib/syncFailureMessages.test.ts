@@ -54,7 +54,7 @@ describe('describeSyncFailure', () => {
     ],
     [
       'spending.transaction.planned_invalid',
-      'Planned item no longer available',
+      'Upcoming item no longer available',
       'counts toward',
     ],
     [

@@ -11,7 +11,7 @@ const ROWS: { key: keyof NotificationPrefs; label: string; desc: string }[] = [
   {
     key: 'bills',
     label: 'Bill reminders',
-    desc: 'Heads-up before a recurring bill is due.',
+    desc: 'Heads-up before a bill is due.',
   },
   {
     key: 'budget',

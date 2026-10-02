@@ -57,7 +57,7 @@ function plannedItem(p: LocalPlanned, ctx: ItemContext): SearchItem {
       key: `planned:${p.id}`,
       target: { kind: 'planned', id: p.id },
       title: p.name,
-      sub: `Planned · ${dateLabel(p.date, ctx)}`,
+      sub: `Upcoming · ${dateLabel(p.date, ctx)}`,
       valueStr: signedMoney(p.amount, p.currency, incoming, ctx),
       positive: incoming,
       color: cat?.color ?? NEUTRAL_COLOR,

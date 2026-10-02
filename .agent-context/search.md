@@ -41,7 +41,8 @@ App-level search over the local DB, from the Means design "Transactions Tabs Opt
   `useDeferredValue`. Scaling this is tracked in `working.local/optimization-and-scale/`.
 - Accounts are valued from the stored ledger totals (`readWalletDeltas` → `SearchSources.deltas`
   → `liveBalancesFrom`), not by summing the ledger rows the index already holds.
-- Groups, in order: Accounts, Transactions, Planned (open only), Bills, Goals, Budgets
+- Groups, in order: Accounts, Transactions, Upcoming (the `planned` key; open only, rows
+  "Upcoming · date"), Bills, Goals, Budgets
   (`data/planningItems.ts`: a bill row reads "Bill · Annual · next 01/03/2027" and filters as a
   spend on its category, wallets and next due date; a goal row "Goal · by 30/06/2027" has no
   flow, so a Spend/Income filter drops it; open ones first, closed ones after). Each

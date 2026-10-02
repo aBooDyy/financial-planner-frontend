@@ -41,7 +41,7 @@ export function ComingUpCard({ view }: Props) {
           icon={CalendarCheck}
           size="sm"
           title="Nothing due soon"
-          text="Recurring bills and paydays show up here before they land."
+          text="Bills and paydays show up here before they land."
         />
       ) : (
         <div className="flex flex-col gap-4">

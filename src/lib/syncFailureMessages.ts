@@ -80,7 +80,7 @@ const FIELD_LABEL: Partial<Record<string, string>> = {
   category_id: 'category',
   goal_id: 'goal it counts toward',
   merchant_id: 'merchant',
-  planned_id: 'planned item it settles',
+  planned_id: 'upcoming item it settles',
   date: 'date',
   note: 'note',
   type: 'type',
@@ -117,7 +117,7 @@ const BY_REASON: Partial<Record<string, Rule>> = {
   planned_invalid: (f) =>
     refused(
       f,
-      'Planned item no longer available',
+      'Upcoming item no longer available',
       'Change what it counts toward and save.',
     ),
   category_required: (f) =>

@@ -85,7 +85,7 @@ const MESSAGES: Record<string, string> = {
     'Between accounts in one currency, the amount received is the amount sent.',
   'common.validation': 'Some details weren’t accepted.',
   'spending.transaction.planned_invalid':
-    'That planned item is no longer available.',
+    'That upcoming item is no longer available.',
   'spending.transaction.adjustment_refs':
     'A balance adjustment has no category, goal or merchant.',
   'spending.transaction.adjustment_currency':
@@ -93,7 +93,7 @@ const MESSAGES: Record<string, string> = {
   'spending.transaction.type_change':
     'A balance adjustment can’t become income or spending, or the other way round.',
   'planning.set_aside.planned_invalid':
-    'That planned set-aside is no longer available.',
+    'That upcoming set-aside is no longer available.',
   'planning.set_aside.already_released': 'That money was already freed up.',
   'planned.bill_invalid': 'That bill is no longer available.',
   'balances.settings.main_income_invalid':
@@ -101,14 +101,14 @@ const MESSAGES: Record<string, string> = {
   'settings.category.spend_class_invalid':
     'Only spending categories are sorted into needs, wants and savings.',
   // Minted by the planned slice (`PlannedActionError`), and the server's own planned codes.
-  'planned.not_found': 'That planned item is no longer available.',
-  'planned.not_open': 'That planned item is already confirmed or skipped.',
+  'planned.not_found': 'That upcoming item is no longer available.',
+  'planned.not_open': 'That upcoming item is already confirmed or skipped.',
   'planned.no_wallet': 'Choose the account it comes from or goes into.',
   'planned.bad_amount': 'Enter an amount above zero.',
   'planned.has_settlements':
     'Something is already confirmed against it — close the rest instead.',
   'planned.not_manual':
-    'Planned items from a goal can be skipped, not deleted.',
+    'Upcoming set-asides for a goal can be skipped, not deleted.',
   'planned.origin_gone': 'The bill or goal this belonged to has been deleted.',
   'planned.owner_closed':
     'That bill or goal is done or paused — reopen or resume it to set money aside.',

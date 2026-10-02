@@ -63,7 +63,7 @@ describe('buildSearchView — idle', () => {
     expect(view.groups).toEqual([])
     expect(view.empty).toBe(false)
     expect(view.idleText).toBe(
-      'Search every transaction, budget, bill, goal, planned item and account, whatever tab or account you are on.',
+      'Search every transaction, budget, bill, goal, upcoming item and account, whatever tab or account you are on.',
     )
   })
 
@@ -233,7 +233,7 @@ describe('buildSearchView — the other groups', () => {
       { query: 'rent' },
     )
     expect(keys(view, 'planned')).toEqual(['planned:p1', 'planned:p2'])
-    expect(view.groups[0].rows[0].sub).toBe('Planned · 01/10/2026')
+    expect(view.groups[0].rows[0].sub).toBe('Upcoming · 01/10/2026')
   })
 
   it('lists one bill once, at its soonest occurrence the filters keep', () => {

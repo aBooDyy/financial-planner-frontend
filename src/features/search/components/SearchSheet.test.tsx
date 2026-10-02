@@ -14,7 +14,7 @@ import { SearchTrigger } from './SearchTrigger'
 
 const IDLE: SearchView = {
   idle: true,
-  idleText: 'Search every transaction, budget, planned item and account.',
+  idleText: 'Search every transaction, budget, upcoming item and account.',
   groups: [],
   total: 0,
   empty: false,

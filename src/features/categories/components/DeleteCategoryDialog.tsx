@@ -35,7 +35,7 @@ function filedSummary(t: DeleteTarget): string {
       ? plural(t.incomeCount, 'income stream', 'income streams')
       : null,
     t.plannedCount > 0
-      ? plural(t.plannedCount, 'planned item', 'planned items')
+      ? plural(t.plannedCount, 'upcoming item', 'upcoming items')
       : null,
   ].filter(Boolean)
   const where =

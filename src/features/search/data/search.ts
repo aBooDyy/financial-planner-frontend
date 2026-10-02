@@ -45,7 +45,7 @@ const GROUP_ORDER: ReadonlyArray<SearchGroupKey> = [
 const GROUP_TITLE: Record<SearchGroupKey, string> = {
   accounts: 'Accounts',
   transactions: 'Transactions',
-  planned: 'Planned',
+  planned: 'Upcoming',
   bills: 'Bills',
   goals: 'Goals',
   budgets: 'Budgets',
