@@ -310,6 +310,29 @@ Nice to have for bills, **Must have** / Nice to have for goals, "Left for spendi
   (default **Salary**, required on create), Log it automatically when it arrives, Ends, Note,
   Colour.
 
+### Bills, Goals, Income — `components/lists/`
+
+- **Bills** / **Goals**: a `SectionHeading` ("Bills 8", a summary line, **+ Add bill / goal**),
+  then one `TierCard` per non-empty tier — bills **Must pay** / Nice to have, goals **Must have**
+  / Nice to have (D27) — each noting its per-paycheck total, then the collapsed `DoneCard`
+  (bills **Done**: closed, plus one-offs with nothing left to pay — those have no Reopen; goals
+  **Reached**: closed). An `ItemRow` is grip · spine · name (+ a progress bar: set-aside blue
+  for a bill saved up for, the goal's own colour for a goal with a target) · meta · figure +
+  chip · ⋯ (`useItemActions`). Chips and meta come from `view/itemCopy.ts` (`billChip` /
+  `billMeta`, `goalChip` / `goalMeta`): a bill covered from each paycheck reads *Due Nov 1* /
+  *Due in 3 days*, one saved up for *Saving up 800 / 2,400*; *Covered ✓*, *Behind by SR 200*,
+  *Short SR X*, *Due · confirm*. A goal's figure is its per-paycheck pace ("—" while paused).
+- **Reorder**: `useTierDrag` over `view/reorder.ts` — HTML drag and drop (dropping on a row of
+  the other tier moves the item into that tier: `mustPay` / `mustHave` flips) and ↑ / ↓ on the
+  grip button for keyboards. Both tiers are renumbered from 0 and only moved rows are written
+  (`updateBill` / `updateGoal` with `position`, which `updateGoal` now accepts).
+- **Income**: one card, every stream (ended ones dimmed) — label + **Sets my pay periods** on
+  the main paycheck, "Monthly · 25th · into Main bank", the amount with its cadence's short
+  suffix, ⋯ **Edit · Use for my pay periods · Delete**; a row opens its editor. Header:
+  monthly income and where pay periods run from; a footnote explains the main paycheck.
+- Empty states are dashed cards (`EmptyPlanCard`) with the docs' copy; Goals adds the
+  **Emergency fund** pill.
+
 ### Anytime-action sheets — `components/sheets/`
 
 Every action is on each row's ⋯ menu and in the detail panel (`hooks/useItemActions`: bill

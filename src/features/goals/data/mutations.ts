@@ -244,7 +244,7 @@ export const changesPlan = (before: LocalGoal, after: LocalGoal): boolean =>
 /** Change any of a goal's fields; the rest keep their stored values. */
 export async function updateGoal(
   id: string,
-  patch: Partial<GoalDraft>,
+  patch: Partial<GoalDraft> & { position?: number },
 ): Promise<void> {
   const existing = await db.goals.get(id)
   if (!existing || existing.deleted !== 0) return

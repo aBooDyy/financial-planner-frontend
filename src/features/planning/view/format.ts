@@ -4,7 +4,7 @@
  */
 import { dateOf, daysBetween } from '#/features/planned/data/dates'
 import type { PayCalendar } from '#/features/planning/data/payPeriods'
-import { formatMoneyRounded } from '#/lib/currency'
+import { formatMoneyRounded, numberFormat, toMajor } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
 
 /** "SR 3,000". */
@@ -70,3 +70,9 @@ export function dueIn(date: string, today: string): string {
 
 export const plural = (n: number, one: string, many = `${one}s`): string =>
   `${n} ${n === 1 ? one : many}`
+
+/** "2,400" — a whole amount without its currency, for "800 / 2,400". */
+export const figure = (minor: number, currency: CurrencyCode): string =>
+  numberFormat('en-US', { maximumFractionDigits: 0 }).format(
+    Math.round(toMajor(minor, currency)),
+  )

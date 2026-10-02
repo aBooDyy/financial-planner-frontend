@@ -9,6 +9,7 @@ import type { PlanningSection } from '#/features/planning/sections'
 import { usePlanningUi } from '#/features/planning/stores/planningUi'
 import { useSessionStore } from '#/stores/session'
 import { PlanningSheets } from './PlanningSheets'
+import { SectionView } from './SectionView'
 import { PlanningHeader } from './shell/PlanningHeader'
 import { PlanningSectionStrip } from './shell/PlanningSectionStrip'
 import { PlanningTabCard } from './shell/PlanningTabCard'
@@ -44,6 +45,7 @@ export function PlanningPage() {
           <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-[14px] px-[14px] pt-[14px] pb-[30px] md:px-6 md:pt-[22px] md:pb-[60px]">
             <PlanningHeader onPlan={() => openSheet({ kind: 'chooser' })} />
             <PlanningTabCard section={section} badges={badges} />
+            <SectionView section={section} />
           </div>
         </main>
       </div>
