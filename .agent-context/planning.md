@@ -333,6 +333,27 @@ Copy and shapes in `view/overview.ts`; the cards only draw them.
 - `DecisionsCard` (`decisionNote`): goals get **Push out** (to `pushOutTo`, +6 months, with a
   toast) and **Adjust**; bills **Adjust**.
 
+### Upcoming — `components/upcoming/`
+
+`UpcomingSection`: a header with **Review** (accent count = `reviewCount`; opens the payday
+review for the oldest waiting payday, else the next one), then the view.
+
+- **By paycheck** (`ByPaycheckList`, copy in `view/upcoming.ts`): the warn **Needs confirming**
+  band (`upcoming.due`; *Was due Oct 1 · Main bank*, **Skip** / **Confirm** through
+  `usePlannedRowActions` — one tap when the row knows its wallet, else the confirm dialog as the
+  `confirmPlanned` sheet), then one `PeriodCard` per pay period: *Until payday* · *Now → Oct
+  24* · *N days left* (footer *Still to pay before payday*: payments less what their occurrence
+  holds), *Next paycheck · Oct 25* · *Oct 25 – Nov 24* · *+SR 12,000 in* with sub-heads
+  Paycheck / Bills due / Set aside for later (footer *Left for spending*, danger when
+  negative), and *Later* cards folded to "Bills SR X · Set aside SR Y · Left SR Z · Car service
+  Jan 15". Calendar months read *This month* / *Next month*.
+- Rows (`UpcomingRowItem`) show the **owner's** name (a planned set-aside row's own name has a
+  " set-aside" suffix), a Bill / Goal / Income tag and Auto-pay. Every future bill payment
+  (not auto-pay) offers **Pay now** for that occurrence; every set-aside **Set aside now**
+  (confirms the planned row early). State line: *Set aside ✓* (covered, within 40 days),
+  *Overdue*, *Due in N days* (≤ 10), else the date. A row opens its bill's or goal's detail
+  (income: the confirm dialog).
+
 ### Bills, Goals, Income — `components/lists/`
 
 - **Bills** / **Goals**: a `SectionHeading` ("Bills 8", a summary line, **+ Add bill / goal**),

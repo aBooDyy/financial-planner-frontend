@@ -3,6 +3,7 @@ import { BillsSection } from './lists/BillsSection'
 import { GoalsSection } from './lists/GoalsSection'
 import { IncomeSection } from './lists/IncomeSection'
 import { OverviewSection } from './overview/OverviewSection'
+import { UpcomingSection } from './upcoming/UpcomingSection'
 
 /** The section the URL names. */
 export function SectionView({ section }: { section: PlanningSection }) {
@@ -15,6 +16,8 @@ export function SectionView({ section }: { section: PlanningSection }) {
       return <IncomeSection />
     case 'overview':
       return <OverviewSection />
+    case 'upcoming':
+      return <UpcomingSection />
     default:
       return null
   }

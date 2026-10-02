@@ -7,6 +7,7 @@ import { PlanChooser } from './chooser/PlanChooser'
 import { BillEditor } from './editors/BillEditor'
 import { GoalEditor } from './editors/GoalEditor'
 import { IncomeEditor } from './editors/IncomeEditor'
+import { ConfirmPlannedDialog } from '#/features/planned/components/ConfirmPlannedDialog'
 import { AddMoneySheet } from './sheets/AddMoneySheet'
 import { DeleteItemConfirm } from './sheets/DeleteItemConfirm'
 import { LeftoverSheet } from './sheets/LeftoverSheet'
@@ -112,6 +113,15 @@ export function PlanningSheets() {
       return <MarkDoneSheet owner={sheet.owner} onClose={closeSheet} />
     case 'useIt':
       return <UseItSheet goalId={sheet.goalId} onClose={closeSheet} />
+    case 'confirmPlanned':
+      return (
+        <ConfirmPlannedDialog
+          plannedId={sheet.plannedId}
+          onOpenChange={(open) => {
+            if (!open) closeSheet()
+          }}
+        />
+      )
     case 'delete':
       return (
         <DeleteItemConfirm
