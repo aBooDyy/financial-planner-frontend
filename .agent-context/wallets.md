@@ -202,7 +202,9 @@ planning" teaser went the same day (its "planning pages coming next" copy was st
   set-asides of its bill occurrence (or its goal) **in that wallet** — never another wallet's —
   so paying a bill that was saved for leaves Free unchanged and never warns. One alert from
   walking the items in date order: **short** (the balance goes below zero, red) beats
-  **setAside** (*"Dips into set-aside money on Oct 1"*, amber: Free goes below zero). Wallets
+  **setAside** (*"Dips into set-aside money on Oct 1"*, amber: a step takes Free lower, below
+  zero — a wallet already over-committed whose payment is covered by its own set-aside is not
+  blamed). Wallets
   with an alert sort first. Rows whose wallet is missing or archived are not priced per wallet;
   they are summed instead (F9): *"No wallet yet: −SR 650.00 · 2 items"* (income adds, payments
   subtract, base currency), so the card agrees with Balance ahead. Planned set-asides are not
