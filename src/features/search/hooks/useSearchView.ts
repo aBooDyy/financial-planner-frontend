@@ -66,6 +66,14 @@ export function useSearchView({
     () => whenEnabled(read, () => db.budgets.toArray()),
     [read],
   )
+  const bills = useLiveQuery(
+    () => whenEnabled(read, () => db.bills.toArray()),
+    [read],
+  )
+  const goals = useLiveQuery(
+    () => whenEnabled(read, () => db.goals.toArray()),
+    [read],
+  )
   const merchants = useLiveQuery(
     () => whenEnabled(read, () => db.merchants.toArray()),
     [read],
@@ -86,6 +94,8 @@ export function useSearchView({
     if (
       !txns ||
       !planned ||
+      !bills ||
+      !goals ||
       !budgets ||
       !merchants ||
       !nodeRows ||
@@ -97,6 +107,8 @@ export function useSearchView({
       {
         txns,
         planned,
+        bills,
+        goals,
         budgets,
         nodes: nodeRows,
         merchants,
@@ -110,6 +122,8 @@ export function useSearchView({
   }, [
     txns,
     planned,
+    bills,
+    goals,
     budgets,
     merchants,
     nodeRows,

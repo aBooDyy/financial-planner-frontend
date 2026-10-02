@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import * as fx from '#/features/planned/testing/fixtures'
 import {
   CAFES,
   CARD,
@@ -62,7 +63,7 @@ describe('buildSearchView — idle', () => {
     expect(view.groups).toEqual([])
     expect(view.empty).toBe(false)
     expect(view.idleText).toBe(
-      'Search every transaction, budget, planned item and account, whatever tab or account you are on.',
+      'Search every transaction, budget, bill, goal, planned item and account, whatever tab or account you are on.',
     )
   })
 
@@ -537,5 +538,57 @@ describe('buildSearchView — narrowed to the page', () => {
       },
     })
     expect(keys(view, 'transactions').sort()).toEqual(['tx:cash', 'tx:main'])
+  })
+})
+
+describe('buildSearchView — bills and goals', () => {
+  it('finds bills and goals by name, and opens them on Planning', () => {
+    const view = run(
+      {
+        bills: [
+          fx.bill({
+            id: 'b1',
+            name: 'Car insurance',
+            categoryId: DINING,
+            nextDue: '2027-03-01',
+            frequency: 'annual',
+            currency: 'EUR',
+          }),
+        ],
+        goals: [
+          fx.goal({
+            id: 'g1',
+            name: 'Car fund',
+            target: 500000,
+            dueDate: '2027-06-30',
+            currency: 'EUR',
+          }),
+        ],
+      },
+      { query: 'car' },
+    )
+    const bill = groupOf(view, 'bills')?.rows[0]
+    expect(bill).toMatchObject({
+      key: 'bill:b1',
+      target: { kind: 'bill', id: 'b1' },
+      title: 'Car insurance',
+      sub: 'Bill · Annual · next 01/03/2027',
+    })
+    expect(groupOf(view, 'goals')?.rows[0]).toMatchObject({
+      target: { kind: 'goal', id: 'g1' },
+      sub: 'Goal · by 30/06/2027',
+    })
+  })
+
+  it('drops goals for a spend or income filter, keeps bills for spend', () => {
+    const view = run(
+      {
+        bills: [fx.bill({ id: 'b1', name: 'Rent', currency: 'EUR' })],
+        goals: [fx.goal({ id: 'g1', name: 'Rent deposit', amount: 10000 })],
+      },
+      { query: 'rent', filters: { type: 'spend' } },
+    )
+    expect(keys(view, 'bills')).toEqual(['bill:b1'])
+    expect(keys(view, 'goals')).toEqual([])
   })
 })

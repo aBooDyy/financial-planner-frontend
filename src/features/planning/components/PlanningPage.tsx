@@ -3,6 +3,7 @@ import { useParams } from '@tanstack/react-router'
 import { MobileTabBar } from '#/components/chrome/MobileTabBar'
 import { TopNav } from '#/components/chrome/TopNav'
 import { useLogout } from '#/features/auth/hooks/useLogout'
+import { useOpenFromPlanningSearch } from '#/features/planning/hooks/useOpenFromPlanningSearch'
 import { usePaydayNoticeToast } from '#/features/planning/hooks/usePaydayNoticeToast'
 import { usePlanning } from '#/features/planning/hooks/usePlanning'
 import { isPlanningSection } from '#/features/planning/sections'
@@ -26,6 +27,7 @@ export function PlanningPage() {
   const section: PlanningSection = isPlanningSection(param) ? param : 'overview'
   const planning = usePlanning()
   usePaydayNoticeToast()
+  useOpenFromPlanningSearch(!planning.loading)
   const openSheet = usePlanningUi((s) => s.openSheet)
   const reset = usePlanningUi((s) => s.closeDetail)
 

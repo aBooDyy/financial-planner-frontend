@@ -4,7 +4,7 @@ import { scopeDateLabel } from './filterLabels'
 import type { SearchContext, SearchFilters } from './types'
 
 export const WIDE_IDLE_TEXT =
-  'Search every transaction, budget, planned item and account, whatever tab or account you are on.'
+  'Search every transaction, budget, bill, goal, planned item and account, whatever tab or account you are on.'
 
 const viewLabel = (context: SearchContext): string =>
   SPENDING_VIEW_META[context.view].label

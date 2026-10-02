@@ -1,6 +1,8 @@
 import type {
   LocalBalanceNode,
+  LocalBill,
   LocalBudget,
+  LocalGoal,
   LocalMerchant,
   LocalPlanned,
   LocalTransaction,
@@ -18,6 +20,7 @@ import { inScope, itemPredicate } from './itemFilter'
 import type { ItemContext, SearchItem } from './items'
 import { ledgerItems } from './ledgerItems'
 import { budgetItems, plannedItems } from './planItems'
+import { billItems, goalItems } from './planningItems'
 import type {
   SearchContext,
   SearchFilters,
@@ -34,6 +37,8 @@ const GROUP_ORDER: ReadonlyArray<SearchGroupKey> = [
   'accounts',
   'transactions',
   'planned',
+  'bills',
+  'goals',
   'budgets',
 ]
 
@@ -41,6 +46,8 @@ const GROUP_TITLE: Record<SearchGroupKey, string> = {
   accounts: 'Accounts',
   transactions: 'Transactions',
   planned: 'Planned',
+  bills: 'Bills',
+  goals: 'Goals',
   budgets: 'Budgets',
 }
 
@@ -53,6 +60,8 @@ const VIEW_GROUP: Record<SpendingView, SearchGroupKey> = {
 export type SearchSources = {
   txns: LocalTransaction[]
   planned: LocalPlanned[]
+  bills: LocalBill[]
+  goals: LocalGoal[]
   budgets: LocalBudget[]
   nodes: LocalBalanceNode[]
   merchants: LocalMerchant[]
@@ -102,6 +111,8 @@ export function indexSearch(
       accounts: accountItems(nodes, balances, ctx),
       transactions: ledgerItems(sources.txns, ctx),
       planned: plannedItems(sources.planned, ctx),
+      bills: billItems(sources.bills, ctx),
+      goals: goalItems(sources.goals, ctx),
       budgets: budgetItems(sources.budgets, ctx),
     },
     nodes,

@@ -142,6 +142,8 @@ export const merchant = (over: Partial<LocalMerchant> = {}): LocalMerchant => ({
 export const sources = (over: Partial<SearchSources> = {}): SearchSources => ({
   txns: [],
   planned: [],
+  bills: [],
+  goals: [],
   budgets: [],
   nodes: NODES,
   merchants: [],

@@ -41,8 +41,10 @@ App-level search over the local DB, from the Means design "Transactions Tabs Opt
   `useDeferredValue`. Scaling this is tracked in `working.local/optimization-and-scale/`.
 - Accounts are valued from the stored ledger totals (`readWalletDeltas` → `SearchSources.deltas`
   → `liveBalancesFrom`), not by summing the ledger rows the index already holds.
-- Groups, in order: Accounts, Transactions, Planned (open only), Budgets. (The Recurring group
-  went with recurring schedules; bills are not searchable yet — their keys will be `bill:<id>`.) Each
+- Groups, in order: Accounts, Transactions, Planned (open only), Bills, Goals, Budgets
+  (`data/planningItems.ts`: a bill row reads "Bill · Annual · next 01/03/2027" and filters as a
+  spend on its category, wallets and next due date; a goal row "Goal · by 30/06/2027" has no
+  flow, so a Spend/Income filter drops it; open ones first, closed ones after). Each
   shows up to `SEARCH_ROW_CAP` rows, but its count covers every match.
 - Transfers collapse to one row per `transferId`. Adjustments get their own target.
 - Planned occurrences of one origin share a `series` (a bill and role, an income stream, or a
@@ -69,8 +71,10 @@ the panel is closed, active ones show as removable chips.
 
 `useOpenSearchTarget` closes the sheet, then:
 - an **account** sets Spending's scope to that wallet and goes to Activity;
+- a **planned item, bill or goal** goes to Planning with `?open=planned|bill|goal:<id>`
+  (`PLANNING_OPEN_SECTION`: Upcoming, Bills, Goals), where `useOpenFromPlanningSearch` opens the
+  confirm dialog or the detail panel once the page has loaded and strips the param;
 - anything else navigates to its tab with `?open=<kind>:<id>` (see [routing.md](routing.md)).
   On the Spending page, `useOpenFromSearch` consumes the param once the page has loaded, opens
   the matching editor (tx, adjustment, transfer or budget), and strips the param with
-  `replace`. A planned result goes to `/planning/upcoming?open=planned:<id>` instead (its
-  confirm dialog).
+  `replace`.

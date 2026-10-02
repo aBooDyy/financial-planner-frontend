@@ -47,6 +47,8 @@ export type SearchTarget =
   | { kind: 'adjustment'; id: string }
   | { kind: 'transfer'; transferId: string }
   | { kind: 'planned'; id: string }
+  | { kind: 'bill'; id: string }
+  | { kind: 'goal'; id: string }
   | { kind: 'budget'; id: string }
   | { kind: 'account'; id: string }
 
@@ -66,7 +68,13 @@ export type SearchResultRow = {
   transfer?: boolean
 }
 
-export type SearchGroupKey = 'accounts' | 'transactions' | 'planned' | 'budgets'
+export type SearchGroupKey =
+  | 'accounts'
+  | 'transactions'
+  | 'planned'
+  | 'bills'
+  | 'goals'
+  | 'budgets'
 
 export type SearchGroup = {
   key: SearchGroupKey

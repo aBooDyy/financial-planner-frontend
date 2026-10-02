@@ -12,7 +12,10 @@ import {
 import type { OpenIntent } from '#/features/transactions/data/openParam'
 import { useEntrySession } from '#/features/transactions/stores/entrySession'
 
-type ItemTarget = Exclude<SearchTarget, { kind: 'account' | 'planned' }>
+type ItemTarget = Exclude<
+  SearchTarget,
+  { kind: 'account' | 'planned' | 'bill' | 'goal' }
+>
 
 const openIntentOf = (target: ItemTarget): OpenIntent =>
   target.kind === 'transfer'
@@ -39,10 +42,14 @@ export function useOpenSearchTarget() {
       })
       return
     }
-    if (target.kind === 'planned') {
+    if (
+      target.kind === 'planned' ||
+      target.kind === 'bill' ||
+      target.kind === 'goal'
+    ) {
       void navigate({
         to: '/planning/$section',
-        params: { section: PLANNING_OPEN_SECTION.planned },
+        params: { section: PLANNING_OPEN_SECTION[target.kind] },
         search: { open: encodePlanningOpen(target) },
       })
       return
