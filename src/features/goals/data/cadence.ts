@@ -14,7 +14,7 @@ import {
   DEFAULT_CUSTOM_UNIT,
   FREQUENCIES,
 } from '#/features/goals/constants'
-import type { Cadence, FreqMeta } from '#/features/goals/constants'
+import type { FreqMeta } from '#/features/goals/constants'
 
 export type Repeat = {
   frequency: ObligationFrequency | null
@@ -119,47 +119,3 @@ export const repeatBlock = (
   draft.customRepeat && !isValidInterval(Number(draft.customInterval))
     ? `Repeat every 1 to ${CUSTOM_INTERVAL_MAX} days, weeks or months`
     : null
-
-/** Whole months between dues, at least one — the planner's month-granular view of a cycle. */
-export const cycleMonthsOf = (meta: FreqMeta): number =>
-  Math.max(1, Math.round(12 / meta.perYear))
-
-const DAY_MS = 86_400_000
-
-const stepDays = ({ unit, every }: Cadence): number =>
-  unit === 'week' ? 7 * every : every
-
-/**
- * The due `n` cycles from `anchor` (negative steps back). Always measured from the anchor, so
- * month steps keep its day instead of drifting.
- */
-export function stepDue(anchor: Date, cadence: Cadence, n: number): Date {
-  if (cadence.unit === 'month')
-    return new Date(
-      anchor.getFullYear(),
-      anchor.getMonth() + n * cadence.every,
-      anchor.getDate(),
-    )
-  return new Date(
-    anchor.getFullYear(),
-    anchor.getMonth(),
-    anchor.getDate() + n * stepDays(cadence),
-  )
-}
-
-/** Roughly how many whole cycles lie between `anchor` and `date`; may be one off either way. */
-export function approxCyclesBetween(
-  anchor: Date,
-  date: Date,
-  cadence: Cadence,
-): number {
-  if (cadence.unit === 'month') {
-    const months =
-      (date.getFullYear() - anchor.getFullYear()) * 12 +
-      (date.getMonth() - anchor.getMonth())
-    return Math.floor(months / cadence.every)
-  }
-  return Math.floor(
-    (date.getTime() - anchor.getTime()) / (stepDays(cadence) * DAY_MS),
-  )
-}

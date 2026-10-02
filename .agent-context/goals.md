@@ -54,7 +54,7 @@ Local row + outbox entry in one Dexie transaction (`db/enqueue.ts`), then `sched
   "Use it" and Add money are `planning/actions` ([planning.md](planning.md#money-actions--actions)). Each writes
   the goal and queues `op: 'close' | 'reopen' | 'pause' | 'resume'`; the "already done" codes are
   `goals.goal.already_closed`, `not_closed`, `already_paused` (and `already_closed` for a
-  pause), `not_paused`. A paused goal plans no set-asides (`isPlannable`), so the planner's next
+  pause), `not_paused`. A paused goal plans no set-asides (`planning/data/funding.isPlannableGoal`), so the planner's next
   fill removes its future unsettled ones; resume plans it again from today.
 
 ## Derivations
@@ -72,8 +72,8 @@ Local row + outbox entry in one Dexie transaction (`db/enqueue.ts`), then `sched
   annual whole months from it; without one they step from fixed epochs. **Custom** steps every N
   days / weeks from the anchor (or `day` of Jan 2000), or every N months keeping the anchor's day,
   clamped. The planner stops a stream's paydays after its `endsOn`.
-- **Cadence (`data/cadence.ts`)**: `frequencyMetaOf`, `stepDue`, `approxCyclesBetween`,
-  `cycleMonthsOf`, and the editor helpers (`RepeatDraft`, `repeatDraftOf`, `repeatOfDraft`,
+- **Cadence (`data/cadence.ts`)**: `frequencyMetaOf`, `customFrequencyMeta`, and the editor
+  helpers (`RepeatDraft`, `repeatDraftOf`, `repeatOfDraft`,
   `repeatBlock`) the Planning editors will reuse. `Repeat` is `{frequency, customInterval,
   customUnit}`, satisfied by bills and streams.
 

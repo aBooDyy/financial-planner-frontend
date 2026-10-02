@@ -3,8 +3,6 @@
  * so the selectors stay pure and testable. Wire dates are ISO `YYYY-MM-DD` strings; these
  * helpers convert at the edge. Ported from the design's date helpers.
  */
-import { frequencyMetaOf, stepDue } from '#/features/goals/data/cadence'
-import type { Repeat } from '#/features/goals/data/cadence'
 import type { BudgetPeriod } from '#/features/transactions/api/types'
 import type { PeriodMode, RangeMode } from '#/features/transactions/constants'
 import { toMajor } from '#/lib/currency'
@@ -164,7 +162,3 @@ export const budgetWindow = (
     end: new Date(today.getFullYear(), today.getMonth() + 1, 0),
   }
 }
-
-/** Step a repeating schedule one cadence forward from its current next-due. */
-export const advanceDue = (iso: string, repeat: Repeat): string =>
-  ymd(stepDue(parseISO(iso), frequencyMetaOf(repeat, 'monthly').cadence, 1))

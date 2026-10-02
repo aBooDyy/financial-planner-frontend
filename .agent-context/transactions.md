@@ -81,12 +81,10 @@ and `recurrings` went with the planning rebuild: a repeating payment is a **bill
   budget that skips payments for a bill (rows with a `billId`); it is stored and synced, and
   `BudgetDraft.excludesBills` left undefined keeps the stored choice. It is optional on
   `LocalBudget` because rows stored before it existed lack it (read as off).
-- **planning.ts** — date math (`windowOf`, `budgetWindow`, calendar grid, `advanceDue`,
-  `relFuture`), parameterized by `today` for testability. `advanceDue` and `monthlyFactor` take
-  a schedule's whole repeat (`frequency` + `customInterval` + `customUnit`) and read it through
-  the Goals `cadence.ts` (`frequencyMetaOf` + `stepDue`), so a custom "every 28 days"
-  schedule steps, totals and labels ("Every 28 days") the same way a custom goal does. **`fmtK` takes minor units and a
-  currency code** — every caller holds minor units, so the major conversion lives there.
+- **planning.ts** — date math (`windowOf`, `budgetWindow`, the calendar grid), parameterized
+  by `today` for testability. A bill's due dates step in `planning/data/occurrences.ts`
+  (`stepOccurrence`). **`fmtK` takes minor units and a currency code** — every caller holds
+  minor units, so the major conversion lives there.
 
 ### The calendar — one cell shape, two grids
 
