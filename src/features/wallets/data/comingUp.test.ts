@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import type { LocalPlanned, LocalTransaction } from '#/db/types'
+import type { LocalPlanned, LocalSetAside, LocalTransaction } from '#/db/types'
 import { buildPlannedList } from '#/features/planned/data/views'
 import { indexSettlements } from '#/features/planned/data/settle'
-import { RATES, m, planned, wallet } from '#/features/planned/testing/fixtures'
+import {
+  RATES,
+  m,
+  planned,
+  setAside,
+  wallet,
+} from '#/features/planned/testing/fixtures'
 import { buildComingUp } from './comingUp'
 import { transferWallets } from './transferDialog'
 
@@ -39,9 +45,12 @@ const payday = (over: Partial<LocalPlanned>) =>
 
 function view(
   rows: LocalPlanned[],
-  reserved: Record<string, number> = {},
+  setAsides: LocalSetAside[] = [],
   txns: LocalTransaction[] = [],
 ) {
+  const held: Record<string, number> = {}
+  for (const a of setAsides)
+    if (a.walletId) held[a.walletId] = (held[a.walletId] ?? 0) + a.amount
   const nodes = [checking, dollars]
   const list = buildPlannedList({
     planned: rows,
@@ -54,7 +63,9 @@ function view(
   return buildComingUp({
     rows: [...list.due, ...list.next, ...list.later],
     wallets: transferWallets(nodes, {}, 'SAR'),
-    reserved,
+    setAside: held,
+    setAsides,
+    base: 'SAR',
     rates: RATES,
     today: TODAY,
   })
@@ -105,14 +116,68 @@ describe('buildComingUp', () => {
     expect(v.wallets[0].afterStr).toBe('SR 2,500.00')
   })
 
-  it('warns when a payment eats into money held for goals', () => {
-    const v = view([bill({ occurrence: '2026-10-01', amount: m(1500) })], {
-      w1: m(1000),
-    })
+  it('walks Free to spend, not the balance', () => {
+    const v = view(
+      [payday({ occurrence: '2026-10-05', amount: m(500) })],
+      [setAside({ walletId: 'w1', amount: m(1200) })],
+    )
+    expect(v.wallets[0].nowStr).toBe('SR 800.00')
+    expect(v.wallets[0].afterStr).toBe('SR 1,300.00')
+  })
+
+  it('warns when a payment eats into money set aside for something else', () => {
+    const v = view(
+      [bill({ billId: 'rent', occurrence: '2026-10-01', amount: m(1500) })],
+      [setAside({ walletId: 'w1', goalId: 'trip', amount: m(1000) })],
+    )
     expect(v.wallets[0].alert).toEqual({
-      kind: 'reserved',
-      text: 'Dips into goal money on Oct 1',
+      kind: 'setAside',
+      text: 'Dips into set-aside money on Oct 1',
     })
+  })
+
+  it('lets a payment release its own set-aside without crying wolf (F8)', () => {
+    const v = view(
+      [bill({ billId: 'rent', occurrence: '2026-10-01', amount: m(1500) })],
+      [
+        setAside({
+          walletId: 'w1',
+          goalId: null,
+          billId: 'rent',
+          occurrence: '2026-10-01',
+          amount: m(1500),
+        }),
+      ],
+    )
+    const w = v.wallets[0]
+    expect(w.alert).toBeNull()
+    // Free was 500; the payment is covered by what it had set aside, so Free stays 500.
+    expect(w.nowStr).toBe('SR 500.00')
+    expect(w.afterStr).toBe('SR 500.00')
+  })
+
+  it('releases only what is held in the paying wallet, for that occurrence', () => {
+    const v = view(
+      [bill({ billId: 'rent', occurrence: '2026-10-01', amount: m(1500) })],
+      [
+        setAside({
+          walletId: 'w2',
+          goalId: null,
+          billId: 'rent',
+          occurrence: '2026-10-01',
+          amount: m(100),
+        }),
+        setAside({
+          walletId: 'w1',
+          goalId: null,
+          billId: 'rent',
+          occurrence: '2026-11-01',
+          amount: m(1000),
+        }),
+      ],
+    )
+    const checkingRow = v.wallets.find((w) => w.name === 'Checking')
+    expect(checkingRow?.alert?.kind).toBe('setAside')
   })
 
   it('prices a bill in another currency in the wallet currency', () => {
@@ -148,6 +213,7 @@ describe('buildComingUp', () => {
     ])
     expect(v.wallets).toHaveLength(0)
     expect(v.unassignedCount).toBe(2)
+    expect(v.unassignedStr).toBe('No wallet yet: −SR 3,000.00')
     expect(v.isEmpty).toBe(false)
   })
 })

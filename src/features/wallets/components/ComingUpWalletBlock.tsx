@@ -4,7 +4,7 @@ import type { ComingUpWallet } from '#/features/wallets/data/comingUp'
 import { ComingUpAlertLine } from './ComingUpAlertLine'
 import { ComingUpItemRow } from './ComingUpItemRow'
 
-/** One wallet's next 30 days: today's balance → where it ends up, and what moves it. */
+/** One wallet's next 30 days: Free to spend now → where it ends up, and what moves it. */
 export function ComingUpWalletBlock({ wallet }: { wallet: ComingUpWallet }) {
   return (
     <div className="flex flex-col gap-[9px]">
@@ -18,6 +18,7 @@ export function ComingUpWalletBlock({ wallet }: { wallet: ComingUpWallet }) {
         <div className="min-w-0 flex-1">
           <div className="truncate text-[13.5px] font-bold">{wallet.name}</div>
           <div className="fp-sensitive flex flex-wrap items-center gap-x-[6px] text-[12px] text-fp-text-2 tabular-nums">
+            <span className="whitespace-nowrap text-fp-text-3">Free</span>
             <span className="whitespace-nowrap">{wallet.nowStr}</span>
             <span className="sr-only">to</span>
             <ArrowRight

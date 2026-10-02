@@ -12,14 +12,14 @@ type Props = {
   view: ComingUpView | null
 }
 
-const plural = (n: number) => (n === 1 ? 'item has' : 'items have')
+const items = (n: number) => `${n} ${n === 1 ? 'item' : 'items'}`
 
 export function ComingUpCard({ view }: Props) {
   return (
     <div className="rounded-[18px] border border-fp-border bg-fp-surface p-[18px] shadow-fp">
       <RailCardHeader
         title="Coming up"
-        sub={`Bills and income, next ${COMING_UP_DAYS} days`}
+        sub={`Free to spend as bills and pay land, next ${COMING_UP_DAYS} days`}
         action={
           <Link
             to="/planning/$section"
@@ -53,10 +53,12 @@ export function ComingUpCard({ view }: Props) {
               <ComingUpWalletBlock wallet={wallet} />
             </div>
           ))}
-          {view.unassignedCount > 0 ? (
-            <div className="text-[12px] text-fp-text-3">
-              {view.unassignedCount} {plural(view.unassignedCount)} no wallet
-              yet.
+          {view.unassignedStr ? (
+            <div className="flex flex-wrap items-baseline gap-x-2 border-t border-fp-border pt-3 text-[12px] text-fp-text-3">
+              <span className="fp-sensitive font-semibold text-fp-text-2 tabular-nums">
+                {view.unassignedStr}
+              </span>
+              <span>· {items(view.unassignedCount)}</span>
             </div>
           ) : null}
         </div>

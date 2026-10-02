@@ -60,7 +60,8 @@ export function WalletsPage() {
   const adjust = useAdjustBalance(wallets)
   const comingUp = useComingUp({
     wallets,
-    reservations: setAsideLines,
+    setAsideLines,
+    base,
     rates,
     balancesLoading,
   })

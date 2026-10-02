@@ -192,15 +192,21 @@ planning" teaser went the same day (its "planning pages coming next" copy was st
 
 - **Coming up** (`ComingUpCard`, `hooks/useComingUp`, pure `data/comingUp.ts`, tested). Open
   planned **payments and income** due within `COMING_UP_DAYS` (30), overdue ones included (owed,
-  so they land "now"), grouped by wallet. Set-asides are left out — they earmark money without
-  moving it. Rows come from `usePlanned()` (the Planned tab's own `PlannedRowView`s, so the
-  remainder, "in 3 days"/"2 days late" text and filtering agree with that tab); balances are
-  `transferWallets` (opening + deltas) and goal reserves are `useWallets().reservations`. Each
-  wallet shows now → after, up to three items (+N more), and one alert from walking its items in
-  date order: **short** (first day it goes below zero, red) beats **reserved** (first day it drops
-  under what it holds for goals, amber). Wallets with an alert sort first. Rows whose wallet is
-  missing or archived are only counted ("N items have no wallet yet"). "See all" →
-  `/transactions/planned`. `null` view (skeleton) until both balances and planned rows land.
+  so they land "now"), grouped by wallet. Rows come from `usePlanned()` (the Planned tab's own
+  `PlannedRowView`s, so the remainder and "in 3 days"/"2 days late" text agree with Upcoming);
+  balances are `transferWallets` (opening + deltas), what each wallet holds set aside is
+  `useWallets().setAsideLines`, and the set-aside rows come from `usePlannedData().inputs`.
+  Each wallet walks **Free to spend** *now → after* (03 §9: "Free SR 800.00 → SR 1,300.00"), up
+  to three items (+N more), each a link to the planned row on Planning › Upcoming
+  (`?open=planned:<id>`). **A payment releases its own set-aside as it lands (F8)**: the live
+  set-asides of its bill occurrence (or its goal) **in that wallet** — never another wallet's —
+  so paying a bill that was saved for leaves Free unchanged and never warns. One alert from
+  walking the items in date order: **short** (the balance goes below zero, red) beats
+  **setAside** (*"Dips into set-aside money on Oct 1"*, amber: Free goes below zero). Wallets
+  with an alert sort first. Rows whose wallet is missing or archived are not priced per wallet;
+  they are summed instead (F9): *"No wallet yet: −SR 650.00 · 2 items"* (income adds, payments
+  subtract, base currency), so the card agrees with Balance ahead. Planned set-asides are not
+  listed (they move no money). `null` view (skeleton) until both balances and planned rows land.
 - **Money in & out** (`MonthlyFlowCard`, `hooks/useMonthlyFlow`, pure `data/monthlyFlow.ts`,
   tested). Income vs spending per calendar month for the last `FLOW_MONTHS` (6), the running
   month included, in base currency. Same rule as every report: spend/income with a category only
