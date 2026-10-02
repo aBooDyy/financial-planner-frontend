@@ -19,7 +19,9 @@
  * - **Priority** (D10): must-pay bills, then must-have goals, then nice-to-have bills and
  *   goals; earliest deadline first within a tier (ongoing goals last), position breaks ties.
  *   Each slot pays tracks in that order at the pace that finishes them in their window; a
- *   track that ran out of income catches up later, at a higher pace.
+ *   track that ran out of income catches up later, at a higher pace. A must-pay bill or a
+ *   must-have goal with a deadline takes at least what later slots could no longer cover
+ *   (`laterRoom`), so pay that is about to stop goes to it before a nice-to-have.
  *
  * The plan runs twice: once against income (`funded`) and once unlimited (`required` — what
  * the plan needs, which the "Each paycheck" picture and the verdict compare to income).
@@ -326,6 +328,45 @@ type Run = {
   completesAt: Array<number | null>
 }
 
+/**
+ * For each must-pay bill and must-have dated goal, how much the slots after `k` could still
+ * give it (owner currency): its need placed as late as its window allows, the higher priority
+ * first, each taking what the ones before it left of a slot. Null for any other track.
+ */
+function laterRoom(
+  tracks: ReadonlyArray<FundingTrack>,
+  capacities: ReadonlyArray<number>,
+  toBase: ReadonlyArray<number>,
+): Array<number[] | null> {
+  const n = capacities.length
+  const room = [...capacities]
+  return tracks.map((t, i) => {
+    if (
+      t.tier === 3 ||
+      t.perSlot !== null ||
+      !Number.isFinite(t.need) ||
+      t.end < t.start ||
+      toBase[i] <= 0
+    )
+      return null
+    const placed = new Array<number>(n).fill(0)
+    let left = t.need * toBase[i]
+    for (let k = t.end; k >= t.start && left > EPS; k--) {
+      const give = Math.min(left, room[k])
+      placed[k] = give
+      room[k] -= give
+      left -= give
+    }
+    const after = new Array<number>(n).fill(0)
+    let sum = 0
+    for (let k = n - 1; k >= 0; k--) {
+      after[k] = sum / toBase[i]
+      sum += placed[k]
+    }
+    return after
+  })
+}
+
 /** Walk the slots, paying tracks in priority order from each slot's capacity. */
 function simulate(
   tracks: ReadonlyArray<FundingTrack>,
@@ -336,16 +377,19 @@ function simulate(
   const schedule = tracks.map(() => new Array<number>(n).fill(0))
   const left = tracks.map((t) => t.need)
   const completesAt: Array<number | null> = tracks.map(() => null)
+  const later = laterRoom(tracks, capacities, toBase)
   for (let k = 0; k < n; k++) {
     let cap = capacities[k]
     for (let i = 0; i < tracks.length; i++) {
       const t = tracks[i]
       if (k < t.start || k > t.end || left[i] <= EPS) continue
       if (cap <= EPS) break
-      const pace =
+      const even =
         t.perSlot === null
           ? left[i] / (t.end - k + 1)
           : Math.min(t.perSlot, left[i])
+      const floor = later[i] ? left[i] - later[i][k] : 0
+      const pace = Math.max(even, floor)
       const give = Math.min(pace, cap / toBase[i])
       if (give <= 0) continue
       schedule[i][k] = give

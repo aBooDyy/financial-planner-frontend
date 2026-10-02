@@ -95,7 +95,7 @@ describe('verdictOf', () => {
     })
     const tuition = bill({
       id: 'tuition',
-      amount: m(26000),
+      amount: m(30000),
       frequency: null,
       nextDue: '2026-11-30',
     })
@@ -104,12 +104,12 @@ describe('verdictOf', () => {
       bills: [tuition],
       goals: [],
     })
-    // 13,000 a payday is needed; 17,000 lands now, 12,000 next time: 1,000 short.
+    // 15,000 a payday is needed; 17,000 lands now, 12,000 next time: 1,000 short.
     expect(verdict).toEqual({
       kind: 'short',
       per: 'total',
       shortBy: m(1000),
-      left: m(4000),
+      left: m(2000),
     })
     expect(needsDecision(state)).toEqual([
       {
@@ -117,7 +117,7 @@ describe('verdictOf', () => {
         ownerId: 'tuition',
         occurrence: '2026-11-30',
         shortBy: m(1000),
-        requiredPerPaycheck: m(13000),
+        requiredPerPaycheck: m(15000),
         deadline: '2026-11-30',
         pushOutTo: null,
       },

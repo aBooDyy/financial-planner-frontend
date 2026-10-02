@@ -79,7 +79,11 @@ view read the same plan.
   bills and goals; earliest deadline first within a tier (ongoing goals last), then
   `position`, then key. Each slot pays tracks in that order, each at the pace that finishes it
   in its window (`left / slots left`, or its per-paycheck draw), capped by what capacity is
-  left. An underfunded track's pace rises in later slots.
+  left. An underfunded track's pace rises in later slots. **Feasibility floor**
+  (`laterRoom`): a must-pay bill or a dated must-have goal takes at least `left − what the
+  slots after this one could still give it` — its need placed as late as its window allows,
+  higher priority first — so pay that is about to stop (an income with an end, a bonus month)
+  goes to it before a nice-to-have takes its even share. The unlimited run has no floor.
 - It runs **twice**: `funded` (against capacity) and `required` (unlimited). `shortfall` is
   what the funded run leaves uncovered by a finite track's deadline; `completesAt` the slot it
   is covered in. Amounts are owner currency, unrounded; `roundedSchedule` rounds on the
@@ -428,7 +432,7 @@ review for the oldest waiting payday, else the next one), then the view.
 The one-sheet variant (design default, 03 §4, D31): `paydayReview` for the requested payday
 (the oldest waiting one from **Review**, else the next payday), groups **Bills due before next
 payday** · **Saving up for bills** · **Goals** (each with its base total). Each line: tick, name
-+ "Due Nov 1" / "By Jun 2027" / "Ongoing", a wallet select, an amount field (its own
++ "Due Nov 1" / "By Jun 2027" / "Goal" (no date), a wallet select, an amount field (its own
 currency). Per destination other than the deposit wallet a ticked-by-default **"I've moved SR X
 to Savings"** card (`transfersFor` over the ticked, edited lines). The over-commit guardrail
 reads free money after those transfers and turns the button into **Set aside anyway**.

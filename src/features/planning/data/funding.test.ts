@@ -285,6 +285,34 @@ describe('two-tier priority', () => {
     expect(tracksOf(p, 'bill', 'gym')[0].shortfall).toBe(m(300))
   })
 
+  it('funds a must-pay bill in full before pay stops, ahead of a nice-to-have goal', () => {
+    // Pay ends after January; a one-off of 6,000 is due Apr 1.
+    const ending = income({
+      id: 'ending',
+      amount: m(2000),
+      day: 25,
+      endsOn: '2027-01-31',
+    })
+    const deposit = bill({
+      id: 'deposit',
+      amount: m(6000),
+      frequency: null,
+      nextDue: '2027-04-01',
+    })
+    const holiday = goal({ id: 'holiday', amount: m(1000) })
+    const p = plan({ bills: [deposit], goals: [holiday], income: [ending] })
+    const [track] = tracksOf(p, 'bill', 'deposit')
+    expect(track.shortfall).toBe(0)
+    expect(
+      roundedSchedule(track.funded).reduce((sum, a) => sum + a, 0),
+    ).toBe(m(6000))
+    // The goal gets only what the bill can spare.
+    const goalTotal = roundedSchedule(
+      tracksOf(p, 'goal', 'holiday')[0].funded,
+    ).reduce((sum, a) => sum + a, 0)
+    expect(goalTotal).toBe(m(2 * 2000 - (6000 - 2 * 2000)))
+  })
+
   it('still records what the plan would need with income unlimited', () => {
     const p = plan({
       bills: [gym, rent],
