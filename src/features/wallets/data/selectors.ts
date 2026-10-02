@@ -8,12 +8,8 @@ import type { LocalBalanceNode } from '#/db/types'
 import type { WalletSetAsideLine } from '#/features/setAsides/data/totals'
 import { activeNodes } from './archive'
 
-// One bill's or goal's set-aside in a wallet, in the wallet's currency
-// (built by setAsides/data/totals).
-export type WalletReservation = WalletSetAsideLine
-
-// A set-aside line on a wallet row, ready to render.
-export type ReservationRow = {
+// A wallet's set-aside for one bill or goal, ready to render.
+export type SetAsideLineRow = {
   ownerId: string
   owner: 'goal' | 'bill'
   ownerName: string
@@ -38,17 +34,19 @@ export type BalanceRow = {
   isForeign: boolean
   baseStr: string
   subtotalStr: string
-  // Wallet earmarks: part of the balance reserved for goals, and what's left available. A
-  // group rolls up its descendant wallets' reserved/available. `reservations` is the per-goal
-  // breakdown shown when a wallet row is expanded. Over-reserving is allowed: `available` then
-  // goes negative and `overReserved` is set (rendered in red).
-  reserved: number
-  available: number
-  hasReserved: boolean
-  overReserved: boolean
-  reservedStr: string
-  availableStr: string
-  reservations: ReservationRow[]
+  // Set aside (live set-asides held in it) and Free to spend (Balance − Set aside), in the
+  // wallet's currency; a group sums its active wallets in base. Setting aside more than the
+  // balance is allowed: `free` goes negative, `overCommitted` is set and `overStr` says by how
+  // much. `setAsideLines` is a wallet's per bill/goal breakdown, largest first.
+  setAside: number
+  free: number
+  hasSetAside: boolean
+  overCommitted: boolean
+  setAsideStr: string
+  freeStr: string
+  /** "SR 200.00 over" when over-committed. */
+  overStr: string
+  setAsideLines: SetAsideLineRow[]
 }
 
 export type GroupBar = {
@@ -70,11 +68,6 @@ export type WalletsView = {
   currencyCountStr: string
   rows: BalanceRow[]
   groupBars: GroupBar[]
-  // Total earmarked for goals across all wallets, in base currency, and what's left free.
-  reservedTotal: number
-  hasReserved: boolean
-  reservedTotalStr: string
-  availableTotalStr: string
 }
 
 const plural = (n: number, one: string, many: string) =>
@@ -180,9 +173,8 @@ export function buildWalletsView(
   // Signed minor-unit deltas per wallet (from the ledger), in each wallet's own currency.
   // Defaults to empty so callers without transactions get the plain stored balances.
   walletDeltas: Record<string, number> = {},
-  // Goal reserves earmarked against each wallet, in the wallet's own currency (from
-  // goals/data/reservations). Defaults to empty so callers without goals see no reserves.
-  reservations: Record<string, WalletReservation[]> = {},
+  // Live set-aside lines per wallet, in the wallet's own currency (setAsides/data/totals).
+  setAsideLines: Record<string, WalletSetAsideLine[]> = {},
 ): WalletsView {
   const live = nodes.filter((n) => n.deleted === 0)
   const children = childrenByParent(live)
@@ -191,15 +183,9 @@ export function buildWalletsView(
   const effectiveAmount = (node: LocalBalanceNode): number =>
     (node.amount ?? 0) + (walletDeltas[node.id] ?? 0)
 
-  // What a wallet has earmarked for goals, in its own currency. Not capped at the balance:
-  // over-reserving is allowed and shows up as a negative available figure.
-  const walletReserved = (node: LocalBalanceNode): number => {
-    const lines = reservations[node.id] ?? []
-    return Math.max(
-      0,
-      lines.reduce((acc, l) => acc + l.amount, 0),
-    )
-  }
+  // What a wallet holds set aside, in its own currency — never capped at the balance.
+  const walletSetAside = (node: LocalBalanceNode): number =>
+    (setAsideLines[node.id] ?? []).reduce((acc, l) => acc + l.amount, 0)
 
   const baseTotal = (node: LocalBalanceNode): number => {
     if (node.kind === 'wallet') {
@@ -216,25 +202,24 @@ export function buildWalletsView(
     )
   }
 
-  // Reserved (base currency) rolled up across a node's descendant wallets.
-  const reservedBase = (node: LocalBalanceNode): number => {
+  // Set aside (base currency) rolled up across a node's descendant wallets.
+  const setAsideBase = (node: LocalBalanceNode): number => {
     if (node.kind === 'wallet') {
       return convertMinor(
-        walletReserved(node),
+        walletSetAside(node),
         node.currency ?? base,
         base,
         rates,
       )
     }
     return (children.get(node.id) ?? []).reduce(
-      (sum, child) => sum + reservedBase(child),
+      (sum, child) => sum + setAsideBase(child),
       0,
     )
   }
 
   const roots = children.get(null) ?? []
   const grand = roots.reduce((sum, n) => sum + baseTotal(n), 0)
-  const reservedTotal = roots.reduce((sum, n) => sum + reservedBase(n), 0)
 
   // Totals and counts describe everything the user owns, so they tally the whole tree.
   // Collapsing a group only hides rows below; it must never change these figures.
@@ -259,8 +244,8 @@ export function buildWalletsView(
   const walk = (node: LocalBalanceNode, depth: number) => {
     if (node.kind === 'group') {
       const kids = children.get(node.id) ?? []
-      const groupReserved = reservedBase(node)
-      const groupAvailable = baseTotal(node) - groupReserved
+      const groupSetAside = setAsideBase(node)
+      const groupFree = baseTotal(node) - groupSetAside
       rows.push({
         id: node.id,
         kind: 'group',
@@ -276,13 +261,14 @@ export function buildWalletsView(
         isForeign: false,
         baseStr: '',
         subtotalStr: formatMoney(baseTotal(node), base),
-        reserved: groupReserved,
-        available: groupAvailable,
-        hasReserved: groupReserved > 0,
-        overReserved: groupAvailable < -0.5,
-        reservedStr: formatMoney(groupReserved, base),
-        availableStr: formatMoney(groupAvailable, base),
-        reservations: [],
+        setAside: groupSetAside,
+        free: groupFree,
+        hasSetAside: groupSetAside > 0,
+        overCommitted: groupFree < 0,
+        setAsideStr: formatMoney(groupSetAside, base),
+        freeStr: formatMoney(groupFree, base),
+        overStr: `${formatMoney(Math.max(0, -groupFree), base)} over`,
+        setAsideLines: [],
       })
       if (!node.collapsed) for (const child of kids) walk(child, depth + 1)
       return
@@ -290,9 +276,9 @@ export function buildWalletsView(
 
     const currency = node.currency ?? base
     const amount = effectiveAmount(node)
-    const reserved = walletReserved(node)
-    const available = amount - reserved
-    const reservationRows: ReservationRow[] = (reservations[node.id] ?? []).map(
+    const setAside = walletSetAside(node)
+    const free = amount - setAside
+    const lineRows: SetAsideLineRow[] = (setAsideLines[node.id] ?? []).map(
       (l) => ({
         ownerId: l.ownerId,
         owner: l.owner,
@@ -316,13 +302,14 @@ export function buildWalletsView(
       isForeign: currency !== base,
       baseStr: `≈ ${formatMoney(convertMinor(amount, currency, base, rates), base)}`,
       subtotalStr: '',
-      reserved,
-      available,
-      hasReserved: reserved > 0,
-      overReserved: available < -0.5,
-      reservedStr: formatMoney(reserved, currency),
-      availableStr: formatMoney(available, currency),
-      reservations: reservationRows,
+      setAside,
+      free,
+      hasSetAside: setAside > 0,
+      overCommitted: free < 0,
+      setAsideStr: formatMoney(setAside, currency),
+      freeStr: formatMoney(free, currency),
+      overStr: `${formatMoney(Math.max(0, -free), currency)} over`,
+      setAsideLines: lineRows,
     })
   }
   for (const root of roots) walk(root, 0)
@@ -362,9 +349,5 @@ export function buildWalletsView(
     currencyCountStr: plural(currencies.size, 'currency', 'currencies'),
     rows,
     groupBars,
-    reservedTotal,
-    hasReserved: reservedTotal > 0,
-    reservedTotalStr: formatMoney(reservedTotal, base),
-    availableTotalStr: formatMoney(grand - reservedTotal, base),
   }
 }

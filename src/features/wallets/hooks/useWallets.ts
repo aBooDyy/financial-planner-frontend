@@ -60,12 +60,12 @@ export function useWallets() {
   // Set-asides earmark part of each wallet until they are released.
   const liveGoals = (goalRows ?? []).filter((g) => g.deleted === 0)
   const liveBills = (billRows ?? []).filter((b) => b.deleted === 0)
-  const reservations = balancesLoading
+  const setAsideLines = balancesLoading
     ? NONE
     : walletSetAsides(setAsideRows, liveGoals, liveBills, liveNodes, rates)
   // Archived nodes keep their ledger and earmarks but leave the tree and its totals.
   const active = activeNodes(liveNodes)
-  const view = buildWalletsView(active, base, rates, deltas, reservations)
+  const view = buildWalletsView(active, base, rates, deltas, setAsideLines)
   const held = heldCurrencies(base, [
     liveNodes,
     liveGoals,
@@ -85,7 +85,7 @@ export function useWallets() {
     nodes: active,
     archivedCount: liveNodes.filter(isArchived).length,
     deltas,
-    reservations,
+    setAsideLines,
     view,
   }
 }

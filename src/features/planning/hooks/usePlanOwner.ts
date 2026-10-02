@@ -7,9 +7,10 @@ export type OwnerInfo =
   | { kind: 'bill'; bill: LocalBill; name: string; currency: CurrencyCode }
   | { kind: 'goal'; goal: LocalGoal; name: string; currency: CurrencyCode }
 
-/** The bill or goal a sheet acts on, or null once it is gone. */
-export function usePlanOwner(owner: PlanOwner): OwnerInfo | null {
+/** The bill or goal a sheet acts on, or null once it is gone (or none is picked yet). */
+export function usePlanOwner(owner: PlanOwner | null): OwnerInfo | null {
   const { inputs } = usePlannedData()
+  if (!owner) return null
   if (owner.kind === 'bill') {
     const bill = inputs.bills.find((b) => b.id === owner.id)
     return bill

@@ -10,10 +10,12 @@ import {
   toggleCollapse,
 } from '#/features/wallets/data/mutations'
 import { useMoneyFigures } from '#/features/planning'
+import { AddMoneySheet } from '#/features/planning/components/sheets/AddMoneySheet'
 import { isoOf } from '#/features/planned/data/dates'
 import { startOfToday } from '#/features/transactions/data/planning'
 import { safeHeaderView } from '#/features/wallets/data/safeHeader'
 import type { SafeLineLink } from '#/features/wallets/data/safeHeader'
+import type { SetAsideLineRow } from '#/features/wallets/data/selectors'
 import { useAdjustBalance } from '#/features/wallets/hooks/useAdjustBalance'
 import { useBudgetsLeft } from '#/features/wallets/hooks/useBudgetsLeft'
 import { useComingUp } from '#/features/wallets/hooks/useComingUp'
@@ -45,7 +47,7 @@ export function WalletsPage() {
     base,
     nodes,
     deltas,
-    reservations,
+    setAsideLines,
     rates,
     view,
     archivedCount,
@@ -58,7 +60,7 @@ export function WalletsPage() {
   const adjust = useAdjustBalance(wallets)
   const comingUp = useComingUp({
     wallets,
-    reservations,
+    reservations: setAsideLines,
     rates,
     balancesLoading,
   })
@@ -78,6 +80,8 @@ export function WalletsPage() {
   const navigate = useNavigate()
   const [archivingId, setArchivingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [settingAsideIn, setSettingAsideIn] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   const targetOf = (id: string | null) =>
     id ? archiveTarget(nodes, id, { deltas, base, rates }) : null
   const archiving = targetOf(archivingId)
@@ -96,11 +100,27 @@ export function WalletsPage() {
         to: '/planning/$section',
         params: { section: 'upcoming' },
       })
-    else
+    else {
+      setExpanded(new Set(Object.keys(setAsideLines)))
       document
         .getElementById(WALLETS_TREE_ID)
         ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
   }
+
+  const toggleLines = (walletId: string) =>
+    setExpanded((open) => {
+      const next = new Set(open)
+      if (!next.delete(walletId)) next.add(walletId)
+      return next
+    })
+
+  const openLine = (line: SetAsideLineRow) =>
+    void navigate({
+      to: '/planning/$section',
+      params: { section: line.owner === 'bill' ? 'bills' : 'goals' },
+      search: { open: `${line.owner}:${line.ownerId}` },
+    })
 
   const confirmArchive = () => {
     if (!archiving) return
@@ -164,9 +184,10 @@ export function WalletsPage() {
               onAdjust={adjust.openFor}
               onDelete={setDeletingId}
               onAddInside={(id) => editor.openAdd('wallet', id)}
-              onOpenGoal={(goalId) =>
-                void navigate({ to: '/goals', search: { goal: goalId } })
-              }
+              onSetAside={setSettingAsideIn}
+              onOpenLine={openLine}
+              expanded={expanded}
+              onToggleLines={toggleLines}
               archivedCount={archivedCount}
             />
           </div>
@@ -181,6 +202,14 @@ export function WalletsPage() {
       <MobileTabBar active="wallets" />
 
       <TransferDialog t={transfer} rates={rates} dateFormat={dateFormat} />
+
+      {settingAsideIn ? (
+        <AddMoneySheet
+          owner={null}
+          walletId={settingAsideIn}
+          onClose={() => setSettingAsideIn(null)}
+        />
+      ) : null}
 
       {editor.editing ? (
         <NodeEditor

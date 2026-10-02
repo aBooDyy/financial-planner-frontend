@@ -82,6 +82,30 @@ describe('Add money', () => {
     expect(toastText()).toBe('SR 500 set aside for Umrah')
   })
 
+  it('starts from a wallet and asks which bill or goal the money is for', async () => {
+    await db.bills.put(
+      bill({ id: 'rent', name: 'Rent', nextDue: '2026-11-01' }),
+    )
+    const onClose = vi.fn()
+    render(<AddMoneySheet owner={null} walletId="savings" onClose={onClose} />)
+    expect(
+      await screen.findByRole('heading', { name: 'Set aside in Savings' }),
+    ).toBeTruthy()
+    fireEvent.change(screen.getByLabelText('How much?'), {
+      target: { value: '300' },
+    })
+    expect(screen.getAllByText('Pick a bill or goal').length).toBe(2)
+    fireEvent.click(screen.getByRole('combobox', { name: 'For' }))
+    fireEvent.click(await screen.findByRole('option', { name: 'Rent' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Set aside SR 300' }))
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect((await db.setAsides.toArray())[0]).toMatchObject({
+      billId: 'rent',
+      walletId: 'savings',
+      amount: m(300),
+    })
+  })
+
   it('warns before over-committing a wallet, and sets aside anyway', async () => {
     const onClose = vi.fn()
     render(<AddMoneySheet owner={goalOwner('umrah')} onClose={onClose} />)

@@ -457,7 +457,9 @@ Delete**). Reopen / Pause / Resume act at once with a toast; the rest open a she
   When?. The guardrail (`view/addMoney.ts#overCommits`, parts summed per wallet in its own
   currency) shows *"Main bank has SR 300 free. Setting aside SR 500 leaves it SR 200
   over-committed."* and the button turns into **Set aside anyway** — a warning, never a block
-  (D31). Calls `addMoney`.
+  (D31). Calls `addMoney`. With `owner: null` and a `walletId` (Wallets' row menu **Set
+  aside…**, 03 §3) it is titled *Set aside in {wallet}*, starts in that wallet and asks **For**
+  (open bills and goals, grouped) before it can save (`usePlanOwner` takes null).
 - **Pay now** (`PayNowSheet`): *Which one?* (the next three open occurrences), Full amount ↔
   Different amount, Paid from, and the effect line (`view/payNow.ts`): what leaves the wallet and
   how much the occurrence's set-asides **in that wallet** cover. Calls `payBill`; when the

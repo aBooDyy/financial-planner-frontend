@@ -179,7 +179,7 @@ describe('useWallets', () => {
     expect(result.current.view).toEqual(expected.view)
     expect(result.current.held).toEqual(expected.held)
     // The set-aside earmarks the wallet, and the deleted EUR row still counts as held.
-    expect(result.current.view.hasReserved).toBe(true)
+    expect(result.current.view.rows.some((r) => r.hasSetAside)).toBe(true)
     expect(result.current.held).toContain('EUR')
   })
 

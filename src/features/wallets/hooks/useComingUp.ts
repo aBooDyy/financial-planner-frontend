@@ -3,13 +3,13 @@ import { usePlanned } from '#/features/planned'
 import { isoOf } from '#/features/planned/data/dates'
 import { buildComingUp } from '#/features/wallets/data/comingUp'
 import type { ComingUpView } from '#/features/wallets/data/comingUp'
-import type { WalletReservation } from '#/features/wallets/data/selectors'
+import type { WalletSetAsideLine } from '#/features/setAsides/data/totals'
 import type { TransferWallet } from '#/features/wallets/data/transferDialog'
 import type { RatesMap } from '#/lib/config/rates'
 
 type Input = {
   wallets: TransferWallet[]
-  reservations: Readonly<Record<string, WalletReservation[]>>
+  reservations: Readonly<Record<string, WalletSetAsideLine[]>>
   rates: RatesMap
   /** The wallets' balances are not known yet. */
   balancesLoading: boolean

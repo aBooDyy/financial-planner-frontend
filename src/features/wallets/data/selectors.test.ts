@@ -118,8 +118,8 @@ describe('buildWalletsView', () => {
   })
 })
 
-describe('buildWalletsView reservations', () => {
-  it('splits a wallet into reserved vs available and lists the breakdown', () => {
+describe('buildWalletsView set-asides', () => {
+  it('splits a wallet into Set aside and Free to spend and lists the breakdown', () => {
     const reservations = {
       w1: [
         {
@@ -140,15 +140,20 @@ describe('buildWalletsView reservations', () => {
     }
     const view = buildWalletsView(sampleTree(), 'SAR', rates, {}, reservations)
     const w1 = view.rows.find((r) => r.id === 'w1')!
-    expect(w1.reserved).toBe(450000)
-    expect(w1.available).toBe(550000) // 10,000 − 4,500
-    expect(w1.hasReserved).toBe(true)
-    expect(w1.reservations.map((r) => r.ownerName)).toEqual(['New car', 'Rent'])
-    // Untouched wallets carry no reserve.
-    expect(view.rows.find((r) => r.id === 'w2')!.hasReserved).toBe(false)
+    expect(w1.setAside).toBe(450000)
+    expect(w1.free).toBe(550000) // 10,000 − 4,500
+    expect(w1.hasSetAside).toBe(true)
+    expect(w1.setAsideStr).toBe('SR 4,500.00')
+    expect(w1.freeStr).toBe('SR 5,500.00')
+    expect(w1.setAsideLines.map((r) => r.ownerName)).toEqual([
+      'New car',
+      'Rent',
+    ])
+    // Untouched wallets hold nothing set aside.
+    expect(view.rows.find((r) => r.id === 'w2')!.hasSetAside).toBe(false)
   })
 
-  it('rolls reserved up to the group and the view total (base currency)', () => {
+  it('rolls Set aside and Free up to the group in base currency', () => {
     const reservations = {
       w1: [
         {
@@ -171,13 +176,18 @@ describe('buildWalletsView reservations', () => {
       ],
     }
     const view = buildWalletsView(sampleTree(), 'SAR', rates, {}, reservations)
-    expect(view.rows.find((r) => r.id === 'g1')!.reserved).toBe(300000)
-    expect(view.reservedTotal).toBe(300000 + 37500)
-    expect(view.hasReserved).toBe(true)
-    expect(view.reservedTotalStr).toBe('SR 3,375.00')
+    const g1 = view.rows.find((r) => r.id === 'g1')!
+    expect(g1.setAside).toBe(300000)
+    expect(g1.hasSetAside).toBe(true)
+    // A group's Free is its subtotal less its Set aside: the sums of its rows.
+    expect(g1.free).toBe(
+      view.rows
+        .filter((r) => r.kind === 'wallet' && ['w1', 'w2'].includes(r.id))
+        .reduce((sum, r) => sum + r.free, 0),
+    )
   })
 
-  it('allows over-reserving a wallet — available goes negative and is flagged', () => {
+  it('allows setting aside more than a wallet holds — Free goes negative and says by how much', () => {
     const reservations = {
       // 6,000 reserved against a 5,000.00 balance.
       w2: [
@@ -192,9 +202,10 @@ describe('buildWalletsView reservations', () => {
     }
     const view = buildWalletsView(sampleTree(), 'SAR', rates, {}, reservations)
     const w2 = view.rows.find((r) => r.id === 'w2')!
-    expect(w2.reserved).toBe(600000) // not capped
-    expect(w2.available).toBe(-100000)
-    expect(w2.overReserved).toBe(true)
+    expect(w2.setAside).toBe(600000) // not capped
+    expect(w2.free).toBe(-100000)
+    expect(w2.overCommitted).toBe(true)
+    expect(w2.overStr).toBe('SR 1,000.00 over')
   })
 })
 

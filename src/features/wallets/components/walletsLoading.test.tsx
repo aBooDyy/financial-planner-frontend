@@ -99,7 +99,10 @@ describe('Wallets while the balances load', () => {
         onAdjust={noop}
         onDelete={noop}
         onAddInside={noop}
-        onOpenGoal={noop}
+        onSetAside={noop}
+        onOpenLine={noop}
+        expanded={new Set()}
+        onToggleLines={noop}
         archivedCount={0}
       />,
     )

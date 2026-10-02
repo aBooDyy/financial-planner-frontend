@@ -11,7 +11,9 @@ import { ResponsiveDialog } from '#/components/ui/responsive-dialog'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select'
@@ -39,20 +41,32 @@ const OUTSIDE = '__outside__'
 
 type Row = { key: number; walletId: string; amount: string }
 
-type Props = { owner: PlanOwner; onClose: () => void }
+type Props = {
+  /** Null when started from a wallet ("Set aside…"): the sheet asks which bill or goal. */
+  owner: PlanOwner | null
+  /** The wallet it starts in. */
+  walletId?: string
+  onClose: () => void
+}
 
-/** Add money (03 §3): set aside any amount, in one wallet or split, warning before over-committing. */
+/**
+ * Add money (03 §3): set aside any amount, in one wallet or split, warning before
+ * over-committing. Started from a wallet's "Set aside…" it begins in that wallet and asks for
+ * the bill or goal instead.
+ */
 export function AddMoneySheet(props: Props) {
   return usePlanningReady() ? <AddMoneySheetBody {...props} /> : null
 }
 
-function AddMoneySheetBody({ owner, onClose }: Props) {
-  const info = usePlanOwner(owner)
+function AddMoneySheetBody({ owner, walletId: startIn, onClose }: Props) {
+  const [picked, setPicked] = useState<PlanOwner | null>(owner)
+  const info = usePlanOwner(picked)
   const { inputs, today } = usePlannedData()
   const wallets = usePlanningWallets()
   const { figures } = useMoneyFigures()
   const dateFormat = usePreferencesStore((s) => s.dateFormat)
   const defaultWallet =
+    startIn ??
     (info?.kind === 'goal'
       ? info.goal.saveWalletId
       : (info?.bill.saveWalletId ?? info?.bill.walletId)) ??
@@ -73,7 +87,10 @@ function AddMoneySheetBody({ owner, onClose }: Props) {
   ])
   const [date, setDate] = useState(today)
   const [busy, setBusy] = useState(false)
-  const currency = info?.currency ?? wallets.base
+  const currency =
+    info?.currency ??
+    (startIn ? wallets.byId.get(startIn)?.currency : undefined) ??
+    wallets.base
 
   const total = parseAmountToMinor(amount, currency) ?? 0
   const parsedRows = rows.map((r) => ({
@@ -111,8 +128,9 @@ function AddMoneySheetBody({ owner, onClose }: Props) {
     inputs.rates,
   )
 
-  const block =
-    total <= 0
+  const block = !info
+    ? 'Pick a bill or goal'
+    : total <= 0
       ? 'Enter how much to set aside'
       : split && left !== 0
         ? 'The split has to add up'
@@ -126,7 +144,8 @@ function AddMoneySheetBody({ owner, onClose }: Props) {
     if (block || !info) return
     setBusy(true)
     try {
-      await addMoney(owner, parts, { date })
+      if (!picked) return
+      await addMoney(picked, parts, { date })
       toast(`${money(total, currency)} set aside for ${info.name}`)
       onClose()
     } finally {
@@ -148,7 +167,11 @@ function AddMoneySheetBody({ owner, onClose }: Props) {
       onOpenChange={(open) => {
         if (!open) onClose()
       }}
-      title={`Add money to ${info?.name ?? ''}`}
+      title={
+        owner
+          ? `Add money to ${info?.name ?? ''}`
+          : `Set aside in ${startIn ? walletName(startIn) : 'a wallet'}`
+      }
       contentClassName="sm:max-w-[480px]"
       footer={
         <DialogActions
@@ -165,6 +188,15 @@ function AddMoneySheetBody({ owner, onClose }: Props) {
         />
       }
     >
+      {owner ? null : (
+        <OwnerPicker
+          value={picked}
+          onChange={setPicked}
+          bills={inputs.bills}
+          goals={inputs.goals}
+        />
+      )}
+
       <AmountWell
         question="How much?"
         currency={currency}
@@ -377,6 +409,66 @@ function SplitRows({
               : `${money(-left, currency)} too much`}
         </span>
       </div>
+    </div>
+  )
+}
+
+const ownerKey = (o: PlanOwner) => `${o.kind}:${o.id}`
+
+/** "For" — the open bills and goals a wallet's money can be set aside for. */
+function OwnerPicker({
+  value,
+  onChange,
+  bills,
+  goals,
+}: {
+  value: PlanOwner | null
+  onChange: (owner: PlanOwner) => void
+  bills: ReadonlyArray<{ id: string; name: string; closedAt: string | null }>
+  goals: ReadonlyArray<{ id: string; name: string; closedAt: string | null }>
+}) {
+  const open = <T extends { closedAt: string | null }>(
+    list: ReadonlyArray<T>,
+  ) => list.filter((x) => x.closedAt === null)
+  const groups = [
+    { label: 'Bills', kind: 'bill' as const, items: open(bills) },
+    { label: 'Goals', kind: 'goal' as const, items: open(goals) },
+  ].filter((g) => g.items.length > 0)
+  return (
+    <div>
+      <FieldLabel>For</FieldLabel>
+      {groups.length === 0 ? (
+        <p className="text-[13px] text-fp-text-3">
+          Add a bill or goal on Planning first.
+        </p>
+      ) : (
+        <Select
+          value={value ? ownerKey(value) : undefined}
+          onValueChange={(key) => {
+            const [kind, id] = key.split(':') as ['bill' | 'goal', string]
+            onChange({ kind, id })
+          }}
+        >
+          <SelectTrigger aria-label="For" className="w-full">
+            <SelectValue placeholder="Pick a bill or goal" />
+          </SelectTrigger>
+          <SelectContent>
+            {groups.map((g) => (
+              <SelectGroup key={g.kind}>
+                <SelectLabel>{g.label}</SelectLabel>
+                {g.items.map((item) => (
+                  <SelectItem
+                    key={item.id}
+                    value={ownerKey({ kind: g.kind, id: item.id })}
+                  >
+                    {item.name}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
     </div>
   )
 }

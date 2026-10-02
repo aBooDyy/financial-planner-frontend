@@ -4,6 +4,7 @@ import { IconChip } from '#/components/icons/IconChip'
 import { ValueOrSkeleton } from '#/components/ValueOrSkeleton'
 import { Button } from '#/components/ui/button'
 import type { BalanceRow } from '#/features/wallets/data/selectors'
+import { WalletSetAsideLine } from './WalletSetAsideLine'
 
 type Props = {
   row: BalanceRow
@@ -24,6 +25,7 @@ const stop = (fn: (id: string) => void, id: string) => (e: MouseEvent) => {
   fn(id)
 }
 
+/** A group: its Balance subtotal, and Set aside · Free — the sums of its wallets (03 §8). */
 export function GroupRow({
   row,
   loading,
@@ -49,9 +51,10 @@ export function GroupRow({
         color={row.color}
         className="max-sm:size-7 max-sm:[&>svg]:size-[15px]"
       />
-      <span className="min-w-0 flex-1 truncate text-[14.5px] font-bold">
-        {row.name}
-      </span>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate text-[14.5px] font-bold">{row.name}</span>
+        {row.hasSetAside && !loading ? <WalletSetAsideLine row={row} /> : null}
+      </div>
       <span className="shrink-0 text-[12px] font-semibold text-fp-text-3 max-sm:hidden">
         {row.childCountStr}
       </span>

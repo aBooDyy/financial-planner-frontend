@@ -3,7 +3,10 @@ import { Archive, ChevronRight, Plus, Wallet } from 'lucide-react'
 import { EmptyState } from '#/components/EmptyState'
 import { TransferGlyph } from '#/components/icons/TransferGlyph'
 import { Button } from '#/components/ui/button'
-import type { BalanceRow } from '#/features/wallets/data/selectors'
+import type {
+  BalanceRow,
+  SetAsideLineRow,
+} from '#/features/wallets/data/selectors'
 import { GroupRow } from './GroupRow'
 import { WalletRow } from './WalletRow'
 
@@ -22,7 +25,11 @@ type Props = {
   onAdjust: (id: string) => void
   onDelete: (id: string) => void
   onAddInside: (id: string) => void
-  onOpenGoal: (goalId: string) => void
+  onSetAside: (walletId: string) => void
+  onOpenLine: (line: SetAsideLineRow) => void
+  /** Wallets whose set-aside list is open. */
+  expanded: ReadonlySet<string>
+  onToggleLines: (walletId: string) => void
   archivedCount: number
 }
 
@@ -38,7 +45,10 @@ export function WalletsGroupsCard({
   onAdjust,
   onDelete,
   onAddInside,
-  onOpenGoal,
+  onSetAside,
+  onOpenLine,
+  expanded,
+  onToggleLines,
   archivedCount,
 }: Props) {
   return (
@@ -111,7 +121,10 @@ export function WalletsGroupsCard({
                 onEdit={onEdit}
                 onAdjust={onAdjust}
                 onDelete={onDelete}
-                onOpenGoal={onOpenGoal}
+                onSetAside={onSetAside}
+                onOpenLine={onOpenLine}
+                expanded={expanded.has(row.id)}
+                onToggleLines={onToggleLines}
               />
             ),
           )}

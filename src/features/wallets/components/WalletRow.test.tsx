@@ -21,24 +21,25 @@ const wallet = (over: Partial<BalanceRow> = {}): BalanceRow => ({
   isForeign: false,
   baseStr: '',
   subtotalStr: '',
-  reserved: 0,
-  available: 1_000_000,
-  hasReserved: false,
-  overReserved: false,
-  reservedStr: 'SR 0.00',
-  availableStr: 'SR 10,000.00',
-  reservations: [],
+  setAside: 0,
+  free: 1_000_000,
+  hasSetAside: false,
+  overCommitted: false,
+  setAsideStr: 'SR 0.00',
+  freeStr: 'SR 10,000.00',
+  overStr: 'SR 0.00 over',
+  setAsideLines: [],
   ...over,
 })
 
-const withPots = (over: Partial<BalanceRow> = {}) =>
+const holding = (over: Partial<BalanceRow> = {}) =>
   wallet({
-    reserved: 506_700,
-    available: 493_300,
-    hasReserved: true,
-    reservedStr: 'SR 5,067.00',
-    availableStr: 'SR 4,933.00',
-    reservations: [
+    setAside: 506_700,
+    free: 493_300,
+    hasSetAside: true,
+    setAsideStr: 'SR 5,067.00',
+    freeStr: 'SR 4,933.00',
+    setAsideLines: [
       {
         ownerId: 'umrah',
         owner: 'goal',
@@ -48,59 +49,99 @@ const withPots = (over: Partial<BalanceRow> = {}) =>
       },
       {
         ownerId: 'tuition',
-        owner: 'goal',
+        owner: 'bill',
         ownerName: 'Tuition',
         color: '#8B5CF6',
-        amountStr: 'SR 1,067.00',
+        amountStr: 'SR 1,000.00',
+      },
+      {
+        ownerId: 'gym',
+        owner: 'bill',
+        ownerName: 'Gym',
+        color: '#06B6D4',
+        amountStr: 'SR 67.00',
       },
     ],
     ...over,
   })
 
-const renderRow = (row: BalanceRow, loading = false) => {
+const renderRow = (
+  row: BalanceRow,
+  { loading = false, expanded = false } = {},
+) => {
   const handlers = {
     onEdit: vi.fn(),
     onAdjust: vi.fn(),
-    onArchive: vi.fn(),
     onDelete: vi.fn(),
-    onOpenGoal: vi.fn(),
+    onSetAside: vi.fn(),
+    onOpenLine: vi.fn(),
+    onToggleLines: vi.fn(),
   }
-  render(<WalletRow row={row} loading={loading} {...handlers} />)
+  render(
+    <WalletRow row={row} loading={loading} expanded={expanded} {...handlers} />,
+  )
   return handlers
 }
 
 describe('WalletRow', () => {
   it('names a wallet at once and holds its balance back until it has loaded', () => {
-    renderRow(wallet({ isForeign: true, baseStr: 'SR 3.75' }), true)
+    renderRow(wallet({ isForeign: true, baseStr: 'SR 3.75' }), {
+      loading: true,
+    })
     expect(screen.getByText('Main Checking')).toBeDefined()
     expect(screen.queryByText('SR 10,000.00')).toBeNull()
     expect(screen.queryByText('SR 3.75')).toBeNull()
     expect(document.querySelector('[data-slot="skeleton"]')).not.toBeNull()
   })
 
-  it('leaves a wallet without reservations as it was', () => {
+  it('shows only the balance when nothing is set aside in it', () => {
     renderRow(wallet())
     expect(screen.getByText('SR 10,000.00')).toBeDefined()
-    expect(screen.queryByText(/in bank/)).toBeNull()
-    expect(screen.queryByText('available')).toBeNull()
+    expect(screen.queryByText(/Set aside/)).toBeNull()
+    expect(screen.queryByText(/Free to spend/)).toBeNull()
   })
 
-  it('heads a wallet holding goal money with what is available', () => {
-    renderRow(withPots())
-    expect(screen.getByText('SR 4,933.00')).toBeDefined()
-    expect(screen.getByText('available')).toBeDefined()
-    expect(screen.getByText('SR 10,000.00 in bank')).toBeDefined()
+  it('keeps the balance as the big figure and says what is set aside and free', () => {
+    renderRow(holding())
+    expect(screen.getByText('SR 10,000.00')).toBeDefined()
+    expect(screen.getByText('Set aside SR 5,067.00')).toBeDefined()
+    expect(screen.getByText('Free to spend SR 4,933.00')).toBeDefined()
+    expect(screen.queryByText(/available|reserved/i)).toBeNull()
   })
 
-  it('lists its pots by default, each opening its goal', () => {
-    const { onOpenGoal, onEdit } = renderRow(withPots())
-    expect(screen.getByText('Umrah trip')).toBeDefined()
-    expect(screen.getByText('SR 1,067.00')).toBeDefined()
-    fireEvent.click(
-      screen.getByRole('button', { name: /Open Tuition, SR 1,067.00/ }),
-    )
-    expect(onOpenGoal).toHaveBeenCalledWith('tuition')
+  it('names the largest set-asides folded, and opens the list on a tap', () => {
+    const { onToggleLines, onEdit } = renderRow(holding())
+    const summary = screen.getByRole('button', {
+      name: 'Umrah trip SR 4,000.00 · Tuition SR 1,000.00 · +1',
+    })
+    expect(summary.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(summary)
+    expect(onToggleLines).toHaveBeenCalledWith('w1')
     expect(onEdit).not.toHaveBeenCalled()
+  })
+
+  it('lists every set-aside when open, each opening its bill or goal', () => {
+    const { onOpenLine } = renderRow(holding(), { expanded: true })
+    expect(screen.getByText('Gym')).toBeDefined()
+    fireEvent.click(
+      screen.getByRole('button', { name: /Open Tuition, SR 1,000.00/ }),
+    )
+    expect(onOpenLine).toHaveBeenCalledWith(
+      expect.objectContaining({ ownerId: 'tuition', owner: 'bill' }),
+    )
+  })
+
+  it('shows an over-committed wallet in red, by how much', () => {
+    renderRow(
+      holding({
+        free: -50_000,
+        overCommitted: true,
+        overStr: 'SR 500.00 over',
+      }),
+    )
+    const over = screen.getByText('SR 500.00 over')
+    expect(over.parentElement?.className).toContain('text-fp-danger')
+    expect(screen.queryByText(/Free to spend/)).toBeNull()
   })
 
   it('adjusts the balance from its own action without opening the editor', () => {
@@ -110,34 +151,24 @@ describe('WalletRow', () => {
     expect(onEdit).not.toHaveBeenCalled()
   })
 
-  it('shows an over-reserved wallet in red', () => {
-    renderRow(
-      withPots({
-        available: -50_000,
-        overReserved: true,
-        availableStr: '-SR 500.00',
-      }),
+  it('sets money aside from its menu', async () => {
+    const { onSetAside, onEdit } = renderRow(wallet())
+    fireEvent.keyDown(
+      screen.getByRole('button', { name: 'More for Main Checking' }),
+      { key: 'Enter' },
     )
-    expect(screen.getByText('over-reserved').className).toContain(
-      'text-fp-danger',
-    )
-    expect(screen.getByText('-SR 500.00').className).toContain('text-fp-danger')
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Set aside…' }))
+    expect(onSetAside).toHaveBeenCalledWith('w1')
+    expect(onEdit).not.toHaveBeenCalled()
   })
 
   it('lets only the name give way when the row runs out of width', () => {
-    renderRow(withPots({ isForeign: true, baseStr: '≈ SR 37,500.00' }))
-    const figures = [
-      screen.getByText('SR 4,933.00'),
-      screen.getByText('SR 10,000.00 in bank'),
-      screen.getByText('· ≈ SR 37,500.00'),
-      screen.getByText('SR 1,067.00'),
-    ]
-    for (const el of figures) {
+    renderRow(holding({ isForeign: true, baseStr: '≈ SR 37,500.00' }))
+    for (const text of ['SR 10,000.00', '≈ SR 37,500.00']) {
+      const el = screen.getByText(text)
       expect(el.className).not.toContain('truncate')
       expect(el.className).toContain('whitespace-nowrap')
     }
-    expect(screen.getByText('SR 4,933.00').className).toContain('shrink-0')
-    expect(screen.getByText('SR 1,067.00').className).toContain('shrink-0')
     expect(screen.getByText('Main Checking').className).toContain('truncate')
   })
 })

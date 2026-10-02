@@ -47,7 +47,7 @@ those without a coordinated backend + Dexie migration.
 - `heldCurrencies(base, sources)` lists the currencies the user actually holds (wallets,
   goals, bills, transactions, set-asides, overrides); anything that renders a rate list uses it.
 - `src/features/wallets/data/selectors.ts` — pure `buildWalletsView(nodes, base, rates,
-walletDeltas?, reservations?)` builds the flattened tree (honoring collapse), grand total,
+walletDeltas?, setAsideLines?)` builds the flattened tree (honoring collapse), grand total,
   counts, and top-level bars. `groupParentOptions` powers the "Place inside"
   picker (excludes self + descendants). Unit-tested in `selectors.test.ts` / `currency.test.ts`.
 - **Wallet pickers show groups as headings.** A dropdown where only wallets can be picked
@@ -77,21 +77,18 @@ walletDeltas?, reservations?)` builds the flattened tree (honoring collapse), gr
   nothing else. Wallet/group/currency counts and the grand total are
   tallied over the whole synced tree (`tally` in `buildWalletsView`, separate from the row
   `walk`), so collapsing a group never changes a headline figure.
-- **Reserved vs available (set-asides).** The 5th arg, `reservations` (per-wallet lines from
-  `walletSetAsides` in `features/setAsides/data/totals.ts` — see [set-asides.md](set-asides.md)),
-  splits each wallet into `reserved`/`available`, with a per-owner `reservations[]` breakdown
-  (`ownerId`, `owner: 'goal' | 'bill'`, `ownerName`); groups roll the figures up in base
-  currency, and the view exposes `reservedTotal` + `availableTotalStr`. `useWallets` reads
-  `goals`, `bills` and `setAsides` to build them: a line is the sum of one bill's or goal's
-  **live** wallet set-asides in that wallet (a released row no longer counts — release is
-  explicit, nothing is re-derived from payments), one line per owner per wallet. The rows still
-  say "reserved / available"; the Wallets rebuild renames them Set aside / Free to spend. Wallet
-  money is **earmarked in place** — the balance and grand total are unchanged; reserving only reclassifies part of a
-  wallet as spoken-for. **Over-reserving is allowed**: reserved is _not_ capped at the balance,
-  so `available` can go **negative** and the row carries `overReserved` (rendered red). Nothing
-  checks before the money is reserved — no editor, contribution or confirm flow compares against
-  `available` — so an over-reserve only shows **after the fact**, as the red available figure and
-  "over-reserved" label on the wallet row (`ReservedWalletLines`).
+- **Set aside · Free to spend (03 §2, §8, D14).** The 5th arg, `setAsideLines` (per-wallet
+  lines from `walletSetAsides` in `features/setAsides/data/totals.ts` — see
+  [set-asides.md](set-asides.md)), gives each wallet row `setAside` (Σ its lines, never capped)
+  and `free = balance − setAside`, with `setAsideLines` (one per bill/goal: `ownerId`, `owner`,
+  `ownerName`, colour, amount) for the expandable list. Groups roll both up in base currency
+  over their active wallets, so a group's Set aside and Free are the sums of its rows.
+  Setting aside more than a wallet holds is allowed (D31 warns, never blocks): `free` goes
+  negative, `overCommitted` is set and `overStr` reads "SR 200.00 over". `useWallets` reads
+  `goals`, `bills` and `setAsides` to build the lines; only **live** wallet set-asides in a live
+  wallet count (release is explicit). The words are D14's — never "available", "reserved" or
+  "pots". The engine's `planning/data/balances.ts` derives the same three numbers for the
+  headline (`useMoneyFigures`); both read the same lines and deltas, so they agree.
 
 ### The ledger read and the loading state
 
@@ -113,8 +110,8 @@ walletDeltas?, reservations?)` builds the flattened tree (honoring collapse), gr
   counts, actions), titles, labels, the base pill and the wallet/group/currency counts at once;
   each figure goes through the shared `ValueOrSkeleton` with `loading` passed down —
   `SafeToSpendCard` (the headline and its sum, group-bar values, the bar itself), `GroupRow` (subtotal), `WalletRow`
-  (balance; the foreign base line waits), and the editor's `BalanceNowStrip` (`currentBalance: null`). `ReservedWalletLines`/`PotRow`
-  need no flag: with no set-asides while loading, no wallet has pots until the figures land.
+  (balance; the foreign base line waits), and the editor's `BalanceNowStrip` (`currentBalance: null`). The set-aside line and
+  list need no flag: they are drawn only once the figures land.
   The page grid is `aria-busy` with one `sr-only` `role="status"`.
   `components/walletsLoading.test.tsx` pins chrome present, no money figure, skeletons in place.
 
@@ -146,17 +143,20 @@ walletDeltas?, reservations?)` builds the flattened tree (honoring collapse), gr
   trash button clips. The chip costs horizontal room the row never had; `min-w-0 truncate` on
   the group name fixed clipping from 375px up, and the row overflowed by ~54px _before_ the
   chip, so this is an improvement, not a regression. Fixing it properly means shrinking the
-  chip or the action cluster — a design decision. **Pots (05 §6, ADR-3).** A wallet
-  holding goal money leads with **available** as its headline (red, captioned "over-reserved",
-  when negative), a secondary "SR 10,000 in bank" line under its name, and its **pot rows shown
-  by default** underneath (`PotRow`: goal colour swatch, name, amount, chevron — no expand
-  state). Its text is `ReservedWalletLines`: two paired lines (name | available, then
-  in-bank | caption) instead of two columns, so the in-bank figure gets the width the short
-  caption leaves, not what the headline amount leaves. Figures are `whitespace-nowrap` and
-  `shrink-0`; a line that still runs out of room wraps (the caption or the "≈ base" part drops
-  to the next line); **only the name truncates** — at 320px included. Tapping a pot navigates to `/goals?goal=<id>`, which redirects to `/planning/goals?open=goal:<id>` (that goal's detail panel). A
-  wallet with nothing reserved looks exactly as before. The headline's *Set aside* line is the
-  overall split now (`SafeToSpendCard`). `ExchangeRatesCard` exists
+  chip or the action cluster — a design decision. **Wallet rows (03 §8).** **Balance** stays the big
+  figure (it is what the bank app shows). A wallet holding set-aside money adds
+  `WalletSetAsideLine` — *"Set aside SR 1,900.00 · Free to spend SR 3,500.00"*, or in red *"Set
+  aside SR 5,600.00 · SR 200.00 over"* — and `SetAsideLines`: folded, one button naming the two
+  largest (*"Rent SR 3,000.00 · Car insurance SR 800.00 · +1"*); open, one line per bill/goal
+  (colour, name, amount, chevron) that opens it on Planning (`/planning/bills|goals?open=…`).
+  Which wallets are open is page state (`WalletsPage`: `expanded`); the headline's *Set aside*
+  line opens them all. A **group row** adds the same line under its name — its Set aside · Free
+  sums. Without set-asides a row is just name + balance. Figures are `whitespace-nowrap`; only
+  the name truncates. The row's actions are Edit, Adjust (desktop) and a **⋯ menu**
+  (`WalletMenu`): **Set aside…** (opens the Planning `AddMoneySheet` with `owner: null` and the
+  wallet: it starts in that wallet and asks *For* — a bill or goal picker, Bills / Goals groups),
+  **Adjust balance** (so phones reach it too) and **Delete** (the trash icon moved into the
+  menu, which also gave the 320px row back some width). `ExchangeRatesCard` exists
   but is **not** mounted on the page (FX editing belongs to Settings).
 - Route `/wallets` (guarded like the auth routes); the index redirects authenticated users
   there (it replaced the old `SignedInHome` placeholder). API types/mappers in
@@ -223,7 +223,7 @@ see backend `balances.md`). Archiving is **view-level**: nothing is moved or rew
 - **Where the filter applies.** `useWallets` builds the view from `activeNodes` and returns
   the active set as `nodes` (so the transfer dialog, the "Place inside" picker, Preferences'
   default account, email-sync and integrations pickers all drop archived wallets), plus
-  `archivedCount`. Ledger deltas, goal reservations and `heldCurrencies` still see every live
+  `archivedCount`. Ledger deltas, set-aside lines and `heldCurrencies` still see every live
   node. `walletGroupOptions`/`groupParentOptions`, `scopeSections` (Spending's account filter),
   the goal contribution form and the planned confirm form filter through `activeNodes` too.
   **Existing entries keep resolving**: `useTransactions` returns `wallets` (active, for new
