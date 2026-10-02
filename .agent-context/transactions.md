@@ -1,8 +1,9 @@
 # Spending feature (the "Spending" page — `src/features/transactions/`)
 
-Third synced slice, local-first like Wallets/Goals. One page, three views (Activity /
-Planned / Budgets) recreating the Means `TransactionsApp` design (the Planned tab
-belongs to [planned.md](planned.md#the-planned-tab-and-the-confirm-dialog-components)). Route `/transactions`
+Third synced slice, local-first like Wallets/Goals. One page, two views (Activity ·
+Budgets) recreating the Means `TransactionsApp` design. The Planned tab moved to Planning ›
+Upcoming (D8; `/transactions/planned` redirects there); Activity leads with `PlannedNudge`
+("N waiting for you to confirm · Review →" → `/planning/upcoming`) while something is due. Route `/transactions`
 (the nav's 3rd "Spending" slot, `active="budget"`). Dexie declares `transactions`,
 `budgets`; `OutboxEntity` carries `transaction|transfer|budget`. The Recurring tab, its editor
 and `recurrings` went with the planning rebuild: a repeating payment is a **bill**

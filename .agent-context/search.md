@@ -71,5 +71,6 @@ the panel is closed, active ones show as removable chips.
 - an **account** sets Spending's scope to that wallet and goes to Activity;
 - anything else navigates to its tab with `?open=<kind>:<id>` (see [routing.md](routing.md)).
   On the Spending page, `useOpenFromSearch` consumes the param once the page has loaded, opens
-  the matching editor (tx, adjustment, transfer or budget) or the planned confirm
-  dialog, and strips the param with `replace`.
+  the matching editor (tx, adjustment, transfer or budget), and strips the param with
+  `replace`. A planned result goes to `/planning/upcoming?open=planned:<id>` instead (its
+  confirm dialog).

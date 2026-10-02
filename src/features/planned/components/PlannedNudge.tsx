@@ -1,4 +1,4 @@
-/** Activity's one-line pointer to the Planned tab when something is waiting. */
+/** Activity's one-line pointer to Planning › Upcoming when something waits to be confirmed. */
 export function PlannedNudge({
   count,
   onReview,
@@ -17,7 +17,7 @@ export function PlannedNudge({
         className="size-[7px] flex-none rounded-full bg-fp-warn"
       />
       <span className="min-w-0 flex-1 font-semibold">
-        {count} planned waiting for you to confirm
+        {count} waiting for you to confirm
       </span>
       <span className="flex-none font-bold">
         Review <span className="inline-block rtl:-scale-x-100">→</span>

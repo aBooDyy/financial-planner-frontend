@@ -17,7 +17,6 @@ import {
 } from '#/features/transactions/data/selectors'
 import type { Scope } from '#/features/transactions/data/selectors'
 import {
-  allAccountsMinor,
   scopeBalance,
   scopeLabel,
 } from '#/features/transactions/data/scopePicker'
@@ -35,12 +34,7 @@ import { useEntryDefaults } from '#/features/transactions/hooks/useEntryDefaults
 import { useEntrySession } from '#/features/transactions/stores/entrySession'
 import { usePublishSearchContext } from '#/features/search/hooks/usePublishSearchContext'
 import { usePlanned } from '#/features/planned'
-import { ConfirmPlannedDialog } from '#/features/planned/components/ConfirmPlannedDialog'
-import { PlannedCard } from '#/features/planned/components/PlannedCard'
 import { PlannedNudge } from '#/features/planned/components/PlannedNudge'
-import { PlannedRail } from '#/features/planned/components/PlannedRail'
-import { useOriginColors } from '#/features/planned/hooks/useOriginColors'
-import { usePlannedRowActions } from '#/features/planned/hooks/usePlannedRowActions'
 import type { CurrencyCode } from '#/lib/currency'
 import { AdjustmentEditor } from './AdjustmentEditor'
 import { BreakdownCard } from './BreakdownCard'
@@ -91,9 +85,6 @@ export function TransactionsPage() {
   const viewParam = useParams({ from: '/transactions/$view' }).view
   const view = isSpendingView(viewParam) ? viewParam : 'activity'
   const planned = usePlanned()
-  const originColor = useOriginColors()
-  const [confirmId, setConfirmId] = useState<string | null>(null)
-  const plannedActions = usePlannedRowActions(setConfirmId)
   const chosenScope = useEntrySession((s) => s.scope) ?? ALL_ACCOUNTS
   const setScope = useEntrySession((s) => s.rememberScope)
   const [calOpen, setCalOpen] = useState(false)
@@ -129,12 +120,7 @@ export function TransactionsPage() {
     adjustment,
     ledger?.rows ?? NO_ROWS,
   )
-  useOpenFromSearch(!loading, {
-    editor,
-    adjustment,
-    inputs,
-    openPlanned: setConfirmId,
-  })
+  useOpenFromSearch(!loading, { editor, adjustment, inputs })
   usePublishSearchContext({
     view,
     scope,
@@ -163,12 +149,7 @@ export function TransactionsPage() {
     wallets.find((w) => w.id === entryDefaults.walletId) ?? null
   const activeCurrency: CurrencyCode = activeWallet?.currency ?? base
   const { activity, budgets } = views
-  const busy =
-    view === 'activity'
-      ? !activity?.cashflow
-      : view === 'budgets'
-        ? !budgets
-        : false
+  const busy = view === 'activity' ? !activity?.cashflow : !budgets
 
   const balancesLoading = loading || !deltas
   const scopePicker = (compact: boolean) => (
@@ -184,11 +165,7 @@ export function TransactionsPage() {
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-fp-bg text-fp-text">
       <TopNav user={user} active="budget" onSignOut={() => void logout()} />
-      <SpendingSubNav
-        view={view}
-        dueCount={planned.dueCount}
-        trailing={scopePicker(true)}
-      />
+      <SpendingSubNav view={view} trailing={scopePicker(true)} />
 
       <div className="flex-1 overflow-auto">
         <span role="status" className="sr-only">
@@ -200,11 +177,7 @@ export function TransactionsPage() {
         >
           {/* Left column */}
           <div className="flex min-w-0 flex-col gap-4">
-            <SpendingTabCard
-              view={view}
-              dueCount={planned.dueCount}
-              trailing={scopePicker(false)}
-            />
+            <SpendingTabCard view={view} trailing={scopePicker(false)} />
             {view === 'activity' ? (
               <>
                 {planned.dueCount > 0 ? (
@@ -212,8 +185,8 @@ export function TransactionsPage() {
                     count={planned.dueCount}
                     onReview={() =>
                       void navigate({
-                        to: '/transactions/$view',
-                        params: { view: 'planned' },
+                        to: '/planning/$section',
+                        params: { section: 'upcoming' },
                       })
                     }
                   />
@@ -261,17 +234,6 @@ export function TransactionsPage() {
                 ) : null}
               </>
             ) : null}
-            {view === 'planned' ? (
-              <PlannedCard
-                view={planned}
-                loading={planned.loading}
-                colorOf={originColor}
-                busyId={plannedActions.busyId}
-                onOpen={setConfirmId}
-                onConfirm={(row) => void plannedActions.confirm(row)}
-                onSkip={(row) => void plannedActions.skip(row)}
-              />
-            ) : null}
             {view === 'budgets' ? (
               <BudgetsCard
                 view={budgets}
@@ -301,12 +263,6 @@ export function TransactionsPage() {
                 />
               </>
             ) : null}
-            {view === 'planned' ? (
-              <PlannedRail
-                planned={planned}
-                balance={balancesLoading ? null : allAccountsMinor(sections)}
-              />
-            ) : null}
             {view === 'budgets' ? (
               <BudgetHealthCard view={budgets} onAdd={editor.openAddBudget} />
             ) : null}
@@ -333,15 +289,6 @@ export function TransactionsPage() {
         wallets={editorWallets}
         dateFormat={dateFormat}
       />
-
-      {confirmId ? (
-        <ConfirmPlannedDialog
-          plannedId={confirmId}
-          onOpenChange={(open) => {
-            if (!open) setConfirmId(null)
-          }}
-        />
-      ) : null}
 
       {reviewOpen ? (
         <PendingReviewModal

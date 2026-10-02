@@ -22,8 +22,8 @@ export function ComingUpCard({ view }: Props) {
         sub={`Bills and income, next ${COMING_UP_DAYS} days`}
         action={
           <Link
-            to="/transactions/$view"
-            params={{ view: 'planned' }}
+            to="/planning/$section"
+            params={{ section: 'upcoming' }}
             className="shrink-0 text-[12px] font-semibold text-fp-accent-ink hover:underline"
           >
             See all

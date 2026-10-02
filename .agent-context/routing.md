@@ -79,7 +79,7 @@ rendering its feature component directly:
   an optional `&rule=` (the queue's "Fix the rule" for an inbox row) — `EmailSyncSearch`;
   every id must be uuid-shaped or the whole intent is dropped. `/transactions?review=1` is the
   other search-driven entry, with `?open=<kind>:<id>` (`tx`, `adjustment`, `transfer` — by
-  `transferId` — `planned`, `budget`; `data/openParam.ts`, the id uuid-shaped or the
+  `transferId` — `budget`; `data/openParam.ts`, the id uuid-shaped or the
   param is dropped): the global search's way of opening a result. `useOpenFromSearch` waits for the
   page's data, opens that editor, then strips `open` with `replace`, re-arming on the next value.
 
@@ -96,7 +96,7 @@ a tab is linkable and the back button moves between tabs. Each area is a directo
 - `$section.tsx` / `$view.tsx` — renders the page; `beforeLoad` redirects an unknown tab to the
   first one. The valid tabs are `PLANNING_SECTIONS` (`features/planning/sections.ts`:
   `overview`, `upcoming`, `bills`, `goals`, `income`) and `SPENDING_VIEWS`
-  (`features/transactions/constants.ts`: `activity`, `planned`, `budgets`).
+  (`features/transactions/constants.ts`: `activity`, `budgets`).
 
 **A tab is a param, not a child route per tab** (unlike Settings) because the tabs share page
 state — the Planning detail panel and sheets, the Spending scope, range and calendar. One param

@@ -1,4 +1,8 @@
 import { useNavigate } from '@tanstack/react-router'
+import {
+  PLANNING_OPEN_SECTION,
+  encodePlanningOpen,
+} from '#/features/planning/data/openParam'
 import { useSearchStore } from '#/features/search/stores/search'
 import type { SearchTarget } from '#/features/search/data/types'
 import {
@@ -8,7 +12,7 @@ import {
 import type { OpenIntent } from '#/features/transactions/data/openParam'
 import { useEntrySession } from '#/features/transactions/stores/entrySession'
 
-type ItemTarget = Exclude<SearchTarget, { kind: 'account' }>
+type ItemTarget = Exclude<SearchTarget, { kind: 'account' | 'planned' }>
 
 const openIntentOf = (target: ItemTarget): OpenIntent =>
   target.kind === 'transfer'
@@ -32,6 +36,14 @@ export function useOpenSearchTarget() {
       void navigate({
         to: '/transactions/$view',
         params: { view: 'activity' },
+      })
+      return
+    }
+    if (target.kind === 'planned') {
+      void navigate({
+        to: '/planning/$section',
+        params: { section: PLANNING_OPEN_SECTION.planned },
+        search: { open: encodePlanningOpen(target) },
       })
       return
     }

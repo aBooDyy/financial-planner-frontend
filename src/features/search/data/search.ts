@@ -46,7 +46,6 @@ const GROUP_TITLE: Record<SearchGroupKey, string> = {
 
 const VIEW_GROUP: Record<SpendingView, SearchGroupKey> = {
   activity: 'transactions',
-  planned: 'planned',
   budgets: 'budgets',
 }
 

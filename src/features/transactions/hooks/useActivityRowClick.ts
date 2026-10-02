@@ -18,7 +18,10 @@ export function useActivityRowClick(
 
   return (row: ActivityRow) => {
     if (row.kind === 'set_aside') {
-      void navigate({ to: '/goals' })
+      void navigate({
+        to: '/planning/$section',
+        params: { section: 'goals' },
+      })
       return
     }
     if (row.kind === 'transfer') {

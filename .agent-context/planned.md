@@ -217,7 +217,7 @@ wanted id is the input's, else the row's, else the bill's, else the income strea
 ## Reading it (`hooks/`, `data/views.ts`, `data/preview.ts`)
 
 Everything the UI needs is on the public surface, `features/planned/index.ts`:
-`usePlanned()` (Planned tab: due / next 14 days / later with row display fields and actions),
+`usePlanned()` (due / next 14 days / later with row display fields and actions — Upcoming builds on the same row views, Spending reads its `dueCount`),
 `useGoalPlan(goalId)` (stored vs live header, behind/ahead with reason, progress with the
 awaiting segment, contributions timeline + `collapseContributions`, `recalc()`, `lastRecalc`
 with its undo, `addContribution`), `useConfirmPlanned(id, walletId)` (dialog defaults + `preview(amount, date)` —
@@ -261,51 +261,20 @@ dialog is mounted) and hands it to `previewConfirm` as `walletTxns`; the line wa
 The read is tagged with its wallet id: on a wallet switch `useLiveQuery` keeps the previous
 result until the new one lands, and that stale ledger must never price the new wallet.
 
-## The Planned tab and the confirm dialog (`components/`)
+## The confirm dialog and the nudge (`components/`)
 
-The Spending page composes these; they read only the public hooks above.
+The Planned tab moved to **Planning › Upcoming** ([planning.md](planning.md#upcoming--componentsupcoming));
+its list, rail (`ForecastCard`, `HeadedCard`, `data/forecast.ts`, `data/headed.ts`,
+`data/outlook.ts`), `PlanningGuideCard` and `useOriginColors` were deleted. What stays here:
 
-- **Tab.** `TransactionsPage` calls `usePlanned()` once and passes the view down: tabs are
-  Activity · Planned · Budgets (routes `/transactions/$view`), the Planned label carries an amber count pill when
-  `dueCount > 0`, and Activity leads with `PlannedNudge` in that case.
-- **`PlannedCard`** (1c): header, then `PlannedBand` sections — "Needs confirming · N" (amber,
-  no caption) with live rows, "Planned · next 14 days" (neutral, `nextCaption`) with
-  muted rows, and "Later in <Month>" collapsed behind "N more · Show all". `PlannedEmpty`
-  links to `/goals`. `PlannedRow` draws one row: a dashed icon in the origin's colour
-  (`hooks/useOriginColors`: goal → bill → stream → its category's root colour, as everywhere else), name + `TagPill`
-  (Goal / Bill / Income), meta, amount
-  (income in accent, outflow in text colour, never red; muted rows grey with a dashed pill),
-  and — due rows only — Skip + Confirm ("Confirm received" for income). A partly settled row
-  has no Skip (refused with settlements); its dialog offers "Close the rest".
-- **The rail** (`PlannedRail`, the side column; below the list on mobile). With nothing planned it
-  is `PlanningGuideCard`: links to the three places planned rows come from (income, bills,
-  goals — still the `/goals` sections until Planning replaces them). Otherwise two cards over `hooks/usePlannedOutlook`,
-  which takes the list `usePlanned()` already built plus every live account's balance in base
-  (`allAccountsMinor` over the Spending scope sections; `null` while balances load). Both look
-  `OUTLOOK_DAYS` (30) ahead through `data/outlook.ts` (open rows with a remainder, overdue ones
-  included). They cover all accounts and ignore the scope picker, as the list does.
-  - **Balance ahead** (`ForecastCard` / `ForecastChart`, pure `data/forecast.ts`, tested). End-of-day
-    balance for today + 30 days as payments and income land; set-asides do not move money, and
-    overdue items land today. It is drawn as a step line in a stretched 100×100 SVG box (non-scaling
-    stroke), clipped into three zones: accent above goal money, warn inside it, danger below zero.
-    Dots, the crosshair and the reference lines ("Goal money", and "Zero" only on a shortfall) are
-    HTML over it, so they keep their shape. In RTL the SVG mirrors (`rtl:-scale-x-100`) and overlays
-    use `inset-inline-start`. The readout rests on the lowest day. Pointer or arrow keys scrub it
-    (it is a `role="slider"` with a per-day `aria-valuetext`), and Escape returns to the lowest day.
-    Status line: short (first day below zero) beats reserved (first day under goal money) beats
-    clear. Goal money is `walletSetAsides` (every live wallet set-aside, bills' included) from the
-    planner's own inputs, summed over live
-    wallets in base, and held flat: it doesn't step with future set-asides.
-  - **Where it's headed** (`HeadedCard`, pure `data/headed.ts`, tested). Planned income against
-    payments and set-asides as a `SegmentedBar` (scaled to whichever is larger), a legend with
-    values, and the leftover line ("X of what comes in has no plan yet" / "X more planned than
-    comes in").
+- **`PlannedNudge`** — Activity's one line ("N waiting for you to confirm · Review →") when
+  `usePlanned().dueCount > 0`; it links to `/planning/upcoming`.
 - **One-tap confirm** (`hooks/usePlannedRowActions`): `confirmPlanned(id)` when `row.oneTap`
   (known wallet, nothing settled), else the dialog. A refused one-tap or skip (e.g.
   `origin_gone` for a deleted goal's leftover set-aside) opens the dialog, which shows why and
-  still offers Skip.
+  still offers Skip. Upcoming's Needs confirming band and its *Set aside now* use it.
 - **`ConfirmPlannedDialog`** (1d) — `{ plannedId: string | null; onOpenChange }`, open while
-  `plannedId` is set. State lives in `hooks/useConfirmForm`
+  `plannedId` is set; Planning shows it as its `confirmPlanned` sheet. State lives in `hooks/useConfirmForm`
   (seeded once per opening from `useConfirmPlanned().defaults`: remainder, suggested wallet or
   the first wallet, today). Fields: an `AmountWell` ("How much are you confirming?" / "How much
   came in?", "of X planned" under it), From/Into `ConfirmWalletSelect` (+ "External…" with a
@@ -317,15 +286,16 @@ The Spending page composes these; they read only the public hooks above.
   (asks first through a light `ConfirmDialog`), Close the rest (partials) as two equal quiet
   buttons under a full-width primary. `PlannedActionError` codes map to copy via
   `messageForCode('planned.<code>')` (`plannedErrorMessage`).
-- Amber on the Planned tab (due band, nudge, due rows) is `fp-warn` at 10 % / 25 %
+- Amber for things waiting (the nudge, Upcoming's band) is `fp-warn` at 10 % / 25-30 %
   (`bg-fp-warn/10`, `border-fp-warn/25`) — there is no separate amber-soft token. The confirm
   dialog's partial line instead uses the dialog kit's `warn` (`fp-spend` on `fp-spend-soft`).
 
 ## Where the UI reads it
 
-- **Goals**: nothing yet — the goal detail that read `useGoalPlan` / `useRecalcAll` went with the
-  old Goals page. Both hooks (and `buildGoalPlanView`, `ConfirmPlannedDialog`) stay on the
-  public surface for the Planning page. See [goals.md](goals.md).
+- **Planning** reads `usePlannedData` through `usePlanning` / `useMoneyFigures` /
+  `useYearAhead`, and `useBillPlan` / `useGoalPlan` in the detail panels' Plan box (recalc +
+  undo from `useRecalcUndoStore`). See [planning.md](planning.md#the-planning-page--components).
+- **Spending**: `usePlanned()` for the nudge's count; the transaction dialog's match hooks.
 
 ## What planned rows never affect
 
@@ -337,7 +307,7 @@ budgets ([transactions.md](transactions.md)).
 ## Tests
 
 `data/{ids,generate,reconcile,settle,views,mutations,runner,sync,confirmCopy,linkedTransactions,preview}.test.ts`,
-`data/{forecast,headed}.test.ts`, `components/{PlannedCard,ConfirmPlannedDialog,ForecastCard}.test.tsx`,
+`components/ConfirmPlannedDialog.test.tsx`,
 `hooks/usePlannedRunner.test.ts`, `hooks/useConfirmPlanned.test.tsx`, `hooks/usePlannedData.test.tsx` (consumers share one set of
 reads and one derivation; the last unmount closes them), `goals/data/paydays.test.ts`, `goals/data/progress.test.ts`. The design's worked example
 (04 §4 — Umrah 1,500 × 8 → Sep 24 behind 1,500, live 1,800 × 5, recalc Oct–Feb to 1,800 with

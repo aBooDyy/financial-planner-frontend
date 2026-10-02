@@ -1,14 +1,11 @@
 import { isUuid } from '#/lib/uuid'
 import type { SpendingView } from '#/features/transactions/constants'
 
-/** What `?open=<kind>:<id>` asks the Spending page to open. A transfer's id is its `transferId`. */
-export const OPEN_KINDS = [
-  'tx',
-  'adjustment',
-  'transfer',
-  'planned',
-  'budget',
-] as const
+/**
+ * What `?open=<kind>:<id>` asks the Spending page to open. A transfer's id is its `transferId`.
+ * Planned items open on Planning (`features/planning/data/openParam.ts`).
+ */
+export const OPEN_KINDS = ['tx', 'adjustment', 'transfer', 'budget'] as const
 
 export type OpenKind = (typeof OPEN_KINDS)[number]
 
@@ -19,7 +16,6 @@ export const OPEN_VIEW: Record<OpenKind, SpendingView> = {
   tx: 'activity',
   adjustment: 'activity',
   transfer: 'activity',
-  planned: 'planned',
   budget: 'budgets',
 }
 

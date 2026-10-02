@@ -1,4 +1,4 @@
-import { CalendarClock, Gauge, ReceiptText } from 'lucide-react'
+import { Gauge, ReceiptText } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { SpendingView } from '#/features/transactions/constants'
 
@@ -8,6 +8,5 @@ export const SPENDING_VIEW_META: Record<
   { label: string; icon: LucideIcon }
 > = {
   activity: { label: 'Activity', icon: ReceiptText },
-  planned: { label: 'Planned', icon: CalendarClock },
   budgets: { label: 'Budgets', icon: Gauge },
 }

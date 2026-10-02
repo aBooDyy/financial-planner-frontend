@@ -12,12 +12,11 @@ type Openers = {
   editor: TxEditorApi
   adjustment: AdjustmentEditor
   inputs: SpendingInputs
-  openPlanned: (id: string) => void
 }
 
 async function openIntent(
   intent: OpenIntent,
-  { editor, adjustment, inputs, openPlanned }: Openers,
+  { editor, adjustment, inputs }: Openers,
 ) {
   switch (intent.kind) {
     case 'tx':
@@ -36,10 +35,7 @@ async function openIntent(
     case 'budget': {
       const b = inputs.budgets.find((x) => x.id === intent.id)
       if (b && b.deleted === 0) editor.openEditBudget(b)
-      return
     }
-    case 'planned':
-      openPlanned(intent.id)
   }
 }
 
