@@ -12,7 +12,7 @@ import { Input } from '#/components/ui/input'
 import { ResponsiveDialog } from '#/components/ui/responsive-dialog'
 import { CategoryPicker } from '#/features/categories/components/CategoryPicker'
 import { useBillEditor } from '#/features/planning/hooks/useBillEditor'
-import { useEditorReady } from '#/features/planning/hooks/useEditorReady'
+import { usePlanningReady } from '#/features/planning/hooks/usePlanningReady'
 import { ITEM_COLORS } from '#/features/planning/view/colors'
 import { perYearOf } from '#/features/planning/view/repeat'
 import type { RepeatPick } from '#/features/planning/view/repeat'
@@ -42,7 +42,7 @@ type Props = {
 
 /** New bill / Edit bill (04 §4): short by default, the rest behind More options. */
 export function BillEditor(props: Props) {
-  return useEditorReady() ? <BillEditorForm {...props} /> : null
+  return usePlanningReady() ? <BillEditorForm {...props} /> : null
 }
 
 function BillEditorForm({ id, onClose, onDelete }: Props) {

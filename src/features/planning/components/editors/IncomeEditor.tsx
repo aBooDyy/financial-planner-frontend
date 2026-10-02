@@ -10,7 +10,7 @@ import { FormRow } from '#/components/FormRow'
 import { Input } from '#/components/ui/input'
 import { ResponsiveDialog } from '#/components/ui/responsive-dialog'
 import { CategoryPicker } from '#/features/categories/components/CategoryPicker'
-import { useEditorReady } from '#/features/planning/hooks/useEditorReady'
+import { usePlanningReady } from '#/features/planning/hooks/usePlanningReady'
 import { useIncomeEditor } from '#/features/planning/hooks/useIncomeEditor'
 import { ITEM_COLORS } from '#/features/planning/view/colors'
 import type { RepeatPick } from '#/features/planning/view/repeat'
@@ -37,7 +37,7 @@ type Props = {
 
 /** New income / Edit income: how much, how often, when and where it lands. */
 export function IncomeEditor(props: Props) {
-  return useEditorReady() ? <IncomeEditorForm {...props} /> : null
+  return usePlanningReady() ? <IncomeEditorForm {...props} /> : null
 }
 
 function IncomeEditorForm({ id, onClose, onDelete }: Props) {

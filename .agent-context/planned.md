@@ -243,7 +243,9 @@ module level on the table arrays' identity (plus base, rates, user, day), so how
 hooks a page mounts — Spending's tab + transaction dialog
 + confirm dialog + QuickAdd — the tables are read once and the plan derived once. No provider
 is needed, so the hooks work unchanged in tests and in any tree. A consumer that mounts while
-others are open renders the current snapshot at once (no loading flash).
+others are open renders the current snapshot at once (no loading flash). `loading` stays true
+until every input table but the rates has been read (nodes and the settings row included), so
+a screen that reads defaults from them — the Planning editors and sheets — can wait for it.
 
 **Linked transactions only (`data/linkedTransactions.ts`).** The planner's derivation needs only
 the transactions that link to something: a `goalId` (goal progress, contributions), a

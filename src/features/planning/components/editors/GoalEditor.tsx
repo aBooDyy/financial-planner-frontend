@@ -8,7 +8,7 @@ import { FieldLabel } from '#/components/FieldLabel'
 import { FormRow } from '#/components/FormRow'
 import { Input } from '#/components/ui/input'
 import { ResponsiveDialog } from '#/components/ui/responsive-dialog'
-import { useEditorReady } from '#/features/planning/hooks/useEditorReady'
+import { usePlanningReady } from '#/features/planning/hooks/usePlanningReady'
 import { useGoalEditor } from '#/features/planning/hooks/useGoalEditor'
 import type { GoalPreset } from '#/features/planning/stores/planningUi'
 import { ITEM_COLORS } from '#/features/planning/view/colors'
@@ -27,7 +27,7 @@ type Props = {
 
 /** New goal / Edit goal (04 §4): a target and a date, or a monthly amount. */
 export function GoalEditor(props: Props) {
-  return useEditorReady() ? <GoalEditorForm {...props} /> : null
+  return usePlanningReady() ? <GoalEditorForm {...props} /> : null
 }
 
 function GoalEditorForm({ id, preset, onClose, onDelete }: Props) {

@@ -114,9 +114,13 @@ export function usePlannedData(): PlannedData {
   return {
     loading:
       tables.goals === undefined ||
+      tables.income === undefined ||
+      tables.bills === undefined ||
       tables.planned === undefined ||
       tables.txns === undefined ||
-      tables.setAsides === undefined,
+      tables.setAsides === undefined ||
+      tables.nodes === undefined ||
+      tables.settings === undefined,
     userId,
     today,
     todayDate,

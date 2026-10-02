@@ -277,8 +277,8 @@ Nice to have for bills, **Must have** / Nice to have for goals, "Left for spendi
   (Spending › Budgets), and — while there is no open goal — **Start an emergency fund**:
   a must-have goal targeting 3 × the monthly must-pay bills (`emergencyFundPreset`; no target
   before there are bills). Section headers' **+ Add bill / goal / income** skip it.
-- Editors mount their form only once the planner's inputs and the category catalog have loaded
-  (`useEditorReady`), so the first state holds the real defaults; each has a `use*Editor` hook
+- Editors (and every sheet) mount their body only once the planner's inputs and the category
+  catalog have loaded (`usePlanningReady`), so the first state holds the real defaults; each has a `use*Editor` hook
   (form, block reason, preview, save) and a pure `view/*Draft.ts` (form ↔ entity, `*Block`,
   `*Preview`). Saving shows the hint above the buttons until ready (`DialogActions`), and a
   dirty close asks first (`useDiscardGuard`).
@@ -309,6 +309,37 @@ Nice to have for bills, **Must have** / Nice to have for goals, "Left for spendi
   a **Use for my pay periods** switch that saves `mainIncomeStreamId` · More options: Category
   (default **Salary**, required on create), Log it automatically when it arrives, Ends, Note,
   Colour.
+
+### Anytime-action sheets — `components/sheets/`
+
+Every action is on each row's ⋯ menu and in the detail panel (`hooks/useItemActions`: bill
+**Edit · Add money · Pay now · End this bill** / **Mark as paid** (one-off) **· Delete**; goal
+**Edit · Add money · Use it · Mark as done · Pause / Resume · Delete**; a closed one **Reopen ·
+Delete**). Reopen / Pause / Resume act at once with a toast; the rest open a sheet.
+
+- **Add money** (`AddMoneySheet`, 03 §3): the amount on the blue tint ("It stays in the wallet.
+  We just label it."), *Set aside in* wallet cards with each one's free money
+  (`useMoneyFigures`) plus **Held outside your wallets** (+ where), **Split across wallets**
+  (rows of wallet + amount, "SR X left to place" / "Adds up", saving blocked until it adds up),
+  When?. The guardrail (`view/addMoney.ts#overCommits`, parts summed per wallet in its own
+  currency) shows *"Main bank has SR 300 free. Setting aside SR 500 leaves it SR 200
+  over-committed."* and the button turns into **Set aside anyway** — a warning, never a block
+  (D31). Calls `addMoney`.
+- **Pay now** (`PayNowSheet`): *Which one?* (the next three open occurrences), Full amount ↔
+  Different amount, Paid from, and the effect line (`view/payNow.ts`): what leaves the wallet and
+  how much the occurrence's set-asides **in that wallet** cover. Calls `payBill`; when the
+  result's `leftover` has lines it opens the **leftover prompt** in its place, else toasts.
+- **Leftover** (`LeftoverSheet`, 03 §5, D31): money the paid occurrence still holds in other
+  wallets — **Move it to {paying wallet}** (a real transfer; only when some is in another
+  wallet), **Free it up**, **Keep it for next time** (repeating bills). `resolveLeftover`.
+- **Mark as done** (`MarkDoneSheet`): goals — progress box, then *What happens to the SR X set
+  aside?*: **I spent it** (default, D30: paid-from wallet + category, remembered on the goal →
+  `markGoalSpent`), **Free it up**, **Move it to another bill or goal** (a picker of open ones; a
+  bill gets its next due occurrence) → `closeGoal`. Bills: *End {name}* / *Mark {name} as paid*
+  with Free / Move → `closeBill`. Nothing set aside → no question.
+- **Use it** (`UseItSheet`, D20): amount, paid from, category (asked until the goal remembers
+  one) → `spendFromGoal`.
+- **Delete** (`DeleteItemConfirm`): the P3 confirm, with what happens to set-asides and history.
 
 ## Tests
 
