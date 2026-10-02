@@ -30,6 +30,9 @@ type ConfigLimitsWire = {
   integration_payload_max_bytes: number
   planned_bulk_max?: number
   planned_max?: number
+  set_aside_batch_max?: number
+  safe_horizon_days_min?: number
+  safe_horizon_days_max?: number
 }
 
 export type ConfigWire = {
@@ -92,6 +95,14 @@ export const toAppConfig = (w: ConfigWire): AppConfig => {
       plannedBulkMax:
         w.limits.planned_bulk_max ?? BUNDLED_CONFIG.limits.plannedBulkMax,
       plannedMax: w.limits.planned_max ?? BUNDLED_CONFIG.limits.plannedMax,
+      setAsideBatchMax:
+        w.limits.set_aside_batch_max ?? BUNDLED_CONFIG.limits.setAsideBatchMax,
+      safeHorizonDaysMin:
+        w.limits.safe_horizon_days_min ??
+        BUNDLED_CONFIG.limits.safeHorizonDaysMin,
+      safeHorizonDaysMax:
+        w.limits.safe_horizon_days_max ??
+        BUNDLED_CONFIG.limits.safeHorizonDaysMax,
     },
     integrations: w.integrations
       ? {

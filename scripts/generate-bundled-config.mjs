@@ -2,9 +2,10 @@
 //
 //   pnpm generate-config [-- --backend ../financial-planner-backend]
 //
-// Run it in the same commit as any change to `app/config/currencies.py` or to the limit
-// defaults in `app/config/settings.py`; the snapshot is what a first-run or offline client
-// uses before `GET /config` answers. It parses the Python literals rather than importing
+// Run it in the same commit as any change to `app/config/currencies.py`, to the limit
+// defaults in `app/config/settings.py` or to the published constants in
+// `app/config/limits.py`; the snapshot is what a first-run or offline client uses before
+// `GET /config` answers. It parses the Python literals rather than importing
 // them, so it needs no Python toolchain — and it refuses to write a partial table.
 
 import { execFileSync } from 'node:child_process'
@@ -31,6 +32,13 @@ const LIMIT_KEYS = [
   ['integration_payload_max_bytes', 'integrationPayloadMaxBytes'],
   ['planned_bulk_max', 'plannedBulkMax'],
   ['planned_max', 'plannedMax'],
+]
+
+// Limits the backend keeps as module constants in `app/config/limits.py`, not settings.
+const CONSTANT_LIMIT_KEYS = [
+  ['SET_ASIDE_BATCH_MAX', 'setAsideBatchMax'],
+  ['SAFE_HORIZON_DAYS_MIN', 'safeHorizonDaysMin'],
+  ['SAFE_HORIZON_DAYS_MAX', 'safeHorizonDaysMax'],
 ]
 
 const MIN_CURRENCIES = 100
@@ -127,6 +135,23 @@ function parseLimits(source) {
   return limits
 }
 
+function parseConstantLimits(source) {
+  const limits = {}
+  for (const [pythonName, key] of CONSTANT_LIMIT_KEYS) {
+    const raw = parseSingle(
+      source,
+      new RegExp(`\\n${pythonName}\\s*=\\s*([0-9_]+)\\s*\\n`),
+      pythonName,
+      'limits.py',
+    )
+    limits[key] = Number(raw.replace(/_/g, ''))
+    if (!Number.isInteger(limits[key]) || limits[key] <= 0) {
+      fail(`${pythonName} is not a positive integer (${raw})`)
+    }
+  }
+  return limits
+}
+
 const quote = (value) =>
   `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
 
@@ -211,7 +236,10 @@ const base = parseSingle(
   'currencies.py',
 )
 const { currencies, rates } = parseCurrencies(currenciesPy)
-const limits = parseLimits(settingsPy)
+const limits = {
+  ...parseLimits(settingsPy),
+  ...parseConstantLimits(read(resolve(backend, 'app/config/limits.py'))),
+}
 // The deployment's public webhook URL is runtime configuration, so the snapshot only knows the
 // path; the client joins it to the origin it reaches the API on until `GET /config` answers.
 const webhookPath =

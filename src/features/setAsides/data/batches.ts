@@ -7,6 +7,8 @@
  * with its amount cut to the part and writes the rest as a new live row (the remainder). Ids of
  * remainders and moved rows are minted here and sent with the batch, so they exist offline and
  * the server's rows are these rows. The touched rows are marked dirty; the batch carries them.
+ * More parts than the server takes in one batch (`limits.setAsideBatchMax`) are queued as
+ * several batches, each all-or-nothing on its own.
  */
 import { db } from '#/db/db'
 import { schedulePush } from '#/db/sync'
@@ -19,6 +21,7 @@ import type {
   ReleaseWire,
 } from '#/features/setAsides/api/types'
 import { isoOf } from '#/features/planned/data/dates'
+import { configLimits } from '#/lib/config/appConfig'
 import { newId } from '#/lib/uuid'
 import type { SetAsideOwner } from './mutations'
 import { isLiveSetAside } from './totals'
@@ -122,6 +125,15 @@ async function queueBatch(
   })
 }
 
+/** Consecutive runs of at most `limits.setAsideBatchMax` items. */
+function chunks<T>(items: ReadonlyArray<T>): T[][] {
+  const size = Math.max(1, configLimits().setAsideBatchMax)
+  const out: T[][] = []
+  for (let i = 0; i < items.length; i += size)
+    out.push(items.slice(i, i + size))
+  return out
+}
+
 /**
  * Release set-asides — wholly, or in part. `releasedById` names the payment that released
  * them (it must be one of the user's transactions). Throws `SetAsideBatchError` for a row that
@@ -145,17 +157,19 @@ export async function releaseSetAsides(
         ts,
       ),
     )
-    await queueBatch(
-      'release',
-      splits.flatMap((s) =>
-        s.remainder ? [s.released, s.remainder] : [s.released],
-      ),
-      {
-        released_at: releasedAt,
-        ...(releasedById ? { released_by_id: releasedById } : {}),
-        items: splits.map((s) => s.item),
-      },
-    )
+    for (const chunk of chunks(splits)) {
+      await queueBatch(
+        'release',
+        chunk.flatMap((s) =>
+          s.remainder ? [s.released, s.remainder] : [s.released],
+        ),
+        {
+          released_at: releasedAt,
+          ...(releasedById ? { released_by_id: releasedById } : {}),
+          items: chunk.map((s) => s.item),
+        },
+      )
+    }
   })
   schedulePush()
 }
@@ -235,8 +249,7 @@ export async function moveSetAsides(
   const transferId = options.transferId ?? null
   await db.transaction('rw', db.setAsides, db.bills, db.outbox, async () => {
     const ts = now()
-    const rows: LocalSetAside[] = []
-    const items: MoveItemWire[] = []
+    const moves: { rows: LocalSetAside[]; item: MoveItemWire }[] = []
     const sources = await liveRows(parts)
     for (const [i, source] of sources.entries()) {
       const part = parts[i]
@@ -255,14 +268,22 @@ export async function moveSetAsides(
         transferId,
         ts,
       )
-      rows.push(s.released, ...(s.remainder ? [s.remainder] : []), copy.row)
-      items.push({ ...s.item, new_id: copy.row.id, to: copy.to })
+      moves.push({
+        rows: [s.released, ...(s.remainder ? [s.remainder] : []), copy.row],
+        item: { ...s.item, new_id: copy.row.id, to: copy.to },
+      })
     }
-    await queueBatch('move', rows, {
-      date,
-      ...(transferId ? { transfer_id: transferId } : {}),
-      items,
-    })
+    for (const chunk of chunks(moves)) {
+      await queueBatch(
+        'move',
+        chunk.flatMap((mv) => mv.rows),
+        {
+          date,
+          ...(transferId ? { transfer_id: transferId } : {}),
+          items: chunk.map((mv) => mv.item),
+        },
+      )
+    }
   })
   schedulePush()
 }

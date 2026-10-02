@@ -9,6 +9,7 @@ import type {
 } from '#/features/setAsides/api/types'
 import { bill, m, setAside } from '#/features/planned/testing/fixtures'
 import { ApiError } from '#/lib/apiError'
+import { useAppConfigStore } from '#/lib/config/appConfig'
 
 const api = vi.hoisted(() => ({
   list: vi.fn(),
@@ -246,5 +247,28 @@ describe('pushing a batch', () => {
     expect(api.update).toHaveBeenCalled()
     expect(api.release).not.toHaveBeenCalled()
     expect((await queued()).map((e) => e.op)).toEqual(['update', 'release'])
+  })
+})
+
+describe('batch size', () => {
+  it('queues more parts than the server takes as several batches', async () => {
+    const limits = useAppConfigStore.getState().config.limits
+    useAppConfigStore.setState((st) => ({
+      config: { ...st.config, limits: { ...limits, setAsideBatchMax: 1 } },
+    }))
+    try {
+      await releaseSetAsides([{ id: 'a1' }, { id: 'a2' }])
+    } finally {
+      useAppConfigStore.setState((st) => ({ config: { ...st.config, limits } }))
+    }
+
+    const entries = await queued()
+    expect(entries.map((e) => [e.op, e.id])).toEqual([
+      ['release', 'a1'],
+      ['release', 'a2'],
+    ])
+    expect(
+      entries.map((e) => (e.payload as ReleaseWire).items.map((i) => i.id)),
+    ).toEqual([['a1'], ['a2']])
   })
 })

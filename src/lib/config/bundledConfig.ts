@@ -358,6 +358,9 @@ export const BUNDLED_CONFIG: AppConfig = {
     integrationPayloadMaxBytes: 65536,
     plannedBulkMax: 200,
     plannedMax: 5000,
+    setAsideBatchMax: 200,
+    safeHorizonDaysMin: 7,
+    safeHorizonDaysMax: 90,
   },
   integrations: {
     webhookUrl: null,

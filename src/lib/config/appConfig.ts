@@ -50,6 +50,11 @@ export type ConfigLimits = {
   plannedBulkMax: number
   /** How many planned rows one user may hold. */
   plannedMax: number
+  /** How many set-asides one release, move or close may rewrite. */
+  setAsideBatchMax: number
+  /** The bounds of a "Next N days" Safe-to-spend window. */
+  safeHorizonDaysMin: number
+  safeHorizonDaysMax: number
 }
 
 /** Where integrations post. `webhookUrl` is set only when the deployment names its public origin. */

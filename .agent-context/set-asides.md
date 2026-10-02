@@ -72,8 +72,9 @@ applies all-or-nothing (`POST /set-asides/release`, `/move`).
   not_found` and `409 id_taken` mean the batch no longer applies as written (applied before,
   or overtaken elsewhere): the entry settles and the touched rows are cleaned and re-pulled
   (`resyncSetAsides`). Anything else is flagged.
-- The server caps a batch at `limits.set_aside_batch_max` (200). The client does not read that
-  limit yet; a caller sending more must split.
+- **Batch size.** The server caps a batch at `limits.set_aside_batch_max` (200,
+  `configLimits().setAsideBatchMax`, bundled fallback). `releaseSetAsides` / `moveSetAsides`
+  queue longer lists as several entries of at most that many items, each all-or-nothing.
 
 ## Payments release them — `data/payment.ts`
 

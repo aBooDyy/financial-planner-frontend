@@ -65,13 +65,15 @@ pnpm generate-config -- --backend <path>
 ```
 
 `scripts/generate-bundled-config.mjs` parses the backend's `app/config/currencies.py`
-(`CONFIG_VERSION`, `DEFAULT_BASE_CURRENCY`, `_TABLE`) and the limit defaults in
-`app/config/settings.py`, then writes and prettier-formats `bundledConfig.ts`. It is
+(`CONFIG_VERSION`, `DEFAULT_BASE_CURRENCY`, `_TABLE`), the limit defaults in
+`app/config/settings.py` and the published constants in `app/config/limits.py`
+(`SET_ASIDE_BATCH_MAX`, `SAFE_HORIZON_DAYS_MIN` / `_MAX`), then writes and prettier-formats `bundledConfig.ts`. It is
 idempotent and fails loudly (non-zero exit, nothing written) rather than emitting a partial
 table. **Re-run it in the same commit as any backend seed change.**
 
 A limit the script's `LIMIT_KEYS` doesn't list is silently missing from the snapshot and only
-surfaces as a type error — add the pair there when `settings.py` grows a published cap.
+surfaces as a type error — add the pair there when `settings.py` grows a published cap
+(`CONSTANT_LIMIT_KEYS` for a module constant in `limits.py`).
 
 The script also writes `integrations: { webhookUrl: null, webhookPath }`, the path being
 `api_prefix` from `settings.py` joined to `WEBHOOK_ROUTE` from
@@ -192,6 +194,11 @@ guarantees a value — which is what lets non-React code read it. Two consumers 
   `plannedBulkMax` ([planned.md](planned.md)). `plannedMax` (rows one user may hold) is
   published for completeness; nothing enforces it client-side yet. Both are optional on the
   wire, so an older server falls back to the bundled floor.
+- **Set-aside batches** are cut into runs of `setAsideBatchMax` (one outbox entry each,
+  [set-asides.md](set-asides.md)), and Settings' "Next N days" Safe-to-spend window is
+  bounded by `safeHorizonDaysMin` / `safeHorizonDaysMax`. All three are optional on the wire
+  and fall back to the bundled values (`configApi.test.ts` pins them to the backend's
+  200 / 7 / 90).
 
 The one cap that is **not** published is the import template's 64 KiB `config` limit: it is
 hard-coded on both sides (`MAX_CONFIG_BYTES` here, `import_template_rules.py` there) and the
