@@ -333,6 +333,24 @@ Nice to have for bills, **Must have** / Nice to have for goals, "Left for spendi
 - Empty states are dashed cards (`EmptyPlanCard`) with the docs' copy; Goals adds the
   **Emergency fund** pill.
 
+### Detail panels — `components/detail/`
+
+`DetailHost` renders the open `PlanOwner` (a row's click) in `DetailFrame`: a 400px panel
+floating over the page's end edge on desktop (no reflow, Esc closes, the design's width rather
+than the kit's 330), a bottom sheet on mobile. Changing section closes it. Header: colour dot,
+name, "Semi-annual · Insurance · Must pay" / "Must have goal · by Jun 2027", the ⋯ menu.
+
+- `DetailHero`: *Set aside so far* (a bill saved up for, blue bar) / *Next payment* (covered
+  each paycheck) / *Saved so far* (goal, its own colour), a note and the chip.
+- `DetailActions`: bill **Pay now** · Add money · Edit; goal **Add money** · Use it · Edit;
+  closed **Reopen** · Edit (Mark as done / End this bill / Pause live in the ⋯ menu).
+- `HeldIn` (`BillStatus.heldIn` / `GoalStatus.heldIn`), `PlanBox` (`view/planText.ts`: one
+  sentence per shape, *SR X behind / ahead of plan*, and — when `useBillPlan` / `useGoalPlan`
+  says the stored plan is off — *"Your plan says SR 500 a paycheck; today it works out to SR
+  1,000."* + **Recalculate**, then *Plan updated · Undo* from the recalc-undo store),
+  `NextOccurrences` (repeating bills), `HistoryList` (`view/history.ts`: Set aside / Moved in /
+  Freed / Paid / Used / Skipped, latest first, 15 shown).
+
 ### Anytime-action sheets — `components/sheets/`
 
 Every action is on each row's ⋯ menu and in the detail panel (`hooks/useItemActions`: bill

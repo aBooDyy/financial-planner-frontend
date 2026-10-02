@@ -8,6 +8,7 @@ import { isPlanningSection } from '#/features/planning/sections'
 import type { PlanningSection } from '#/features/planning/sections'
 import { usePlanningUi } from '#/features/planning/stores/planningUi'
 import { useSessionStore } from '#/stores/session'
+import { DetailHost } from './detail/DetailHost'
 import { PlanningSheets } from './PlanningSheets'
 import { SectionView } from './SectionView'
 import { PlanningHeader } from './shell/PlanningHeader'
@@ -26,8 +27,8 @@ export function PlanningPage() {
   const openSheet = usePlanningUi((s) => s.openSheet)
   const reset = usePlanningUi((s) => s.closeDetail)
 
-  // The page's panels belong to this visit; leaving Planning closes them.
-  useEffect(() => reset, [reset])
+  // A panel belongs to the section it was opened from; leaving it (or Planning) closes it.
+  useEffect(() => reset, [reset, section])
 
   if (!user) return null
 
@@ -48,6 +49,7 @@ export function PlanningPage() {
             <SectionView section={section} />
           </div>
         </main>
+        <DetailHost />
       </div>
       <MobileTabBar active="planning" />
       <PlanningSheets />
