@@ -105,7 +105,7 @@ describe('WalletRow', () => {
     renderRow(holding())
     expect(screen.getByText('SR 10,000.00')).toBeDefined()
     expect(screen.getByText('Set aside SR 5,067.00')).toBeDefined()
-    expect(screen.getByText('Free to spend SR 4,933.00')).toBeDefined()
+    expect(screen.getByText(/Free to spend SR 4,933.00/)).toBeDefined()
     expect(screen.queryByText(/available|reserved/i)).toBeNull()
   })
 
@@ -139,7 +139,7 @@ describe('WalletRow', () => {
         overStr: 'SR 500.00 over',
       }),
     )
-    const over = screen.getByText('SR 500.00 over')
+    const over = screen.getByText(/SR 500.00 over/)
     expect(over.parentElement?.className).toContain('text-fp-danger')
     expect(screen.queryByText(/Free to spend/)).toBeNull()
   })

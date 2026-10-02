@@ -14,8 +14,9 @@ export function WalletSetAsideLine({ row }: { row: BalanceRow }) {
       )}
     >
       <span className="whitespace-nowrap">Set aside {row.setAsideStr}</span>
-      <span aria-hidden>·</span>
+      {/* The dot travels with the second half, so a wrapped line never ends on it. */}
       <span className="whitespace-nowrap">
+        <span aria-hidden>· </span>
         {row.overCommitted ? row.overStr : `Free to spend ${row.freeStr}`}
       </span>
     </div>
