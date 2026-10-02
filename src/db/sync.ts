@@ -158,6 +158,20 @@ let stopRunningSync: (() => void) | null = null
 
 const statusOf = (e: unknown): number => (e instanceof ApiError ? e.status : -1)
 
+let syncTail: Promise<unknown> = Promise.resolve()
+
+/**
+ * Run a push or a pull once the other has finished. Overlapping, a pull fetched before a push
+ * lands and applied after it puts the server's older state back over the rows the push just
+ * settled clean — a released set-aside live again, a remainder or a moved copy deleted, a bill
+ * just created gone.
+ */
+function exclusive<T>(run: () => Promise<T>): Promise<T> {
+  const turn = syncTail.then(run, run)
+  syncTail = turn.catch(() => undefined)
+  return turn
+}
+
 // --- Push ----------------------------------------------------------------------------
 
 /** Queue a debounced outbox flush after a local write. */
@@ -185,11 +199,13 @@ export async function flushOutbox(): Promise<void> {
   }
   pushing = true
   try {
-    await trackSync(async () => {
-      while ((await drainPass()) === 'released') {
-        // The released entries are retried by the next pass.
-      }
-    })
+    await exclusive(() =>
+      trackSync(async () => {
+        while ((await drainPass()) === 'released') {
+          // The released entries are retried by the next pass.
+        }
+      }),
+    )
   } finally {
     pushing = false
     if (pushQueued) {
@@ -530,25 +546,27 @@ export async function pullAll(): Promise<void> {
   if (pulling) return
   pulling = true
   try {
-    await trackSync(() =>
-      Promise.all([
-        pullNodes(),
-        pullSettings(),
-        pullRates(),
-        pullCategories(),
-        pullCustomCurrencies(),
-        pullMerchantsAll(),
-        pullImportTemplates(),
-        // Everything the planner generates from, so it only ever runs over the server's rows.
+    await exclusive(() =>
+      trackSync(() =>
         Promise.all([
-          pullGoalsAll(),
-          pullBills(),
-          pullSetAsides(),
-          pullSpendingAll(),
-          pullPlannedDelta(),
-        ]).then(recordPlannerInputsPulled),
-        pullInboundImportsDelta(),
-      ]),
+          pullNodes(),
+          pullSettings(),
+          pullRates(),
+          pullCategories(),
+          pullCustomCurrencies(),
+          pullMerchantsAll(),
+          pullImportTemplates(),
+          // Everything the planner generates from, so it only ever runs over the server's rows.
+          Promise.all([
+            pullGoalsAll(),
+            pullBills(),
+            pullSetAsides(),
+            pullSpendingAll(),
+            pullPlannedDelta(),
+          ]).then(recordPlannerInputsPulled),
+          pullInboundImportsDelta(),
+        ]),
+      ),
     )
   } catch {
     // Pull is best-effort; a failed pull just retries on the next trigger.

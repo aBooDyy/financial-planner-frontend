@@ -264,6 +264,12 @@ backing-off write of any of its rows, and any later write of them waits behind t
     collection each time it happens.
   - Push and pull are independent loops; a local write triggers a push, not a pull.
 - Coalesce/debounce; never run overlapping syncs; single-flight each loop.
+- **A push and a pull never overlap** (`exclusive` in `db/sync.ts`, one promise chain both
+  `flushOutbox` and `pullAll` run on). A full pull fetched before a push landed and applied
+  after it put the server's older state back over rows the push had just settled clean — a
+  released set-aside live again, a batch's remainder or moved copy deleted, a just-created bill
+  gone — because by then those rows were no longer dirty. Pulls a push runs itself (a resync,
+  a taken id) are plain calls inside its turn. Pinned by `db/syncLock.test.ts`.
 
 ### The planner's gate (`db/pullState.ts`)
 
