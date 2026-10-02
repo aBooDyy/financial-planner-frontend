@@ -46,7 +46,9 @@ Notifications, Archived, Data & privacy. Each pane is its own route — see
   **two-level** category tree — the entity, the resolver and the list/editor components all
   belong to `features/categories/`, and this section only composes them, the same way
   `MerchantRow` composes `features/merchants/`. A type `Segmented` filters the list;
-  `useCategoryTree` supplies a live per-row transaction count. Everything about the model,
+  `useCategoryTree` supplies a live per-row transaction count. On the Spending list every row
+  carries a **Needs · Wants · Savings** chip (`SpendClassChip`, wired through `onSpendClass`);
+  the Income list has none. Everything about the model,
   the resolved catalog and the subtree delete is in [categories.md](categories.md).
 - **Merchants** (`MerchantsSection` → `MerchantRow`): each row's "File as … automatically"
   switch shows the merchant's `learnedCategoryId` by `catalog.labelOf` ("Dining · Cafés") with

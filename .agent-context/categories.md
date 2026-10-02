@@ -343,6 +343,15 @@ Recorded as a sync pattern in
   planned rows are small tables and are tallied directly. A **parent's counts roll up its children's** — its delete takes them along, so
   that is the number a user deleting it needs to see; a child counts only rows filed under its
   own id.
+- **The Needs · Wants · Savings chip** (`components/SpendClassChip`, spending list only):
+  a pill before the row's actions showing the resolved bucket with its fill dot
+  (`spendClass.ts`: `SPEND_CLASSES`, `SPEND_CLASS_LABEL`, `SPEND_CLASS_FILL` — a validated
+  categorical set with its own dark steps — `UNSORTED_*`). It opens a radio menu: Needs, Wants,
+  Savings, then **"Not sorted"** on a root or **"Same as Transport · Needs"** on a subcategory
+  (both store `null`). An inherited or unsorted value draws dashed and muted. A pick calls
+  `setCategorySpendClass`, whose PATCH always carries `spend_class` (the mapper builds it from
+  the whole row). `CategoryTree` takes `onSpendClass`; `CategoryTreeRow` renders it in its
+  `tag` slot.
 - **`CategoryTree` / `CategoryTreeRow`** render the two levels with one row anatomy.
   Expansion is **component state, not synced** — a settings list is not a page (unlike a
   balance node's `collapsed`). Children indent with `marginInlineStart`. A collapsed parent

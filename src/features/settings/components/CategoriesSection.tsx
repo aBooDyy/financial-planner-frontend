@@ -5,7 +5,10 @@ import { Button } from '#/components/ui/button'
 import { CategoryEditor } from '#/features/categories/components/CategoryEditor'
 import { CategoryTree } from '#/features/categories/components/CategoryTree'
 import { DeleteCategoryDialog } from '#/features/categories/components/DeleteCategoryDialog'
-import { deleteCategory } from '#/features/categories/data/mutations'
+import {
+  deleteCategory,
+  setCategorySpendClass,
+} from '#/features/categories/data/mutations'
 import { useCategoryCatalog } from '#/features/categories/hooks/useCategoryCatalog'
 import { useCategoryEditor } from '#/features/categories/hooks/useCategoryEditor'
 import { useCategoryTree } from '#/features/categories/hooks/useCategoryTree'
@@ -114,6 +117,11 @@ export function CategoriesSection() {
             onEdit={editor.openEdit}
             onDelete={askDelete}
             onAddSub={(parentId) => editor.openCreate(parentId)}
+            onSpendClass={
+              type === 'spend'
+                ? (id, value) => void setCategorySpendClass(id, value)
+                : undefined
+            }
           />
         )}
       </div>

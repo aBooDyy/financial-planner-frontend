@@ -18,6 +18,8 @@ type Props = {
   indent?: number
   /** The disclosure control, rendered before the chip on a parent row. */
   disclosure?: ReactNode
+  /** Sits before the row's actions — a spending category's Needs / Wants / Savings chip. */
+  tag?: ReactNode
   onEdit: () => void
   /** Absent for a category that can't be deleted. */
   onDelete?: () => void
@@ -32,6 +34,7 @@ export function CategoryTreeRow({
   meta,
   indent = 0,
   disclosure,
+  tag,
   onEdit,
   onDelete,
 }: Props) {
@@ -55,6 +58,7 @@ export function CategoryTreeRow({
           </span>
         ) : null}
       </button>
+      {tag}
       <Button
         type="button"
         variant="ghost"

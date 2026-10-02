@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { ChevronRight, Plus } from 'lucide-react'
+import type { SpendClass } from '#/features/categories/api/types'
 import { isRequiredCategory } from '#/features/categories/data/required'
+import { SpendClassChip } from './SpendClassChip'
 import { CategoryTreeRow } from './CategoryTreeRow'
 import type {
   CategoryTreeNode,
@@ -14,6 +16,8 @@ type Props = {
   onEdit: (id: string) => void
   onDelete: (id: string) => void
   onAddSub: (parentId: string) => void
+  /** Set for spending categories: tags one as needs, wants or savings. */
+  onSpendClass?: (id: string, value: SpendClass | null) => void
 }
 
 const subsLabel = (n: number) =>
@@ -25,6 +29,7 @@ export function CategoryTree({
   onEdit,
   onDelete,
   onAddSub,
+  onSpendClass,
 }: Props) {
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
 
@@ -66,6 +71,15 @@ export function CategoryTree({
                   />
                 </button>
               }
+              tag={
+                onSpendClass ? (
+                  <SpendClassChip
+                    categoryName={c.name}
+                    value={c.spendClass}
+                    onChange={(v) => onSpendClass(c.id, v)}
+                  />
+                ) : undefined
+              }
               onEdit={() => onEdit(c.id)}
               onDelete={
                 isRequiredCategory(c) ? undefined : () => onDelete(c.id)
@@ -81,6 +95,16 @@ export function CategoryTree({
                     icon={s.icon}
                     txCount={s.txCount}
                     indent={CHILD_INDENT}
+                    tag={
+                      onSpendClass ? (
+                        <SpendClassChip
+                          categoryName={s.name}
+                          value={s.spendClass}
+                          inherits={{ name: c.name, value: c.spendClass }}
+                          onChange={(v) => onSpendClass(s.id, v)}
+                        />
+                      ) : undefined
+                    }
                     onEdit={() => onEdit(s.id)}
                     onDelete={() => onDelete(s.id)}
                   />
