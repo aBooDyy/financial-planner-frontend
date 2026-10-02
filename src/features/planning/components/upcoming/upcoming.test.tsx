@@ -138,4 +138,19 @@ describe('Upcoming by paycheck', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Review/ }))
     expect(usePlanningUi.getState().sheet).toMatchObject({ kind: 'review' })
   })
+
+  it('switches to the year ahead lanes', async () => {
+    render(<UpcomingSection />)
+    fireEvent.click(await screen.findByRole('radio', { name: 'Year ahead' }))
+    expect(await screen.findByText('Total set aside')).toBeTruthy()
+    expect(screen.getByText(/^Oct 2026 – /)).toBeTruthy()
+    expect(screen.getByText('Monthly bills')).toBeTruthy()
+    const goalBar = screen.getByText('SR 1,000 a paycheck')
+    expect(goalBar).toBeTruthy()
+    fireEvent.click(goalBar)
+    expect(usePlanningUi.getState().detail).toEqual({
+      kind: 'goal',
+      id: 'umrah',
+    })
+  })
 })

@@ -354,6 +354,17 @@ review for the oldest waiting payday, else the next one), then the view.
   *Overdue*, *Due in N days* (≤ 10), else the date. A row opens its bill's or goal's detail
   (income: the confirm dialog).
 
+- **Year ahead** (the header's *By paycheck · Year ahead* switch; `YearAheadView` over
+  `useYearAhead`, placement in `view/yearView.ts`): desktop **lanes** (`YearLanes`, design default)
+  — a horizontally scrolling grid, a sticky label column, month heads that open a popover of
+  everything in the month (`monthLines`); lanes Income (the brief's lane the mock lacked) ·
+  Monthly bills (a total per month) · one lane per bill saved up for (a blue ramp from its first
+  payday to the month before it is due, filled by what is set aside; a gem marker on the due
+  month) · one bar per goal to its finish (its colour at 15 %, *"SR 940 a paycheck"*, *"… ·
+  ongoing"*, *"… · done Dec 2028"*, amber *"… · slips to Aug 2027"*, dimmed *Paused*) with an
+  outlined target cell · *Total set aside* per month with a stacked bar (its label opens the
+  review). Rows are placed on explicit grid rows so a target cell can sit over its bar; columns
+  follow the document direction. Mobile: **month cards** (`YearMonthCards`, D22).
 - **Rail** (`UpcomingRail`, stacked below on mobile): **Balance ahead** (`view/ahead.ts#balanceAhead`,
   `BalanceAheadCard`) — active wallets' Balance and Free to spend for 30 days from
   `useMoneyFigures().figures.header`: income adds, payments subtract and **release their own
