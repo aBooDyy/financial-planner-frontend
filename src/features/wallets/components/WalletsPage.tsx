@@ -48,6 +48,7 @@ export function WalletsPage() {
     nodes,
     deltas,
     setAsideLines,
+    setAsideRows,
     rates,
     view,
     archivedCount,
@@ -55,7 +56,14 @@ export function WalletsPage() {
   } = useWallets()
   const editor = useNodeEditor(base)
   const wallets = transferWallets(nodes, deltas, base)
-  const transfer = useTransferDialog(wallets, rates)
+  const holdings = { lines: setAsideLines, rows: setAsideRows }
+  const setAsideIn = Object.fromEntries(
+    Object.entries(setAsideLines).map(([id, lines]) => [
+      id,
+      lines.reduce((sum, l) => sum + l.amount, 0),
+    ]),
+  )
+  const transfer = useTransferDialog(wallets, rates, holdings)
   const onTransfer = wallets.length >= 2 ? transfer.openDialog : undefined
   const adjust = useAdjustBalance(wallets)
   const comingUp = useComingUp({
@@ -139,7 +147,11 @@ export function WalletsPage() {
 
   const nestedDialogs = (
     <>
-      <AdjustBalanceDialog a={adjust} dateFormat={dateFormat} />
+      <AdjustBalanceDialog
+        a={adjust}
+        dateFormat={dateFormat}
+        setAsideIn={setAsideIn}
+      />
       <ArchiveNodeDialog
         target={archiving}
         onClose={() => setArchivingId(null)}

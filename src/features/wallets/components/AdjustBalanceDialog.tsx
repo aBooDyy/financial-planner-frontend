@@ -7,10 +7,12 @@ import { DoneState } from '#/components/dialog/DoneState'
 type Props = {
   a: AdjustBalanceState
   dateFormat: DateFormat
+  /** What each wallet holds set aside, in its own currency. */
+  setAsideIn?: Readonly<Record<string, number>>
 }
 
 /** Wallets' "Adjust balance": set a wallet to what it really holds, recording the gap. */
-export function AdjustBalanceDialog({ a, dateFormat }: Props) {
+export function AdjustBalanceDialog({ a, dateFormat, setAsideIn }: Props) {
   const { wallet, preview, done } = a
   if (!wallet || !preview) return null
 
@@ -37,6 +39,7 @@ export function AdjustBalanceDialog({ a, dateFormat }: Props) {
           wallet={wallet}
           preview={preview}
           dateFormat={dateFormat}
+          setAside={setAsideIn?.[wallet.id] ?? 0}
         />
       )}
     </ResponsiveDialog>

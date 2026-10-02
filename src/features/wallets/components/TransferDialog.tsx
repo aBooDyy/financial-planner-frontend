@@ -4,6 +4,7 @@ import type { RatesMap } from '#/lib/config/rates'
 import type { DateFormat } from '#/lib/date'
 import { DoneState } from '#/components/dialog/DoneState'
 import { TransferForm } from './TransferForm'
+import { TransferSetAsidePrompt } from './TransferSetAsidePrompt'
 
 type Props = {
   t: TransferDialogState
@@ -32,6 +33,16 @@ export function TransferDialog({ t, rates, dateFormat }: Props) {
           sub={done.sub}
           onUndo={() => void t.undo()}
           onDone={t.close}
+        />
+      ) : t.prompt ? (
+        <TransferSetAsidePrompt
+          text={t.prompt}
+          fromName={from.name}
+          toName={to.name}
+          busy={t.busy}
+          onMove={t.moveThem}
+          onLeave={t.leaveThem}
+          onBack={t.backToForm}
         />
       ) : (
         <TransferForm

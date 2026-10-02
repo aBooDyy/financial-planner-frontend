@@ -1,7 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '#/db/db'
 import { SETTINGS_KEY } from '#/db/types'
-import type { LocalBalanceNode } from '#/db/types'
+import type { LocalBalanceNode, LocalSetAside } from '#/db/types'
 import { DEFAULT_BASE_CURRENCY } from '#/features/wallets/constants'
 import { activeNodes, isArchived } from '#/features/wallets/data/archive'
 import {
@@ -14,6 +14,7 @@ import { useStableRates } from '#/hooks/useStableRates'
 import type { CurrencyCode } from '#/lib/currency'
 
 const NONE: Record<string, never> = {}
+const NO_SET_ASIDES: LocalSetAside[] = []
 
 /**
  * Reactive read of the whole Wallets view from the local DB. Re-renders instantly on local
@@ -86,6 +87,8 @@ export function useWallets() {
     archivedCount: liveNodes.filter(isArchived).length,
     deltas,
     setAsideLines,
+    /** Every set-aside row, live and released. */
+    setAsideRows: setAsideRows ?? NO_SET_ASIDES,
     view,
   }
 }

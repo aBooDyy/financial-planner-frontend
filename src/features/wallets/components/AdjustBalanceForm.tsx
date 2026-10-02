@@ -1,8 +1,11 @@
+import { TriangleAlert } from 'lucide-react'
 import { DateField } from '#/components/DateField'
+import { NoteBox } from '#/components/dialog/NoteBox'
 import { FormRow } from '#/components/FormRow'
 import { Input } from '#/components/ui/input'
 import { adjustSubmitLabel } from '#/features/wallets/data/adjustBalance'
 import type { AdjustPreview } from '#/features/wallets/data/adjustBalance'
+import { adjustWarning } from '#/features/wallets/data/setAsideMoves'
 import type { TransferWallet } from '#/features/wallets/data/transferDialog'
 import type { AdjustBalanceState } from '#/features/wallets/hooks/useAdjustBalance'
 import type { DateFormat } from '#/lib/date'
@@ -16,10 +19,21 @@ type Props = {
   wallet: TransferWallet
   preview: AdjustPreview
   dateFormat: DateFormat
+  /** What the wallet holds set aside, in its currency. */
+  setAside: number
 }
 
 /** The "Adjust balance" form: the wallet, its real balance, date + difference, note, submit. */
-export function AdjustBalanceForm({ a, wallet, preview, dateFormat }: Props) {
+export function AdjustBalanceForm({
+  a,
+  wallet,
+  preview,
+  dateFormat,
+  setAside,
+}: Props) {
+  const warning = preview.hasTarget
+    ? adjustWarning(wallet.name, preview.next, setAside, wallet.currency)
+    : null
   return (
     <form
       className="flex flex-col gap-[14px]"
@@ -38,6 +52,12 @@ export function AdjustBalanceForm({ a, wallet, preview, dateFormat }: Props) {
         amount={a.actual}
         onAmount={a.setActual}
       />
+
+      {warning ? (
+        <NoteBox tone="danger" icon={<TriangleAlert />}>
+          {warning}
+        </NoteBox>
+      ) : null}
 
       <div className="grid grid-cols-2 items-start gap-3">
         <FormRow id="adjust-date" label="Date">

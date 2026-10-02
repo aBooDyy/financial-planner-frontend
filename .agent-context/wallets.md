@@ -287,6 +287,17 @@ The main place to move money between wallets (Spending records it; see
   Once written it shows the shared `DoneState` with the header hidden.
 - The wallet card leads with the wallet's `IconChip` (34px) rather than the design's bare
   colour dot, matching the wallet rows.
+- **Set-aside money moving with it (03 §6).** `useTransferDialog(wallets, rates, holdings)`
+  takes every wallet's set-aside lines and rows (`useWallets().setAsideLines` / `setAsideRows`).
+  When the amount goes beyond FROM's Free to spend, submit first swaps the form for
+  `TransferSetAsidePrompt`: *"SR 400.00 of this is set aside (Car insurance SR 300.00, Umrah
+  SR 100.00). Move those set-asides with it?"* — **Move them** (the transfer is written, then
+  `moveSetAsides` moves those rows to TO, stamped with the transfer id — one batch) / **Leave
+  them** (FROM is left over-committed, red on its row) / *Change the amount*. Which ones: the
+  share beyond Free comes out of FROM's lines largest first (`pickHeld`), each owner's live rows
+  oldest first with the last one split (`partsForPicks`) — pure in `data/setAsideMoves.ts`.
+  The done line adds "· SR 400.00 set aside moved with it"; **Undo** deletes the transfer and
+  moves those set-asides (live rows in TO carrying the transfer id) back to FROM.
 
 ## Adjust balance dialog
 
@@ -313,6 +324,10 @@ rewritten to fake it.
 - **State** in `hooks/useAdjustBalance.ts`: `openFor(walletId)`, the "Actual balance" string
   (parsed in the wallet's currency; negative allowed), date (default today), note. Submit calls
   `createAdjustment`; the done state keeps the row id so **Undo** deletes it.
+- **Below its set-asides.** `AdjustBalanceDialog` takes `setAsideIn` (what each wallet holds
+  set aside); when the typed balance is below it the form warns, never blocks (03 §6,
+  `adjustWarning`): *"Main bank holds SR 1,900.00 set aside. At SR 1,500.00 it would be SR
+  400.00 over-committed."*
 - **Components**: `AdjustBalanceDialog` → `AdjustBalanceForm` (`AdjustWalletCard` — current
   struck through → new; `ActualBalanceWell`, the big neutral "What does it really hold?" figure
   — its own component because it takes a sign, which the shared `AmountWell` doesn't; Date

@@ -41,20 +41,24 @@ const MAIN: TransferWallet = {
   balance: 100_000,
 }
 
-function Harness() {
+function Harness({ setAside = 0 }: { setAside?: number }) {
   const a = useAdjustBalance([MAIN])
   return (
     <>
       <button type="button" onClick={() => a.openFor(MAIN.id)}>
         open
       </button>
-      <AdjustBalanceDialog a={a} dateFormat="ymd" />
+      <AdjustBalanceDialog
+        a={a}
+        dateFormat="ymd"
+        setAsideIn={{ [MAIN.id]: setAside }}
+      />
     </>
   )
 }
 
-const openDialog = () => {
-  render(<Harness />)
+const openDialog = (setAside = 0) => {
+  render(<Harness setAside={setAside} />)
   fireEvent.click(screen.getByText('open'))
 }
 
@@ -103,5 +107,18 @@ describe('AdjustBalanceDialog', () => {
     })
     const submit = screen.getByRole('button', { name: 'Already matches' })
     expect((submit as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('warns when the new balance falls below what the wallet holds set aside', () => {
+    openDialog(80_000)
+    const actual = screen.getByLabelText('What does it really hold?')
+    fireEvent.change(actual, { target: { value: '900' } })
+    expect(screen.queryByText(/over-committed/)).toBeNull()
+    fireEvent.change(actual, { target: { value: '500' } })
+    expect(
+      screen.getByText(
+        'Main Checking holds SR 800.00 set aside. At SR 500.00 it would be SR 300.00 over-committed.',
+      ),
+    ).toBeTruthy()
   })
 })
