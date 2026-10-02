@@ -45,8 +45,8 @@ Local row + outbox entry in one Dexie transaction (`db/enqueue.ts`), then `sched
   (`unlinkLedgerFrom`, which also rewrites queued payloads). Its planned rows are left to the
   planner's orphan pass, as before.
 - **Actions (`data/actions.ts`)** — the bills' pattern ([bills.md](bills.md#actions--dataactionsts)):
-  `closeGoal(id, {closedAt?, leftover?})` (also ends a pause; "I spent it" is a spend with the
-  goal and its `useCategoryId`, then a close with the default free leftover — not atomic, and
+  `closeGoal(id, {closedAt?, leftover?})` (also ends a pause; "I spent it" is one spend per paying
+  wallet with the goal and its `useCategoryId`, then a close with the default free leftover — not atomic, and
   harmless if the close fails; `planning/actions/goalMoney.markGoalSpent` does both),
   `reopenGoal(id)` (clears `closedAt` and `pausedAt`), `pauseGoal(id, pausedAt?)` (no-op on a
   closed or paused goal) and `resumeGoal(id)`. Reopen and resume file a quiet plan rewrite.
