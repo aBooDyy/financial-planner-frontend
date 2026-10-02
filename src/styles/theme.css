@@ -36,6 +36,8 @@
   --color-fp-chart-in: var(--fp-chart-in);
   --color-fp-chart-out: var(--fp-chart-out);
   --color-fp-chart-set-aside: var(--fp-chart-set-aside);
+  --color-fp-goal: var(--fp-goal);
+  --color-fp-goal-soft: var(--fp-goal-soft);
 
   --shadow-fp: var(--fp-shadow);
   --font-sans: 'Hanken Grotesk Variable', system-ui, sans-serif;
@@ -91,6 +93,9 @@
   --fp-chart-out: #e25c4f;
   /* Money earmarked for goals, beside the in/out pair; checked against both. */
   --fp-chart-set-aside: #2457b8;
+  /* Goals in Planning: their own hue, so orange keeps meaning spending and blue set-aside money. */
+  --fp-goal: #d63384;
+  --fp-goal-soft: rgba(236, 72, 153, 0.12);
   --fp-shadow:
     0 1px 2px rgba(20, 18, 12, 0.05), 0 12px 30px -18px rgba(20, 18, 12, 0.22);
 
@@ -139,6 +144,8 @@
   --fp-chart-in: #27a878;
   --fp-chart-out: #e8625a;
   --fp-chart-set-aside: #5b8def;
+  --fp-goal: #f472b6;
+  --fp-goal-soft: rgba(244, 114, 182, 0.15);
   --fp-shadow:
     0 1px 2px rgba(0, 0, 0, 0.4), 0 18px 40px -22px rgba(0, 0, 0, 0.7);
 }

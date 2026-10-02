@@ -155,6 +155,12 @@ not planned yet = `fp-chart-in`, in that order). The dark step is darker than `f
 `#8DB4F8`, which fails the validator's lightness band on the dark surface. The three pass together
 in both modes; out ↔ in are never adjacent in that bar.
 
+`fp-goal` / `fp-goal-soft` (light `#D63384` on `rgba(236,72,153,.12)`, dark `#F472B6` on
+`rgba(244,114,182,.15)`) is **goals** in Planning (D28): the Goals segment of the Each paycheck
+bar, the goal chooser tile, goal chips. Orange keeps meaning spending (`fp-spend`) and blue keeps
+meaning set-aside money (`fp-transfer` / `fp-chart-set-aside`). A goal's own colour still marks
+its row and bar; the token is for "goals" as a kind.
+
 `ResponsiveDialog` also takes `onBack`: a back button replaces the close button before the title,
 for a sub-view of the dialog (the transaction dialog's in-place pickers).
 
