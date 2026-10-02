@@ -459,6 +459,21 @@ export async function reopenPlanned(id: string): Promise<void> {
   schedulePush()
 }
 
+/**
+ * "Not now" in the payday review: the set-asides leave the review and wait in Needs
+ * confirming. Pinned, so the Automatic payday sort never picks them up again.
+ */
+export async function dismissFromReview(
+  ids: ReadonlyArray<string>,
+): Promise<void> {
+  for (const id of ids) {
+    const item = await db.plannedTransactions.get(id)
+    if (!item || item.deleted !== 0 || !item.review) continue
+    await savePlanned({ ...item, review: false, pinned: true })
+  }
+  schedulePush()
+}
+
 /** Due on another day. Pinned, so the generator never moves it back. */
 export async function movePlanned(id: string, date: string): Promise<void> {
   const item = await openItem(id)

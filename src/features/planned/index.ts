@@ -31,6 +31,7 @@ export {
   closeRest,
   confirmPlanned,
   deleteManualPlanned,
+  dismissFromReview,
   editPlannedAmount,
   movePlanned,
   PlannedActionError,
@@ -45,7 +46,11 @@ export type {
   PlannedActionCode,
 } from './data/mutations'
 export { recalcAllPlans, recalcPlan, runPlanner } from './data/runner'
-export type { PlannerRunSummary, RecalcResult } from './data/runner'
+export type {
+  AutoSummary,
+  PlannerRunSummary,
+  RecalcResult,
+} from './data/runner'
 
 // Pure derivations and view models
 export {
@@ -83,3 +88,5 @@ export type { PlanOwner } from './data/owners'
 
 // Stores
 export { useRecalcUndoStore } from './stores/recalcUndo'
+export { usePaydayNoticeStore } from './stores/paydayNotice'
+export type { PaydayNotice } from './stores/paydayNotice'

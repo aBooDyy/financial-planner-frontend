@@ -112,7 +112,8 @@ and income, bills, set-asides, spending and planned all came home: an in-memory 
 `syncState` marker that outlives the tab). A device that pulled them on an earlier launch does
 not wait for this launch's pull, so an app opened offline still generates and auto-posts what
 came due. Then it runs debounced 500 ms on origin changes (a
-stamp of goals / income / bills), each pull, each plan-rewrite request, and day rollover.
+stamp of goals / income / bills and the settings row — payday mode, main paycheck, income
+varies), each pull, each plan-rewrite request, and day rollover.
 `runPlanner` is single-flight through one queue shared with recalc and undo:
 
 1. Goals and bills being planned with no stored plan (`plannedAt === null`, i.e. new) and
@@ -127,6 +128,24 @@ stamp of goals / income / bills), each pull, each plan-rewrite request, and day 
    resolved the same way. MANUAL rows are left alone unless they are set-asides of a deleted
    goal or bill. (Deleting a goal or bill deletes its set-asides locally, as the server does,
    so its past set-aside rows read as unsettled and are skipped.)
+
+4. **The auto pass** (`data/autoConfirm.ts` — pure `autoPlan`, applied by `runAuto`): open,
+   unsettled rows that have come due are confirmed on their own — a bill payment when the bill
+   is on **auto-pay** (from the bill's wallet, dated its due date — so the payment releases its
+   set-asides there and moves `nextDue`), a payday when its stream **logs automatically**
+   (into the stream's wallet). In **Automatic** payday mode (settings `paydayMode`), a due
+   goal/bill set-aside is set aside without a tap when its wallet is the main paycheck's
+   deposit wallet and that wallet's free money (balance from `readLedgerSummary` − its live
+   set-asides) still covers it, lines taken in plan priority; any other line is flagged
+   `review: true` (another wallet, not enough free money, no main paycheck). Auto-confirms
+   write under `autoSettlementId(plannedId)` (UUIDv5), so two devices write one row. A failed
+   confirm is left for the user. The run's `auto` summary counts them, and Automatic mode posts
+   a `PaydayNotice` to `stores/paydayNotice.ts` for the toast.
+   **Review mode** needs no pass: the generator creates payday set-asides `review: true`, and
+   `fill` keeps future ones in line when the mode changes. **"Not now"**
+   (`dismissFromReview(ids)`) clears `review` and pins the rows, so they wait in Needs
+   confirming and no automatic pass picks them up again (pinning a due row changes nothing
+   else — due rows are never rewritten).
 
 **Plan rewrite requests** (`data/recalcRequests.ts`, a leaf module so the goals and bills
 slices never import the planner) are keyed by owner and may be **quiet**.

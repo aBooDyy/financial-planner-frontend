@@ -24,7 +24,8 @@ const stamp = (rows: ReadonlyArray<Stampable>): string =>
  * before the server's rows arrive would only re-create them (harmless with deterministic ids,
  * but noise). A device that pulled them on an earlier launch does not wait for this one's pull,
  * so an app opened offline still plans what came due. After that it runs, debounced, whenever
- * an origin changes, a pull lands, a plan rewrite is requested, or the day turns.
+ * an origin or the planning settings change, a pull lands, a plan rewrite is requested, or the
+ * day turns.
  */
 export function usePlannedRunner(): void {
   const authenticated = useSessionStore((s) => s.status === 'authenticated')
@@ -35,12 +36,15 @@ export function usePlannedRunner(): void {
     [userId],
   )
   const origins = useLiveQuery(async () => {
-    const [goals, income, bills] = await Promise.all([
+    const [goals, income, bills, settings] = await Promise.all([
       db.goals.toArray(),
       db.incomeStreams.toArray(),
       db.bills.toArray(),
+      db.balanceSettings.toArray(),
     ])
-    return [stamp(goals), stamp(income), stamp(bills)].join('#')
+    return [stamp(goals), stamp(income), stamp(bills), stamp(settings)].join(
+      '#',
+    )
   })
   const [day, setDay] = useState(() => isoOf(startOfToday()))
   const [requests, setRequests] = useState(0)
