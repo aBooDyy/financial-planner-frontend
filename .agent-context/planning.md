@@ -324,7 +324,9 @@ Copy and shapes in `view/overview.ts`; the cards only draw them.
   to their section, values inline above 11 %. When the plan outruns pay the bar scales to the
   plan, a danger line marks *Your pay · SR X* (positioned by `inset-inline-end`, so it mirrors)
   and a hatch covers the overflow. Legend rows under it (Left for spending in danger when
-  negative). The "Last month: Needs · Wants · Savings" line is not built yet (wave D).
+  negative). Under the legend, inside the card, `LastMonthLine`: *Last month: Needs 48% ·
+  Wants 31% · Savings 21% ›* from `useLastMonthNeedsWants` (the reports slice; calendar month,
+  all accounts), opening `/reports?range=last_month`; nothing while last month has no split.
 - `Next30Card` (`next30Events`): bill payments and paydays in the next 30 days from Upcoming's
   periods; a warn pill "N to confirm" with the names; desktop a 152px axis (dots in the bill's
   colour, paydays ringed in accent, labels alternating above/below on stems and hidden when

@@ -17,7 +17,8 @@ import {
   vi,
 } from 'vitest'
 import { db } from '#/db/db'
-import { bill, goal, m } from '#/features/planned/testing/fixtures'
+import { catId } from '#/features/categories/__fixtures__/categories'
+import { bill, goal, m, tx } from '#/features/planned/testing/fixtures'
 import { seedPlanningDb, stubBrowser } from '#/features/planning/testing/dom'
 import { usePlanningUi } from '#/features/planning/stores/planningUi'
 import { usePlanningToast } from '#/features/planning/stores/toast'
@@ -87,6 +88,33 @@ describe('Overview', () => {
     expect(navigate).toHaveBeenCalledWith({
       to: '/planning/$section',
       params: { section: 'upcoming' },
+    })
+  })
+
+  it('sums up last month under Each paycheck and opens it in Reports', async () => {
+    await db.bills.put(bill({ id: 'rent', nextDue: '2026-11-01' }))
+    await db.transactions.bulkPut([
+      tx({
+        type: 'income',
+        categoryId: catId('salary'),
+        amount: m(1_000),
+        date: '2026-09-01',
+      }),
+      tx({
+        categoryId: catId('groceries'),
+        amount: m(480),
+        date: '2026-09-05',
+      }),
+      tx({ categoryId: catId('dining'), amount: m(310), date: '2026-09-30' }),
+    ])
+    render(<OverviewSection />)
+    const line = await screen.findByRole('button', {
+      name: /Last month: Needs 48% · Wants 31% · Savings 21%/,
+    })
+    fireEvent.click(line)
+    expect(navigate).toHaveBeenCalledWith({
+      to: '/reports',
+      search: { range: 'last_month' },
     })
   })
 

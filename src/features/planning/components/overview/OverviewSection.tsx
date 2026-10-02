@@ -16,6 +16,7 @@ import {
 } from '#/features/planning/view/overview'
 import type { VerdictAction } from '#/features/planning/view/overview'
 import { DecisionsCard } from './DecisionsCard'
+import { LastMonthLine } from './LastMonthLine'
 import type { DecisionRow } from './DecisionsCard'
 import { Next30Card } from './Next30Card'
 import { PaycheckCard } from './PaycheckCard'
@@ -100,6 +101,7 @@ export function OverviewSection() {
         bar={paycheckBar(planning.paycheck, base, planning.calendar)}
         base={base}
         onSection={show}
+        footer={<LastMonthLine />}
       />
       <Next30Card
         events={next30Events(planning.upcoming, inputs.bills, planning.today)}

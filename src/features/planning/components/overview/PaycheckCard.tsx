@@ -1,4 +1,5 @@
 import { ChevronRight } from 'lucide-react'
+import type { ReactNode } from 'react'
 import type { CurrencyCode } from '#/lib/currency'
 import type { PlanningSection } from '#/features/planning/sections'
 import { money, signedMoney } from '#/features/planning/view/format'
@@ -16,6 +17,8 @@ type Props = {
   bar: PaycheckBar
   base: CurrencyCode
   onSection: (section: PlanningSection) => void
+  /** Drawn under the legend, inside the card. */
+  footer?: ReactNode
 }
 
 /**
@@ -23,7 +26,7 @@ type Props = {
  * and what is left for spending. When the plan outruns the pay, the bar scales to the plan, a
  * line marks where the pay ends and a hatch covers the rest.
  */
-export function PaycheckCard({ bar, base, onSection }: Props) {
+export function PaycheckCard({ bar, base, onSection, footer }: Props) {
   return (
     <PlanCard>
       <CardHeader
@@ -104,6 +107,7 @@ export function PaycheckCard({ bar, base, onSection }: Props) {
           </li>
         ))}
       </ul>
+      {footer}
     </PlanCard>
   )
 }
