@@ -125,6 +125,13 @@ describe('a bill payment saved from the dialog or QuickAdd', () => {
     expect(await nextDue()).toBe('2026-11-05')
   })
 
+  it('asks nothing about other wallets after a part payment', async () => {
+    const prompt = await saveNewTransaction(spend({ amount: m(2500) }))
+    expect(prompt).toBeNull()
+    expect((await db.plannedTransactions.get('rent-oct'))?.status).toBe('open')
+    expect(await liveRent()).toEqual([['savings', 1000]])
+  })
+
   it('asks nothing when the paying wallet held it all', async () => {
     await db.setAsides.clear()
     await db.setAsides.put(heldFor('main', m(3000)))

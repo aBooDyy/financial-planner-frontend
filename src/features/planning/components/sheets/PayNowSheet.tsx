@@ -23,7 +23,7 @@ type Props = {
   billId: string
   occurrence?: string
   onClose: () => void
-  /** Money for this occurrence still set aside in other wallets: the leftover prompt. */
+  /** Money a settled occurrence still holds: the leftover prompt. */
   onLeftover: (report: LeftoverReport, payingWalletId: string) => void
 }
 

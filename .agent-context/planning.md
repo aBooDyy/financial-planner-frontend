@@ -203,7 +203,11 @@ first, each a Dexie write plus outbox entries; errors are `MoneyActionError` wit
   when the occurrence is beyond the planner's horizon — so the payment releases that
   occurrence's set-asides in the paying wallet and `nextDue` moves to the first occurrence
   still open (paying ahead leaves it put). Returns `{transactionId, occurrence, status,
-  leftover}` — `leftover` is `leftoverFor` after the payment.
+  leftover}` — `leftover` is the leftover report after the payment, **only once the payment
+  settles the occurrence** (a part payment returns no lines: the money elsewhere still waits for
+  the rest of the bill). It is `leftoverFor` plus, as one more line, what the **paying wallet**
+  itself still holds for the occurrence (a settled occurrence would otherwise hold it for good
+  when an earlier part came from another wallet).
 - **`billPaymentTarget(billId, plannedId)` + `settleBillPayment(billId, occurrence, payment)`**
   — the same path for a payment written elsewhere (the transaction dialog, QuickAdd —
   `transactions/data/billPayments.ts`): the first picks the open row to settle (the matched one,
@@ -213,7 +217,8 @@ first, each a Dexie write plus outbox entries; errors are `MoneyActionError` wit
   bill's).
 - **`resolveLeftover(report, 'move' | 'free' | 'keep', {payingWalletId, date?})`** — the
   leftover prompt's answers: *move* records a transfer from each holding wallet to the paying
-  wallet and releases those set-asides (outside money stays as it is); *free* releases them;
+  wallet and releases those set-asides (the paying wallet's own line is released without a
+  transfer; outside money stays as it is); *free* releases them;
   *keep* moves them to `report.nextOccurrence` (repeating bills only).
 - **`addMoney(owner, parts, {date?, note?})`** — Add money / Split: `parts` are
   `{walletId, amount}` or `{externalLabel, amount}` in the owner's currency. A goal gets one
@@ -471,8 +476,8 @@ Delete**). Reopen / Pause / Resume act at once with a toast; the rest open a she
   Different amount, Paid from, and the effect line (`view/payNow.ts`): what leaves the wallet and
   how much the occurrence's set-asides **in that wallet** cover. Calls `payBill`; when the
   result's `leftover` has lines it opens the **leftover prompt** in its place, else toasts.
-- **Leftover** (`LeftoverSheet`, 03 §5, D31): money the paid occurrence still holds in other
-  wallets — **Move it to {paying wallet}** (a real transfer; only when some is in another
+- **Leftover** (`LeftoverSheet`, 03 §5, D31): money the occurrence still holds once a payment
+  settles it (never after a part payment) — **Move it to {paying wallet}** (a real transfer; only when some is in another
   wallet), **Free it up**, **Keep it for next time** (repeating bills). `resolveLeftover`.
 - **Mark as done** (`MarkDoneSheet`): goals — progress box, then *What happens to the SR X set
   aside?*: **I spent it** (default, D30: paid-from wallet + category, remembered on the goal →

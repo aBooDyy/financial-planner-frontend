@@ -2,11 +2,11 @@
  * "Pay now" on a bill: pay any open occurrence — the next one, or a later one ahead of time —
  * in full or in part. The payment settles that occurrence's planned row (made on the spot when
  * the occurrence is beyond what the planner has generated), releases what it had set aside in
- * the paying wallet, and moves `nextDue` on once the occurrence is settled. What the
- * occurrence still holds in other wallets comes back as a leftover report for the prompt.
+ * the paying wallet, and moves `nextDue` on once the occurrence is settled. What a settled
+ * occurrence still holds comes back as a leftover report for the prompt.
  */
 import { db } from '#/db/db'
-import type { LocalBill, LocalPlanned } from '#/db/types'
+import type { LocalBill, LocalPlanned, LocalSetAside } from '#/db/types'
 import { plannedIdFor } from '#/features/planned/data/ids'
 import {
   confirmPlanned,
@@ -17,10 +17,16 @@ import { leftoverFor } from '#/features/planning/data/leftover'
 import type { LeftoverReport } from '#/features/planning/data/leftover'
 import {
   firstOpenOccurrence,
+  isSettledOccurrence,
   paymentRowsOf,
 } from '#/features/planning/data/occurrences'
-import { releaseForPayment } from '#/features/setAsides/data/payment'
+import {
+  heldInWallet,
+  releaseForPayment,
+} from '#/features/setAsides/data/payment'
+import { convertMinor } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
+import type { RatesMap } from '#/lib/config/rates'
 import { useSessionStore } from '#/stores/session'
 import { MoneyActionError } from './errors'
 
@@ -41,7 +47,7 @@ export type PayBillResult = {
   occurrence: string
   /** `done` once the occurrence is paid in full; `open` after a part payment. */
   status: LocalPlanned['status']
-  /** What the occurrence still holds outside the paying wallet. */
+  /** What a settled occurrence still holds; empty after a part payment. */
   leftover: LeftoverReport
 }
 
@@ -96,25 +102,71 @@ async function paymentRow(
   return row
 }
 
-/** What the occurrence still holds outside the paying wallet, read after the payment landed. */
+/**
+ * The paying wallet's own leftover, as one more line: a settled occurrence still holding money
+ * there (an earlier part payment came from elsewhere) would otherwise stay set aside for good.
+ */
+function withPayingWallet(
+  report: LeftoverReport,
+  bill: LocalBill,
+  setAsides: ReadonlyArray<LocalSetAside>,
+  payingWalletId: string,
+  rates: RatesMap,
+): LeftoverReport {
+  const held = heldInWallet(
+    setAsides,
+    { billId: bill.id, occurrence: report.occurrence },
+    payingWalletId,
+  )
+  if (held.length === 0) return report
+  const currency = held[0].currency
+  const amount = held.reduce(
+    (sum, a) => sum + convertMinor(a.amount, a.currency, currency, rates),
+    0,
+  )
+  return {
+    ...report,
+    lines: [
+      ...report.lines,
+      {
+        walletId: payingWalletId,
+        externalLabel: null,
+        amount,
+        currency,
+        ids: held.map((a) => a.id),
+      },
+    ],
+    total: report.total + convertMinor(amount, currency, bill.currency, rates),
+  }
+}
+
+/**
+ * What the occurrence still holds after the payment landed — asked about only once the
+ * occurrence is settled: until then that money is still waiting for the rest of the bill.
+ */
 async function leftoverAfter(
   bill: LocalBill,
   occurrence: string,
   payingWalletId: string,
 ): Promise<LeftoverReport> {
-  const [after, setAsides, latest] = await Promise.all([
+  const [after, rows, latest, rates] = await Promise.all([
     paymentsOf(bill),
     db.setAsides.where('billId').equals(bill.id).toArray(),
     db.bills.get(bill.id),
+    currentRates(),
   ])
-  return leftoverFor({
+  const setAsides = rows.filter((a) => a.deleted === 0)
+  const report = leftoverFor({
     bill: latest ?? bill,
     occurrence,
     payingWalletId,
-    setAsides: setAsides.filter((a) => a.deleted === 0),
+    setAsides,
     payments: after,
-    rates: await currentRates(),
+    rates,
   })
+  if (!isSettledOccurrence(after, occurrence))
+    return { ...report, lines: [], total: 0 }
+  return withPayingWallet(report, bill, setAsides, payingWalletId, rates)
 }
 
 export async function payBill(
@@ -178,7 +230,7 @@ export async function billPaymentTarget(
 /**
  * What Pay now does after its transaction, for one already written with the row's
  * `plannedId`: release the occurrence's set-asides in the paying wallet, move `nextDue` on, and
- * report what other wallets still hold for the leftover prompt.
+ * report what a settled occurrence still holds for the leftover prompt.
  */
 export async function settleBillPayment(
   billId: string,

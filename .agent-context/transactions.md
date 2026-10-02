@@ -54,7 +54,8 @@ and `recurrings` went with the planning rebuild: a repeating payment is a **bill
   `billId` settles a payment row — the matched one while it is that bill's and open, else the
   first open occurrence's, made on the spot (`planning/actions/payBill#billPaymentTarget`) — then
   `settleBillPayment` releases that occurrence's set-asides **in the paying wallet**, moves
-  `nextDue` on and returns `leftoverFor`. Money the occurrence still holds elsewhere comes back as
+  `nextDue` on and returns the leftover report. Money a **settled** occurrence still holds (none
+  is asked about after a part payment) comes back as
   a `LeftoverPrompt` the caller hands to `stores/leftoverPrompt`; `LeftoverPromptHost` (mounted
   in `__root.tsx`, since the dialog and QuickAdd close as they save) shows Planning's
   `LeftoverSheet` on any page. An edit pays only when it **newly** links a bill (an unchanged link

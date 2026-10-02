@@ -18,7 +18,7 @@ type Props = {
 }
 
 /**
- * After a payment, money this occurrence still holds in other wallets (03 §5): move it to the
+ * After the payment that settles an occurrence, money it still holds (03 §5): move it to the
  * paying wallet (a real transfer), free it up, or keep it for the next one. Never silent.
  */
 export function LeftoverSheet({

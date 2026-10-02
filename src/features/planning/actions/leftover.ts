@@ -1,10 +1,10 @@
 /**
- * The leftover prompt's three answers (03 §5), for money a paid occurrence still holds outside
- * the paying wallet:
+ * The leftover prompt's three answers (03 §5), for money a settled occurrence still holds:
  *
  * - **move** — "Move it to <paying wallet>": records a transfer from each wallet that held some
- *   and releases those set-asides (the payment already used the money). Money held outside the
- *   app cannot ride a transfer and is left as it is.
+ *   and releases those set-asides (the payment already used the money). What the paying wallet
+ *   itself still holds is released without a transfer. Money held outside the app cannot ride
+ *   a transfer and is left as it is.
  * - **free** — releases them where they are; that wallet's free money goes up.
  * - **keep** — repeating bills only: they move to the next open occurrence.
  */
@@ -56,7 +56,14 @@ export async function resolveLeftover(
   const bill = await db.bills.get(report.billId)
   const rates = await currentRates()
   for (const line of report.lines) {
-    if (!line.walletId || line.walletId === paying.id) continue
+    if (!line.walletId) continue
+    if (line.walletId === paying.id) {
+      await releaseSetAsides(
+        line.ids.map((id) => ({ id })),
+        { releasedAt: date },
+      )
+      continue
+    }
     const toCurrency = paying.currency ?? line.currency
     await createTransfer({
       fromWalletId: line.walletId,

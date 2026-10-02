@@ -260,6 +260,49 @@ describe('Pay now', () => {
   })
 })
 
+describe('the leftover after a part payment', () => {
+  const heldForRent = (walletId: string, amount: number) =>
+    setAside({
+      goalId: null,
+      billId: 'rent',
+      occurrence: '2026-10-05',
+      walletId,
+      amount,
+    })
+
+  it('asks nothing while the occurrence is still open, then everything once it is paid', async () => {
+    await db.setAsides.put(heldForRent('savings', m(3000)))
+
+    const part = await payBill('rent', { amount: m(1000), walletId: 'main' })
+    expect(part.status).toBe('open')
+    expect(part.leftover.lines).toEqual([])
+    expect(await liveOf('rent')).toEqual([['savings', '2026-10-05', 3000]])
+
+    const rest = await payBill('rent', { walletId: 'main' })
+    expect(rest.status).toBe('done')
+    expect(rest.leftover.lines).toEqual([
+      expect.objectContaining({ walletId: 'savings', amount: m(3000) }),
+    ])
+  })
+
+  it('reports what the paying wallet still holds once a split payment settles it', async () => {
+    await db.setAsides.put(heldForRent('savings', m(3000)))
+    await payBill('rent', { amount: m(1000), walletId: 'main' })
+
+    const { leftover } = await payBill('rent', { walletId: 'savings' })
+    expect(leftover.lines).toEqual([
+      expect.objectContaining({ walletId: 'savings', amount: m(1000) }),
+    ])
+    expect(leftover.total).toBe(m(1000))
+
+    await resolveLeftover(leftover, 'move', { payingWalletId: 'savings' })
+    expect(await liveOf('rent')).toEqual([])
+    expect((await db.transactions.toArray()).some((t) => t.transferId)).toBe(
+      false,
+    )
+  })
+})
+
 describe('the leftover’s free answer', () => {
   it('releases what other wallets held, where it is', async () => {
     await db.setAsides.put(
