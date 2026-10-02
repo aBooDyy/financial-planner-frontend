@@ -292,6 +292,15 @@ Nice to have for bills, **Must have** / Nice to have for goals, "Left for spendi
   ready on Mar 1.* (amount ÷ the paydays from today through the due date — the engine's first
   window); *Due before your next paycheck. It comes out of what is free now.* when no payday comes
   first.
+- **Goal** (`GoalEditor`): What are you saving for? · How much do you need? (optional) · By when?
+  (optional, with **No date**) · How much each month? (only without a date) · Save in · How
+  important? (Must have ↔ Nice to have, inline as in the design) · the preview · More options:
+  Colour. Valid with a name and either a date + target or a monthly amount (`goalBlock`); a new
+  goal's currency is its Save-in wallet's, an existing goal keeps its own. Preview
+  (`goalPreview`): *Set aside SR X a paycheck to have SR T by Jun 2027.* ((target − saved) ÷
+  the paydays to the date), *Set aside SR X a month. Done around Aug 2027.*, *…with no end
+  date.*, or what is missing. The emergency fund suggestion opens it pre-filled
+  (`GoalPreset`).
 
 ## Tests
 
