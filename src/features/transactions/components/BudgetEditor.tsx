@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { CurrencyPicker } from '#/components/CurrencyPicker'
 import { AmountWell } from '#/components/dialog/AmountWell'
 import { OptionTiles } from '#/components/dialog/OptionTiles'
+import { ToggleCard } from '#/components/dialog/ToggleCard'
 import { FieldLabel } from '#/components/FieldLabel'
 import { FieldMessage } from '#/components/FormRow'
 import type { LocalBalanceNode } from '#/db/types'
@@ -9,10 +10,15 @@ import { useCategoryCatalog } from '#/features/categories/hooks/useCategoryCatal
 import type { BudgetScope } from '#/features/transactions/api/types'
 import {
   BUDGET_SCOPES,
+  billLines,
+  billsInBudget,
   budgetBlock,
   budgetDeleteCopy,
   customDaysValid,
+  paycheckHint,
 } from '#/features/transactions/data/scheduleEditor'
+import { startOfToday, ymd } from '#/features/transactions/data/planning'
+import { useBudgetPlanContext } from '#/features/transactions/hooks/useBudgetPlanContext'
 import type {
   TxEditorDraft,
   TxEditorState,
@@ -54,6 +60,8 @@ export function BudgetEditor({
   const { id, draft } = editing
   const [attempted, setAttempted] = useState(false)
   const catalog = useCategoryCatalog()
+  const today = ymd(startOfToday())
+  const plan = useBudgetPlanContext(today)
 
   const target =
     draft.scopeType === 'wallet' ? draft.walletId : draft.categoryId
@@ -69,6 +77,9 @@ export function BudgetEditor({
   const daysInvalid =
     attempted && draft.period === 'custom' && !customDaysValid(draft.customDays)
   const targetMissing = attempted && draft.scopeType !== 'overall' && !target
+
+  const covered = billsInBudget(plan.bills, draft, catalog)
+  const bills = billLines(covered, draft, catalog, wallets)
 
   const label =
     draft.scopeType === 'overall'
@@ -154,9 +165,30 @@ export function BudgetEditor({
         period={draft.period}
         customDays={draft.customDays}
         daysInvalid={daysInvalid}
+        paycheckHint={
+          plan.payCalendar ? paycheckHint(plan.payCalendar, today) : null
+        }
         onPeriod={(p) => onField('period', p)}
         onCustomDays={(d) => onField('customDays', d)}
       />
+
+      <div className="flex flex-col gap-2">
+        <ToggleCard
+          title="Leave out planned bills"
+          description="Only count spending you didn’t plan for."
+          checked={draft.excludesBills}
+          onCheckedChange={(on) => onField('excludesBills', on)}
+        />
+        {bills.length > 0 ? (
+          <ul className="flex flex-col gap-[3px] px-[14px] text-[12px] leading-[1.45] font-semibold text-fp-text-3">
+            {bills.map((line) => (
+              <li key={line} className="fp-sensitive">
+                {line}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
     </EditorDialog>
   )
 }

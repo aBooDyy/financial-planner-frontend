@@ -10,6 +10,8 @@ type Props = {
   period: BudgetPeriod
   customDays: string
   daysInvalid: boolean
+  /** Under the chips while Per paycheck is chosen: its window, or why it is monthly. */
+  paycheckHint: string | null
   onPeriod: (period: BudgetPeriod) => void
   onCustomDays: (days: string) => void
 }
@@ -21,6 +23,7 @@ export function BudgetPeriodFields({
   period,
   customDays,
   daysInvalid,
+  paycheckHint,
   onPeriod,
   onCustomDays,
 }: Props) {
@@ -39,6 +42,11 @@ export function BudgetPeriodFields({
             </Chip>
           ))}
         </ChipRow>
+        {period === 'paycheck' && paycheckHint ? (
+          <p className="mt-2 text-[12px] font-semibold text-fp-text-3">
+            {paycheckHint}
+          </p>
+        ) : null}
       </TxSection>
 
       {period === 'custom' ? (

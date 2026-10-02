@@ -87,6 +87,7 @@ const draft = (over: Partial<TxEditorDraft>): TxEditorDraft => ({
   customDays: '30',
   limit: '',
   currency: 'SAR',
+  excludesBills: false,
   ...over,
 })
 

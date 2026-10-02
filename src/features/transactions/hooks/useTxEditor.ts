@@ -74,6 +74,8 @@ export type TxEditorDraft = {
   customDays: string
   limit: string
   currency: CurrencyCode
+  /** "Leave out planned bills" — off by default. */
+  excludesBills: boolean
 }
 
 /** What "Counts toward" resolved: the planned item settled and, for a spend, its goal or bill. */
@@ -172,6 +174,7 @@ export function useTxEditor(
     customDays: '30',
     limit: '',
     currency: base,
+    excludesBills: false,
   })
 
   // --- Transactions ---
@@ -242,6 +245,7 @@ export function useTxEditor(
         customDays: String(b.customDays ?? 30),
         limit: minorToInputValue(b.limit, b.currency),
         currency: b.currency,
+        excludesBills: b.excludesBills ?? false,
       },
     })
 
@@ -478,6 +482,7 @@ export function useTxEditor(
           : null,
       limit,
       currency: draft.currency,
+      excludesBills: draft.excludesBills,
     }
     if (id) await updateBudget(id, payload)
     else await createBudget(payload)

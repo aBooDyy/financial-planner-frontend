@@ -238,8 +238,15 @@ tx/budget editor state machine. Components are dumb (`components/`): page compos
   `setScopeType` and save normalise it with `rootOf`) and a wallet budget reads
   `draft.walletId`; save sends `BudgetDraft { categoryId, walletId }` with the other one null, `AmountWell` on the spend tint with `CurrencyPill` (the `CurrencyPicker` flattened into a
   "Currency SAR ▾" pill), "Which category/account?" `BudgetTargetSelect`, `BudgetPeriodFields`
-  (Weekly / Monthly / Custom days chips + "Period length __ days", at least 1; the editor does
-  not offer Per paycheck yet).
+  (**Weekly · Monthly · Per paycheck · Custom** chips + "Period length __ days", at least 1;
+  under Per paycheck the pure `paycheckHint(cal, today)` reads "Resets every payday · Oct 25 –
+  Nov 24", or with no main paycheck "Add your income to budget per paycheck — until then this
+  resets monthly."), then a `ToggleCard` **Leave out planned bills** ("Only count spending you
+  didn't plan for.", `draft.excludesBills`, off on a new budget, saved on every create/update)
+  with the bills it is about listed under it — `billsInBudget` (open bills under the budget's
+  root, from its account, or all for Overall) and `billLines` ("Rent (SR 3,000) is planned as a
+  bill in Housing.", the first three then "And N more bills."). The calendar and bills come from
+  `hooks/useBudgetPlanContext(today)` (live `readPayCalendar` + `db.bills`).
 - **Ledger row title** is the note, else the **leaf** category's own name ("Cafés", not
   "Dining"); the line under it reads "Dining · Cafés | Everyday · Main". Whenever the scope spans
   more than one wallet (All accounts, a group) every activity row names a wallet with its
