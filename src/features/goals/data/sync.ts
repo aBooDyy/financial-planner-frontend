@@ -2,6 +2,7 @@ import { db } from '#/db/db'
 import { queuedBesides } from '#/db/enqueue'
 import { pushItemAction } from '#/db/itemAction'
 import { storeAnswer } from '#/db/storeAnswer'
+import { settleTakenCreate } from '#/db/takenCreate'
 import type { OutboxEntry } from '#/db/types'
 import { goalsApi } from '#/features/goals/api/goalsApi'
 import type {
@@ -49,12 +50,18 @@ async function pushIncomeCreate(entry: OutboxEntry): Promise<void> {
       await db.outbox.delete(entry.seq)
     })
   } catch (e) {
-    if (statusOf(e) === 409) {
-      await db.outbox.delete(entry.seq)
-      await pullIncome()
-      return
-    }
-    throw e
+    if (statusOf(e) !== 409) throw e
+    await settleTakenCreate(entry, {
+      table: db.incomeStreams,
+      find: async () =>
+        (await goalsApi.listIncome()).find((s) => s.id === entry.id),
+      toLocal: serverIncomeToLocal,
+      rebased: (local, server) =>
+        localIncomeToUpdateWire({ ...local, version: server.version }),
+      update: (body) =>
+        goalsApi.updateIncome(entry.id, body as UpdateIncomeWire),
+      queued: () => queuedBesides(entry),
+    })
   }
 }
 
@@ -149,12 +156,17 @@ async function pushGoalCreate(entry: OutboxEntry): Promise<void> {
       await db.outbox.delete(entry.seq)
     })
   } catch (e) {
-    if (statusOf(e) === 409) {
-      await db.outbox.delete(entry.seq)
-      await pullGoals()
-      return
-    }
-    throw e
+    if (statusOf(e) !== 409) throw e
+    await settleTakenCreate(entry, {
+      table: db.goals,
+      find: async () =>
+        (await goalsApi.listGoals()).find((g) => g.id === entry.id),
+      toLocal: serverGoalToLocal,
+      rebased: (local, server) =>
+        localGoalToUpdateWire({ ...local, version: server.version }),
+      update: (body) => goalsApi.updateGoal(entry.id, body as UpdateGoalWire),
+      queued: () => queuedBesides(entry),
+    })
   }
 }
 

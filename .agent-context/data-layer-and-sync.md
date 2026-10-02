@@ -236,6 +236,13 @@ backing-off write of any of its rows, and any later write of them waits behind t
     and for as long as the server kept refusing it. Bills, goals, income and set-asides use it,
     for actions' answers and adopts too.
   - **`409` conflict** → the server row moved on. Reconcile (see below).
+  - **`409 id_taken` on a single create** (bills, goals, income, set-asides, ledger rows) →
+    `settleTakenCreate` (`db/takenCreate.ts`): the id is the user's own — an earlier send whose
+    answer was lost, or a deterministic auto-confirm id another device wrote first — so the
+    server's row is adopted **clean**, with this device's fields re-applied by one PATCH when
+    they differ (set-asides keep the server's release fields), and a row the server no longer
+    has is dropped. It used to drop the entry and run a full pull, which skips dirty rows, so
+    the row stayed dirty forever. Planned rows have their own `settleTakenId`.
   - Anything else → keep in the outbox and **flag** it; see
     [Failed pushes](#failed-pushes-flag-hold-retry--never-drop).
 - **Pull**: `pullAll()` fans out to eight collection pulls in one `Promise.all`, single-flight

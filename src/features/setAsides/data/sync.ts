@@ -1,6 +1,7 @@
 import { db } from '#/db/db'
 import { storeAnswer } from '#/db/storeAnswer'
-import type { OutboxEntry } from '#/db/types'
+import { settleTakenCreate } from '#/db/takenCreate'
+import type { LocalSetAside, OutboxEntry } from '#/db/types'
 import { setAsidesApi } from '#/features/setAsides/api/setAsidesApi'
 import type {
   CreateSetAsideWire,
@@ -61,12 +62,18 @@ async function pushSetAsideCreate(entry: OutboxEntry): Promise<void> {
       await setAsidesApi.create(entry.payload as CreateSetAsideWire),
     )
   } catch (e) {
-    if (statusOf(e) === 409) {
-      await db.outbox.delete(entry.seq)
-      await pullSetAsides()
-      return
-    }
-    throw e
+    if (statusOf(e) !== 409) throw e
+    await settleTakenCreate(entry, {
+      table: db.setAsides,
+      find: async () =>
+        (await setAsidesApi.list()).find((a) => a.id === entry.id),
+      toLocal: serverSetAsideToLocal,
+      rebased: (local, server) =>
+        localSetAsideToUpdateWire(onServer(local, server)),
+      update: (body) =>
+        setAsidesApi.update(entry.id, body as UpdateSetAsideWire),
+      queued: () => hasQueuedWrites(entry.id),
+    })
   }
 }
 
@@ -91,10 +98,18 @@ async function pushSetAsideUpdate(entry: OutboxEntry): Promise<void> {
 }
 
 /**
- * The edit on the server's version. Releasing is never an edit — it rides a batch or a close —
- * so the release fields are the server's: re-sending ours would un-release money another device
- * paid or freed, counting it as both spent and set aside.
+ * The local row on the server's version. Releasing is never an edit — it rides a batch or a
+ * close — so the release fields are the server's: re-sending ours would un-release money another
+ * device paid or freed, counting it as both spent and set aside.
  */
+const onServer = (local: LocalSetAside, server: SetAside): LocalSetAside => ({
+  ...local,
+  version: server.version,
+  releasedAt: server.releasedAt,
+  releasedById: server.releasedById,
+  movedByTransferId: server.movedByTransferId,
+})
+
 async function rebaseSetAside(entry: OutboxEntry): Promise<void> {
   const fresh = (await setAsidesApi.list()).find((a) => a.id === entry.id)
   const local = await db.setAsides.get(entry.id)
@@ -107,13 +122,7 @@ async function rebaseSetAside(entry: OutboxEntry): Promise<void> {
       entry,
       await setAsidesApi.update(
         entry.id,
-        localSetAsideToUpdateWire({
-          ...local,
-          version: fresh.version,
-          releasedAt: fresh.releasedAt,
-          releasedById: fresh.releasedById,
-          movedByTransferId: fresh.movedByTransferId,
-        }),
+        localSetAsideToUpdateWire(onServer(local, fresh)),
       ),
     )
   } catch (e) {

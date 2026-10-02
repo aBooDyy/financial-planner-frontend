@@ -58,6 +58,26 @@ describe('pushBillsEntry', () => {
     expect(await db.outbox.count()).toBe(0)
   })
 
+  it('adopts the server row, clean, when a create’s id is already taken', async () => {
+    const local = bill({ id: 'b1', dirty: 1, version: '' })
+    await db.bills.put(local)
+    api.create.mockRejectedValue(failure(409, 'planning.bill.id_taken'))
+    api.list.mockResolvedValue([asServer(local, 'v1')])
+    const entry = await queue({
+      op: 'create',
+      entity: 'bill',
+      id: 'b1',
+      payload: {},
+      baseVersion: null,
+    })
+
+    await pushBillsEntry(entry)
+
+    expect(api.update).not.toHaveBeenCalled()
+    expect(await db.bills.get('b1')).toMatchObject({ version: 'v1', dirty: 0 })
+    expect(await db.outbox.count()).toBe(0)
+  })
+
   it('rebases a stale update on the server’s version and retries once', async () => {
     const local = bill({ id: 'b1', amount: 50, dirty: 1, version: 'v1' })
     await db.bills.put(local)

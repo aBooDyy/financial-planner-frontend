@@ -37,7 +37,7 @@ beforeEach(async () => {
 })
 
 describe('pushSetAsidesEntry', () => {
-  it('adopts the server row when a create’s id is already taken', async () => {
+  it('adopts the server row, clean, when a create’s id is already taken', async () => {
     const local = setAside({ id: 'a1', dirty: 1, version: '' })
     await db.setAsides.put(local)
     api.create.mockRejectedValue(
@@ -59,8 +59,80 @@ describe('pushSetAsidesEntry', () => {
     await pushSetAsidesEntry(entry)
 
     expect(await db.outbox.count()).toBe(0)
-    // Still dirty locally, so the pull leaves it for its own next write to settle.
-    expect((await db.setAsides.get('a1'))?.id).toBe('a1')
+    expect(api.update).not.toHaveBeenCalled()
+    expect(await db.setAsides.get('a1')).toMatchObject({
+      version: 'v1',
+      dirty: 0,
+    })
+  })
+
+  it('re-applies a taken create’s edits on the server row, keeping its release', async () => {
+    const local = setAside({ id: 'a1', note: 'mine', dirty: 1, version: '' })
+    await db.setAsides.put(local)
+    const server = asServer(
+      { ...local, note: null, releasedAt: '2026-10-01', releasedById: 't9' },
+      'v1',
+    )
+    api.create.mockRejectedValue(
+      new ApiError({
+        status: 409,
+        code: 'planning.set_aside.id_taken',
+        message: '',
+      }),
+    )
+    api.list.mockResolvedValue([server])
+    api.update.mockImplementation(
+      (_id: string, body: Record<string, unknown>) =>
+        Promise.resolve({ ...server, note: body.note, version: 'v2' }),
+    )
+    const entry = await queue({
+      op: 'create',
+      entity: 'setAside',
+      id: 'a1',
+      payload: {},
+      baseVersion: null,
+    })
+
+    await pushSetAsidesEntry(entry)
+
+    expect(api.update).toHaveBeenCalledWith(
+      'a1',
+      expect.objectContaining({
+        version: 'v1',
+        note: 'mine',
+        released_at: '2026-10-01',
+        released_by_id: 't9',
+      }),
+    )
+    expect(await db.setAsides.get('a1')).toMatchObject({
+      note: 'mine',
+      releasedAt: '2026-10-01',
+      dirty: 0,
+    })
+  })
+
+  it('drops a taken create’s row when the server no longer has it', async () => {
+    await db.setAsides.put(setAside({ id: 'a1', dirty: 1, version: '' }))
+    api.create.mockRejectedValue(
+      new ApiError({
+        status: 409,
+        code: 'planning.set_aside.id_taken',
+        message: '',
+      }),
+    )
+    api.list.mockResolvedValue([])
+    const entry = await queue({
+      op: 'create',
+      entity: 'setAside',
+      id: 'a1',
+      payload: {},
+      baseVersion: null,
+    })
+
+    await pushSetAsidesEntry(entry)
+
+    expect(await db.setAsides.get('a1')).toBeUndefined()
+    expect(await db.outbox.count()).toBe(0)
   })
 
   it('never un-releases a row another device released while rebasing an edit', async () => {

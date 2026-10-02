@@ -1,5 +1,7 @@
 import { db } from '#/db/db'
 import { pullDelta } from '#/db/delta'
+import { queuedBesides } from '#/db/enqueue'
+import { settleTakenCreate } from '#/db/takenCreate'
 import { flagEntry, invalidItemFailure } from '#/db/syncFailure'
 import type { OutboxEntry } from '#/db/types'
 import {
@@ -41,12 +43,18 @@ async function pushTransactionCreate(entry: OutboxEntry): Promise<void> {
       await db.outbox.delete(entry.seq)
     })
   } catch (e) {
-    if (statusOf(e) === 409) {
-      await db.outbox.delete(entry.seq)
-      await pullTransactions()
-      return
-    }
-    throw e
+    if (statusOf(e) !== 409) throw e
+    await settleTakenCreate(entry, {
+      table: db.transactions,
+      find: async () =>
+        (await transactionsApi.list()).find((t) => t.id === entry.id),
+      toLocal: serverTransactionToLocal,
+      rebased: (local, server) =>
+        localTransactionToUpdateWire({ ...local, version: server.version }),
+      update: (body) =>
+        transactionsApi.update(entry.id, body as UpdateTransactionWire),
+      queued: () => queuedBesides(entry),
+    })
   }
 }
 

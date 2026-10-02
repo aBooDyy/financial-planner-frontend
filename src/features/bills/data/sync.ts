@@ -2,6 +2,7 @@ import { db } from '#/db/db'
 import { queuedBesides } from '#/db/enqueue'
 import { pushItemAction } from '#/db/itemAction'
 import { storeAnswer } from '#/db/storeAnswer'
+import { settleTakenCreate } from '#/db/takenCreate'
 import type { OutboxEntry } from '#/db/types'
 import { billsApi } from '#/features/bills/api/billsApi'
 import type { CreateBillWire, UpdateBillWire } from '#/features/bills/api/types'
@@ -42,13 +43,16 @@ async function pushBillCreate(entry: OutboxEntry): Promise<void> {
       await billsApi.create(entry.payload as CreateBillWire),
     )
   } catch (e) {
-    if (statusOf(e) === 409) {
-      // The id is already the server's: a retried create that landed before.
-      await db.outbox.delete(entry.seq)
-      await pullBills()
-      return
-    }
-    throw e
+    if (statusOf(e) !== 409) throw e
+    await settleTakenCreate(entry, {
+      table: db.bills,
+      find: async () => (await billsApi.list()).find((b) => b.id === entry.id),
+      toLocal: serverBillToLocal,
+      rebased: (local, server) =>
+        localBillToUpdateWire({ ...local, version: server.version }),
+      update: (body) => billsApi.update(entry.id, body as UpdateBillWire),
+      queued: () => queuedBesides(entry),
+    })
   }
 }
 
