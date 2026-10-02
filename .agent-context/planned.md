@@ -137,7 +137,11 @@ varies), each pull, each plan-rewrite request, and day rollover.
    goal/bill set-aside is set aside without a tap when its wallet is the main paycheck's
    deposit wallet and that wallet's free money (balance from `readLedgerSummary` − its live
    set-asides) still covers it, lines taken in plan priority; any other line is flagged
-   `review: true` (another wallet, not enough free money, no main paycheck). Auto-confirms
+   `review: true` (another wallet, not enough free money, no main paycheck). **It waits for
+   the pay:** while the main paycheck's income row on that payday (matched by `date` or
+   `occurrence`, `ctx.mainStreamId`) is still open and unconfirmed — and is not being logged
+   automatically in the same pass — the payday's lines are left alone, neither set aside nor
+   flagged; the next run after the income is confirmed takes them. Auto-confirms
    write under `autoSettlementId(plannedId)` (UUIDv5), so two devices write one row. A failed
    confirm is left for the user. The run's `auto` summary counts them, and Automatic mode posts
    a `PaydayNotice` to `stores/paydayNotice.ts` for the toast.

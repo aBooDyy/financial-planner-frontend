@@ -335,6 +335,7 @@ async function runAuto(
     streams: new Map(inputs.income.map((s) => [s.id, s])),
     depositWalletId:
       calendar.kind === 'paycheck' ? calendar.stream.walletId : null,
+    mainStreamId: calendar.kind === 'paycheck' ? calendar.stream.id : null,
     free: wallets?.free ?? {},
     walletCurrency: wallets?.currency ?? new Map(),
     rates: inputs.rates,

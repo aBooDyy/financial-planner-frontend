@@ -4,9 +4,11 @@
  * - a bill payment whose bill is on **auto-pay**, on its due date, from the bill's wallet;
  * - a payday whose stream is set to **log automatically**, into the stream's wallet;
  * - in **Automatic** payday mode, a payday set-aside whose wallet is the main paycheck's
- *   deposit wallet and still has the free money for it (03 §4, D17). Every other due set-aside
- *   — another wallet (the money must really move), not enough free money, or no deposit wallet
- *   at all — is flagged for the payday review instead.
+ *   deposit wallet and still has the free money for it (03 §4, D17) — once that payday's pay
+ *   has arrived: while the main paycheck's income row for the day is open and unconfirmed (and
+ *   not being logged automatically in this same pass) the line waits, untouched. Every other
+ *   due set-aside — another wallet (the money must really move), not enough free money, or no
+ *   deposit wallet at all — is flagged for the payday review instead.
  *
  * Only open rows nothing settles yet are considered, and never a pinned set-aside: dismissing
  * the review ("Not now") pins it, so it is never picked up again.
@@ -32,6 +34,8 @@ export type AutoContext = {
   streams: ReadonlyMap<string, LocalIncomeStream>
   /** The main paycheck's wallet; null without one (no income, or income that varies). */
   depositWalletId: string | null
+  /** The main paycheck's stream, whose payday must be confirmed before setting aside. */
+  mainStreamId: string | null
   /** Free to spend per wallet, in the wallet's currency. */
   free: Readonly<Record<string, number>>
   walletCurrency: ReadonlyMap<string, CurrencyCode>
@@ -115,6 +119,18 @@ export function autoPlan(
   }
 
   if (ctx.paydayMode !== 'auto') return plan
+  const logging = new Set(plan.income.map((i) => i.id))
+  const payNotIn = new Set(
+    due
+      .filter(
+        (p) =>
+          p.role === 'income' &&
+          p.incomeStreamId !== null &&
+          p.incomeStreamId === ctx.mainStreamId &&
+          !logging.has(p.id),
+      )
+      .flatMap((p) => [p.date, p.occurrence]),
+  )
   const free = { ...ctx.free }
   const setAsides = due
     .filter(
@@ -126,6 +142,7 @@ export function autoPlan(
     )
     .sort(byPriority(ctx))
   for (const p of setAsides) {
+    if (payNotIn.has(p.date)) continue
     const walletId = p.walletId
     const currency = walletId ? ctx.walletCurrency.get(walletId) : undefined
     if (!walletId || !currency || walletId !== ctx.depositWalletId) {

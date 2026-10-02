@@ -19,7 +19,7 @@ import {
 import { usePaydayNoticeStore } from '#/features/planned/stores/paydayNotice'
 import { autoPlan, autoSettlementId } from './autoConfirm'
 import type { AutoContext } from './autoConfirm'
-import { dismissFromReview } from './mutations'
+import { confirmPlanned, dismissFromReview } from './mutations'
 import { runPlanner } from './runner'
 
 vi.mock('#/db/sync', () => ({ schedulePush: () => undefined }))
@@ -40,6 +40,7 @@ describe('autoPlan', () => {
     ]),
     streams: new Map([['salary', salary]]),
     depositWalletId: 'main',
+    mainStreamId: 'salary',
     free: { main: m(1000), savings: m(5000) },
     walletCurrency: new Map([
       ['main', 'SAR'],
@@ -124,6 +125,31 @@ describe('autoPlan', () => {
         ctx({ paydayMode: 'review' }),
       ).review,
     ).toEqual([])
+  })
+
+  it('waits for the payday’s pay to be confirmed before setting aside', () => {
+    const payday = planned({
+      id: 'payday',
+      origin: 'income',
+      role: 'income',
+      goalId: null,
+      incomeStreamId: 'salary',
+    })
+    const line = save('trip-line', 'trip', 'main', m(100))
+    const manual = new Map([['salary', { ...salary, autolog: false }]])
+
+    const waiting = autoPlan([payday, line], ctx({ streams: manual }))
+    expect(waiting.setAsides).toEqual([])
+    expect(waiting.review).toEqual([])
+
+    // Confirmed (settled, or no longer open) — or logged in this same pass — it goes ahead.
+    const confirmed = autoPlan(
+      [payday, line],
+      ctx({ streams: manual, isSettled: (p) => p.id === 'payday' }),
+    )
+    expect(confirmed.setAsides.map((a) => a.id)).toEqual(['trip-line'])
+    expect(autoPlan([line], ctx({ streams: manual })).setAsides).toHaveLength(1)
+    expect(autoPlan([payday, line], ctx()).setAsides).toHaveLength(1)
   })
 
   it('reviews everything without a deposit wallet', () => {
@@ -240,6 +266,7 @@ describe('the planner’s auto pass', () => {
 
   it('sets aside deposit-wallet lines in Automatic mode and sends the rest to review', async () => {
     await settle('auto')
+    await db.incomeStreams.put({ ...SALARY, autolog: true })
     await db.goals.bulkPut([
       goal({ id: 'trip', amount: m(500), saveWalletId: 'main' }),
       goal({ id: 'car', amount: m(800), saveWalletId: 'savings', position: 1 }),
@@ -268,5 +295,27 @@ describe('the planner’s auto pass', () => {
       review: false,
       pinned: true,
     })
+  })
+
+  it('holds Automatic set-asides until the payday’s pay is confirmed', async () => {
+    await settle('auto')
+    await db.goals.put(
+      goal({ id: 'trip', amount: m(500), saveWalletId: 'main' }),
+    )
+    await runPlanner('u1', new Date(2026, 9, 1))
+    expect(await db.setAsides.count()).toBe(0)
+    const line = (
+      await db.plannedTransactions.where('goalId').equals('trip').toArray()
+    ).find((p) => p.date === '2026-10-01')
+    expect(line).toMatchObject({ status: 'open', review: false })
+    expect(usePaydayNoticeStore.getState().notice).toBeNull()
+
+    const payday = (await db.plannedTransactions.toArray()).find(
+      (p) => p.role === 'income' && p.occurrence === '2026-10-01',
+    )
+    await confirmPlanned(payday?.id ?? '', { walletId: 'main' })
+    await runPlanner('u1', new Date(2026, 9, 1))
+    const live = (await db.setAsides.toArray()).filter(isLiveSetAside)
+    expect(live.map((a) => [a.goalId, a.amount / 100])).toEqual([['trip', 500]])
   })
 })
