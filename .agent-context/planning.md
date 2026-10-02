@@ -244,6 +244,55 @@ Mutations are called directly (`payBill`, `addMoney`, `spendFromGoal`, `markGoal
 `resolveLeftover`; `confirmPlanned`, `dismissFromReview`, recalc from `features/planned`;
 close / reopen / pause / resume from the bills and goals slices).
 
+## The Planning page — `components/`
+
+The screen over the engine (04, design `working.local/planning-model/design/`): `/planning/$section`
+([routing.md](routing.md#planning-and-spending-tabs)). The design decides layout and visuals; the
+docs decide words and behaviour (D27–D31): Covered / Saving up / Behind / Short, **Must pay** /
+Nice to have for bills, **Must have** / Nice to have for goals, "Left for spending", goals in the
+`fp-goal` pink.
+
+- **Shell** — `PlanningPage`: `TopNav` (`active="planning"`), the mobile `PlanningSectionStrip`
+  (five icon tabs) or the desktop `PlanningTabCard`, `PlanningHeader` (title + **Plan
+  something**), the section, the detail panel, `PlanningSheets` and `PlanningToastView`. Badges:
+  Upcoming counts Needs confirming (warn), Overview counts Needs a decision (danger).
+- **Page state** — `stores/planningUi.ts`: the open detail (`PlanOwner`) and **one** sheet
+  (`PlanningSheet`, a union by `kind`: chooser, the three editors, the anytime-action sheets,
+  delete, review, confirm). Rows deep in a section open sheets through the store instead of
+  threaded callbacks; `PlanningSheets` renders the one open. A sheet that leads to another
+  (Pay now → leftover, editor → delete) replaces itself.
+- **Toasts** — `stores/toast.ts` (`toast(message, action?)`), drawn by `PlanningToastView`:
+  bottom-centre dark pill, 3.6 s, optional action. Every write confirms with one.
+- **Kit** — `components/kit/`: `PlanCard`/`CardHeader`, `MicroLabel`, `StatusChip` (ok, warn,
+  danger, blue, goal, neutral), `Spine`/`Dot`, `ProgressBar`, `ItemMenu` (the ⋯ menu, destructive
+  last), `CountBadge`, `InfoLine` (the blue "what this will do" line).
+- **Copy and maths for the screens** live in `view/` (pure, tested): `format.ts` (rounded money,
+  "Oct 18" / "Jun 2027", "a paycheck" vs "a month" by the pay calendar), `repeat.ts` (the docs'
+  repeat names: Just once · Weekly · Monthly · Quarterly · Semi-annual · Annual · Custom),
+  `colors.ts` (the item palette), `emergencyFund.ts`, and one `*Draft.ts` per editor.
+
+### Plan something and the editors
+
+- `PlanChooser`: A bill · A goal · Income, "Regular spending like groceries? Set a budget →"
+  (Spending › Budgets), and — while there is no open goal — **Start an emergency fund**:
+  a must-have goal targeting 3 × the monthly must-pay bills (`emergencyFundPreset`; no target
+  before there are bills). Section headers' **+ Add bill / goal / income** skip it.
+- Editors mount their form only once the planner's inputs and the category catalog have loaded
+  (`useEditorReady`), so the first state holds the real defaults; each has a `use*Editor` hook
+  (form, block reason, preview, save) and a pure `view/*Draft.ts` (form ↔ entity, `*Block`,
+  `*Preview`). Saving shows the hint above the buttons until ready (`DialogActions`), and a
+  dirty close asks first (`useDiscardGuard`).
+- **Bill** (`BillEditor`): What is it? · How much? (`AmountWell`, the currency follows the
+  "Paid from" wallet pill, which also offers *Decide when paying*) · Repeats · *When is it due?* /
+  *Next due date* · Category (`CategoryPicker`, default Housing) · the preview line · More
+  options: Ends (Never / On a date), Auto-pay ("Log it automatically on the due date"), Must pay ↔
+  Nice to have, Save up in (bills not covered by each paycheck), Merchant (the shared
+  `MerchantOptions` in a popover), Note, Colour. Preview (`billPreview`): *Covered from each
+  paycheck.* when it repeats at least as often as pay; *We'll set aside SR X a paycheck so it's
+  ready on Mar 1.* (amount ÷ the paydays from today through the due date — the engine's first
+  window); *Due before your next paycheck. It comes out of what is free now.* when no payday comes
+  first.
+
 ## Tests
 
 `data/{payPeriods,occurrences,funding,leftover,balances,safeToSpend,status,paycheck,views}.test.ts`
