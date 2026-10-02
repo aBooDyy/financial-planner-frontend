@@ -137,6 +137,20 @@ export const isPlannableGoal = (
   g: Pick<LocalGoal, 'closedAt' | 'pausedAt' | 'deleted'>,
 ): boolean => g.deleted === 0 && g.closedAt === null && g.pausedAt === null
 
+/**
+ * Whether a planned row's bill or goal takes no money now: a closed bill, a closed or paused
+ * goal. Its rows are not set aside, reviewed or counted ahead.
+ */
+export const isStoppedOwner = (
+  row: Pick<LocalPlanned, 'billId' | 'goalId'>,
+  bills: ReadonlyMap<string, Pick<LocalBill, 'closedAt'>>,
+  goals: ReadonlyMap<string, Pick<LocalGoal, 'closedAt' | 'pausedAt'>>,
+): boolean => {
+  if (row.billId) return (bills.get(row.billId)?.closedAt ?? null) !== null
+  const goal = row.goalId ? goals.get(row.goalId) : undefined
+  return !!goal && (goal.closedAt !== null || goal.pausedAt !== null)
+}
+
 /** A goal with a target and a date: a finite plan, computed from what is left. */
 export const isDatedTargetGoal = (
   g: Pick<LocalGoal, 'dueDate' | 'target'>,

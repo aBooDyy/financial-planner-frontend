@@ -54,7 +54,8 @@ Local row + outbox entry in one Dexie transaction (`db/enqueue.ts`), then `sched
   the goal and queues `op: 'close' | 'reopen' | 'pause' | 'resume'`; the "already done" codes are
   `goals.goal.already_closed`, `not_closed`, `already_paused` (and `already_closed` for a
   pause), `not_paused`. A paused goal plans no set-asides (`planning/data/funding.isPlannableGoal`), so the planner's next
-  fill removes its future unsettled ones; resume plans it again from today.
+  fill removes its future unsettled ones, and `pauseGoal` skips the ones already due with nothing
+  settling them (`planned/data/rows.skipDueSetAsides`); resume plans it again from today.
 
 ## Derivations
 

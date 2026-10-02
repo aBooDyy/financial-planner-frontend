@@ -110,6 +110,8 @@ const MESSAGES: Record<string, string> = {
   'planned.not_manual':
     'Planned items from a goal can be skipped, not deleted.',
   'planned.origin_gone': 'The bill or goal this belonged to has been deleted.',
+  'planned.owner_closed':
+    'That bill or goal is done or paused — reopen or resume it to set money aside.',
   'merchants.not_found': 'That merchant is no longer available.',
   'merchants.name_required': 'Give the merchant a name.',
   'merchants.alias.taken': 'Another merchant already answers to that spelling.',

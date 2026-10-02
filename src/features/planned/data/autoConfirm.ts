@@ -11,7 +11,8 @@
  *   deposit wallet at all — is flagged for the payday review instead.
  *
  * Only open rows nothing settles yet are considered, and never a pinned set-aside: dismissing
- * the review ("Not now") pins it, so it is never picked up again.
+ * the review ("Not now") pins it, so it is never picked up again. A closed bill or a closed or
+ * paused goal has nothing set aside for it, here or in the review.
  */
 import type {
   LocalBill,
@@ -19,6 +20,7 @@ import type {
   LocalIncomeStream,
   LocalPlanned,
 } from '#/db/types'
+import { isStoppedOwner } from '#/features/planning/data/funding'
 import type { PaydayMode } from '#/features/wallets/api/types'
 import { convertMinor } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
@@ -138,7 +140,8 @@ export function autoPlan(
         p.role === 'set_aside' &&
         (p.origin === 'goal' || p.origin === 'bill') &&
         !p.review &&
-        !p.pinned,
+        !p.pinned &&
+        !isStoppedOwner(p, ctx.bills, ctx.goals),
     )
     .sort(byPriority(ctx))
   for (const p of setAsides) {

@@ -152,6 +152,34 @@ describe('autoPlan', () => {
     expect(autoPlan([payday, line], ctx()).setAsides).toHaveLength(1)
   })
 
+  it('neither sets aside nor reviews for a paused goal or a closed bill', () => {
+    const plan = autoPlan(
+      [
+        save('paused', 'trip', 'main', m(100)),
+        planned({
+          id: 'closed',
+          origin: 'bill',
+          goalId: null,
+          billId: 'gym',
+          walletId: 'main',
+          amount: m(100),
+          date: TODAY,
+          occurrence: TODAY,
+        }),
+      ],
+      ctx({
+        bills: new Map([
+          ['gym', bill({ id: 'gym', walletId: 'main', closedAt: '2026-09-30' })],
+        ]),
+        goals: new Map([
+          ['trip', goal({ id: 'trip', pausedAt: '2026-09-30' })],
+        ]),
+      }),
+    )
+    expect(plan.setAsides).toEqual([])
+    expect(plan.review).toEqual([])
+  })
+
   it('reviews everything without a deposit wallet', () => {
     const plan = autoPlan(
       [save('x', 'trip', 'main', m(10))],

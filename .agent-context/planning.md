@@ -141,7 +141,8 @@ shortBy}` (base). `Safe = header.free − bills − setAsides + income` over H =
 - **income**: open income rows due after today, by H.
 
 Deviation from 03 §8's "today…H": overdue payments and set-asides are counted too (until
-confirmed, that money is still in Free). Each term lists its rows (`items`) for the
+confirmed, that money is still in Free). A closed bill's or a closed or paused goal's rows are
+not counted (`funding.isStoppedOwner`; the input carries `goals` for it). Each term lists its rows (`items`) for the
 arithmetic. `payday` is set when the window runs until the next main payday. Budgets are never
 subtracted (D18).
 
@@ -198,7 +199,8 @@ Plus `progress` / `setAside` / `used` / `target` / `left`, `perPaycheck`,
   `saving_up` · `goals`, each in plan priority with a base total. `transfers` = one per wallet
   other than the deposit wallet (Σ its lines, in the deposit wallet's currency);
   `transfersFor(lines, depositWalletId, depositCurrency, rates)` re-totals edited lines
-  (`ticked: false` left out). `waitingReviews(...)` lists every payday with lines waiting
+  (`ticked: false` left out). A closed bill's or a closed or paused goal's set-asides are left
+  out. `waitingReviews(...)` lists every payday with lines waiting
   (`review: true`, due), oldest first; `reviewCount` is the badge.
 - **`buildYearAhead(inputs, state, today, {months?})`** (`data/yearAhead.ts`) → `{months,
   ramps, goals}`: 12 months from this one, stretched to the latest goal date. Per month
@@ -256,9 +258,10 @@ first, each a Dexie write plus outbox entries; errors are `MoneyActionError` wit
   everything from one wallet: that wallet's Balance would stop matching its bank. Returns the
   spends' ids. Not atomic; a failure in between leaves an open goal with payments, harmless.
 - **Close / reopen / pause / resume** stay in their slices (`bills/data/actions`,
-  `goals/data/actions`). Close drops the open unsettled rows after the close date and pause
-  stops the plan (the planner's fill removes future set-asides); reopen and resume file a
-  quiet plan rewrite, so the owner is planned again from today.
+  `goals/data/actions`). Close drops the open unsettled rows after the close date, and the
+  planner's orphan pass resolves the rest; pause skips the goal's set-asides already due
+  (`rows.skipDueSetAsides`) and stops the plan (the planner's fill removes future ones); reopen
+  and resume file a quiet plan rewrite, so the owner is planned again from today.
 
 ## Reading it — `hooks/`, `index.ts`
 

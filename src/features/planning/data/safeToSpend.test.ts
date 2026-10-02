@@ -5,6 +5,7 @@ import type { PlanningSettings } from '#/features/wallets/api/types'
 import {
   RATES,
   bill,
+  goal,
   income,
   m,
   planned,
@@ -111,6 +112,7 @@ const run = (over: Partial<SafeToSpendInput> = {}) =>
     index: new Map(),
     setAsides: [],
     bills: BILLS,
+    goals: [],
     settings: settings(),
     calendar: CAL,
     today: TODAY,
@@ -139,6 +141,20 @@ describe('safeToSpend', () => {
     // Paydays and set-asides fall on the 25th: none before payday.
     expect(s.income.total).toBe(0)
     expect(s.setAsides.total).toBe(0)
+  })
+
+  it('leaves out a closed bill’s payment and a paused goal’s set-aside', () => {
+    const s = run({
+      bills: BILLS.map((b) =>
+        b.id === 'streaming' ? { ...b, closedAt: '2026-10-01' } : b,
+      ),
+      goals: [goal({ id: 'trip', pausedAt: '2026-10-01' })],
+      settings: settings({ safeHorizon: 'end_of_month' }),
+    })
+    expect(s.bills.items.map((l) => l.name)).not.toContain('Streaming')
+    expect(s.setAsides.items.map((l) => l.name)).not.toContain(
+      'Trip set-aside',
+    )
   })
 
   it('counts only what is not already set aside for an occurrence', () => {

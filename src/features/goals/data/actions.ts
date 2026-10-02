@@ -9,6 +9,7 @@ import type { LocalGoal, OutboxOp } from '#/db/types'
 import { isoOf } from '#/features/planned/data/dates'
 import { goalOwner } from '#/features/planned/data/owners'
 import { requestPlanRecalc } from '#/features/planned/data/recalcRequests'
+import { skipDueSetAsides } from '#/features/planned/data/rows'
 import { queueClose } from '#/features/setAsides/data/leftover'
 import type { Leftover } from '#/features/setAsides/data/leftover'
 
@@ -89,8 +90,9 @@ export async function reopenGoal(id: string): Promise<void> {
 }
 
 /**
- * Pause a goal: no planned set-asides while paused; money already set aside stays. Refused (a
- * no-op) on a closed or already paused goal, as the server refuses it.
+ * Pause a goal: no planned set-asides while paused — the ones already due are skipped; money
+ * already set aside stays. Refused (a no-op) on a closed or already paused goal, as the server
+ * refuses it.
  */
 export async function pauseGoal(
   id: string,
@@ -99,6 +101,8 @@ export async function pauseGoal(
   const goal = await liveGoal(id)
   if (!goal || goal.closedAt !== null || goal.pausedAt !== null) return
   await queueAction(goal, { pausedAt }, 'pause', { paused_at: pausedAt })
+  await skipDueSetAsides(id, pausedAt)
+  schedulePush()
 }
 
 /** Resume a paused goal: its plan is rewritten from today. */

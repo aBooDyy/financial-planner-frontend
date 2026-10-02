@@ -273,6 +273,14 @@ async function resolveOrphans(
       goalIds: new Set(inputs.goals.map((g) => g.id)),
       incomeIds: new Set(inputs.income.map((s) => s.id)),
       billNextDue: new Map(inputs.bills.map((b) => [b.id, b.nextDue])),
+      closedOwners: new Set([
+        ...inputs.goals
+          .filter((g) => g.closedAt !== null)
+          .map((g) => ownerKey(goalOwner(g.id))),
+        ...inputs.bills
+          .filter((b) => b.closedAt !== null)
+          .map((b) => ownerKey(billOwner(b.id))),
+      ]),
     },
     (row) => hasSettlements(row, state.index),
   )

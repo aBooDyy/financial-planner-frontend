@@ -3,7 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '#/db/db'
 import type { LocalGoal } from '#/db/types'
 import type { Goal } from '#/features/goals/api/types'
-import { goal, m, setAside } from '#/features/planned/testing/fixtures'
+import {
+  goal,
+  m,
+  planned,
+  setAside,
+} from '#/features/planned/testing/fixtures'
 import { ApiError } from '#/lib/apiError'
 
 vi.mock('#/db/sync', () => ({ schedulePush: vi.fn() }))
@@ -137,5 +142,32 @@ describe('close and reopen', () => {
     await reopenGoal('trip')
     expect((await db.goals.get('trip'))?.closedAt).toBeNull()
     expect((await queued()).map((e) => e.op)).toEqual(['reopen'])
+  })
+})
+
+describe('pausing a goal’s planned set-asides', () => {
+  it('skips the ones already due with nothing set aside against them', async () => {
+    const row = (id: string, date: string, over = {}) =>
+      planned({ id, goalId: 'trip', occurrence: date, date, ...over })
+    await db.plannedTransactions.bulkPut([
+      row('due', '2026-10-01'),
+      row('partial', '2026-09-01'),
+      row('done', '2026-08-01', { status: 'done' }),
+      row('later', '2026-11-01'),
+    ])
+    await db.setAsides.put(
+      setAside({ goalId: 'trip', plannedId: 'partial', amount: m(50) }),
+    )
+
+    await pauseGoal('trip', '2026-10-02')
+
+    const status = async (id: string) =>
+      (await db.plannedTransactions.get(id))?.status
+    expect(await status('due')).toBe('skipped')
+    expect(await status('partial')).toBe('open')
+    expect(await status('done')).toBe('done')
+    // Future rows are the planner's to remove.
+    expect(await status('later')).toBe('open')
+    expect((await queued())[0]).toMatchObject({ entity: 'goal', op: 'pause' })
   })
 })

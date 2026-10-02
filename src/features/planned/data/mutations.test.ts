@@ -301,6 +301,27 @@ describe('confirmPlanned', () => {
     })
   })
 
+  it('refuses to set aside for a paused goal or a closed bill', async () => {
+    await db.goals.put({ ...UMRAH, pausedAt: '2026-09-20' })
+    await expect(
+      confirmPlanned('sep', { walletId: 'w1' }),
+    ).rejects.toMatchObject({ code: 'owner_closed' })
+    await db.bills.put(bill({ id: 'car', closedAt: '2026-09-20' }))
+    await db.plannedTransactions.put(
+      planned({
+        id: 'car-save',
+        origin: 'bill',
+        goalId: null,
+        billId: 'car',
+        walletId: 'w1',
+      }),
+    )
+    await expect(confirmPlanned('car-save')).rejects.toMatchObject({
+      code: 'owner_closed',
+    })
+    expect(await db.setAsides.count()).toBe(0)
+  })
+
   it('asks for a wallet when the item has none', async () => {
     await expect(confirmPlanned('sep')).rejects.toBeInstanceOf(
       PlannedActionError,

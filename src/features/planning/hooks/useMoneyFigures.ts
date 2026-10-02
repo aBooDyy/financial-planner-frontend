@@ -45,6 +45,7 @@ export function useMoneyFigures(): MoneyFiguresView {
         index: state.index,
         setAsides: inputs.setAsides,
         bills: inputs.bills,
+        goals: inputs.goals,
         settings: inputs.settings,
         calendar: state.funding.calendar,
         today,

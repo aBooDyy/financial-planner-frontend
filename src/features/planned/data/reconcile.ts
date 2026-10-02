@@ -198,6 +198,8 @@ export type OrphanOrigins = {
   incomeIds: ReadonlySet<string>
   /** Each live bill's `nextDue`: an open payment dated before it is stale. */
   billNextDue: ReadonlyMap<string, string>
+  /** Closed goals and bills (`goal:<id>` / `bill:<id>`): nothing of theirs is still to come. */
+  closedOwners: ReadonlySet<string>
 }
 
 export type OrphanPlan = {
@@ -212,7 +214,9 @@ export type OrphanPlan = {
  * no longer exists, so they are resolved instead: skipped when nothing settles them, closed
  * with the rest abandoned when something does. A hand-made row belongs to no origin and stays —
  * unless it is a set-aside whose goal or bill is gone, which could never be confirmed. A bill
- * payment dated before the bill's `nextDue` (the user moved the bill on past it) is stale too.
+ * payment dated before the bill's `nextDue` (the user moved the bill on past it) is stale too,
+ * and so is every row of a closed goal or bill: closing drops the ones after the close date, and
+ * what was due by then (a one-off "Mark as paid", a missed set-aside) is over as well.
  */
 export function orphanedPlanned(
   rows: ReadonlyArray<LocalPlanned>,
@@ -220,9 +224,13 @@ export function orphanedPlanned(
   isSettled: (row: LocalPlanned) => boolean,
 ): OrphanPlan {
   const goalGone = (p: LocalPlanned) =>
-    !p.goalId || !origins.goalIds.has(p.goalId)
+    !p.goalId ||
+    !origins.goalIds.has(p.goalId) ||
+    origins.closedOwners.has(`goal:${p.goalId}`)
   const billGone = (p: LocalPlanned) =>
-    !p.billId || !origins.billNextDue.has(p.billId)
+    !p.billId ||
+    !origins.billNextDue.has(p.billId) ||
+    origins.closedOwners.has(`bill:${p.billId}`)
   const stalePayment = (p: LocalPlanned) =>
     p.role === 'payment' &&
     p.occurrence < (origins.billNextDue.get(p.billId ?? '') ?? '')

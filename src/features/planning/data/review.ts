@@ -128,7 +128,7 @@ function lineOf(
   if (amount <= 0) return null
   if (p.billId) {
     const bill = inputs.bills.find((b) => b.id === p.billId)
-    if (!bill) return null
+    if (!bill || bill.closedAt !== null) return null
     const due = occurrenceFrom(bill, p.date, payments.get(bill.id) ?? new Map())
     return {
       plannedId: p.id,
@@ -146,7 +146,7 @@ function lineOf(
     }
   }
   const goal = inputs.goals.find((g) => g.id === p.goalId)
-  if (!goal) return null
+  if (!goal || goal.closedAt !== null || goal.pausedAt !== null) return null
   return {
     plannedId: p.id,
     group: 'goals',

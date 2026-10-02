@@ -54,6 +54,7 @@ export type PlannedActionCode =
   | 'has_settlements'
   | 'not_manual'
   | 'origin_gone'
+  | 'owner_closed'
   | 'category_invalid'
 
 /** A planned action the item's state does not allow. `code` is stable; show your own copy. */
@@ -186,16 +187,22 @@ type SetAsideTarget =
   | { kind: 'goal'; goalId: string }
   | { kind: 'bill'; bill: LocalBill }
 
-/** Who a set-aside row puts money aside for: its goal, or its bill. */
-async function setAsideTargetOf(
-  item: LocalPlanned,
-): Promise<SetAsideTarget | null> {
+/**
+ * Who a set-aside row puts money aside for: its goal, or its bill. Refused when that is gone
+ * (`origin_gone`), or closed or paused (`owner_closed`) — reopen or resume it first.
+ */
+async function setAsideTargetOf(item: LocalPlanned): Promise<SetAsideTarget> {
   if (item.goalId) {
     const goal = await db.goals.get(item.goalId)
-    return goal && goal.deleted === 0 ? { kind: 'goal', goalId: goal.id } : null
+    if (!goal || goal.deleted !== 0) throw new PlannedActionError('origin_gone')
+    if (goal.closedAt !== null || goal.pausedAt !== null)
+      throw new PlannedActionError('owner_closed')
+    return { kind: 'goal', goalId: goal.id }
   }
   const bill = await billOf(item)
-  return bill ? { kind: 'bill', bill } : null
+  if (!bill) throw new PlannedActionError('origin_gone')
+  if (bill.closedAt !== null) throw new PlannedActionError('owner_closed')
+  return { kind: 'bill', bill }
 }
 
 /** A category the user's tree actually has for this type, preferring `wanted`. */
@@ -266,10 +273,7 @@ export async function confirmPlanned(
   input: ConfirmInput = {},
 ): Promise<ConfirmResult> {
   const item = await openItem(id)
-  // A set-aside is held for its goal or bill; with that gone there is nothing to hold it.
   const target = item.role === 'set_aside' ? await setAsideTargetOf(item) : null
-  if (item.role === 'set_aside' && !target)
-    throw new PlannedActionError('origin_gone')
   const rates = await currentRates()
   const remainder = Math.max(0, item.amount - (await settledNow(item)))
   const amount = input.amount ?? remainder

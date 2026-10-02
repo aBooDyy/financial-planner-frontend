@@ -393,6 +393,7 @@ describe('orphanedPlanned', () => {
     goalIds: new Set(['umrah']),
     incomeIds: new Set(['salary']),
     billNextDue: new Map([['rent', '2026-09-01']]),
+    closedOwners: new Set<string>(),
   }
   const row = (id: string, over: Partial<LocalPlanned>) =>
     planned({ id, occurrence: '2026-09-01', ...over })
@@ -473,6 +474,39 @@ describe('orphanedPlanned', () => {
       () => false,
     )
     expect(plan.skip).toEqual(['stale'])
+  })
+
+  it('resolves what a closed bill or goal left open on or before its close', () => {
+    const closing = {
+      goalIds: new Set(['umrah', 'trip']),
+      incomeIds: new Set(['salary']),
+      billNextDue: new Map([
+        ['rent', '2026-09-01'],
+        ['car', '2026-09-01'],
+      ]),
+      closedOwners: new Set(['goal:trip', 'bill:car']),
+    }
+    const plan = orphanedPlanned(
+      [
+        row('trip-due', { goalId: 'trip' }),
+        row('trip-partial', { goalId: 'trip' }),
+        row('trip-manual', { origin: 'manual', goalId: 'trip' }),
+        // "Mark as paid" on a one-off: its payment must not wait in Needs confirming.
+        row('car-payment', {
+          origin: 'bill',
+          role: 'payment',
+          goalId: null,
+          billId: 'car',
+        }),
+        row('umrah-due', { goalId: 'umrah' }),
+      ],
+      closing,
+      (p) => p.id === 'trip-partial',
+    )
+    expect(plan.skip.sort()).toEqual(
+      ['car-payment', 'trip-due', 'trip-manual'].sort(),
+    )
+    expect(plan.closeRest).toEqual(['trip-partial'])
   })
 
   it('skips a hand-made set-aside whose goal or bill is gone — it could never be confirmed', () => {

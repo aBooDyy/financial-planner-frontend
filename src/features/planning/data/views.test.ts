@@ -119,6 +119,28 @@ describe('the payday review', () => {
     ])
   })
 
+  it('leaves out a paused goal’s and a closed bill’s set-asides', () => {
+    const { inputs, state, today } = world()
+    const stopped = {
+      ...inputs,
+      goals: inputs.goals.map((g) =>
+        g.id === 'umrah' ? { ...g, pausedAt: '2026-10-20' } : g,
+      ),
+      bills: inputs.bills.map((b) =>
+        b.id === 'rent' ? { ...b, closedAt: '2026-10-20' } : b,
+      ),
+    }
+    const review = paydayReview(stopped, state, '2026-10-25', {
+      today,
+      walletCurrency: CURRENCIES,
+    })
+    expect(review.groups.flatMap((g) => g.lines.map((l) => l.name))).toEqual([
+      'Internet',
+      'Car insurance',
+      'Emergency fund',
+    ])
+  })
+
   it('lists the paydays waiting in the queue and counts their lines', () => {
     const { inputs, state, today } = world()
     const waiting = waitingReviews(inputs, state, {

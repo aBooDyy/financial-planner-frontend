@@ -166,6 +166,32 @@ export async function closeCovered(
 }
 
 /**
+ * A paused goal sets nothing aside: its open set-aside rows already due (on or before
+ * `through`) that nothing settles are skipped, so they never wait in Needs confirming. Later
+ * ones are the planner's to remove.
+ */
+export async function skipDueSetAsides(
+  goalId: string,
+  through: string,
+): Promise<string[]> {
+  const rows = (
+    await db.plannedTransactions.where('goalId').equals(goalId).toArray()
+  ).filter(
+    (p) =>
+      p.deleted === 0 &&
+      p.status === 'open' &&
+      p.role === 'set_aside' &&
+      p.date <= through,
+  )
+  if (rows.length === 0) return []
+  const { txns, setAsides } = await settlementsOf(rows.map((p) => p.id))
+  const index = indexSettlements(txns, setAsides)
+  const skip = rows.filter((p) => (index.get(p.id) ?? []).length === 0)
+  for (const row of skip) await savePlanned({ ...row, status: 'skipped' })
+  return skip.map((p) => p.id)
+}
+
+/**
  * A closed bill or goal stops planning: its open, unsettled rows dated after `after` go, as
  * the server deletes (and tombstones) them in the same close. Their queued writes go too; no
  * delete is queued — the close itself removes them server-side.

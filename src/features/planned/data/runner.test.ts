@@ -2,6 +2,7 @@ import 'fake-indexeddb/auto'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '#/db/db'
 import type { LocalPlanned } from '#/db/types'
+import { closeBill } from '#/features/bills/data/actions'
 import { updateBill } from '#/features/bills/data/mutations'
 import { deleteGoal, updateGoal } from '#/features/goals/data/mutations'
 import {
@@ -656,5 +657,32 @@ describe('runPlanner — a bill whose schedule changed', () => {
 
     expect(await live()).toEqual([['2027-03-15', 600]])
     expect(await plannedTotal()).toBe(600)
+  })
+})
+
+describe('runPlanner — a one-off marked as paid', () => {
+  it('does not leave its payment waiting in Needs confirming', async () => {
+    await db.goals.clear()
+    await db.bills.put(
+      bill({
+        id: 'service',
+        name: 'Car service',
+        amount: m(400),
+        frequency: null,
+        nextDue: '2026-09-20',
+        walletId: 'w1',
+      }),
+    )
+    await runPlanner(USER, SEP_24)
+    const payment = async () =>
+      (await db.plannedTransactions.where('billId').equals('service').toArray())
+        .filter((p) => p.role === 'payment')
+        .map((p) => p.status)
+    expect(await payment()).toEqual(['open'])
+
+    await closeBill('service', { closedAt: '2026-09-24' })
+    await runPlanner(USER, SEP_24)
+
+    expect(await payment()).toEqual(['skipped'])
   })
 })

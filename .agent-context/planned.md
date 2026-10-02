@@ -127,7 +127,9 @@ varies), each pull, each plan-rewrite request, and day rollover.
    resolved, so they never wait in Needs confirming for nothing: **skipped** when unsettled,
    **closed with the rest abandoned** when partly settled (`orphanedPlanned` in `reconcile.ts`).
    A bill payment dated before its bill's `nextDue` (the user moved the bill on past it) is
-   resolved the same way. MANUAL rows are left alone unless they are set-asides of a deleted
+   resolved the same way, and so is every open row of a **closed** bill or goal
+   (`closedOwners`): the close dropped the ones after its date, and what was due by then — a
+   one-off's payment after *Mark as paid*, a missed set-aside — is over too. MANUAL rows are left alone unless they are set-asides of a deleted
    goal or bill. (Deleting a goal or bill deletes its set-asides locally, as the server does,
    so its past set-aside rows read as unsettled and are skipped.)
 
@@ -143,7 +145,8 @@ varies), each pull, each plan-rewrite request, and day rollover.
    the pay:** while the main paycheck's income row on that payday (matched by `date` or
    `occurrence`, `ctx.mainStreamId`) is still open and unconfirmed — and is not being logged
    automatically in the same pass — the payday's lines are left alone, neither set aside nor
-   flagged; the next run after the income is confirmed takes them. Auto-confirms
+   flagged; the next run after the income is confirmed takes them. A closed bill's or a closed
+   or paused goal's set-asides are neither set aside nor flagged (`isStoppedOwner`). Auto-confirms
    write under `autoSettlementId(plannedId)` (UUIDv5), so two devices write one row. A failed
    confirm is left for the user. The run's `auto` summary counts them, and Automatic mode posts
    a `PaydayNotice` to `stores/paydayNotice.ts` for the toast.
@@ -185,7 +188,7 @@ spend carrying the bill (`billId`, the bill's category, merchant and note) or, f
 manual payment, the goal; SET_ASIDE → set-aside(s) for the row's goal or bill (`origin_gone`
 when that owner no longer exists) — in a wallet, or outside under a label. Amounts are in the
 item's currency and converted to the wallet's. Defaults: the open remainder, the item's wallet,
-**today**. Partial keeps it open; overpaying closes it and the excess still counts.
+**today**. A set-aside for a closed bill or a closed or paused goal is refused (`owner_closed`). Partial keeps it open; overpaying closes it and the excess still counts.
 `settlementId` makes it idempotent (the runner's auto-confirms pass a deterministic one); the
 result carries `settlementId` and every row written (`settlementIds`).
 

@@ -9,10 +9,15 @@
  * H is `safeHorizonEnd` (until the day before the next main payday by default). Payments and
  * set-asides already overdue count too: until confirmed, that money is still in the free
  * figure. A bill set-aside whose occurrence falls due within H is left out — its payment is
- * already counted, and counting both would take the money twice. Budgets are never
- * subtracted (D18). Pure.
+ * already counted, and counting both would take the money twice. A closed bill's or a closed or
+ * paused goal's rows count for nothing. Budgets are never subtracted (D18). Pure.
  */
-import type { LocalBill, LocalPlanned, LocalSetAside } from '#/db/types'
+import type {
+  LocalBill,
+  LocalGoal,
+  LocalPlanned,
+  LocalSetAside,
+} from '#/db/types'
 import { remainderOf } from '#/features/planned/data/settle'
 import type { SettlementIndex } from '#/features/planned/data/settle'
 import { isLiveSetAside } from '#/features/setAsides/data/totals'
@@ -24,6 +29,7 @@ import { convertMinor } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
 import type { RatesMap } from '#/lib/config/rates'
 import type { MoneyFigures } from './balances'
+import { isStoppedOwner } from './funding'
 import { occurrenceFrom, paymentRowsByBill } from './occurrences'
 import { paydayAfter, safeHorizonEnd } from './payPeriods'
 import type { PayCalendar } from './payPeriods'
@@ -67,6 +73,7 @@ export type SafeToSpendInput = {
   index: SettlementIndex
   setAsides: ReadonlyArray<LocalSetAside>
   bills: ReadonlyArray<LocalBill>
+  goals: ReadonlyArray<LocalGoal>
   settings: Pick<PlanningSettings, 'safeHorizon' | 'safeHorizonDays'>
   calendar: PayCalendar
   /** ISO date. */
@@ -84,6 +91,7 @@ export function safeToSpend(input: SafeToSpendInput): SafeToSpend {
   const { today, base, rates, index } = input
   const end = safeHorizonEnd(input.settings, input.calendar, today)
   const bills = new Map(input.bills.map((b) => [b.id, b]))
+  const goals = new Map(input.goals.map((g) => [g.id, g]))
   const payments = paymentRowsByBill(input.planned)
   const inBase = (amount: number, currency: CurrencyCode) =>
     convertMinor(amount, currency, base, rates)
@@ -113,7 +121,11 @@ export function safeToSpend(input: SafeToSpendInput): SafeToSpend {
       )
 
   const open = input.planned.filter(
-    (p) => p.deleted === 0 && p.status === 'open' && p.date <= end,
+    (p) =>
+      p.deleted === 0 &&
+      p.status === 'open' &&
+      p.date <= end &&
+      !isStoppedOwner(p, bills, goals),
   )
   const billLines: SafeLine[] = []
   const setAsideLines: SafeLine[] = []
