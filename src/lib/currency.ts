@@ -120,18 +120,32 @@ export const numberFormat = (
   return format
 }
 
-/** Format minor units as a display string, e.g. "SR 18,420.50". */
+/**
+ * The sign goes ahead of the symbol, as a true minus ("−SR 100.00", never "SR -100.00"), and
+ * an amount that rounds away to nothing shows no sign.
+ */
+const withSymbol = (
+  amountMinor: number,
+  code: CurrencyCode,
+  formatMajor: (major: number) => string,
+): string => {
+  const formatted = formatMajor(Math.abs(toMajor(amountMinor, code)))
+  const sign = amountMinor < 0 && /[1-9]/.test(formatted) ? '−' : ''
+  return `${sign}${prefixFor(code)}${formatted}`
+}
+
+/** Format minor units as a display string, e.g. "SR 18,420.50" or "−SR 40.00". */
 export const formatMoney = (
   amountMinor: number,
   code: CurrencyCode,
   locale = 'en-US',
 ): string => {
   const decimals = decimalsFor(code)
-  const formatted = numberFormat(locale, {
+  const format = numberFormat(locale, {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
-  }).format(toMajor(amountMinor, code))
-  return `${prefixFor(code)}${formatted}`
+  })
+  return withSymbol(amountMinor, code, (major) => format.format(major))
 }
 
 /**
@@ -143,10 +157,10 @@ export const formatMoneyRounded = (
   code: CurrencyCode,
   locale = 'en-US',
 ): string => {
-  const formatted = numberFormat(locale, {
-    maximumFractionDigits: 0,
-  }).format(Math.round(toMajor(amountMinor, code)))
-  return `${prefixFor(code)}${formatted}`
+  const format = numberFormat(locale, { maximumFractionDigits: 0 })
+  return withSymbol(amountMinor, code, (major) =>
+    format.format(Math.round(major)),
+  )
 }
 
 /** Format minor units compactly for a chart scale, e.g. "SR 12K". */
@@ -155,11 +169,11 @@ export const formatMoneyCompact = (
   code: CurrencyCode,
   locale = 'en-US',
 ): string => {
-  const formatted = numberFormat(locale, {
+  const format = numberFormat(locale, {
     notation: 'compact',
     maximumFractionDigits: 1,
-  }).format(toMajor(amountMinor, code))
-  return `${prefixFor(code)}${formatted}`
+  })
+  return withSymbol(amountMinor, code, (major) => format.format(major))
 }
 
 /**

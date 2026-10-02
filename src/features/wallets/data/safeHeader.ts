@@ -132,7 +132,7 @@ export function safeHeaderView(args: {
       link: 'upcoming',
     })
   return {
-    safeStr: safe.safe < 0 ? `−${fmt(-safe.safe)}` : fmt(safe.safe),
+    safeStr: fmt(safe.safe),
     negative: safe.safe < 0,
     windowStr: words.title,
     shortStr:

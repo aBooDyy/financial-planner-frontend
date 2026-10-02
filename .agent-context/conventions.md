@@ -96,6 +96,10 @@ minimal non-stale comments).
   keeps the plain `18420.50`; `minorToInputValue` prefills with the currency's full decimals.
 - **Ledger rows show exact money.** Activity rows and day totals use `formatMoney`
   (`SR 1,234.50`); `formatMoneyRounded` is for planning/summary figures only.
+- **Negative money reads `−SR 100.00`.** `formatMoney`, `formatMoneyRounded` and
+  `formatMoneyCompact` put a true minus (U+2212) ahead of the symbol and drop it when the amount
+  rounds to zero, so pass signed amounts straight in rather than hand-building the sign. Only
+  an explicit `+` for gains (`+SR 120.00`) is added by the caller.
 
 ## Comments
 

@@ -4,6 +4,8 @@ import {
   convertMinor,
   decimalsFor,
   formatMoney,
+  formatMoneyCompact,
+  formatMoneyRounded,
   fromWireCurrency,
   fromWireCurrencyOrNull,
   isSupportedCurrency,
@@ -57,6 +59,17 @@ describe('formatMoney', () => {
   it('shows the digits the currency actually has', () => {
     expect(formatMoney(1200, 'JPY')).toBe('¥1,200')
     expect(formatMoney(12345, 'KWD')).toBe('KD 12.345')
+  })
+
+  it('puts a true minus ahead of the symbol', () => {
+    expect(formatMoney(-10000, 'SAR')).toBe('−SR 100.00')
+    expect(formatMoney(-150, 'USD')).toBe('−$1.50')
+    expect(formatMoneyRounded(-300000, 'SAR')).toBe('−SR 3,000')
+    expect(formatMoneyCompact(-1200000, 'SAR')).toBe('−SR 12K')
+  })
+
+  it('drops the sign when the amount rounds to nothing', () => {
+    expect(formatMoneyRounded(-40, 'SAR')).toBe('SR 0')
   })
 })
 

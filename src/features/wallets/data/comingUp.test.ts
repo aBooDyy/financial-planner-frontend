@@ -169,7 +169,7 @@ describe('buildComingUp', () => {
         }),
       ],
     )
-    expect(v.wallets[0].nowStr).toBe('SR -100.00')
+    expect(v.wallets[0].nowStr).toBe('−SR 100.00')
     expect(v.wallets[0].alert).toBeNull()
   })
 
