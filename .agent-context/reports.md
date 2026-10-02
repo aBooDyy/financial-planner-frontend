@@ -36,8 +36,10 @@ start`), so no window ever runs backwards.
 `readReportLedger(spans, periodStart, rates)` is one live query: the rows in the period's and the
 comparison's spans (`inAnyRange` over `mergeRanges`), plus **`before`** — `walletDeltas` over
 every row dated before the period, reduced inside the query so only a per-wallet map reaches
-React — plus merchant names, plus **`goalSetAsides`** — the live (`isLiveSetAside`) goal set-asides
-dated in any of the spans, for the Needs / Wants / Savings caption. The answer is tagged with `ledgerKey(spans)`; `useReport` only
+React — plus merchant names, plus **`goalSetAsides`** — the goal set-asides dated in any of the spans that
+count as saving (`data/goalSaving.ts#countsAsGoalSaving`: live, or later used by a payment;
+not freed again, not a move's new row — a transfer-less move leaves no mark, so its money
+counts once, on the move's date), for the Needs / Wants / Savings caption. The answer is tagged with `ledgerKey(spans)`; `useReport` only
 builds a view from an answer whose key matches, and keeps showing the last built view while a
 new period loads (state, not a ref), so switching presets never flashes skeletons or stale sums.
 

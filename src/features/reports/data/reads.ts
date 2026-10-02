@@ -1,10 +1,10 @@
 import { db } from '#/db/db'
 import type { LocalSetAside, LocalTransaction } from '#/db/types'
-import { isLiveSetAside } from '#/features/setAsides/data/totals'
 import { walletDeltas } from '#/features/transactions/data/ledger'
 import { mergeRanges } from '#/features/transactions/data/ledgerRange'
 import type { IsoRange } from '#/features/transactions/data/ledgerRange'
 import type { RatesMap } from '#/lib/config/rates'
+import { countsAsGoalSaving } from './goalSaving'
 
 /** What one report reads from the ledger. */
 export type ReportLedger = {
@@ -15,7 +15,7 @@ export type ReportLedger = {
   /** Each wallet's signed delta from every row dated before the period. */
   before: Record<string, number>
   merchantNames: Map<string, string>
-  /** Live goal set-asides dated in the period or its comparison. */
+  /** Goal set-asides dated in the period or its comparison that count as saving. */
   goalSetAsides: LocalSetAside[]
 }
 
@@ -57,8 +57,7 @@ export async function readReportLedger(
     ),
     goalSetAsides: setAsides.filter(
       (a) =>
-        a.goalId !== null &&
-        isLiveSetAside(a) &&
+        countsAsGoalSaving(a) &&
         merged.some(([from, to]) => a.date >= from && a.date <= to),
     ),
   }
