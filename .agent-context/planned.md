@@ -218,7 +218,7 @@ result carries `settlementId` and every row written (`settlementIds`).
   occurrence.
 - **A payment that settles an occurrence rewrites the bill's plan quietly**
   (`replanSettledOccurrence(billId, occurrence)` — `confirmPlanned` calls it; any other path that
-  writes a bill payment, e.g. `settleBillPayment`, should too). Paying early would otherwise
+  writes a bill payment calls it too — `payBill` / `settleBillPayment`'s `afterPayment`). Paying early would otherwise
   leave the set-asides still planned for that occurrence to be set aside again. A part payment
   files nothing.
 - **`nextDue`** (`syncBillNextDue`): after a payment, a close-the-rest or a skip it moves to the

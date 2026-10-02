@@ -8,10 +8,9 @@
 import { db } from '#/db/db'
 import type { LocalBill, LocalPlanned, LocalSetAside } from '#/db/types'
 import { plannedIdFor } from '#/features/planned/data/ids'
-import { billOwner } from '#/features/planned/data/owners'
-import { requestPlanRecalc } from '#/features/planned/data/recalcRequests'
 import {
   confirmPlanned,
+  replanSettledOccurrence,
   syncBillNextDue,
 } from '#/features/planned/data/mutations'
 import { currentRates, insertPlanned } from '#/features/planned/data/rows'
@@ -20,7 +19,6 @@ import type { LeftoverReport } from '#/features/planning/data/leftover'
 import {
   billOccurrences,
   firstOpenOccurrence,
-  isSettledOccurrence,
   paymentRowsOf,
 } from '#/features/planning/data/occurrences'
 import {
@@ -169,9 +167,8 @@ async function afterPayment(
     payments: after,
     rates,
   })
-  if (!isSettledOccurrence(after, occurrence))
+  if (!(await replanSettledOccurrence(bill.id, occurrence)))
     return { ...report, lines: [], total: 0 }
-  requestPlanRecalc(billOwner(bill.id), { quiet: true })
   return withPayingWallet(report, bill, setAsides, payingWalletId, rates)
 }
 
