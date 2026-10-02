@@ -14,6 +14,10 @@ export const TAKEAWAY = catId('takeaway', 'dining')
 export const GROCERIES = catId('groceries')
 export const SALARY = catId('salary')
 export const FREELANCE = catId('freelance')
+export const INVESTING = catId('investing')
+export const OTHER = catId('other')
+export const RENT = catId('rent', 'housing')
+export const HOUSING = catId('housing')
 
 export const reportCatalog = () =>
   buildCatalog([
@@ -21,6 +25,7 @@ export const reportCatalog = () =>
       slug: 'dining',
       name: 'Dining',
       color: '#EF4444',
+      spendClass: 'want',
       position: 0,
     }),
     categoryRow({
@@ -43,6 +48,7 @@ export const reportCatalog = () =>
       slug: 'groceries',
       name: 'Groceries',
       color: '#22C55E',
+      spendClass: 'need',
       position: 1,
     }),
     categoryRow({
@@ -58,6 +64,34 @@ export const reportCatalog = () =>
       type: 'income',
       color: '#0EA5E9',
       position: 3,
+    }),
+    categoryRow({
+      slug: 'investing',
+      name: 'Investing',
+      color: '#1F9D6B',
+      spendClass: 'saving',
+      position: 4,
+    }),
+    categoryRow({
+      slug: 'other',
+      name: 'Other',
+      color: '#64748B',
+      position: 5,
+    }),
+    categoryRow({
+      slug: 'housing',
+      name: 'Housing',
+      color: '#8B5CF6',
+      spendClass: 'need',
+      position: 6,
+    }),
+    categoryRow({
+      id: RENT,
+      parentId: HOUSING,
+      slug: 'rent',
+      name: 'Rent',
+      color: '',
+      position: 0,
     }),
   ])
 

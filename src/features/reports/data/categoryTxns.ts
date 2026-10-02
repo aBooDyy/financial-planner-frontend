@@ -14,6 +14,12 @@ import { convertMinor, formatMoney } from '#/lib/currency'
 import type { DateFormat } from '#/lib/date'
 import { ROOT_ITSELF_LABEL } from './breakdown'
 import { rowsIn } from './flowRows'
+import { bucketOf } from './needsWants'
+import type { SpendBucket } from './needsWants'
+import {
+  SPEND_CLASS_LABEL,
+  UNSORTED_LABEL,
+} from '#/features/categories/spendClass'
 import type { ReportWindow } from './range'
 
 /** A breakdown row whose transactions are asked for. */
@@ -22,6 +28,11 @@ export type CategoryPick = {
   rootId: string
   /** One subcategory beneath the root — the root's own id for its "General" rows — or null for all of it. */
   subId: string | null
+  /**
+   * Only the spends in this Needs / Wants / Savings bucket — the card's drill-down. Without
+   * it a spend pick leaves out the Savings bucket, as Reports' spending does.
+   */
+  bucket?: SpendBucket
 }
 
 export type CategoryTxnsView = {
@@ -53,10 +64,17 @@ export function categoryTxnsOf({
   inputs,
 }: Omit<Inputs, 'today' | 'dateFormat'>): LocalTransaction[] {
   const inScope = walletMatcher(scope, [...inputs.nodes])
+  const inBucket = (categoryId: string) => {
+    if (pick.type !== 'spend') return true
+    const bucket = bucketOf(catalog, categoryId)
+    return pick.bucket === undefined
+      ? bucket !== 'saving'
+      : bucket === pick.bucket
+  }
   const inPick = (categoryId: string) =>
-    pick.subId !== null
+    (pick.subId !== null
       ? categoryId === pick.subId
-      : catalog.rootOf(categoryId).id === pick.rootId
+      : catalog.rootOf(categoryId).id === pick.rootId) && inBucket(categoryId)
   return rowsIn(rows, period).filter(
     (t) =>
       t.deleted === 0 &&
@@ -93,8 +111,15 @@ export function buildCategoryTxns(args: Inputs): CategoryTxnsView {
         ? ROOT_ITSELF_LABEL
         : catalog.get(pick.subId).name
 
+  const bucketName =
+    pick.bucket === undefined
+      ? null
+      : pick.bucket === 'unsorted'
+        ? UNSORTED_LABEL
+        : SPEND_CLASS_LABEL[pick.bucket]
+
   return {
-    title: subName ? `${root.name} · ${subName}` : root.name,
+    title: [root.name, subName, bucketName].filter(Boolean).join(' · '),
     countStr: `${count} transaction${count === 1 ? '' : 's'}`,
     totalStr: formatMoney(total, inputs.base),
     list: {

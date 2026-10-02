@@ -1,5 +1,6 @@
 import { db } from '#/db/db'
-import type { LocalTransaction } from '#/db/types'
+import type { LocalSetAside, LocalTransaction } from '#/db/types'
+import { isLiveSetAside } from '#/features/setAsides/data/totals'
 import { walletDeltas } from '#/features/transactions/data/ledger'
 import { mergeRanges } from '#/features/transactions/data/ledgerRange'
 import type { IsoRange } from '#/features/transactions/data/ledgerRange'
@@ -14,6 +15,8 @@ export type ReportLedger = {
   /** Each wallet's signed delta from every row dated before the period. */
   before: Record<string, number>
   merchantNames: Map<string, string>
+  /** Live goal set-asides dated in the period or its comparison. */
+  goalSetAsides: LocalSetAside[]
 }
 
 export const ledgerKey = (spans: ReadonlyArray<IsoRange>): string =>
@@ -28,14 +31,16 @@ export async function readReportLedger(
   periodStart: string,
   rates: RatesMap,
 ): Promise<ReportLedger> {
-  const [rows, earlier, nodes, merchants] = await Promise.all([
+  const merged = mergeRanges(spans)
+  const [rows, earlier, nodes, merchants, setAsides] = await Promise.all([
     db.transactions
       .where('date')
-      .inAnyRange(mergeRanges(spans), { includeUppers: true })
+      .inAnyRange(merged, { includeUppers: true })
       .toArray(),
     db.transactions.where('date').below(periodStart).toArray(),
     db.balanceNodes.toArray(),
     db.merchants.toArray(),
+    db.setAsides.toArray(),
   ])
   return {
     key: ledgerKey(spans),
@@ -49,6 +54,12 @@ export async function readReportLedger(
       merchants
         .filter((m) => m.deleted === 0)
         .map((m) => [m.id, m.displayName]),
+    ),
+    goalSetAsides: setAsides.filter(
+      (a) =>
+        a.goalId !== null &&
+        isLiveSetAside(a) &&
+        merged.some(([from, to]) => a.date >= from && a.date <= to),
     ),
   }
 }

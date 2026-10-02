@@ -36,7 +36,8 @@ start`), so no window ever runs backwards.
 `readReportLedger(spans, periodStart, rates)` is one live query: the rows in the period's and the
 comparison's spans (`inAnyRange` over `mergeRanges`), plus **`before`** — `walletDeltas` over
 every row dated before the period, reduced inside the query so only a per-wallet map reaches
-React — plus merchant names. The answer is tagged with `ledgerKey(spans)`; `useReport` only
+React — plus merchant names, plus **`goalSetAsides`** — the live (`isLiveSetAside`) goal set-asides
+dated in any of the spans, for the Needs / Wants / Savings caption. The answer is tagged with `ledgerKey(spans)`; `useReport` only
 builds a view from an answer whose key matches, and keeps showing the last built view while a
 new period loads (state, not a ref), so switching presets never flashes skeletons or stale sums.
 
@@ -44,6 +45,11 @@ new period loads (state, not a ref), so switching presets never flashes skeleton
 
 - `flowRowsOf` — live **spend/income with a category**, in scope, converted to base. Transfer legs
   and balance adjustments never count (the product's reports rule).
+- **A spend filed under a Savings category is not spending** (`isSavingSpend`: `classOf` says
+  `saving`, e.g. investing). `buildReport` drops those rows before the summary, trend, breakdown
+  and largest builders, so every "Spending" figure and Net skip them; only the Needs / Wants /
+  Savings card reads them (as part of Savings). The balance strip's change then differs from
+  Net by them, and says so: "Net less what went into savings categories".
 - `summary.ts` — income, spending, net; `pctDelta` ("▲ 12%", "No change" under 1%, or `NO_BASE` — a chevrons-up-down glyph and "–%", with a hint — when the comparison period had nothing) toned
   by whether the change is welcome (more income good, more spending bad); net's delta is money.
 - `balances.ts` — `balanceAt(throughIso)` = each in-scope, non-archived wallet's opening amount
@@ -62,8 +68,30 @@ new period loads (state, not a ref), so switching presets never flashes skeleton
   largest, delta; expanding shows "N transactions · avg · last period" and the leaves the rows
   were filed under — a row filed on the root itself is listed as **"General"**.
 - `largest.ts` — the six biggest spends, titled merchant → note → leaf category name.
+- `needsWants.ts` — **Needs / Wants / Savings** (06, D12). `bucketOf` = `classOf` or
+  `'unsorted'`; `needsWantsTotals(flowRows, catalog)` → `{income, need, want, unsorted,
+  savedSpends, savings}` with **savings = income − need − want − unsorted** (so savings-class
+  spends sit inside it, and it goes negative when overspent); `sharesOf` → whole % of income
+  (largest-remainder rounded to exactly 100 unless overspent; null without income);
+  `sharesLine`, `pctText` (true minus sign). **`needsWantsSummary({rows, from, to, catalog,
+  base, rates})`** → `{totals, shares, line}` is the pure, all-accounts summary any surface can
+  read (Planning Overview's "Last month: Needs 48% · Wants 31% · Savings 21%").
+- `needsWantsCard.ts` — `buildNeedsWants({cur, prev, goalSetAside, range, today, catalog,
+  base})` (fed the rows **with** savings spends): `segments` (needs, wants, not sorted,
+  savings as widths of income; overspent → the spends squeezed into income's share and a red
+  `overspent` tail; no income → the spends' own split), `ticks` at 50/80 % of income (moved
+  with the squeeze), three `rows` (amount, %, guideline `≤ 50%` / `≤ 30%` / `≥ 20%`,
+  `verdictOf`: ✓ / "a little over|under" within 5 points / "over|under", tone good|warn — a
+  benchmark, never danger), `wasStr` from the comparison, Savings' `note` ("SR 9,000 set aside
+  for goals · SR 1,000 into savings categories", or "Overspent by …"), the roots behind each
+  bucket for the drill-down, `unsorted` (amount, %, the roots to tag, "Sort N categories"), and
+  `months` — a 100%-stacked split per calendar month (`monthBuckets`, future months dropped)
+  once the range spans ≥ 3 of them. `goalSetAside` comes from `buildReport`: wallet set-asides
+  in scope, outside ones only for all accounts (Spending's rule).
 - `categoryTxns.ts` — the transactions behind one breakdown row. A `CategoryPick` is
-  `{ type, rootId, subId }`: `subId: null` is the whole root (rolled up via `rootOf`), the
+  `{ type, rootId, subId, bucket? }` — `bucket` narrows a spend pick to one Needs / Wants /
+  Savings / unsorted bucket (the card's drill-down; titled "Transport · Wants"), and without it
+  a spend pick leaves the Savings bucket out, matching the breakdown: `subId: null` is the whole root (rolled up via `rootOf`), the
   root's own id is its "General" rows. `categoryTxnsOf` applies the breakdown's own filters
   (live, the pick's type, in scope, `start..dataEnd`), so the list always matches the figure the
   user clicked; `buildCategoryTxns` feeds those rows to Spending's `buildActivityList` (no
@@ -73,7 +101,13 @@ new period loads (state, not a ref), so switching presets never flashes skeleton
 
 `ReportsPage` (TopNav + MobileTabBar shell) → `ReportsHeader` (title; account filter on desktop)
 → `RangeControls` (period `MenuSelect` prominent, caption or custom-span button, account filter on
-mobile, comparison `MenuSelect`) → `SummaryCards` (net leads full-width on mobile) → `TrendCard`
+mobile, comparison `MenuSelect`) → `SummaryCards` (net leads full-width on mobile) →
+`NeedsWantsCard` (the `SegmentedBar` with `fillClassName` per bucket from
+`components/needsWantsFills.ts` over `categories/spendClass.ts`, the 50/80 tick strip, one
+`NeedsWantsRow` per bucket — a toggle opening the bucket's roots, each a button that opens
+`CategoryTransactionsDialog` with `bucket` set — the Not sorted row with its **Sort N
+categories** button, which opens `SortCategoriesDialog` (the roots captured when it opened, each
+with a `SpendClassChip`), and `NeedsWantsTrend` for ≥ 3 months) → `TrendCard`
 (`BalanceSummary`, `TrendReadout`, `TrendChart`) → `CategoryBreakdownCard` (`CategoryRow`) beside
 `LargestExpensesCard` (360px rail on desktop). An expanded category's panel has a **View all** button and
 each subcategory row is a button (chevron at the end); either opens

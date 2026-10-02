@@ -10,8 +10,10 @@ import { useSessionStore } from '#/stores/session'
 import { CategoryBreakdownCard } from './CategoryBreakdownCard'
 import { CategoryTransactionsDialog } from './CategoryTransactionsDialog'
 import { LargestExpensesCard } from './LargestExpensesCard'
+import { NeedsWantsCard } from './NeedsWantsCard'
 import { RangeControls } from './RangeControls'
 import { ReportsHeader } from './ReportsHeader'
+import { SortCategoriesDialog } from './SortCategoriesDialog'
 import { SummaryCards } from './SummaryCards'
 import { TrendCard } from './TrendCard'
 
@@ -22,6 +24,7 @@ export function ReportsPage() {
   const { range, today, view, rows, sections, scope, balancesLoading } =
     useReport(controls)
   const [pick, setPick] = useState<CategoryPick | null>(null)
+  const [sorting, setSorting] = useState<string[] | null>(null)
 
   if (!user) return null
 
@@ -55,6 +58,13 @@ export function ReportsPage() {
             scopePicker={scopePicker(true)}
           />
           <SummaryCards view={view?.summary ?? null} />
+          <NeedsWantsCard
+            view={view?.needsWants ?? null}
+            onViewCategory={(bucket, rootId) =>
+              setPick({ type: 'spend', rootId, subId: null, bucket })
+            }
+            onSort={setSorting}
+          />
           <TrendCard
             trend={view?.trend ?? null}
             balance={view?.balance ?? null}
@@ -82,6 +92,12 @@ export function ReportsPage() {
           scope={scope}
           range={range}
           onClose={() => setPick(null)}
+        />
+      ) : null}
+      {sorting ? (
+        <SortCategoriesDialog
+          rootIds={sorting}
+          onClose={() => setSorting(null)}
         />
       ) : null}
     </div>

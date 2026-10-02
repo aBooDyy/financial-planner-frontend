@@ -1,13 +1,21 @@
 import { describe, expect, it } from 'vitest'
-import { RATES, m, tx, wallet } from '#/features/planned/testing/fixtures'
+import {
+  RATES,
+  m,
+  setAside,
+  tx,
+  wallet,
+} from '#/features/planned/testing/fixtures'
 import {
   CAFES,
   GROCERIES,
+  INVESTING,
   SALARY,
   reportCatalog,
 } from '#/features/reports/testing/fixtures'
 import type { Scope } from '#/features/transactions/data/selectors'
 import { reportRange } from './range'
+import type { ReportLedger } from './reads'
 import { buildReport } from './report'
 
 const TODAY = new Date(2026, 8, 29)
@@ -23,7 +31,7 @@ const nodes = [
   }),
 ]
 
-const ledger = {
+const ledger: ReportLedger = {
   key: '',
   rows: [
     tx({
@@ -81,11 +89,12 @@ const ledger = {
   ],
   before: { w1: m(1000) },
   merchantNames: new Map([['mer1', 'Blue Bottle']]),
+  goalSetAsides: [],
 }
 
-const report = (scope: Scope) =>
+const report = (scope: Scope, over: Partial<ReportLedger> = {}) =>
   buildReport({
-    ledger,
+    ledger: { ...ledger, ...over },
     nodes,
     scope,
     range: reportRange('this_month', { start: '', end: '' }, 'prev', TODAY),
@@ -147,5 +156,59 @@ describe('buildReport', () => {
     expect(r.balance.startStr).toBe('SR 0')
     expect(r.balance.endStr).toBe('SR 1,700')
     expect(r.breakdown.income.items).toEqual([])
+  })
+
+  it('counts a spend into a Savings category as savings, not spending', () => {
+    const r = report(
+      { type: 'all' },
+      {
+        rows: [
+          ...ledger.rows,
+          tx({
+            type: 'spend',
+            walletId: 'w1',
+            categoryId: INVESTING,
+            amount: m(700),
+            date: '2026-09-12',
+          }),
+        ],
+      },
+    )
+    expect(r.summary.spending.amountStr).toBe('SR 1,300')
+    expect(r.summary.net.amountStr).toBe('+SR 3,700')
+    expect(r.trend.whole.spendingStr).toBe('SR 1,300')
+    expect(r.breakdown.spend.items.map((i) => i.name)).toEqual([
+      'Dining',
+      'Groceries',
+    ])
+    expect(r.largest.map((i) => i.title)).not.toContain('Investing')
+    expect(r.balance.changeStr).toBe('+SR 3,000')
+    expect(r.balance.note).toBe('Net less what went into savings categories')
+    expect(r.needsWants.rows[2]).toMatchObject({
+      amountStr: 'SR 3,700',
+      note: 'SR 700 into savings categories',
+    })
+  })
+
+  it('captions the live goal set-asides dated in the period and scope', () => {
+    const goalSetAsides = [
+      setAside({ walletId: 'w1', amount: m(400), date: '2026-09-05' }),
+      setAside({ walletId: 'w2', amount: m(100), date: '2026-09-06' }),
+      setAside({
+        source: 'outside',
+        walletId: null,
+        externalLabel: 'Bank',
+        amount: m(50),
+        date: '2026-09-07',
+      }),
+      setAside({ walletId: 'w1', amount: m(900), date: '2026-08-05' }),
+    ]
+    expect(
+      report({ type: 'all' }, { goalSetAsides }).needsWants.rows[2].note,
+    ).toBe('SR 550 set aside for goals')
+    expect(
+      report({ type: 'wallet', id: 'w1' }, { goalSetAsides }).needsWants.rows[2]
+        .note,
+    ).toBe('SR 400 set aside for goals')
   })
 })

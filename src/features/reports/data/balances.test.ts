@@ -83,9 +83,17 @@ describe('balanceAt', () => {
   })
 })
 
+const flows = (net: number, savedSpends = 0) => ({ net, savedSpends })
+
 describe('buildBalanceStrip', () => {
   it('reads the start, today and the change, noting when it equals net', () => {
-    const strip = buildBalanceStrip(reader(), range(), m(125), true, 'SAR')
+    const strip = buildBalanceStrip(
+      reader(),
+      range(),
+      flows(m(125)),
+      true,
+      'SAR',
+    )
     expect(strip).toEqual({
       startStr: 'SR 1,875',
       startDate: 'Sep 1, 2026',
@@ -100,19 +108,27 @@ describe('buildBalanceStrip', () => {
 
   it('treats a change within the same whole unit as equal to net', () => {
     const read = (iso: string) => (iso === '2026-08-31' ? 0 : 12_540)
-    expect(buildBalanceStrip(read, range(), 12_510, false, 'SAR').note).toBe(
-      'Equals net for the period',
-    )
+    expect(
+      buildBalanceStrip(read, range(), flows(12_510), false, 'SAR').note,
+    ).toBe('Equals net for the period')
   })
 
   it('explains a change that is not the net', () => {
     const read = reader()
-    expect(buildBalanceStrip(read, range(), m(100), true, 'SAR').note).toBe(
-      'Net plus balance adjustments',
-    )
-    expect(buildBalanceStrip(read, range(), m(100), false, 'SAR').note).toBe(
-      'Includes transfers in and out',
-    )
+    expect(
+      buildBalanceStrip(read, range(), flows(m(100)), true, 'SAR').note,
+    ).toBe('Net plus balance adjustments')
+    expect(
+      buildBalanceStrip(read, range(), flows(m(100)), false, 'SAR').note,
+    ).toBe('Includes transfers in and out')
+  })
+
+  it('explains a change that is net less money put into savings categories', () => {
+    const read = reader()
+    expect(
+      buildBalanceStrip(read, range(), flows(m(225), m(100)), false, 'SAR')
+        .note,
+    ).toBe('Net less what went into savings categories')
   })
 
   it('calls a finished period its ending balance, and signs a drop', () => {
@@ -120,7 +136,7 @@ describe('buildBalanceStrip', () => {
     const strip = buildBalanceStrip(
       read,
       range('last_month'),
-      -m(700),
+      flows(-m(700)),
       true,
       'SAR',
     )

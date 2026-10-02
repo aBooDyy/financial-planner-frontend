@@ -302,7 +302,8 @@ alone overflows a line; a part still too long then truncates.
 **`SegmentedBar` — the one stacked bar** (`src/components/SegmentedBar.tsx`). The Cashflow hero
 (Spending) and the Total hero (Wallets) both draw a proportional stack of coloured parts, so the
 stack itself is a shared primitive: it takes `BarSegment[]` (`key`, `label`, `color`, `pct`,
-`valueStr`, `pctStr`, optional `note`) and reveals a part's figures on hover, keyboard focus and
+`valueStr`, `pctStr`, optional `note`; a part themed per light/dark passes `fillClassName` — e.g.
+the Needs / Wants / Savings fills, `bg-[#…] dark:bg-[#…]` — instead of a `color`) and reveals a part's figures on hover, keyboard focus and
 tap. A segment is a real `<button>` with an `aria-label` carrying the same three facts, so the bar
 is reachable without a pointer; non-active segments dim to 0.4 so the one being read stands out.
 The numbers are **built by the selectors, not the bar** — `buildCashflow`/`buildBudgetsView`

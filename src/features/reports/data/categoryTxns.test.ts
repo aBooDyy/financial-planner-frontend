@@ -13,6 +13,8 @@ import type {
   SpendingInputs,
 } from '#/features/transactions/data/selectors'
 import { parseISO } from '#/features/transactions/data/planning'
+import { buildCatalog } from '#/features/categories/data/catalog'
+import { categoryRow } from '#/features/categories/__fixtures__/categories'
 import { buildCategoryTxns, categoryTxnsOf } from './categoryTxns'
 import type { CategoryPick } from './categoryTxns'
 
@@ -72,6 +74,66 @@ describe('categoryTxnsOf', () => {
     expect(ids({ type: 'spend', rootId: DINING, subId: DINING })).toEqual([
       'root',
     ])
+  })
+})
+
+describe('a Needs / Wants / Savings pick', () => {
+  const transport = categoryRow({ slug: 'transport', spendClass: 'need' })
+  const taxi = categoryRow({
+    id: 'taxi',
+    slug: 'taxi',
+    parentId: transport.id,
+    spendClass: 'want',
+  })
+  const car = categoryRow({
+    id: 'car-fund',
+    slug: 'car_fund',
+    parentId: transport.id,
+    spendClass: 'saving',
+  })
+  const split = buildCatalog([transport, taxi, car])
+  const splitRows = [
+    tx({ id: 'fuel', categoryId: transport.id, date: '2026-09-02' }),
+    tx({ id: 'ride', categoryId: 'taxi', date: '2026-09-03' }),
+    tx({ id: 'kept', categoryId: 'car-fund', date: '2026-09-04' }),
+  ]
+  const pickIds = (bucket?: 'need' | 'want' | 'saving') =>
+    categoryTxnsOf({
+      rows: splitRows,
+      pick: { type: 'spend', rootId: transport.id, subId: null, bucket },
+      catalog: split,
+      scope: MAIN_ONLY,
+      period,
+      inputs,
+    }).map((t) => t.id)
+
+  it('takes only the root’s rows in that bucket', () => {
+    expect(pickIds('need')).toEqual(['fuel'])
+    expect(pickIds('want')).toEqual(['ride'])
+    expect(pickIds('saving')).toEqual(['kept'])
+  })
+
+  it('leaves savings out of a plain spending pick, as Reports spending does', () => {
+    expect(pickIds()).toEqual(['fuel', 'ride'])
+  })
+
+  it('names the bucket in the title', () => {
+    const view = buildCategoryTxns({
+      rows: splitRows,
+      pick: {
+        type: 'spend',
+        rootId: transport.id,
+        subId: null,
+        bucket: 'want',
+      },
+      catalog: split,
+      scope: MAIN_ONLY,
+      period,
+      today: parseISO('2026-09-30'),
+      inputs,
+      dateFormat: 'dmy',
+    })
+    expect(view.title).toBe('transport · Wants')
   })
 })
 

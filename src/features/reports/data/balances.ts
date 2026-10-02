@@ -66,7 +66,7 @@ const dayBefore = (d: Date): string =>
 export function buildBalanceStrip(
   read: BalanceAt,
   range: ReportRange,
-  net: number,
+  flows: { net: number; savedSpends: number },
   allAccounts: boolean,
   base: CurrencyCode,
 ): BalanceStrip {
@@ -74,13 +74,15 @@ export function buildBalanceStrip(
   const end = read(ymd(range.dataEnd))
   const change = end - start
   // Whole units, so a conversion's rounding never claims the two differ.
-  const matchesNet =
-    Math.round(toMajor(change, base)) === Math.round(toMajor(net, base))
-  const note = matchesNet
+  const same = (a: number, b: number) =>
+    Math.round(toMajor(a, base)) === Math.round(toMajor(b, base))
+  const note = same(change, flows.net)
     ? 'Equals net for the period'
-    : allAccounts
-      ? 'Net plus balance adjustments'
-      : 'Includes transfers in and out'
+    : flows.savedSpends > 0 && same(change, flows.net - flows.savedSpends)
+      ? 'Net less what went into savings categories'
+      : allAccounts
+        ? 'Net plus balance adjustments'
+        : 'Includes transfers in and out'
   return {
     startStr: balanceMoney(start, base),
     startDate: dayCaption(range.start),

@@ -64,7 +64,8 @@ function weekBuckets(win: ReportWindow, today: Date): Bucket[] {
   return out
 }
 
-function monthBuckets(win: ReportWindow, today: Date): Bucket[] {
+/** One column per calendar month the window touches, each clipped to the window. */
+export function monthBuckets(win: ReportWindow, today: Date): Bucket[] {
   const spansYears = win.start.getFullYear() !== win.end.getFullYear()
   const out: Bucket[] = []
   for (

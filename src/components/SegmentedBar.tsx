@@ -10,7 +10,9 @@ import { cn } from '#/lib/utils'
 export type BarSegment = {
   key: string
   label: string
-  color: string
+  /** A CSS colour, or leave empty and theme the fill through `fillClassName`. */
+  color?: string
+  fillClassName?: string
   pct: number
   valueStr: string
   pctStr: string
@@ -57,7 +59,10 @@ export function SegmentedBar({ segments, className, minWidth = '2px' }: Props) {
             <button
               type="button"
               aria-label={`${s.label}: ${s.valueStr}, ${s.pctStr}`}
-              className="h-full cursor-pointer transition-opacity outline-none"
+              className={cn(
+                'h-full cursor-pointer transition-opacity outline-none',
+                s.fillClassName,
+              )}
               style={{
                 width: `${s.pct}%`,
                 minWidth,
@@ -78,7 +83,10 @@ export function SegmentedBar({ segments, className, minWidth = '2px' }: Props) {
           <TooltipContent sideOffset={6} className="px-[10px] py-[7px]">
             <div className="flex items-center gap-[7px]">
               <span
-                className="h-[8px] w-[8px] shrink-0 rounded-[2px]"
+                className={cn(
+                  'h-[8px] w-[8px] shrink-0 rounded-[2px]',
+                  s.fillClassName,
+                )}
                 style={{ background: s.color }}
               />
               <span className="text-[12px] font-semibold">{s.label}</span>
