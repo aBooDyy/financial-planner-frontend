@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router'
 import { ArrowUp, Check } from 'lucide-react'
 import type { LocalIncomeStream } from '#/db/types'
 import { frequencyMetaOf } from '#/features/goals/data/cadence'
@@ -20,6 +21,7 @@ import { PlanCard } from '#/features/planning/components/kit/PlanCard'
 import { Spine } from '#/features/planning/components/kit/Spine'
 import { EmptyPlanCard } from './EmptyPlanCard'
 import { SectionHeading } from './SectionHeading'
+import { PLANNING_PREFS_ID } from '#/features/settings/data/planningPrefs'
 
 /** "Monthly · 25th · into Main bank" / "Weekly · next Oct 9 · into Savings". */
 function incomeMeta(
@@ -87,6 +89,15 @@ export function IncomeSection() {
       <SectionHeading
         title="Income"
         sub={`${money(monthly, inputs.base)} a month · ${periods}`}
+        subLink={
+          <Link
+            to="/settings/preferences"
+            hash={PLANNING_PREFS_ID}
+            className="font-semibold text-fp-text-2 underline decoration-fp-border underline-offset-2 hover:text-fp-text"
+          >
+            Planning settings
+          </Link>
+        }
         addLabel="Add income"
         onAdd={add}
       />

@@ -32,8 +32,15 @@ Everything under `data/` is pure and clock-free: `today` is an ISO date passed i
 
 - `stepOccurrence(anchor, bill, n)` — month cadences keep the anchor's day, clamped
   (Jan 31 → Feb 28 → Mar 31); day/week cadences step whole days.
-- `billOccurrences(bill, through)` — from `nextDue`, stopping at `endsOn`; a closed bill has
-  none, a one-off at most its `nextDue`.
+- **The schedule's anchor** is `nextDue`, except for a month cadence whose `nextDue` sits on a
+  day a short month clamped it to: then it is the latest earlier payment-row occurrence that
+  steps onto `nextDue` exactly (Jan 31 for Feb 28), so March comes back to the 31st. Only
+  `nextDue` is stored, so every occurrence helper takes the bill's payment rows
+  (`paymentRowsOf`). A `nextDue` moved by hand to another day starts a new anchor; one moved to
+  a day the old one also clamps to (Apr 30 after the 31st) keeps the old day.
+- `billOccurrences(bill, payments, through)` — from `nextDue`, stopping at `endsOn`; a closed
+  bill has none, a one-off at most its `nextDue`. `occurrenceBefore(bill, payments, o)` is the
+  one before (status's Behind window).
 - An occurrence is **settled** when its planned PAYMENT row (`paymentRowsOf`) exists and is no
   longer open (paid in full, closed with the rest abandoned, or skipped).
   `firstOpenOccurrence(bill, rows)` is what `nextDue` should read; `openOccurrences` lists the
@@ -80,6 +87,18 @@ view read the same plan.
 - `tracksOf(plan, kind, id)` — one owner's tracks in date order. `rateOf` is the unrounded
   conversion factor the engine uses; `isPlannableGoal`, `isDatedTargetGoal`, `isGoalReached`
   are the shared goal predicates.
+
+## Stranded set-asides — `data/rekey.ts`
+
+A bill's set-aside covers one occurrence by its exact date, so a moved due date, a new repeat or
+end, or a skipped occurrence would strand it: held forever while the new occurrence is set aside
+for again (and Safe to spend subtracts both). `strandedSetAsides(bill, payments, setAsides)`
+lists each live set-aside whose occurrence is not one of the bill's open occurrences, with the
+open occurrence **nearest its old date**. Money on an occurrence that was **paid** (`done`
+payment row) stays — that leftover is the prompt's call; a closed bill's are released already.
+The runner moves them (`moveSetAsides`, same bill, dated today) **before** it derives the plan,
+so every exact-date matcher (fill, funding, status, Safe to spend, payment release, leftover)
+sees them on the right occurrence.
 
 ## Fill-then-spill — `data/fill.ts`
 
@@ -432,7 +451,9 @@ the root layout, not by `PlanningPage`.
 - **Income**: one card, every stream (ended ones dimmed) — label + **Sets my pay periods** on
   the main paycheck, "Monthly · 25th · into Main bank", the amount with its cadence's short
   suffix, ⋯ **Edit · Use for my pay periods · Delete**; a row opens its editor. Header:
-  monthly income and where pay periods run from; a footnote explains the main paycheck.
+  monthly income and where pay periods run from, then a quiet **Planning settings** link
+  (`SectionHeading`'s `subLink`) to `/settings/preferences#planning`; a footnote explains the
+  main paycheck.
 - Empty states are dashed cards (`EmptyPlanCard`) with the docs' copy; Goals adds the
   **Emergency fund** pill.
 

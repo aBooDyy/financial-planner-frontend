@@ -1,17 +1,27 @@
 import { Plus } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { Button } from '#/components/ui/button'
 
 type Props = {
   title: string
   count?: number
   sub?: string
+  /** A quiet link after the summary, e.g. "Planning settings". */
+  subLink?: ReactNode
   /** "+ Add bill" — skips the chooser. */
   addLabel: string
   onAdd: () => void
 }
 
 /** A list section's head: "Bills 8", its one-line summary and its add button. */
-export function SectionHeading({ title, count, sub, addLabel, onAdd }: Props) {
+export function SectionHeading({
+  title,
+  count,
+  sub,
+  subLink,
+  addLabel,
+  onAdd,
+}: Props) {
   return (
     <div className="flex items-start gap-3">
       <div className="min-w-0 flex-1">
@@ -24,8 +34,9 @@ export function SectionHeading({ title, count, sub, addLabel, onAdd }: Props) {
           ) : null}
         </h2>
         {sub ? (
-          <p className="fp-sensitive mt-[2px] text-[13px] text-fp-text-2">
-            {sub}
+          <p className="mt-[2px] text-[13px] text-fp-text-2">
+            <span className="fp-sensitive">{sub}</span>
+            {subLink ? <> · {subLink}</> : null}
           </p>
         ) : null}
       </div>

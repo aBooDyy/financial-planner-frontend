@@ -14,6 +14,7 @@ import { isoOf } from '#/features/planned/data/dates'
 import {
   DEFAULT_HORIZON_DAYS,
   HORIZON_OPTIONS,
+  PLANNING_PREFS_ID,
   PAYDAY_MODE_OPTIONS,
   VARIES_EXPLAINER,
   clampHorizonDays,
@@ -78,7 +79,7 @@ export function PlanningPrefsCard({ base, rates }: Props) {
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div id={PLANNING_PREFS_ID} className="flex scroll-mt-4 flex-col gap-2">
       <div className="px-1 text-[12px] font-extrabold tracking-[0.06em] text-fp-text-3 uppercase">
         Planning
       </div>

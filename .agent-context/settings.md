@@ -38,7 +38,8 @@ Notifications, Archived, Data & privacy. Each pane is its own route — see
   lowest month of income among the last six full months (`lowestMonthlyIncome`, from
   `incomeLookbackStart`). Back to Steady drops the floor (the client normalises like the
   server). Words and the sums are pure in `data/planningPrefs.ts`. Nothing here changes the
-  default (steady) experience.
+  default (steady) experience. The card carries `id={PLANNING_PREFS_ID}` (`planning`), so a
+  link with `hash: 'planning'` (Planning › Income) scrolls to it via the router's hash scroll.
   Date _inputs_ use `components/DateField` (goal due/target date, tx date): a native
   `<input type="date">` can't honor a custom format (it renders in the OS locale), so DateField
   overlays the transparent native picker on a styled box that shows `formatDate(value)` — the box

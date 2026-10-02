@@ -26,6 +26,18 @@ import { GoalsSection } from './GoalsSection'
 import { IncomeSection } from './IncomeSection'
 
 vi.mock('#/db/sync', () => ({ schedulePush: () => undefined }))
+vi.mock('@tanstack/react-router', async (original) => ({
+  ...(await original<typeof import('@tanstack/react-router')>()),
+  Link: ({
+    to,
+    hash,
+    children,
+  }: {
+    to: string
+    hash?: string
+    children: React.ReactNode
+  }) => <a href={hash ? `${to}#${hash}` : to}>{children}</a>,
+}))
 
 beforeAll(stubBrowser)
 
@@ -279,5 +291,11 @@ describe('Income', () => {
       screen.getByText('SR 12,000 a month · pay periods run from the 25th'),
     ).toBeTruthy()
     expect(screen.getByText('Monthly · 25th · into Main bank')).toBeTruthy()
+  })
+
+  it('links to the Planning settings', async () => {
+    render(<IncomeSection />)
+    const link = await screen.findByRole('link', { name: 'Planning settings' })
+    expect(link.getAttribute('href')).toBe('/settings/preferences#planning')
   })
 })

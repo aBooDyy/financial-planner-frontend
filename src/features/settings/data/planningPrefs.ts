@@ -8,6 +8,9 @@ import { convertMinor } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
 import type { RatesMap } from '#/lib/config/rates'
 
+/** The Planning card's anchor on Settings › Preferences, so other pages can link to it. */
+export const PLANNING_PREFS_ID = 'planning'
+
 export const HORIZON_OPTIONS: ReadonlyArray<{
   value: SafeHorizon
   label: string
