@@ -79,7 +79,24 @@ view read the same plan.
   conversion factor the engine uses; `isPlannableGoal`, `isDatedTargetGoal`, `isGoalReached`
   are the shared goal predicates.
 
+## Fill-then-spill — `data/fill.ts`
+
+`occurrenceNeeds(bill, payments, setAsides, index, rates)` — the open occurrences from
+`nextDue` (10 years out) and what each still needs (amount − paid on its row − live
+set-asides). `spill(needs, amount)` splits money across them in order, each up to its need; an
+excess stays with the last one filled (the first, when none needed anything). Used by a
+planned bill set-aside's confirm and by Add money.
+
+## Leftover after a payment — `data/leftover.ts`
+
+`leftoverFor({bill, occurrence, payingWalletId, setAsides, payments, rates})` →
+`{lines, total, canKeep, nextOccurrence}`: the occurrence's live set-asides **outside** the
+paying wallet, one line per wallet / outside label (with the row ids), the total in the bill's
+currency, and whether "Keep it for next time" applies (a repeating, open bill) with the
+occurrence it would roll to (the next one not settled). Pure — the prompt is the UI's.
+
 ## Tests
 
-`data/{payPeriods,funding}.test.ts`; generation and the runner in
-`planned/data/{generate,reconcile,runner}.test.ts`.
+`data/{payPeriods,funding,leftover}.test.ts` (leftover + fill); generation and the runner in
+`planned/data/{generate,reconcile,runner}.test.ts`; payments in
+`planned/data/billPayments.test.ts`.

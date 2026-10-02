@@ -75,6 +75,19 @@ applies all-or-nothing (`POST /set-asides/release`, `/move`).
 - The server caps a batch at `limits.set_aside_batch_max` (200). The client does not read that
   limit yet; a caller sending more must split.
 
+## Payments release them — `data/payment.ts`
+
+03 §5: a payment from wallet *P* releases its owner's live set-asides **in P only** — for a
+bill, those of the occurrence paid — oldest first (`date`, then `createdAt`), up to the amount
+paid, the last row split. `heldInWallet` and `releasesForPayment` (pure) pick the parts;
+`releaseForPayment(paidFor, payment, rates)` queues them as one release batch with
+`releasedById` = the payment. `planned/data/mutations.confirmPlanned` calls it for every bill
+payment and goal payment it writes. Set-asides in other wallets stay live until the user
+decides (`planning/data/leftover.leftoverFor`).
+
+`createSetAside` takes an optional `id` in the draft: an id already held writes nothing, so a
+retried auto-confirm never sets aside twice.
+
 ## Totals — `data/totals.ts` (pure)
 
 - `isLiveSetAside(row)`.
@@ -88,11 +101,13 @@ Goal progress (`goals/data/progress.ts`) = live set-asides + spending from the g
 
 ## Elsewhere
 
-- Confirming a planned set-aside writes one (`planned/data/mutations.ts`); "Add contribution"
-  on a goal writes one, now or as a hand-made planned row.
+- Confirming a planned set-aside writes one (a bill's: one per occurrence its money reaches,
+  `planned/data/mutations.ts`); "Add contribution" on a goal writes one, now or as a hand-made
+  planned row.
 - Spending's Activity lists set-asides as their own rows (`SetAsideRow`, `ownerId`), kept out of
   every total; the cashflow hero's "Saved" is Σ wallet set-asides made in the window.
 
 ## Tests
 
-`data/{mutations,sync,totals,batches}.test.ts`.
+`data/{mutations,sync,totals,batches}.test.ts`; payments in
+`planned/data/billPayments.test.ts`.

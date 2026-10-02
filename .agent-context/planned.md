@@ -154,20 +154,38 @@ it is created again under its old id. Not persisted (04 §5).
 
 ## Settlement mutations (`data/mutations.ts`)
 
-`confirmPlanned(id, {amount?, walletId?, externalLabel?, date?, categoryId?, note?})`
+`confirmPlanned(id, {amount?, walletId?, externalLabel?, date?, categoryId?, note?, settlementId?})`
 writes by role: INCOME → income transaction (under the stream's own category); PAYMENT → a
 spend carrying the bill (`billId`, the bill's category, merchant and note) or, for a goal's
-manual payment, the goal; SET_ASIDE → a set-aside for the row's goal, or its bill and
-occurrence (`origin_gone` when that owner no longer exists) — in a wallet, or outside under a
-label. Settling a bill's payment moves the bill's `nextDue` past the occurrence
-(`advanceBillPast`; close-the-rest and skip do too). Amounts are in the item's currency and converted to the
-wallet's. Defaults: the open remainder, the item's wallet, **today**. Partial keeps it open;
-overpaying closes it and the excess still counts. Also `closeRest`, `skipPlanned` (refused
-with settlements), `reopenPlanned`, `movePlanned` (pins), `editPlannedAmount` (pins),
-`deleteManualPlanned`, and `addContribution(goalId, {mode: 'now'|'later', …})` — always a
-set-aside: "now" settles the goal's oldest due set-aside if there is one (unless `link: false`),
-else writes an unlinked set-aside; "later" writes a MANUAL set-aside row. Errors are
-`PlannedActionError` with a stable `code`.
+manual payment, the goal; SET_ASIDE → set-aside(s) for the row's goal or bill (`origin_gone`
+when that owner no longer exists) — in a wallet, or outside under a label. Amounts are in the
+item's currency and converted to the wallet's. Defaults: the open remainder, the item's wallet,
+**today**. Partial keeps it open; overpaying closes it and the excess still counts.
+`settlementId` makes it idempotent (the runner's auto-confirms pass a deterministic one); the
+result carries `settlementId` and every row written (`settlementIds`).
+
+- **A payment releases set-asides only in the paying wallet** (03 §5,
+  `setAsides/data/payment.releaseForPayment`): the bill occurrence's (or the goal's) live
+  set-asides in that wallet, oldest first, up to the amount paid — the last one split — in one
+  release batch carrying the payment's id. More than they held comes out of free money; other
+  wallets are untouched (`planning/data/leftover.leftoverFor` reports them for the prompt).
+- **A bill set-aside fills occurrences in order** (`chunksFor` → `planning/data/fill.spill`):
+  from the first open occurrence due on or after the row's date, each up to what it still
+  needs, the rest spilling into the next — one set-aside per occurrence reached, all linked to
+  the row. (A weekly bill's payday set-aside covers several occurrences.)
+- **`nextDue`** (`syncBillNextDue`): after a payment, a close-the-rest or a skip it moves to the
+  bill's first occurrence whose payment row is still open — paying a later one ahead leaves it
+  put; reopening an earlier occurrence moves it back. Bookkeeping (`setBillNextDue`), not a
+  plan change.
+- **Skip / close the rest of a bill payment** rolls what is still set aside for that occurrence
+  to the next open one (a same-bill move), so it never sits on an occurrence that will not be
+  paid. A one-off has no next one: closing the bill frees it.
+
+Also `closeRest`, `skipPlanned` (refused with settlements), `reopenPlanned`, `movePlanned`
+(pins), `editPlannedAmount` (pins), `deleteManualPlanned`, and `addContribution(goalId, {mode:
+'now'|'later', …})` — always a set-aside: "now" settles the goal's oldest due set-aside if there
+is one (unless `link: false`), else writes an unlinked set-aside; "later" writes a MANUAL
+set-aside row. Errors are `PlannedActionError` with a stable `code`.
 
 **The category of a confirmed entry** (`categoryFor(type, wanted)`): the input's `categoryId`,
 else the row's; used only while the catalog still holds it **and** its root is of the entry's

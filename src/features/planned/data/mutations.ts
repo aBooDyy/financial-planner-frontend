@@ -12,15 +12,25 @@ import { schedulePush } from '#/db/sync'
 import type { LocalBill, LocalPlanned } from '#/db/types'
 import { setBillNextDue } from '#/features/bills/data/mutations'
 import { buildCatalog } from '#/features/categories/data/catalog'
+import { occurrenceNeeds, spill } from '#/features/planning/data/fill'
+import type { OccurrenceChunk } from '#/features/planning/data/fill'
+import {
+  billOccurrences,
+  firstOpenOccurrence,
+  isSettledOccurrence,
+  paymentRowsOf,
+} from '#/features/planning/data/occurrences'
+import { moveSetAsides } from '#/features/setAsides/data/batches'
+import { isLiveSetAside } from '#/features/setAsides/data/totals'
 import { createSetAside } from '#/features/setAsides/data/mutations'
-import type { SetAsideOwner } from '#/features/setAsides/data/mutations'
+import { releaseForPayment } from '#/features/setAsides/data/payment'
 import type { PlannedRole } from '#/features/planned/api/types'
-import { createTransaction } from '#/features/transactions/data/mutations'
-import { advanceDue } from '#/features/transactions/data/planning'
+import { addTransactionWithId } from '#/features/transactions/data/mutations'
 import type { TxType } from '#/features/transactions/api/types'
+import type { RatesMap } from '#/lib/config/rates'
 import { convertMinor } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
-import { isoOf } from './dates'
+import { addMonthsISO, isoOf } from './dates'
 import {
   closeCovered,
   currentRates,
@@ -31,6 +41,7 @@ import {
 } from './rows'
 import { dueList, indexSettlements, settledOf } from './settle'
 import { newId } from '#/lib/uuid'
+import { PLANNED_NAMESPACE, uuidv5 } from './ids'
 
 export type PlannedActionCode =
   | 'not_found'
@@ -76,26 +87,97 @@ async function billOf(item: LocalPlanned): Promise<LocalBill | null> {
   return bill && bill.deleted === 0 ? bill : null
 }
 
-/** Keep a repeating bill's `nextDue` past every occurrence the user has dealt with. */
-async function advanceBillPast(item: LocalPlanned): Promise<void> {
-  if (item.origin !== 'bill' || item.role !== 'payment') return
-  const bill = await billOf(item)
-  if (!bill?.frequency || bill.nextDue > item.occurrence) return
-  let next = bill.nextDue
-  while (next <= item.occurrence) next = advanceDue(next, bill)
-  await setBillNextDue(bill.id, next)
+const billPayments = async (bill: LocalBill) =>
+  paymentRowsOf(
+    bill.id,
+    await db.plannedTransactions.where('billId').equals(bill.id).toArray(),
+  )
+
+/**
+ * Keep a bill's `nextDue` on its first occurrence not yet dealt with: paying, closing or
+ * skipping that one moves it on past every settled one after it; settling a later occurrence
+ * (paying ahead) leaves it where it is.
+ */
+export async function syncBillNextDue(billId: string): Promise<void> {
+  const bill = await db.bills.get(billId)
+  if (!bill || bill.deleted !== 0) return
+  const next = firstOpenOccurrence(bill, await billPayments(bill))
+  if (next !== bill.nextDue) await setBillNextDue(bill.id, next)
 }
 
-/** Who a set-aside row puts money aside for: its goal, or its bill and occurrence. */
-async function setAsideOwnerOf(
+const isBillPayment = (
   item: LocalPlanned,
-): Promise<SetAsideOwner | null> {
+): item is LocalPlanned & { billId: string } =>
+  item.origin === 'bill' && item.role === 'payment' && item.billId !== null
+
+const syncNextDueOf = async (item: LocalPlanned): Promise<void> => {
+  if (isBillPayment(item)) await syncBillNextDue(item.billId)
+}
+
+/**
+ * A bill occurrence that won't be paid (skipped, or closed with the rest abandoned) keeps its
+ * money with the bill: what is still set aside for it rolls to the next open occurrence. A
+ * one-off has none — closing the bill frees it.
+ */
+async function rollToNextOccurrence(item: LocalPlanned): Promise<void> {
+  if (item.origin !== 'bill' || item.role !== 'payment') return
+  const bill = await billOf(item)
+  if (!bill) return
+  const held = (
+    await db.setAsides.where('billId').equals(bill.id).toArray()
+  ).filter((a) => isLiveSetAside(a) && a.occurrence === item.occurrence)
+  if (held.length === 0) return
+  const payments = await billPayments(bill)
+  const next = billOccurrences(bill, addMonthsISO(item.occurrence, 24)).find(
+    (o) => o > item.occurrence && !isSettledOccurrence(payments, o),
+  )
+  if (!next) return
+  await moveSetAsides(
+    held.map((a) => ({
+      id: a.id,
+      to: { owner: { billId: bill.id, occurrence: next } },
+    })),
+    { date: today() },
+  )
+}
+
+/**
+ * Money set aside for a bill, filled into its open occurrences in order — those due on or
+ * after `from` when given.
+ */
+export async function chunksFor(
+  bill: LocalBill,
+  amount: number,
+  rates: RatesMap,
+  from?: string,
+): Promise<OccurrenceChunk[]> {
+  const [payments, setAsides, txns] = await Promise.all([
+    billPayments(bill),
+    db.setAsides.where('billId').equals(bill.id).toArray(),
+    db.transactions.where('billId').equals(bill.id).toArray(),
+  ])
+  const index = indexSettlements(
+    txns.filter((t) => t.deleted === 0),
+    setAsides.filter((a) => a.deleted === 0),
+  )
+  const needs = occurrenceNeeds(bill, payments, setAsides, index, rates)
+  return spill(from ? needs.filter((n) => n.occurrence >= from) : needs, amount)
+}
+
+type SetAsideTarget =
+  | { kind: 'goal'; goalId: string }
+  | { kind: 'bill'; bill: LocalBill }
+
+/** Who a set-aside row puts money aside for: its goal, or its bill. */
+async function setAsideTargetOf(
+  item: LocalPlanned,
+): Promise<SetAsideTarget | null> {
   if (item.goalId) {
     const goal = await db.goals.get(item.goalId)
-    return goal && goal.deleted === 0 ? { goalId: goal.id } : null
+    return goal && goal.deleted === 0 ? { kind: 'goal', goalId: goal.id } : null
   }
   const bill = await billOf(item)
-  return bill ? { billId: bill.id, occurrence: item.occurrence } : null
+  return bill ? { kind: 'bill', bill } : null
 }
 
 /** A category the user's tree actually has for this type, preferring `wanted`. */
@@ -139,10 +221,15 @@ export type ConfirmInput = {
   note?: string | null
   /** Provenance marker for the transaction. */
   source?: string | null
+  /** A caller-chosen id for what is written, so a retried confirm writes nothing twice. */
+  settlementId?: string
 }
 
 export type ConfirmResult = {
+  /** The first (usually only) row written. */
   settlementId: string
+  /** Every row written: a bill set-aside spilling over occurrences writes one per occurrence. */
+  settlementIds: string[]
   kind: 'transaction' | 'setAside'
   /** The item's status after the settlement landed. */
   status: LocalPlanned['status']
@@ -159,8 +246,8 @@ export async function confirmPlanned(
 ): Promise<ConfirmResult> {
   const item = await openItem(id)
   // A set-aside is held for its goal or bill; with that gone there is nothing to hold it.
-  const owner = item.role === 'set_aside' ? await setAsideOwnerOf(item) : null
-  if (item.role === 'set_aside' && !owner)
+  const target = item.role === 'set_aside' ? await setAsideTargetOf(item) : null
+  if (item.role === 'set_aside' && !target)
     throw new PlannedActionError('origin_gone')
   const rates = await currentRates()
   const remainder = Math.max(0, item.amount - (await settledNow(item)))
@@ -169,68 +256,151 @@ export async function confirmPlanned(
     throw new PlannedActionError('bad_amount')
   const date = input.date ?? today()
   const walletId = input.walletId !== undefined ? input.walletId : item.walletId
-  const external = item.role === 'set_aside' ? input.externalLabel?.trim() : ''
+  const external = (target && input.externalLabel?.trim()) || null
 
-  let result: Omit<ConfirmResult, 'status'>
-  if (owner && external) {
-    const settlementId = await createSetAside(owner, {
-      source: 'outside',
-      walletId: null,
-      externalLabel: external,
-      amount,
-      currency: item.currency,
-      note: input.note ?? null,
-      date,
-      plannedId: item.id,
-    })
-    result = { settlementId, kind: 'setAside' }
-  } else {
-    const currency = walletId ? await walletCurrency(walletId) : null
-    if (!walletId || !currency) throw new PlannedActionError('no_wallet')
-    const inWallet = convertMinor(amount, item.currency, currency, rates)
-    if (owner) {
-      const settlementId = await createSetAside(owner, {
-        source: 'wallet',
+  const settlementIds = target
+    ? await writeSetAsides(item, target, {
+        amount,
         walletId,
-        externalLabel: null,
-        amount: inWallet,
-        currency,
+        external,
+        date,
         note: input.note ?? null,
-        date,
-        plannedId: item.id,
+        id: input.settlementId,
+        rates,
       })
-      result = { settlementId, kind: 'setAside' }
-    } else {
-      const type: TxType = item.role === 'income' ? 'income' : 'spend'
-      const bill = await billOf(item)
-      const wanted =
-        input.categoryId !== undefined
-          ? input.categoryId
-          : (item.categoryId ??
-            bill?.categoryId ??
-            (await streamCategoryOf(item)))
-      const settlementId = await createTransaction({
-        type,
-        amount: inWallet,
-        currency,
-        categoryId: await categoryFor(type, wanted),
-        walletId,
-        goalId: type === 'spend' && !bill ? item.goalId : null,
-        billId: type === 'spend' ? (bill?.id ?? null) : null,
-        merchantId: bill?.merchantId ?? null,
-        date,
-        note: input.note !== undefined ? input.note : bill?.note || item.name,
-        source: input.source ?? null,
-        plannedId: item.id,
-      })
-      result = { settlementId, kind: 'transaction' }
-    }
-  }
+    : [await writePayment(item, { ...input, amount, walletId, date }, rates)]
 
   const after = await db.plannedTransactions.get(item.id)
-  if (after?.status === 'done') await advanceBillPast(item)
+  await syncNextDueOf(item)
   schedulePush()
-  return { ...result, status: after?.status ?? 'open' }
+  return {
+    settlementId: settlementIds[0],
+    settlementIds,
+    kind: target ? 'setAside' : 'transaction',
+    status: after?.status ?? 'open',
+  }
+}
+
+/**
+ * The set-aside(s) a planned set-aside stands for. A goal's is one row; a bill's money fills
+ * its open occurrences in order, one row per occurrence it reaches.
+ */
+async function writeSetAsides(
+  item: LocalPlanned,
+  target: SetAsideTarget,
+  args: {
+    amount: number
+    walletId: string | null
+    external: string | null
+    date: string
+    note: string | null
+    id?: string
+    rates: RatesMap
+  },
+): Promise<string[]> {
+  const { external, rates } = args
+  const currency = external
+    ? item.currency
+    : args.walletId
+      ? await walletCurrency(args.walletId)
+      : null
+  if (!currency) throw new PlannedActionError('no_wallet')
+  const where = {
+    source: external ? ('outside' as const) : ('wallet' as const),
+    walletId: external ? null : args.walletId,
+    externalLabel: external,
+    currency,
+    note: args.note,
+    date: args.date,
+    plannedId: item.id,
+  }
+  if (target.kind === 'goal')
+    return [
+      await createSetAside(
+        { goalId: target.goalId },
+        {
+          ...where,
+          id: args.id,
+          amount: convertMinor(args.amount, item.currency, currency, rates),
+        },
+      ),
+    ]
+  const { bill } = target
+  const inBill = convertMinor(args.amount, item.currency, bill.currency, rates)
+  // The payday it was planned for covers what falls due from then on.
+  const chunks = await chunksFor(bill, inBill, rates, item.occurrence)
+  const spread =
+    chunks.length > 0 ? chunks : [{ occurrence: bill.nextDue, amount: inBill }]
+  const ids: string[] = []
+  for (const [i, chunk] of spread.entries()) {
+    ids.push(
+      await createSetAside(
+        { billId: bill.id, occurrence: chunk.occurrence },
+        {
+          ...where,
+          id:
+            args.id && i > 0
+              ? uuidv5(`${args.id}:${chunk.occurrence}`, PLANNED_NAMESPACE)
+              : args.id,
+          amount: convertMinor(chunk.amount, bill.currency, currency, rates),
+        },
+      ),
+    )
+  }
+  return ids
+}
+
+/**
+ * The transaction a planned payday or payment stands for. A payment releases what its bill
+ * occurrence (or its goal) had set aside in the paying wallet.
+ */
+async function writePayment(
+  item: LocalPlanned,
+  input: ConfirmInput & {
+    amount: number
+    walletId: string | null
+    date: string
+  },
+  rates: RatesMap,
+): Promise<string> {
+  const { walletId, date } = input
+  const currency = walletId ? await walletCurrency(walletId) : null
+  if (!walletId || !currency) throw new PlannedActionError('no_wallet')
+  const inWallet = convertMinor(input.amount, item.currency, currency, rates)
+  const type: TxType = item.role === 'income' ? 'income' : 'spend'
+  const bill = await billOf(item)
+  const wanted =
+    input.categoryId !== undefined
+      ? input.categoryId
+      : (item.categoryId ?? bill?.categoryId ?? (await streamCategoryOf(item)))
+  const goalId = type === 'spend' && !bill ? item.goalId : null
+  const txId = input.settlementId ?? newId()
+  await addTransactionWithId(txId, {
+    type,
+    amount: inWallet,
+    currency,
+    categoryId: await categoryFor(type, wanted),
+    walletId,
+    goalId,
+    billId: type === 'spend' ? (bill?.id ?? null) : null,
+    merchantId: bill?.merchantId ?? null,
+    date,
+    note: input.note !== undefined ? input.note : bill?.note || item.name,
+    source: input.source ?? null,
+    plannedId: item.id,
+  })
+  const paidFor = bill
+    ? { billId: bill.id, occurrence: item.occurrence }
+    : goalId
+      ? { goalId }
+      : null
+  if (paidFor)
+    await releaseForPayment(
+      paidFor,
+      { id: txId, walletId, amount: inWallet, currency, date },
+      rates,
+    )
+  return txId
 }
 
 /** A payday files under its stream's own income category. */
@@ -243,7 +413,8 @@ async function streamCategoryOf(item: LocalPlanned): Promise<string | null> {
 export async function closeRest(id: string): Promise<void> {
   const item = await openItem(id)
   await savePlanned({ ...item, status: 'done' })
-  await advanceBillPast(item)
+  await rollToNextOccurrence(item)
+  await syncNextDueOf(item)
   schedulePush()
 }
 
@@ -253,7 +424,8 @@ export async function skipPlanned(id: string): Promise<void> {
   if ((await settledNow(item)) > 0)
     throw new PlannedActionError('has_settlements')
   await savePlanned({ ...item, status: 'skipped' })
-  await advanceBillPast(item)
+  await rollToNextOccurrence(item)
+  await syncNextDueOf(item)
   schedulePush()
 }
 
@@ -263,6 +435,10 @@ export async function reopenPlanned(id: string): Promise<void> {
   if (!item || item.deleted !== 0) throw new PlannedActionError('not_found')
   if (item.status === 'open') return
   await savePlanned({ ...item, status: 'open' })
+  // An occurrence waiting again is the next one due if it comes first.
+  const bill = isBillPayment(item) ? await billOf(item) : null
+  if (bill && item.occurrence < bill.nextDue)
+    await setBillNextDue(bill.id, item.occurrence)
   schedulePush()
 }
 

@@ -26,6 +26,8 @@ export type SetAsideOwner =
   | { billId: string; occurrence?: string | null }
 
 export type SetAsideDraft = {
+  /** A caller-chosen id makes the create idempotent: an id already held writes nothing. */
+  id?: string
   source: SetAsideSource
   /** Read only for a `wallet` set-aside. */
   walletId: string | null
@@ -41,7 +43,7 @@ export type SetAsideDraft = {
 }
 
 /** A change to an existing set-aside; the owner is fixed at create. */
-export type SetAsidePatch = Partial<SetAsideDraft> & {
+export type SetAsidePatch = Partial<Omit<SetAsideDraft, 'id'>> & {
   occurrence?: string | null
 }
 
@@ -78,7 +80,8 @@ export async function createSetAside(
   owner: SetAsideOwner,
   draft: SetAsideDraft,
 ): Promise<string> {
-  const id = newId()
+  const id = draft.id ?? newId()
+  if (draft.id && (await db.setAsides.get(draft.id))) return id
   const ts = now()
   const row: LocalSetAside = {
     id,
