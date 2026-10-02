@@ -2,8 +2,10 @@ import 'fake-indexeddb/auto'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '#/db/db'
 import type { LocalPlanned } from '#/db/types'
+import { updateBill } from '#/features/bills/data/mutations'
 import { deleteGoal, updateGoal } from '#/features/goals/data/mutations'
 import {
+  bill,
   goal,
   income,
   m,
@@ -18,7 +20,8 @@ import {
   movePlanned,
   skipPlanned,
 } from './mutations'
-import { loadPlannerInputs, recalcGoalPlan, runPlanner } from './runner'
+import { goalOwner } from './owners'
+import { loadPlannerInputs, recalcPlan, runPlanner } from './runner'
 import { derivePlannerState } from './state'
 import { buildGoalPlanView } from './views'
 
@@ -29,17 +32,19 @@ const SEP_24 = new Date(2026, 8, 24)
 const USER = 'u1'
 
 const MAIN = wallet({ id: 'w1', name: 'Main Checking' })
+/** Paid on the 1st, so set-asides fall on the 1st. */
 const SALARY = income({
   id: 'salary',
   amount: m(20000),
-  day: 27,
+  day: 1,
   walletId: 'w1',
 })
+/** Due mid-February: the last payday before it is Feb 1. */
 const UMRAH = goal({
   id: 'umrah',
   name: 'Umrah trip',
   target: m(13000),
-  dueDate: '2027-03-01',
+  dueDate: '2027-02-15',
 })
 /** The SR 1,000 already saved toward Umrah before any plan existed. */
 const BASELINE = setAside({
@@ -93,7 +98,7 @@ beforeEach(async () => {
   await db.incomeStreams.put(SALARY)
   await db.goals.put(UMRAH)
   await db.setAsides.put(BASELINE)
-  useRecalcUndoStore.setState({ byGoal: {} })
+  useRecalcUndoStore.setState({ byOwner: {} })
 })
 
 describe('runPlanner — a goal’s first plan', () => {
@@ -123,15 +128,15 @@ describe('runPlanner — a goal’s first plan', () => {
       .equals('salary')
       .toArray()
     expect(paydays.map((p) => p.occurrence).sort()).toEqual([
-      '2026-06-27',
-      '2026-07-27',
-      '2026-08-27',
+      '2026-07-01',
+      '2026-08-01',
+      '2026-09-01',
     ])
     // Every row is queued for the server; a first plan offers no undo.
     expect(
       (await db.outbox.toArray()).filter((e) => e.entity === 'planned'),
     ).toHaveLength(11)
-    expect(useRecalcUndoStore.getState().byGoal).toEqual({})
+    expect(useRecalcUndoStore.getState().byOwner).toEqual({})
   })
 
   it('is a no-op when nothing changed', async () => {
@@ -176,7 +181,7 @@ describe('runPlanner — paydays follow the stream', () => {
         .filter((p) => p.deleted === 0)
         .map((p) => p.occurrence)
         .sort()
-    expect(await paydays()).toEqual(['2026-09-27', '2026-10-27', '2026-11-27'])
+    expect(await paydays()).toEqual(['2026-10-01', '2026-11-01', '2026-12-01'])
 
     await db.incomeStreams.put({
       ...SALARY,
@@ -253,9 +258,9 @@ describe('runPlanner — rows whose origin is gone', () => {
       .where('incomeStreamId')
       .equals('salary')
       .toArray()
-    // Jun 27 was due: skipped. Jul 27 / Aug 27 were future and unsettled: removed.
+    // Jul 1 was due: skipped. Aug 1 / Sep 1 were future and unsettled: removed.
     expect(paydays.map((p) => [p.occurrence, p.status])).toEqual([
-      ['2026-06-27', 'skipped'],
+      ['2026-07-01', 'skipped'],
     ])
     expect((await db.plannedTransactions.get('manual'))?.status).toBe('skipped')
   })
@@ -263,7 +268,8 @@ describe('runPlanner — rows whose origin is gone', () => {
 
 describe('the design’s worked example (04 §4)', () => {
   /**
-   * Umrah SR 13,000 by Mar 1, 2027, SR 1,000 saved. Plan Jun 12: SR 1,500 × 8, Jul 1 → Feb 1.
+   * Umrah SR 13,000 by Feb 15, 2027, SR 1,000 saved, paid on the 1st. Plan Jun 12: SR 1,500 × 8,
+   * Jul 1 → Feb 1.
    * Jul and Aug confirmed → SR 4,000. Sep 1 unconfirmed. Today Sep 24.
    */
   const setUp = async () => {
@@ -307,7 +313,7 @@ describe('the design’s worked example (04 §4)', () => {
     await setUp()
     const before = await setAsides()
 
-    const result = await recalcGoalPlan('umrah', USER, SEP_24)
+    const result = await recalcPlan(goalOwner('umrah'), USER, SEP_24)
 
     expect(await amounts()).toEqual([
       ['2026-07', 1500],
@@ -331,7 +337,7 @@ describe('the design’s worked example (04 §4)', () => {
     expect((await setAsides()).map((p) => p.id)).toEqual(
       before.map((p) => p.id),
     )
-    expect(useRecalcUndoStore.getState().byGoal.umrah).toBe(result)
+    expect(useRecalcUndoStore.getState().byOwner['goal:umrah']).toBe(result)
   })
 
   it('undoes a recalculation exactly: same ids, same amounts, same stored plan', async () => {
@@ -339,7 +345,7 @@ describe('the design’s worked example (04 §4)', () => {
     const before = await setAsides()
     const goalBefore = await db.goals.get('umrah')
 
-    const result = await recalcGoalPlan('umrah', USER, SEP_24)
+    const result = await recalcPlan(goalOwner('umrah'), USER, SEP_24)
     await result?.undo()
 
     const after = await setAsides()
@@ -352,7 +358,7 @@ describe('the design’s worked example (04 §4)', () => {
       planCount: goalBefore?.planCount,
       planStart: goalBefore?.planStart,
     })
-    expect(useRecalcUndoStore.getState().byGoal.umrah).toBeUndefined()
+    expect(useRecalcUndoStore.getState().byOwner['goal:umrah']).toBeUndefined()
   })
 
   it('undo recreates rows the recalculation removed, under their old ids', async () => {
@@ -360,7 +366,7 @@ describe('the design’s worked example (04 §4)', () => {
     // Pull the deadline in: the new plan has fewer months, so some rows go.
     await db.goals.update('umrah', { dueDate: '2026-12-15' })
     const before = await setAsides()
-    const result = await recalcGoalPlan('umrah', USER, SEP_24)
+    const result = await recalcPlan(goalOwner('umrah'), USER, SEP_24)
     expect((await setAsides()).length).toBeLessThan(before.length)
 
     await result?.undo()
@@ -400,20 +406,20 @@ describe('a plan-changing edit', () => {
     expect(new Set((await amounts()).map(([, a]) => a))).toEqual(
       new Set([1900]),
     )
-    expect(useRecalcUndoStore.getState().byGoal.umrah).toBeDefined()
+    expect(useRecalcUndoStore.getState().byOwner['goal:umrah']).toBeDefined()
   })
 
   it('leaves the plan alone for a rename', async () => {
     await runPlanner(USER, JUN_12)
     await updateGoal('umrah', { name: 'Umrah 2027', color: '#3B82F6' })
     await runPlanner(USER, JUN_12)
-    expect(useRecalcUndoStore.getState().byGoal.umrah).toBeUndefined()
+    expect(useRecalcUndoStore.getState().byOwner['goal:umrah']).toBeUndefined()
   })
 })
 
 describe('recalculating around rows it may not rewrite', () => {
   /**
-   * Browser-found: Umrah SR 13,000 by Mar 1, 2027, planned on Sep 24 as 2,600 × 5 (Oct–Feb).
+   * Browser-found: Umrah SR 13,000 by Feb 15, 2027, planned on Sep 24 as 2,600 × 5 (Oct–Feb).
    * A 1,000 contribution, then the Oct 1 set-aside moved to Sep 1 and confirmed in full:
    * saved 3,600, left 9,400. The engine spreads 9,400 over Oct–Feb, but Oct's id is taken by
    * the confirmed row, so only Nov–Feb can be written — they must carry the whole 9,400.
@@ -467,7 +473,7 @@ describe('recalculating around rows it may not rewrite', () => {
   it('writes the remaining 9,400 over Nov–Feb, and stored equals live afterwards', async () => {
     const oct = await setUp()
 
-    const result = await recalcGoalPlan('umrah', USER, SEP_24)
+    const result = await recalcPlan(goalOwner('umrah'), USER, SEP_24)
 
     const rows = await future()
     expect(rows.map((p) => [p.occurrence, p.amount / 100])).toEqual([
@@ -501,12 +507,82 @@ describe('recalculating around rows it may not rewrite', () => {
     await runPlanner(USER, SEP_24)
     await movePlanned((await byMonth('2026-10-01')).id, '2026-10-20')
 
-    await recalcGoalPlan('umrah', USER, SEP_24)
+    await recalcPlan(goalOwner('umrah'), USER, SEP_24)
 
     const rows = await future()
     // Oct (moved, 2,600 still to pay) + Nov–Feb = 13,000: nothing needed to change.
     expect(rows.reduce((a, p) => a + p.amount, 0)).toBe(m(13000))
     expect(new Set(rows.map((p) => p.amount))).toEqual(new Set([m(2600)]))
     expect((await planView(SEP_24)).isOffPlan).toBe(false)
+  })
+})
+
+describe('runPlanner — bills', () => {
+  const RENT = bill({
+    id: 'rent',
+    name: 'Rent',
+    amount: m(3000),
+    nextDue: '2026-10-05',
+    walletId: 'w1',
+  })
+  const rentRows = async (role: 'payment' | 'set_aside') =>
+    (await db.plannedTransactions.where('billId').equals('rent').toArray())
+      .filter((p) => p.role === role)
+      .sort((a, b) => a.occurrence.localeCompare(b.occurrence))
+      .map((p) => [p.occurrence, p.amount / 100])
+
+  beforeEach(async () => {
+    await db.goals.clear()
+    await db.bills.put(RENT)
+  })
+
+  it('plans payments and the payday set-asides that cover them, and stores the plan', async () => {
+    await runPlanner(USER, SEP_24)
+    expect(await rentRows('payment')).toEqual([
+      ['2026-10-05', 3000],
+      ['2026-11-05', 3000],
+      ['2026-12-05', 3000],
+    ])
+    expect(await rentRows('set_aside')).toEqual([
+      ['2026-10-01', 3000],
+      ['2026-11-01', 3000],
+      ['2026-12-01', 3000],
+    ])
+    expect(await db.bills.get('rent')).toMatchObject({
+      plannedAt: '2026-09-24',
+      planAmount: m(3000),
+      planCount: 3,
+      planStart: '2026-10-01',
+    })
+    expect(useRecalcUndoStore.getState().byOwner).toEqual({})
+  })
+
+  it('rewrites the plan when the amount changes, with an undo', async () => {
+    await runPlanner(USER, SEP_24)
+    await updateBill('rent', { amount: m(3200) })
+    await runPlanner(USER, SEP_24)
+
+    expect(await rentRows('set_aside')).toEqual([
+      ['2026-10-01', 3200],
+      ['2026-11-01', 3200],
+      ['2026-12-01', 3200],
+    ])
+    // Payments have no stored plan: they follow the bill.
+    expect((await rentRows('payment')).map(([, a]) => a)).toEqual([
+      3200, 3200, 3200,
+    ])
+    const undo = useRecalcUndoStore.getState().byOwner['bill:rent']
+    expect(undo).toBeDefined()
+    await undo.undo()
+    expect((await rentRows('set_aside')).map(([, a]) => a)).toEqual([
+      3000, 3000, 3000,
+    ])
+  })
+
+  it('leaves the plan alone for a rename', async () => {
+    await runPlanner(USER, SEP_24)
+    await updateBill('rent', { name: 'Flat', color: '#3B82F6' })
+    await runPlanner(USER, SEP_24)
+    expect(useRecalcUndoStore.getState().byOwner).toEqual({})
   })
 })

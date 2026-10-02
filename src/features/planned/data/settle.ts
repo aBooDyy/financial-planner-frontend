@@ -8,6 +8,8 @@ import { convertMinor } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
 import type { RatesMap } from '#/lib/config/rates'
 import { addDaysISO, isoOf } from './dates'
+import { isPlanRowOf } from './owners'
+import type { PlanOwner } from './owners'
 
 /** A real row that settles (part of) a planned item. */
 export type Settlement = {
@@ -134,7 +136,7 @@ export function dueList(
 }
 
 export type Behind = {
-  /** Σ planned for this goal up to today — skipped rows included. */
+  /** Σ planned for this goal or bill up to today — skipped rows included. */
   expected: number
   /** Σ settled against those rows. */
   settled: number
@@ -146,9 +148,9 @@ export type Behind = {
   unconfirmed: LocalPlanned[]
 }
 
-/** How far a goal's stored plan is behind what has actually been confirmed. */
+/** How far a goal's or bill's stored plan is behind what has actually been confirmed. */
 export function behindOf(
-  goalId: string,
+  owner: PlanOwner,
   items: ReadonlyArray<LocalPlanned>,
   index: SettlementIndex,
   rates: RatesMap,
@@ -156,13 +158,7 @@ export function behindOf(
 ): Behind {
   const now = todayISO(today)
   const past = items
-    .filter(
-      (p) =>
-        p.deleted === 0 &&
-        p.origin === 'goal' &&
-        p.goalId === goalId &&
-        p.date <= now,
-    )
+    .filter((p) => p.deleted === 0 && isPlanRowOf(p, owner) && p.date <= now)
     .sort(byDate)
   const expected = past.reduce((sum, p) => sum + p.amount, 0)
   const settled = past.reduce((sum, p) => sum + settledOf(p, index, rates), 0)

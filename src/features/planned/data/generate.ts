@@ -1,23 +1,32 @@
 /**
- * The planned rows the user's goals and income streams call for right now — pure, and
+ * The planned rows the user's income, bills and goals call for right now — pure, and
  * deterministic down to the ids, so every device derives the same rows.
  *
- * Interim: bills generate nothing yet; their occurrences, coverage set-asides and payments
- * come with the bills engine.
+ * - **Paydays**: each stream's paydays within the horizon, until its `endsOn`.
+ * - **Bill payments**: one per occurrence from `nextDue` (an overdue one arrives already due)
+ *   through the horizon, in the bill's wallet and category.
+ * - **Set-asides** from the funding plan, one row per owner per payday: a goal with a target
+ *   and a date gets its whole schedule (its stored plan); a bill gets every payday through
+ *   its next occurrence's last one, and the horizon beyond; anything else rolls within the
+ *   horizon. In Review mode they are generated flagged for the payday review.
  */
-import type { LocalGoal, LocalIncomeStream, LocalPlanned } from '#/db/types'
 import type {
-  GoalPlanEntry,
-  GoalsPlan,
-} from '#/features/goals/data/fundingPlan'
-import { isDatedGoal } from '#/features/goals/data/fundingPlan'
-import { clampSetAsideDay, datedSchedule } from '#/features/goals/data/planning'
+  LocalBill,
+  LocalGoal,
+  LocalIncomeStream,
+  LocalPlanned,
+} from '#/db/types'
 import { paydaysOf } from '#/features/goals/data/paydays'
+import {
+  isDatedTargetGoal,
+  roundedSchedule,
+} from '#/features/planning/data/funding'
+import type { FundingPlan, TrackPlan } from '#/features/planning/data/funding'
+import { billOccurrences } from '#/features/planning/data/occurrences'
 import type { PlannedOrigin, PlannedRole } from '#/features/planned/api/types'
-import { convertMinor } from '#/lib/currency'
+import type { PaydayMode } from '#/features/wallets/api/types'
 import type { CurrencyCode } from '#/lib/currency'
-import type { RatesMap } from '#/lib/config/rates'
-import { addDaysISO, isoOf } from './dates'
+import { addDaysISO } from './dates'
 import { plannedIdFor } from './ids'
 
 export { paydaysOf }
@@ -31,15 +40,16 @@ export type DesiredPlanned = Omit<
 export type GeneratorInput = {
   userId: string
   income: ReadonlyArray<LocalIncomeStream>
-  /** The live plan (`planGoals`). */
-  plan: GoalsPlan
-  base: CurrencyCode
-  rates: RatesMap
-  today: Date
+  bills: ReadonlyArray<LocalBill>
+  goals: ReadonlyArray<LocalGoal>
+  funding: FundingPlan
+  paydayMode: PaydayMode
+  /** ISO date. */
+  today: string
   horizonDays?: number
 }
 
-/** How far ahead rolling origins (paydays, open-ended goals) are planned. */
+/** How far ahead rolling origins (paydays, bills, open-ended goals) are planned. */
 export const HORIZON_DAYS = 90
 
 type RowSeed = {
@@ -52,6 +62,7 @@ type RowSeed = {
   name: string
   walletId?: string | null
   categoryId?: string | null
+  review?: boolean
 }
 
 const rowFor = (userId: string, seed: RowSeed): DesiredPlanned => ({
@@ -76,54 +87,9 @@ const rowFor = (userId: string, seed: RowSeed): DesiredPlanned => ({
   date: seed.occurrence,
   status: 'open',
   pinned: false,
-  review: false,
+  review: seed.review ?? false,
   note: null,
 })
-
-/**
- * A dated goal with a target has a whole, finite plan (its stored plan); anything else rolls
- * forward within the horizon.
- */
-export const isFinitePlan = (goal: LocalGoal): boolean =>
-  isDatedGoal(goal) && (goal.target ?? 0) > 0
-
-function goalRows(
-  entry: GoalPlanEntry,
-  input: GeneratorInput,
-  until: string,
-): RowSeed[] {
-  const { goal, plan } = entry
-  const inGoal = (baseMinor: number) =>
-    convertMinor(baseMinor, input.base, goal.currency, input.rates)
-
-  const setAsides = datedSchedule(
-    plan.schedule,
-    input.today,
-    clampSetAsideDay(goal.setAsideDay),
-  )
-    .filter((d) => d.amount > 0.5)
-    .filter((d) => isFinitePlan(goal) || d.date <= until)
-    .map((d) => ({ date: d.date, amount: Math.round(inGoal(d.amount)) }))
-
-  // A finite plan that finishes must add up to exactly what is left, whatever the rounding.
-  if (isFinitePlan(goal) && plan.completesIn !== null && setAsides.length > 0) {
-    const left = Math.max(0, (goal.target ?? 0) - entry.saved)
-    const others = setAsides.slice(0, -1).reduce((sum, s) => sum + s.amount, 0)
-    const last = left - others
-    if (last > 0) setAsides[setAsides.length - 1].amount = last
-  }
-
-  return setAsides.map((s) => ({
-    origin: 'goal',
-    originId: goal.id,
-    role: 'set_aside',
-    occurrence: s.date,
-    amount: s.amount,
-    currency: goal.currency,
-    name: `${goal.name} set-aside`,
-    walletId: goal.saveWalletId,
-  }))
-}
 
 function incomeRows(
   stream: LocalIncomeStream,
@@ -143,13 +109,87 @@ function incomeRows(
   }))
 }
 
+const paymentRows = (bill: LocalBill, until: string): RowSeed[] =>
+  billOccurrences(bill, until).map((due) => ({
+    origin: 'bill',
+    originId: bill.id,
+    role: 'payment',
+    occurrence: due,
+    amount: bill.amount,
+    currency: bill.currency,
+    name: bill.name,
+    walletId: bill.walletId,
+    categoryId: bill.categoryId,
+  }))
+
+/** Σ of an owner's tracks per slot, each track rounded so it adds up exactly. */
+function perSlot(tracks: ReadonlyArray<TrackPlan>, slots: number): number[] {
+  const out = new Array<number>(slots).fill(0)
+  for (const t of tracks)
+    roundedSchedule(t.funded).forEach((amount, k) => (out[k] += amount))
+  return out
+}
+
+function groupTracks(plan: FundingPlan): Map<string, TrackPlan[]> {
+  const out = new Map<string, TrackPlan[]>()
+  for (const t of plan.tracks) {
+    const key = `${t.kind}:${t.ownerId}`
+    const list = out.get(key)
+    if (list) list.push(t)
+    else out.set(key, [t])
+  }
+  for (const list of out.values())
+    list.sort((a, b) => (a.occurrence ?? '').localeCompare(b.occurrence ?? ''))
+  return out
+}
+
+function setAsideRows(input: GeneratorInput, until: string): RowSeed[] {
+  const { funding } = input
+  const review = input.paydayMode === 'review'
+  const goals = new Map(input.goals.map((g) => [g.id, g]))
+  const bills = new Map(input.bills.map((b) => [b.id, b]))
+  const seeds: RowSeed[] = []
+
+  for (const tracks of groupTracks(funding).values()) {
+    const { kind, ownerId, currency } = tracks[0]
+    const goal = kind === 'goal' ? goals.get(ownerId) : undefined
+    const bill = kind === 'bill' ? bills.get(ownerId) : undefined
+    const owner = goal ?? bill
+    if (!owner) continue
+    // A bill plans its next occurrence whole; a dated goal its whole schedule.
+    const lastSlot = bill
+      ? tracks[0].end
+      : goal && isDatedTargetGoal(goal)
+        ? funding.slots.length - 1
+        : -1
+    perSlot(tracks, funding.slots.length).forEach((amount, k) => {
+      const date = funding.slots[k].date
+      if (amount <= 0 || (date > until && k > lastSlot)) return
+      seeds.push({
+        origin: kind,
+        originId: ownerId,
+        role: 'set_aside',
+        occurrence: date,
+        amount,
+        currency,
+        name: `${owner.name} set-aside`,
+        walletId: goal
+          ? goal.saveWalletId
+          : (bill?.saveWalletId ?? bill?.walletId ?? null),
+        review,
+      })
+    })
+  }
+  return seeds
+}
+
 export function desiredPlanned(input: GeneratorInput): DesiredPlanned[] {
-  const today = isoOf(input.today)
+  const { today } = input
   const until = addDaysISO(today, input.horizonDays ?? HORIZON_DAYS)
   const seeds: RowSeed[] = []
-  for (const entry of input.plan.entries)
-    seeds.push(...goalRows(entry, input, until))
   for (const stream of input.income)
     seeds.push(...incomeRows(stream, today, until))
+  for (const bill of input.bills) seeds.push(...paymentRows(bill, until))
+  seeds.push(...setAsideRows(input, until))
   return seeds.map((seed) => rowFor(input.userId, seed))
 }

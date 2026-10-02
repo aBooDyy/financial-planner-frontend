@@ -1,25 +1,30 @@
 import { create } from 'zustand'
+import { ownerKey } from '#/features/planned/data/owners'
+import type { PlanOwner } from '#/features/planned/data/owners'
 import type { RecalcResult } from '#/features/planned/data/runner'
 
 /**
- * The last plan rewrite per goal, kept so the goal detail can offer "Plan updated · Undo"
- * whether the rewrite came from a Recalculate click or from a plan-changing edit the planner
- * wrote through. In memory only: an undo that survived a reload is not worth persisting.
+ * The last plan rewrite per goal or bill (`goal:<id>` / `bill:<id>`), kept so its detail can
+ * offer "Plan updated · Undo" whether the rewrite came from a Recalculate click or from a
+ * plan-changing edit the planner wrote through. In memory only: an undo that survived a reload
+ * is not worth persisting.
  */
 type RecalcUndoState = {
-  byGoal: Record<string, RecalcResult>
+  byOwner: Record<string, RecalcResult>
   remember: (result: RecalcResult) => void
-  forget: (goalId: string) => void
+  forget: (owner: PlanOwner) => void
 }
 
 export const useRecalcUndoStore = create<RecalcUndoState>((set) => ({
-  byGoal: {},
+  byOwner: {},
   remember: (result) =>
-    set((s) => ({ byGoal: { ...s.byGoal, [result.goalId]: result } })),
-  forget: (goalId) =>
+    set((s) => ({
+      byOwner: { ...s.byOwner, [ownerKey(result.owner)]: result },
+    })),
+  forget: (owner) =>
     set((s) => {
-      const { [goalId]: _gone, ...rest } = s.byGoal
+      const { [ownerKey(owner)]: _gone, ...rest } = s.byOwner
       void _gone
-      return { byGoal: rest }
+      return { byOwner: rest }
     }),
 }))

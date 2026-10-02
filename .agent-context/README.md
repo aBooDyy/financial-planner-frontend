@@ -16,8 +16,7 @@ root product [`.agent-context/`](../../.agent-context/). Keep
   sync engine, money/derivation, and the recreated UI are realized; the transfer and
   adjust-balance dialogs.
 - [goals.md](goals.md) — goals and income streams: the kind-less goal shape, progress from
-  set-asides, the interim funding plan, paydays and cadence (the Goals page is a placeholder
-  while Planning is rebuilt).
+  set-asides, paydays and cadence (the Goals page is a placeholder while Planning is rebuilt).
 - [bills.md](bills.md) — bills (once or repeating, must pay / nice to have): the entity, its
   full-representation sync, the mutations and the cross-entity cascades.
 - [set-asides.md](set-asides.md) — set-asides: labels on money in real wallets for a bill or

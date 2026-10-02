@@ -1,14 +1,16 @@
 /**
- * The headline of a goal's plan — "SR 1,500/mo × 8 from Jul 1" — read off planned rows.
- * The stored plan's copy lives on the goal (written when the plan is saved); the live one is
- * read off the rows the plan would generate today, so the two compare like for like.
+ * The headline of a goal's or bill's plan — "SR 1,500 × 8 from Jul 25" — read off planned
+ * rows. The stored plan's copy lives on the owner's row (written when the plan is saved); the
+ * live one is read off the rows the plan would generate today, so the two compare like for
+ * like.
  */
-import type { LocalGoal, LocalPlanned } from '#/db/types'
-import type { GoalPlanSnapshot } from '#/features/goals/data/mutations'
+import type { LocalPlanned } from '#/db/types'
+import { isPlanRowOf } from './owners'
+import type { PlanOwner } from './owners'
 
 type PlanRow = Pick<
   LocalPlanned,
-  'role' | 'amount' | 'occurrence' | 'goalId' | 'origin'
+  'role' | 'amount' | 'occurrence' | 'goalId' | 'billId' | 'origin'
 >
 
 export type PlanHeader = {
@@ -22,51 +24,48 @@ export type PlanHeader = {
   end: string | null
 }
 
-/**
- * The header of the plan one goal's rows describe, from `from` on. A bill paid each cycle
- * with no set-asides headlines its payment instead, with a count of zero.
- */
+/** The stored plan's header, as goals and bills both keep it on their own row. */
+export type PlanSnapshot = {
+  plannedAt: string | null
+  planAmount: number | null
+  planCount: number | null
+  planStart: string | null
+}
+
+/** The header of the plan one owner's set-asides describe, from `from` on. */
 export function planHeaderOf(
-  goalId: string,
+  owner: PlanOwner,
   rows: ReadonlyArray<PlanRow>,
   from: string,
 ): PlanHeader {
-  const mine = rows.filter(
-    (r) => r.origin === 'goal' && r.goalId === goalId && r.occurrence >= from,
-  )
-  const setAsides = mine
-    .filter((r) => r.role === 'set_aside' && r.amount > 0)
+  const setAsides = rows
+    .filter(
+      (r) => isPlanRowOf(r, owner) && r.occurrence >= from && r.amount > 0,
+    )
     .sort((a, b) => a.occurrence.localeCompare(b.occurrence))
-  if (setAsides.length > 0) {
-    return {
-      amount: Math.max(...setAsides.map((r) => r.amount)),
-      count: setAsides.length,
-      start: setAsides[0].occurrence,
-      end: setAsides[setAsides.length - 1].occurrence,
-    }
-  }
-  const payments = mine.filter((r) => r.role === 'payment')
+  if (setAsides.length === 0)
+    return { amount: 0, count: 0, start: null, end: null }
   return {
-    amount: payments.reduce((mx, r) => Math.max(mx, r.amount), 0),
-    count: 0,
-    start: null,
-    end: null,
+    amount: Math.max(...setAsides.map((r) => r.amount)),
+    count: setAsides.length,
+    start: setAsides[0].occurrence,
+    end: setAsides[setAsides.length - 1].occurrence,
   }
 }
 
 export const snapshotOf = (
   header: PlanHeader,
   today: string,
-): GoalPlanSnapshot => ({
+): PlanSnapshot => ({
   plannedAt: today,
   planAmount: header.amount,
   planCount: header.count,
   planStart: header.start,
 })
 
-export const snapshotFromGoal = (goal: LocalGoal): GoalPlanSnapshot => ({
-  plannedAt: goal.plannedAt,
-  planAmount: goal.planAmount,
-  planCount: goal.planCount,
-  planStart: goal.planStart,
+export const snapshotFrom = (item: PlanSnapshot): PlanSnapshot => ({
+  plannedAt: item.plannedAt,
+  planAmount: item.planAmount,
+  planCount: item.planCount,
+  planStart: item.planStart,
 })

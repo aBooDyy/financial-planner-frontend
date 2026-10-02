@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { LocalPlanned } from '#/db/types'
 import { m, planned } from '#/features/planned/testing/fixtures'
-import { fitGoalPlan } from './fit'
+import { fitPlan } from './fit'
+import { goalOwner } from './owners'
 import type { DesiredPlanned } from './generate'
 
 const TODAY = '2026-09-24'
@@ -22,8 +23,8 @@ const fit = (
   existing: LocalPlanned[],
   settled: (row: LocalPlanned) => number = () => 0,
 ) =>
-  fitGoalPlan({
-    goalId: 'umrah',
+  fitPlan({
+    owner: goalOwner('umrah'),
     desired,
     existing,
     today: TODAY,
@@ -35,7 +36,7 @@ const PLAN = ['2026-10-01', '2026-11-01', '2026-12-01'].map((d) =>
   want(d, m(3000)),
 )
 
-describe('fitGoalPlan', () => {
+describe('fitPlan', () => {
   it('is the engine’s plan exactly when nothing is in the way', () => {
     const out = fit(PLAN, [])
     expect(out.writable.map((d) => d.amount)).toEqual([

@@ -21,3 +21,21 @@ export const addDaysISO = (iso: string, days: number): string => {
 /** Whole days from `a` to `b` (positive when `b` is later). */
 export const daysBetween = (a: string, b: string): number =>
   Math.round((dateOf(b).getTime() - dateOf(a).getTime()) / 86_400_000)
+
+/** `iso` moved by whole calendar months, its day clamped to the target month's length. */
+export const addMonthsISO = (iso: string, months: number): string => {
+  const d = dateOf(iso)
+  const target = new Date(d.getFullYear(), d.getMonth() + months, 1)
+  const last = new Date(
+    target.getFullYear(),
+    target.getMonth() + 1,
+    0,
+  ).getDate()
+  return isoOf(
+    new Date(
+      target.getFullYear(),
+      target.getMonth(),
+      Math.min(d.getDate(), last),
+    ),
+  )
+}

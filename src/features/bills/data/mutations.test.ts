@@ -7,7 +7,10 @@ import { bill, m, setAside, tx } from '#/features/planned/testing/fixtures'
 
 vi.mock('#/db/sync', () => ({ schedulePush: vi.fn() }))
 
-const { createBill, deleteBill, updateBill } = await import('./mutations')
+const { createBill, deleteBill, setBillNextDue, updateBill } =
+  await import('./mutations')
+const { takePlanRecalcRequests } =
+  await import('#/features/planned/data/recalcRequests')
 
 const RENT = {
   name: 'Rent',
@@ -109,6 +112,24 @@ describe('updateBill', () => {
       note: 'Flat 4',
       must_pay: true,
     })
+  })
+
+  it('asks for a plan rewrite only when a planning field changes', async () => {
+    await db.bills.put(bill({ id: 'b1', version: 'v1' }))
+    takePlanRecalcRequests()
+
+    await updateBill('b1', { name: 'Flat', color: '#000000' })
+    expect(takePlanRecalcRequests()).toEqual([])
+
+    await updateBill('b1', { amount: m(3200) })
+    expect(takePlanRecalcRequests()).toEqual([
+      { owner: { kind: 'bill', id: 'b1' }, quiet: false },
+    ])
+
+    // Moving next due on as occurrences settle is bookkeeping, not a new plan.
+    await setBillNextDue('b1', '2026-12-01')
+    expect(takePlanRecalcRequests()).toEqual([])
+    expect((await db.bills.get('b1'))?.nextDue).toBe('2026-12-01')
   })
 })
 

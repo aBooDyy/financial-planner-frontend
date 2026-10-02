@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from 'react'
+import { goalOwner } from '#/features/planned/data/owners'
 import { recalcAllPlans } from '#/features/planned/data/runner'
 import type { RecalcResult } from '#/features/planned/data/runner'
 import { buildGoalPlanView } from '#/features/planned/data/views'
@@ -35,7 +36,12 @@ export function useRecalcAll(): UseRecalcAll {
     [data.inputs, data.state, data.nodes, data.today],
   )
   const recalcAll = useCallback(
-    () => recalcAllPlans(offPlanGoalIds, data.userId, data.todayDate),
+    () =>
+      recalcAllPlans(
+        offPlanGoalIds.map(goalOwner),
+        data.userId,
+        data.todayDate,
+      ),
     // `todayDate` is keyed by its day.
     [offPlanGoalIds, data.userId, data.today],
   )

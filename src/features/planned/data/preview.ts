@@ -14,7 +14,8 @@ import { walletLiveBalances } from '#/features/transactions/data/ledger'
 import { convertMinor } from '#/lib/currency'
 import { isoOf } from './dates'
 import { settledOf } from './settle'
-import { fitGoalPlanFrom } from './fit'
+import { fitPlanFrom } from './fit'
+import { goalOwner } from './owners'
 import { derivePlannerState } from './state'
 import type { PlannerInputs, PlannerState } from './state'
 
@@ -144,8 +145,8 @@ export function previewConfirm(args: {
       name: goal.name,
       savedAfter: after.progress[goal.id]?.progress ?? 0,
       target: goal.target ?? 0,
-      liveAmountAfter: fitGoalPlanFrom(
-        goal.id,
+      liveAmountAfter: fitPlanFrom(
+        goalOwner(goal.id),
         after.desired,
         inputs.planned,
         after.index,

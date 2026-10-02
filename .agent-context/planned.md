@@ -5,13 +5,11 @@ hand-made "plan for later" items. **A planned row never touches balances, budget
 goal progress.** Only what *settles* it does — an ordinary transaction or a set-aside carrying
 its `plannedId`.
 
-> **Interim (2026-10-02):** the planning model changed under this slice (see
-> [bills.md](bills.md), [set-asides.md](set-asides.md), [goals.md](goals.md)). The generator
-> now plans goal set-asides (from the interim funding plan) and paydays only; **bills generate
-> nothing yet** and nothing auto-confirms. The bills engine (coverage, two-tier priority,
-> release, autopay) replaces the generation and runner sections below. Product rules and the design live in
-`working.local/planned-transactions/` (03 lifecycle, 04 snapshot/recalc, 05 set-asides, 06
-contract) until folded into the root knowledge base; this file is how the frontend realizes them.
+What the rows say comes from the planning engine ([planning.md](planning.md)): the funding plan
+decides every set-aside, the bills' schedules decide their payments. Product rules and the
+design live in `working.local/planning-model/` (and the older `working.local/planned-transactions/`
+for the snapshot/recalc lifecycle) until folded into the root knowledge base; this file is how
+the frontend realizes them.
 
 ## The entity
 
@@ -66,40 +64,45 @@ random UUIDs.
 
 ## Generation (`data/generate.ts`) — pure
 
-`desiredPlanned({userId, income, plan, base, rates, today})` builds the rows the origins call
-for today:
+`desiredPlanned({userId, income, bills, goals, funding, paydayMode, today})` builds the rows the
+origins call for today (`HORIZON_DAYS` = 90):
 
-- **Goal set-asides** from `planGoals()` (`goals/data/fundingPlan.ts`, interim) via
-  `datedSchedule`: month *m* of a goal's schedule falls *m* months after its first set-aside date
-  (the goal's `setAsideDay`, default the 1st, on or after today), suggested into the goal's
-  `saveWalletId`. A **finite plan** (a goal with a target and a due date, `isFinitePlan`) gets
-  its **whole** schedule — it is the stored plan — and the last row absorbs rounding so the plan
-  sums to exactly what is left (`target − saved`, `saved` from set-asides + use). Any other goal
-  rolls within the 90-day horizon. Closed and paused goals plan nothing.
 - **Paydays** within the horizon, from `goals/data/paydays.paydaysOf` (re-exported here),
-  stopping after a stream's `endsOn`.
-  Monthly paydays fall on the stream's `day`, clamped (31st → Sep 30). Weekly / quarterly /
-  semi / annual step from the stream's `anchorDate` (a known payday, migration `0025`) so a
-  quarterly bonus lands in its real months; a stream with no anchor steps from a fixed epoch
-  (weekly: `day` of Jan 2000; longer: the months divisible by the cycle). Both are pure
-  functions of the stream, so every device derives the same dates and ids. Editing the
-  anchor, frequency or day re-dates the future open unpinned unsettled paydays on the next
-  `fill` (old occurrences removed, new ones created — paydays have no stored plan).
+  stopping after a stream's `endsOn`. Monthly paydays fall on the stream's `day`, clamped
+  (31st → Sep 30). Weekly / quarterly / semi / annual step from the stream's `anchorDate` (a
+  known payday) so a quarterly bonus lands in its real months; a stream with no anchor steps
+  from a fixed epoch. Both are pure functions of the stream, so every device derives the same
+  dates and ids. Editing the anchor, frequency or day re-dates the future open unpinned
+  unsettled paydays on the next `fill`.
+- **Bill payments**: one PAYMENT row per occurrence (`planning/data/occurrences.billOccurrences`)
+  from the bill's `nextDue` through the horizon — an overdue one arrives already due — with the
+  bill's wallet, category, name and amount. A closed bill has none; `endsOn` ends them.
+- **Set-asides** from the funding plan's `funded` schedule, one row per owner per payday (a
+  bill's tracks for that payday summed; each track rounded on its running total, so an
+  occurrence's rows add up to exactly what it needed). A **dated goal with a target** gets its
+  whole schedule (its stored plan); a **bill** gets every payday through its next open
+  occurrence's last one (a yearly bill's whole saving-up run), plus the horizon; anything else
+  rolls within the horizon. Rows go to the goal's `saveWalletId` / the bill's
+  `saveWalletId ?? walletId`. In **Review** payday mode they are generated `review: true`.
+
 ## Reconciliation (`data/reconcile.ts`) — pure
 
 `reconcilePlanned(desired, existing, ctx)` → `{create, update, remove}`. Never touches a row
-that is done, skipped, pinned, settled (even partly) or due; never touches MANUAL rows.
+that is done, skipped, pinned, settled (even partly) or due; never touches MANUAL rows. Goals
+and bills are both **plan owners** (`data/owners.ts`: `PlanOwner`, keys `goal:<id>` /
+`bill:<id>`): their generated set-asides are their stored plan.
 
 - **`fill`** (background): creates what is missing; removes future unsettled rows whose origin
-  is gone or no longer produces them (a payday that moved). **It never rewrites a goal's
-  set-asides**: a one-time goal's stored plan stays exactly as saved; rolling plans only grow
-  past their last set-aside. Paydays have no stored plan, so their future rows follow the
-  stream (amount, wallet, name, `categoryId` — the patchable fields; a payday or set-aside
-  carries no category). Only a bill's occurrence may be created already due.
-- **`recalc`** (one goal): rewrites that goal's future open unpinned unsettled rows to the live
-  plan — update, create, remove.
-- A completed goal loses its future set-asides; a deleted origin its future unsettled open rows
-  (pinned or not). History always stays.
+  is gone or no longer produces them (a payday or payment that moved). **It never rewrites a
+  stored set-aside**: a dated goal's plan is written whole, once; any other plan (bills,
+  rolling goals) only grows past its last set-aside. It does patch a future set-aside's
+  `review` flag to the payday mode. Paydays and bill payments have no stored plan, so their
+  future rows follow the origin (amount, wallet, name, `categoryId`). Only a bill payment may
+  be created already due. An owner no longer being planned (`activeOwners` — the funding
+  plan's tracks: a closed or paused goal, a reached one, a closed bill) loses its future set-asides.
+- **`recalc`** (one owner): rewrites that owner's future open unpinned unsettled set-asides to
+  the live plan — update, create, remove. Payments are left alone.
+- A deleted origin takes its future unsettled open rows (pinned or not). History always stays.
 
 ## The planner (`data/runner.ts`, `hooks/usePlannedRunner.ts`)
 
@@ -112,36 +115,39 @@ came due. Then it runs debounced 500 ms on origin changes (a
 stamp of goals / income / bills), each pull, each plan-rewrite request, and day rollover.
 `runPlanner` is single-flight through one queue shared with recalc and undo:
 
-1. Goals with no stored plan (`plannedAt === null`, i.e. new) and goals whose plan the user just
-   changed are rewritten in `recalc` mode and get a snapshot (`plannedAt/planAmount/planCount/
-   planStart` on the goal — the headline of the rows from today).
+1. Goals and bills being planned with no stored plan (`plannedAt === null`, i.e. new) and
+   owners whose plan was asked to be rewritten are rewritten in `recalc` mode and get a
+   snapshot (`plannedAt/planAmount/planCount/planStart` on the goal or bill — the headline of
+   the rows from today; `setGoalPlanSnapshot` / `setBillPlanSnapshot`).
 2. Everything else gets `fill`.
 3. Open rows whose origin is gone (link null or the goal / stream / bill deleted) are
    resolved, so they never wait in Needs confirming for nothing: **skipped** when unsettled,
    **closed with the rest abandoned** when partly settled (`orphanedPlanned` in `reconcile.ts`).
-   MANUAL rows are left alone unless they are set-asides of a deleted goal or bill. (Deleting a
-   goal or bill deletes its set-asides locally, as the server does, so its past set-aside rows
-   read as unsettled and are skipped.)
+   A bill payment dated before its bill's `nextDue` (the user moved the bill on past it) is
+   resolved the same way. MANUAL rows are left alone unless they are set-asides of a deleted
+   goal or bill. (Deleting a goal or bill deletes its set-asides locally, as the server does,
+   so its past set-aside rows read as unsettled and are skipped.)
 
-Nothing auto-confirms any more: the recurring auto-poster went with recurring schedules, and
-bill autopay comes with the bills engine.
-
-**Plan-changing edits** (`goals/data/mutations.updateGoal` when currency, amount, target, due
-date or set-aside day change) file
-a request in `data/recalcRequests.ts` — a leaf module, so the goals slice never imports the
-planner. The runner picks it up and remembers the rewrite's undo in `stores/recalcUndo.ts`.
-Name / colour / position edits leave the plan alone. A goal's first plan is written silently
-(no undo).
+**Plan rewrite requests** (`data/recalcRequests.ts`, a leaf module so the goals and bills
+slices never import the planner) are keyed by owner and may be **quiet**.
+`goals/data/mutations.updateGoal` files a loud one when currency, amount, target, due date,
+must-have or save-in wallet change (`changesPlan`); `bills/data/mutations.updateBill` when
+amount, currency, repeat, `nextDue`, `endsOn`, must-pay, paid-from or save-in change
+(`changesBillPlan`). Name / colour / position edits leave the plan alone, and so does
+`setBillNextDue` (moving `nextDue` on as occurrences settle is bookkeeping). The runner
+remembers a loud rewrite's undo in `stores/recalcUndo.ts` (`byOwner`, keyed `goal:<id>` /
+`bill:<id>`); quiet ones and first plans offer none.
 
 **Fitting a rewrite (`data/fit.ts`).** A date the engine plans may already be taken by a row
 a recalc may not rewrite (confirmed early, skipped, moved, partly settled) — and its
 deterministic id means no second row can exist for it. So a rewrite writes
 `Σ planned from today − Σ still open on future rows nobody may rewrite` (hand-made set-asides
 included) over the dates it *can* write, in proportion to the engine's amounts, the last row
-taking the rounding. The runner stores that header as the snapshot, and `useGoalPlan`'s "From
-today" / off-plan / "Recalculate to X" read the same fit — so after a recalc stored == live.
+taking the rounding. It works for either owner (`fitPlan` / `fitPlanFrom(owner, …)`). The
+runner stores that header as the snapshot, and `useGoalPlan`'s "From today" / off-plan /
+"Recalculate to X" read the same fit — so after a recalc stored == live.
 
-**Recalculate + undo** (`recalcGoalPlan`, `recalcAllPlans`): the before-image (rows updated or
+**Recalculate + undo** (`recalcPlan(owner)`, `recalcAllPlans(owners)`): the before-image (rows updated or
 removed, the ids created, the snapshot) is held in memory; undo restores it through the normal
 write paths — a removed row whose delete is still queued has the delete cancelled, otherwise
 it is created again under its old id. Not persisted (04 §5).

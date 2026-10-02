@@ -3,6 +3,7 @@ import type { LocalGoal, LocalPlanned } from '#/db/types'
 import { catId } from '#/features/categories/__fixtures__/categories'
 import { goal, m, planned } from '#/features/planned/testing/fixtures'
 import type { DesiredPlanned } from './generate'
+import { billOwner, goalOwner } from './owners'
 import { orphanedPlanned, reconcilePlanned } from './reconcile'
 import type { ReconcileContext } from './reconcile'
 
@@ -30,7 +31,7 @@ const ctx = (over: Partial<ReconcileContext> = {}): ReconcileContext => {
     mode: 'fill',
     isSettled: () => false,
     goals: new Map(goals.map((g) => [g.id, g])),
-    activeGoalIds: new Set(goals.map((g) => g.id)),
+    activeOwners: new Set([...goals.map((g) => `goal:${g.id}`), 'bill:rent']),
     incomeIds: new Set(['salary']),
     billIds: new Set(['rent']),
     ...over,
@@ -143,7 +144,7 @@ describe('reconcilePlanned — fill', () => {
     const plan = reconcilePlanned(
       [],
       existing,
-      ctx({ activeGoalIds: new Set(['fund', 'car']) }),
+      ctx({ activeOwners: new Set(['goal:fund', 'goal:car']) }),
     )
     expect(plan.remove).toEqual(['umrah:2026-10-01'])
   })
@@ -204,7 +205,7 @@ describe('reconcilePlanned — fill', () => {
     const plan = reconcilePlanned(
       [want(setAside('fund', '2027-01-01'))],
       [setAside('fund', '2026-10-01')],
-      ctx({ skipGoalIds: new Set(['fund']) }),
+      ctx({ skipOwners: new Set(['goal:fund']) }),
     )
     expect(plan).toEqual({ create: [], update: [], remove: [] })
   })
@@ -237,9 +238,88 @@ describe('reconcilePlanned — fill', () => {
   })
 })
 
+describe('reconcilePlanned — bills', () => {
+  const rentSetAside = (occurrence: string, amount = m(3000), over = {}) =>
+    planned({
+      id: `rent-sa:${occurrence}`,
+      origin: 'bill',
+      role: 'set_aside',
+      goalId: null,
+      billId: 'rent',
+      occurrence,
+      amount,
+      ...over,
+    })
+  const rentPayment = (occurrence: string) =>
+    planned({
+      id: `rent-pay:${occurrence}`,
+      origin: 'bill',
+      role: 'payment',
+      goalId: null,
+      billId: 'rent',
+      occurrence,
+      amount: m(3000),
+    })
+
+  it('creates a payment that is already due, but never a past set-aside', () => {
+    const plan = reconcilePlanned(
+      [want(rentPayment('2026-09-01')), want(rentSetAside('2026-08-25'))],
+      [],
+      ctx(),
+    )
+    expect(plan.create.map((d) => d.id)).toEqual(['rent-pay:2026-09-01'])
+  })
+
+  it('keeps a bill’s stored set-asides and only grows past the last one', () => {
+    const existing = [rentSetAside('2026-09-25'), rentSetAside('2026-10-25')]
+    const desired = [
+      want(rentSetAside('2026-10-25', m(2000))),
+      want(rentSetAside('2026-11-25', m(2000))),
+    ]
+    const plan = reconcilePlanned(desired, existing, ctx())
+    expect(plan.update).toEqual([])
+    expect(plan.create.map((d) => d.id)).toEqual(['rent-sa:2026-11-25'])
+    expect(plan.remove).toEqual([])
+  })
+
+  it('brings a future set-aside’s review flag in line with the payday mode', () => {
+    const plan = reconcilePlanned(
+      [want(rentSetAside('2026-10-25', m(3000), { review: true }))],
+      [rentSetAside('2026-10-25', m(3000), { review: false })],
+      ctx(),
+    )
+    expect(plan.update).toEqual([
+      { id: 'rent-sa:2026-10-25', patch: { review: true } },
+    ])
+  })
+
+  it('drops a closed bill’s future set-asides', () => {
+    const plan = reconcilePlanned(
+      [],
+      [rentSetAside('2026-10-25')],
+      ctx({ activeOwners: new Set() }),
+    )
+    expect(plan.remove).toEqual(['rent-sa:2026-10-25'])
+  })
+
+  it('rewrites a bill’s set-asides on recalc and leaves its payments alone', () => {
+    const plan = reconcilePlanned(
+      [
+        want(rentSetAside('2026-10-25', m(2500))),
+        want({ ...rentPayment('2026-11-01'), amount: m(9) }),
+      ],
+      [rentSetAside('2026-10-25'), rentPayment('2026-11-01')],
+      ctx({ mode: 'recalc', owner: billOwner('rent') }),
+    )
+    expect(plan.update).toEqual([
+      { id: 'rent-sa:2026-10-25', patch: { amount: m(2500) } },
+    ])
+  })
+})
+
 describe('reconcilePlanned — recalc', () => {
   const recalc = (over: Partial<ReconcileContext> = {}) =>
-    ctx({ mode: 'recalc', goalId: 'umrah', ...over })
+    ctx({ mode: 'recalc', owner: goalOwner('umrah'), ...over })
 
   it('rewrites only the goal’s future, open, unpinned, unsettled rows', () => {
     const existing = [
@@ -301,7 +381,7 @@ describe('reconcilePlanned — recalc', () => {
       const plan = reconcilePlanned(
         [],
         untouchable,
-        ctx({ mode, goalId: 'umrah', isSettled }),
+        ctx({ mode, owner: goalOwner('umrah'), isSettled }),
       )
       expect(plan).toEqual({ create: [], update: [], remove: [] })
     }
@@ -312,7 +392,7 @@ describe('orphanedPlanned', () => {
   const origins = {
     goalIds: new Set(['umrah']),
     incomeIds: new Set(['salary']),
-    billIds: new Set(['rent']),
+    billNextDue: new Map([['rent', '2026-09-01']]),
   }
   const row = (id: string, over: Partial<LocalPlanned>) =>
     planned({ id, occurrence: '2026-09-01', ...over })
@@ -376,6 +456,23 @@ describe('orphanedPlanned', () => {
       skip: [],
       closeRest: [],
     })
+  })
+
+  it('resolves a bill payment dated before the bill’s next due date as stale', () => {
+    const payment = (id: string, occurrence: string) =>
+      row(id, {
+        origin: 'bill',
+        role: 'payment',
+        goalId: null,
+        billId: 'rent',
+        occurrence,
+      })
+    const plan = orphanedPlanned(
+      [payment('stale', '2026-08-01'), payment('current', '2026-09-01')],
+      origins,
+      () => false,
+    )
+    expect(plan.skip).toEqual(['stale'])
   })
 
   it('skips a hand-made set-aside whose goal or bill is gone — it could never be confirmed', () => {

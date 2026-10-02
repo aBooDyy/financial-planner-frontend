@@ -4,7 +4,8 @@ import type {
   ContributionInput,
   ContributionResult,
 } from '#/features/planned/data/mutations'
-import { recalcGoalPlan } from '#/features/planned/data/runner'
+import { goalOwner, ownerKey } from '#/features/planned/data/owners'
+import { recalcPlan } from '#/features/planned/data/runner'
 import type { RecalcResult } from '#/features/planned/data/runner'
 import { buildGoalPlanView } from '#/features/planned/data/views'
 import type { GoalPlanView } from '#/features/planned/data/views'
@@ -28,7 +29,7 @@ export type UseGoalPlan = {
 export function useGoalPlan(goalId: string | null): UseGoalPlan {
   const data = usePlannedData()
   const lastRecalc = useRecalcUndoStore((s) =>
-    goalId ? (s.byGoal[goalId] ?? null) : null,
+    goalId ? (s.byOwner[ownerKey(goalOwner(goalId))] ?? null) : null,
   )
   const forget = useRecalcUndoStore((s) => s.forget)
 
@@ -54,13 +55,13 @@ export function useGoalPlan(goalId: string | null): UseGoalPlan {
   const recalc = useCallback(
     () =>
       goalId
-        ? recalcGoalPlan(goalId, data.userId, data.todayDate)
+        ? recalcPlan(goalOwner(goalId), data.userId, data.todayDate)
         : Promise.resolve(null),
     // `todayDate` is keyed by its day.
     [goalId, data.userId, data.today],
   )
   const dismissRecalc = useCallback(() => {
-    if (goalId) forget(goalId)
+    if (goalId) forget(goalOwner(goalId))
   }, [goalId, forget])
   const contribute = useCallback(
     (input: ContributionInput) => {

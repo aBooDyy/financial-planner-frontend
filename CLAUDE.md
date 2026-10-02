@@ -19,7 +19,7 @@ pattern changes. Index: [`.agent-context/README.md`](.agent-context/README.md).
 - [styling-and-theming.md](.agent-context/styling-and-theming.md) — Tailwind, the `fp-` design tokens, light/dark, **RTL/LTR** (incl. Radix's direction provider).
 - [pwa-and-mobile.md](.agent-context/pwa-and-mobile.md) — PWA setup, offline, native-like mobile UX, responsive nav.
 - [wallets.md](.agent-context/wallets.md) — Wallets: the first synced entity, money/derivation, the wallets/groups tree.
-- [goals.md](.agent-context/goals.md) — Goals & income: the kind-less goal, progress from set-asides, the interim funding plan, paydays.
+- [goals.md](.agent-context/goals.md) — Goals & income: the kind-less goal, progress from set-asides, paydays.
 - [bills.md](.agent-context/bills.md) — Bills: once or repeating, must pay / nice to have; entity, sync, mutations, cascades.
 - [set-asides.md](.agent-context/set-asides.md) — Set-asides: labels on money in real wallets for a bill or goal; live vs released, totals.
 - [transactions.md](.agent-context/transactions.md) — Spending: ledger + budgets, derived balances, settlement links, transfers between wallets, balance adjustments.

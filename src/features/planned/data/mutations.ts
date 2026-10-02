@@ -10,7 +10,7 @@
 import { db } from '#/db/db'
 import { schedulePush } from '#/db/sync'
 import type { LocalBill, LocalPlanned } from '#/db/types'
-import { updateBill } from '#/features/bills/data/mutations'
+import { setBillNextDue } from '#/features/bills/data/mutations'
 import { buildCatalog } from '#/features/categories/data/catalog'
 import { createSetAside } from '#/features/setAsides/data/mutations'
 import type { SetAsideOwner } from '#/features/setAsides/data/mutations'
@@ -83,7 +83,7 @@ async function advanceBillPast(item: LocalPlanned): Promise<void> {
   if (!bill?.frequency || bill.nextDue > item.occurrence) return
   let next = bill.nextDue
   while (next <= item.occurrence) next = advanceDue(next, bill)
-  await updateBill(bill.id, { nextDue: next })
+  await setBillNextDue(bill.id, next)
 }
 
 /** Who a set-aside row puts money aside for: its goal, or its bill and occurrence. */

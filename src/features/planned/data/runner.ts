@@ -1,7 +1,7 @@
 /**
- * The planner: brings the stored planned rows in line with the goals and streams they come
- * from (`generate` → `reconcile` → writes), rewrites one goal's plan on request, and resolves
- * open rows whose origin is gone.
+ * The planner: brings the stored planned rows in line with the income, bills and goals they
+ * come from (`generate` → `reconcile` → writes), rewrites one goal's or bill's plan on request,
+ * and resolves open rows whose origin is gone.
  *
  * Every entry point runs through one queue, so a background fill, a Recalculate click and
  * an undo can never interleave their reads and writes.
@@ -9,12 +9,18 @@
 import { db } from '#/db/db'
 import { schedulePush } from '#/db/sync'
 import { SETTINGS_KEY } from '#/db/types'
-import type { LocalGoal, LocalPlanned } from '#/db/types'
+import type { LocalPlanned } from '#/db/types'
+import { setBillPlanSnapshot } from '#/features/bills/data/mutations'
 import { DEFAULT_BASE_CURRENCY } from '#/features/goals/constants'
 import { setGoalPlanSnapshot } from '#/features/goals/data/mutations'
-import type { GoalPlanSnapshot } from '#/features/goals/data/mutations'
+import { isPlannableGoal } from '#/features/planning/data/funding'
 import { useRecalcUndoStore } from '#/features/planned/stores/recalcUndo'
+import { planningSettingsOf } from '#/features/wallets/data/mappers'
 import { isoOf } from './dates'
+import { fitPlanFrom } from './fit'
+import { linkedTransactions } from './linkedTransactions'
+import { billOwner, goalOwner, isPlanRowOf, ownerKey } from './owners'
+import type { PlanOwner } from './owners'
 import { takePlanRecalcRequests } from './recalcRequests'
 import { orphanedPlanned, reconcilePlanned } from './reconcile'
 import type { ReconcileContext, ReconcilePlan } from './reconcile'
@@ -26,20 +32,18 @@ import {
   savePlanned,
 } from './rows'
 import { hasSettlements } from './settle'
-import { fitGoalPlanFrom } from './fit'
-import { linkedTransactions } from './linkedTransactions'
-import { snapshotFromGoal, snapshotOf } from './snapshot'
-import type { PlanHeader } from './snapshot'
+import { snapshotFrom, snapshotOf } from './snapshot'
+import type { PlanHeader, PlanSnapshot } from './snapshot'
 import { derivePlannerState, liveInputs } from './state'
 import type { PlannerInputs, PlannerState } from './state'
 
 export type RecalcResult = {
-  goalId: string
+  owner: PlanOwner
   /** ISO date of the rewrite. */
   at: string
-  before: GoalPlanSnapshot
-  after: GoalPlanSnapshot
-  /** The rewritten plan from today on — e.g. 5 set-asides of 1,800, Oct 1 → Feb 1. */
+  before: PlanSnapshot
+  after: PlanSnapshot
+  /** The rewritten plan from today on — e.g. 5 set-asides of 1,800, Oct 25 → Feb 25. */
   header: PlanHeader
   changed: { created: number; updated: number; removed: number }
   /** Restore the plan exactly as it was: same rows, same ids, same amounts. */
@@ -50,6 +54,7 @@ export type PlannerRunSummary = {
   created: number
   updated: number
   removed: number
+  /** Owner keys (`goal:<id>` / `bill:<id>`) whose plan was rewritten. */
   rewritten: string[]
   /** Open rows whose origin is gone: skipped, or closed with the rest abandoned. */
   orphansResolved: number
@@ -81,6 +86,7 @@ export async function loadPlannerInputs(): Promise<PlannerInputs> {
     planned,
     txns,
     setAsides,
+    settings: planningSettingsOf(settings),
     base: settings?.baseCurrency ?? DEFAULT_BASE_CURRENCY,
     rates: await currentRates(),
   })
@@ -94,7 +100,9 @@ const contextFor = (
   today,
   isSettled: (row) => hasSettlements(row, state.index),
   goals: new Map(inputs.goals.map((g) => [g.id, g])),
-  activeGoalIds: new Set(state.plan.entries.map((e) => e.goal.id)),
+  activeOwners: new Set(
+    state.funding.tracks.map((t) => `${t.kind}:${t.ownerId}`),
+  ),
   incomeIds: new Set(inputs.income.map((s) => s.id)),
   billIds: new Set(inputs.bills.map((b) => b.id)),
 })
@@ -132,11 +140,16 @@ async function reinsert(row: LocalPlanned): Promise<void> {
   await insertPlanned([{ ...row, version: '', dirty: 1 }])
 }
 
+const storeSnapshot = (owner: PlanOwner, snapshot: PlanSnapshot) =>
+  owner.kind === 'goal'
+    ? setGoalPlanSnapshot(owner.id, snapshot)
+    : setBillPlanSnapshot(owner.id, snapshot)
+
 async function restore(
-  goalId: string,
+  owner: PlanOwner,
   before: ReadonlyArray<LocalPlanned>,
   createdIds: ReadonlyArray<string>,
-  snapshot: GoalPlanSnapshot,
+  snapshot: PlanSnapshot,
 ): Promise<void> {
   await removePlanned(createdIds)
   for (const row of before) {
@@ -153,22 +166,29 @@ async function restore(
       categoryId: row.categoryId,
     })
   }
-  await setGoalPlanSnapshot(goalId, snapshot)
-  useRecalcUndoStore.getState().forget(goalId)
+  await storeSnapshot(owner, snapshot)
+  useRecalcUndoStore.getState().forget(owner)
   schedulePush()
 }
 
-/** Rewrite one goal's future rows to the live plan and store it as the goal's plan. */
-async function rewriteGoal(
-  goal: LocalGoal,
+const ownerRow = (owner: PlanOwner, inputs: PlannerInputs) =>
+  owner.kind === 'goal'
+    ? inputs.goals.find((g) => g.id === owner.id)
+    : inputs.bills.find((b) => b.id === owner.id)
+
+/** Rewrite one owner's future set-asides to the live plan and store it as its plan. */
+async function rewrite(
+  owner: PlanOwner,
   inputs: PlannerInputs,
   state: PlannerState,
   today: string,
-): Promise<{ result: RecalcResult; hadPlan: boolean }> {
+): Promise<{ result: RecalcResult; hadPlan: boolean } | null> {
+  const item = ownerRow(owner, inputs)
+  if (!item) return null
   // The live plan, fitted around rows a recalc may not rewrite — so what is written, what is
   // stored as the plan and what "From today" showed are one and the same.
-  const fitted = fitGoalPlanFrom(
-    goal.id,
+  const fitted = fitPlanFrom(
+    owner,
     state.desired,
     inputs.planned,
     state.index,
@@ -176,12 +196,12 @@ async function rewriteGoal(
     today,
   )
   const desired = state.desired
-    .filter((d) => !(d.origin === 'goal' && d.goalId === goal.id))
+    .filter((d) => !isPlanRowOf(d, owner))
     .concat(fitted.rows)
   const plan = reconcilePlanned(desired, inputs.planned, {
     ...contextFor(inputs, state, today),
     mode: 'recalc',
-    goalId: goal.id,
+    owner,
   })
   const held = new Map(inputs.planned.map((p) => [p.id, p]))
   const before = [...plan.update.map((u) => u.id), ...plan.remove]
@@ -191,12 +211,12 @@ async function rewriteGoal(
   await applyPlan(plan)
 
   const header = fitted.header
-  const beforeSnapshot = snapshotFromGoal(goal)
+  const beforeSnapshot = snapshotFrom(item)
   const after = snapshotOf(header, today)
-  await setGoalPlanSnapshot(goal.id, after)
+  await storeSnapshot(owner, after)
 
   const result: RecalcResult = {
-    goalId: goal.id,
+    owner,
     at: today,
     before: beforeSnapshot,
     after,
@@ -207,11 +227,10 @@ async function rewriteGoal(
       removed: plan.remove.length,
     },
     undo: () =>
-      serialized(() => restore(goal.id, before, createdIds, beforeSnapshot)),
+      serialized(() => restore(owner, before, createdIds, beforeSnapshot)),
   }
   const hadPlan =
-    goal.plannedAt !== null ||
-    inputs.planned.some((p) => p.origin === 'goal' && p.goalId === goal.id)
+    item.plannedAt !== null || inputs.planned.some((p) => isPlanRowOf(p, owner))
   return { result, hadPlan }
 }
 
@@ -229,7 +248,7 @@ async function resolveOrphans(
     {
       goalIds: new Set(inputs.goals.map((g) => g.id)),
       incomeIds: new Set(inputs.income.map((s) => s.id)),
-      billIds: new Set(inputs.bills.map((b) => b.id)),
+      billNextDue: new Map(inputs.bills.map((b) => [b.id, b.nextDue])),
     },
     (row) => hasSettlements(row, state.index),
   )
@@ -241,6 +260,16 @@ async function resolveOrphans(
   return plan.skip.length + plan.closeRest.length
 }
 
+/** Owners that are being planned but have never had a plan written. */
+const unplanned = (inputs: PlannerInputs): PlanOwner[] => [
+  ...inputs.goals
+    .filter((g) => isPlannableGoal(g) && g.plannedAt === null)
+    .map((g) => goalOwner(g.id)),
+  ...inputs.bills
+    .filter((b) => b.closedAt === null && b.plannedAt === null)
+    .map((b) => billOwner(b.id)),
+]
+
 async function runOnce(
   userId: string,
   todayDate: Date,
@@ -248,15 +277,14 @@ async function runOnce(
   const today = isoOf(todayDate)
   const inputs = await loadPlannerInputs()
   const state = derivePlannerState(inputs, userId, todayDate)
-  const goals = new Map(inputs.goals.map((g) => [g.id, g]))
 
-  const requested = new Set(takePlanRecalcRequests())
-  const rewrite = [
-    ...new Set([
-      ...requested,
-      ...inputs.goals.filter((g) => g.plannedAt === null).map((g) => g.id),
-    ]),
-  ].filter((id) => goals.has(id))
+  const loud = new Set<string>()
+  const owners = new Map<string, PlanOwner>()
+  for (const request of takePlanRecalcRequests()) {
+    owners.set(ownerKey(request.owner), request.owner)
+    if (!request.quiet) loud.add(ownerKey(request.owner))
+  }
+  for (const owner of unplanned(inputs)) owners.set(ownerKey(owner), owner)
 
   const summary: PlannerRunSummary = {
     created: 0,
@@ -265,26 +293,22 @@ async function runOnce(
     rewritten: [],
     orphansResolved: 0,
   }
-  for (const id of rewrite) {
-    const { result, hadPlan } = await rewriteGoal(
-      goals.get(id) as LocalGoal,
-      inputs,
-      state,
-      today,
-    )
+  for (const [key, owner] of owners) {
+    const done = await rewrite(owner, inputs, state, today)
+    if (!done) continue
+    const { result, hadPlan } = done
     summary.created += result.changed.created
     summary.updated += result.changed.updated
     summary.removed += result.changed.removed
-    summary.rewritten.push(id)
-    // A plan-changing edit gets its "Plan updated · Undo"; a goal's first plan is silent.
-    if (requested.has(id) && hadPlan)
-      useRecalcUndoStore.getState().remember(result)
+    summary.rewritten.push(key)
+    // A plan-changing edit gets its "Plan updated · Undo"; a first plan is silent.
+    if (loud.has(key) && hadPlan) useRecalcUndoStore.getState().remember(result)
   }
 
   const fill = reconcilePlanned(state.desired, inputs.planned, {
     ...contextFor(inputs, state, today),
     mode: 'fill',
-    skipGoalIds: new Set(rewrite),
+    skipOwners: new Set(owners.keys()),
   })
   await applyPlan(fill)
   summary.created += fill.create.length
@@ -315,33 +339,32 @@ export function runPlanner(
   return run
 }
 
-/** Recalculate one goal: rewrite its future rows to today's numbers, with an undo. */
-export function recalcGoalPlan(
-  goalId: string,
+/** Recalculate one goal or bill: rewrite its future set-asides to today's numbers, with an undo. */
+export function recalcPlan(
+  owner: PlanOwner,
   userId: string,
   today: Date = new Date(),
 ): Promise<RecalcResult | null> {
   return serialized(async () => {
     const inputs = await loadPlannerInputs()
-    const goal = inputs.goals.find((g) => g.id === goalId)
-    if (!goal) return null
     const state = derivePlannerState(inputs, userId, today)
-    const { result } = await rewriteGoal(goal, inputs, state, isoOf(today))
-    useRecalcUndoStore.getState().remember(result)
+    const done = await rewrite(owner, inputs, state, isoOf(today))
+    if (!done) return null
+    useRecalcUndoStore.getState().remember(done.result)
     schedulePush()
-    return result
+    return done.result
   })
 }
 
-/** "Recalculate all": every goal off its stored plan, one undo per goal. */
+/** "Recalculate all": every goal and bill off its stored plan, one undo each. */
 export async function recalcAllPlans(
-  goalIds: ReadonlyArray<string>,
+  owners: ReadonlyArray<PlanOwner>,
   userId: string,
   today: Date = new Date(),
 ): Promise<RecalcResult[]> {
   const out: RecalcResult[] = []
-  for (const id of goalIds) {
-    const result = await recalcGoalPlan(id, userId, today)
+  for (const owner of owners) {
+    const result = await recalcPlan(owner, userId, today)
     if (result) out.push(result)
   }
   return out

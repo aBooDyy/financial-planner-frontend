@@ -28,6 +28,58 @@ Everything under `data/` is pure and clock-free: `today` is an ISO date passed i
   next main payday; with no reliable payday (no income, or income varies) today + 30; end of
   month; or today + N days.
 
+## Bill occurrences — `data/occurrences.ts`
+
+- `stepOccurrence(anchor, bill, n)` — month cadences keep the anchor's day, clamped
+  (Jan 31 → Feb 28 → Mar 31); day/week cadences step whole days.
+- `billOccurrences(bill, through)` — from `nextDue`, stopping at `endsOn`; a closed bill has
+  none, a one-off at most its `nextDue`.
+- An occurrence is **settled** when its planned PAYMENT row (`paymentRowsOf`) exists and is no
+  longer open (paid in full, closed with the rest abandoned, or skipped).
+  `firstOpenOccurrence(bill, rows)` is what `nextDue` should read; `openOccurrences` lists the
+  rest.
+
+## The funding engine — `data/funding.ts`
+
+`planFunding(input)` → `FundingPlan {calendar, slots, tracks, unlimited, horizonEnd}`. The
+planner state derives it once (`planned/data/state.ts`), so the generator, the runner and every
+view read the same plan.
+
+- **Slots** = the calendar's paydays from today to `horizonEnd` (13 months, stretched to the
+  latest goal date or an undated goal's target run, capped at 10 years). Each slot's
+  **capacity** is the income landing in its pay period (`incomeBetween`, base). With
+  `incomeVaries` and a floor, every slot holds the floor; with no income at all capacity is
+  `Infinity` and `unlimited` is set (the plan funds what it needs — nothing to compare to).
+- **Tracks** (`FundingTrack`): one per open bill occurrence (`bill:<id>:<due>`), one per goal
+  being planned (`goal:<id>`). Each has a `need` (owner currency) net of what is already set
+  aside (and, for a bill occurrence, already paid on its row), a slot **window**
+  `[start, end]`, a `tier` and a `deadline`.
+  - A bill occurrence's window runs from the slot after the previous occurrence's last slot
+    through the last slot on or before its due date; if that is empty it shares the previous
+    one (several weekly occurrences covered from one monthly payday). So a bill due within one
+    pay period is covered whole on its payday; a longer cycle (or a far one-off) saves up in
+    equal installments. With `incomeVaries` the window ends on the slot **before** the due
+    month (next month's bills from this month's income). An occurrence due before the first
+    slot has **no window** (`end < start`): "not set aside yet", paid from free money.
+  - A goal with a target and a date spreads `target − progress` over the slots through its
+    date. A goal with a monthly `amount` draws `perPaycheck(amount)` each slot — until its
+    target, or its date — `need` is `Infinity` without a target.
+  - Bills with `amount` 0, closed bills, settled occurrences, paused / closed / reached goals
+    have no track.
+- **Priority** (D10, `byPriority`): tier 1 must-pay bills, 2 must-have goals, 3 nice-to-have
+  bills and goals; earliest deadline first within a tier (ongoing goals last), then
+  `position`, then key. Each slot pays tracks in that order, each at the pace that finishes it
+  in its window (`left / slots left`, or its per-paycheck draw), capped by what capacity is
+  left. An underfunded track's pace rises in later slots.
+- It runs **twice**: `funded` (against capacity) and `required` (unlimited). `shortfall` is
+  what the funded run leaves uncovered by a finite track's deadline; `completesAt` the slot it
+  is covered in. Amounts are owner currency, unrounded; `roundedSchedule` rounds on the
+  running total so a track's rows add up exactly.
+- `tracksOf(plan, kind, id)` — one owner's tracks in date order. `rateOf` is the unrounded
+  conversion factor the engine uses; `isPlannableGoal`, `isDatedTargetGoal`, `isGoalReached`
+  are the shared goal predicates.
+
 ## Tests
 
-`data/payPeriods.test.ts`.
+`data/{payPeriods,funding}.test.ts`; generation and the runner in
+`planned/data/{generate,reconcile,runner}.test.ts`.

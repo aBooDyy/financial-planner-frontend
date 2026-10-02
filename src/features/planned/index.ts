@@ -44,7 +44,7 @@ export type {
   ContributionResult,
   PlannedActionCode,
 } from './data/mutations'
-export { recalcAllPlans, recalcGoalPlan, runPlanner } from './data/runner'
+export { recalcAllPlans, recalcPlan, runPlanner } from './data/runner'
 export type { PlannerRunSummary, RecalcResult } from './data/runner'
 
 // Pure derivations and view models
@@ -77,7 +77,9 @@ export type {
   PlannedTag,
 } from './data/views'
 export type { ConfirmPreview } from './data/preview'
-export type { PlanHeader } from './data/snapshot'
+export type { PlanHeader, PlanSnapshot } from './data/snapshot'
+export { billOwner, goalOwner, ownerKey } from './data/owners'
+export type { PlanOwner } from './data/owners'
 
 // Stores
 export { useRecalcUndoStore } from './stores/recalcUndo'

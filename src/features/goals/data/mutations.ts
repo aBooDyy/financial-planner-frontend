@@ -11,6 +11,7 @@ import type {
   IntervalUnit,
   ObligationFrequency,
 } from '#/features/goals/api/types'
+import { goalOwner } from '#/features/planned/data/owners'
 import { requestPlanRecalc } from '#/features/planned/data/recalcRequests'
 import { dropSetAsidesOf } from '#/features/setAsides/data/mutations'
 import { unlinkLedgerFrom } from '#/features/transactions/data/mutations'
@@ -232,7 +233,8 @@ const PLAN_FIELDS = [
   'amount',
   'target',
   'dueDate',
-  'setAsideDay',
+  'mustHave',
+  'saveWalletId',
 ] as const satisfies ReadonlyArray<keyof LocalGoal>
 
 /** Name / colour / position edits leave the stored plan alone; these rewrite it. */
@@ -253,7 +255,7 @@ export async function updateGoal(
     dirty: 1,
   }
   await persistGoal(goal)
-  if (changesPlan(existing, goal)) requestPlanRecalc(id)
+  if (changesPlan(existing, goal)) requestPlanRecalc(goalOwner(id))
 }
 
 /** Record the plan the planner just wrote for this goal (no-op for a vanished goal). */

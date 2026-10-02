@@ -1,5 +1,9 @@
 import { useSyncExternalStore } from 'react'
-import type { LocalBalanceNode, LocalExchangeRate } from '#/db/types'
+import type {
+  LocalBalanceNode,
+  LocalBalanceSettings,
+  LocalExchangeRate,
+} from '#/db/types'
 import { DEFAULT_BASE_CURRENCY } from '#/features/goals/constants'
 import { startOfToday } from '#/features/goals/data/planning'
 import { dateOf, isoOf } from '#/features/planned/data/dates'
@@ -12,6 +16,7 @@ import type { PlannerInputs, PlannerState } from '#/features/planned/data/state'
 import type { CurrencyCode } from '#/lib/currency'
 import type { RatesMap } from '#/lib/config/rates'
 import { useMergedRates } from '#/lib/config/rates'
+import { planningSettingsOf } from '#/features/wallets/data/mappers'
 import { useSessionStore } from '#/stores/session'
 
 export type PlannedData = {
@@ -53,6 +58,7 @@ const sharedInputs = memoLast(
     planned: PlannerInputs['planned'],
     txns: PlannerInputs['txns'],
     setAsides: PlannerInputs['setAsides'],
+    settings: LocalBalanceSettings | null,
     base: CurrencyCode,
     ratesKey: string,
   ): PlannerInputs =>
@@ -63,6 +69,7 @@ const sharedInputs = memoLast(
       planned,
       txns,
       setAsides,
+      settings: planningSettingsOf(settings),
       base,
       rates: JSON.parse(ratesKey) as RatesMap,
     }),
@@ -99,6 +106,7 @@ export function usePlannedData(): PlannedData {
     tables.planned ?? NONE,
     tables.txns ?? NONE,
     tables.setAsides ?? NONE,
+    tables.settings ?? null,
     base,
     JSON.stringify(rates),
   )

@@ -34,8 +34,11 @@ row; anything else is flagged by the engine.
 
 - `createBill(draft)` — defaults `mustPay: true`, `autopay: false`; `shaped()` drops the end
   date of a one-off and the interval of a non-custom bill, as the server would.
-- `updateBill(id, patch)` — any field (incl. `nextDue`, `position` and the plan header the
-  planner writes); undefined keeps the stored value.
+- `updateBill(id, patch)` — any field; undefined keeps the stored value. A change to amount,
+  currency, repeat, `nextDue`, `endsOn`, must-pay, paid-from or save-in (`changesBillPlan`)
+  files a plan-rewrite request, as a goal's does.
+- `setBillNextDue(id, nextDue)` — moving `nextDue` on as occurrences settle; no rewrite.
+- `setBillPlanSnapshot(id, header)` — the planner's stored-plan header.
 - `deleteBill(id)` — mirrors the server: its set-asides go with it (`dropSetAsidesOf`), its
   payments keep their rows with `billId` cleared (`unlinkLedgerFrom`, queued payloads rewritten
   too). Its planned rows are resolved by the planner's orphan pass.
@@ -74,11 +77,15 @@ own outbox entry (`op: 'close' | 'reopen'`), which the server applies atomically
 
 - Ledger rows carry `billId` (wire `bill_id`; never with `goalId`, never on transfer legs or
   adjustments). Rows stored before bills lack the field, which reads as null.
-- Planned rows: origin `bill`, `billId`. **The planner generates nothing for bills yet** — the
-  bills engine (coverage set-asides, payments, autopay) is the next phase. Confirming a bill's
-  planned payment files the spend under the bill (category, merchant, note) and moves `nextDue`
-  past the occurrence (`advanceBillPast` in `planned/data/mutations.ts`); confirming a bill's
+- Planned rows: origin `bill`, `billId` — a PAYMENT per occurrence and the payday SET_ASIDEs
+  that cover it, from the funding engine ([planning.md](planning.md), [planned.md](planned.md)).
+  A bill keeps a **stored plan** like a goal (`plannedAt`, `planAmount`, `planCount`,
+  `planStart`; recalc + undo). Confirming a bill's planned payment files the spend under the
+  bill (category, merchant, note) and moves `nextDue` past the occurrence; confirming a bill's
   planned set-aside writes a set-aside for that occurrence.
+- **Occurrences** (`planning/data/occurrences.ts`): stepped from `nextDue`, a month step keeping
+  its day clamped to short months. Because only `nextDue` anchors them, a bill due on the 31st
+  drifts to the 28th once February's occurrence settles.
 - Category delete `move_to` re-files bills; a merchant merge or adopt repoints them.
 
 ## Tests

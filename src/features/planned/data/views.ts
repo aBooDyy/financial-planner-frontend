@@ -17,7 +17,8 @@ import { addDaysISO, dateOf, daysBetween } from './dates'
 import type { DesiredPlanned } from './generate'
 import { behindOf, remainderOf, settledOf, settlementsFor } from './settle'
 import type { Behind, SettlementIndex } from './settle'
-import { fitGoalPlanFrom } from './fit'
+import { fitPlanFrom } from './fit'
+import { goalOwner } from './owners'
 import type { PlanHeader } from './snapshot'
 
 /** "Sep 1". */
@@ -308,8 +309,8 @@ export function buildGoalPlanView(input: GoalPlanInput): GoalPlanView {
   )
 
   // Exactly what a recalc would write today — so after one, stored and live agree.
-  const live = fitGoalPlanFrom(
-    goal.id,
+  const live = fitPlanFrom(
+    goalOwner(goal.id),
     input.desired,
     input.planned,
     index,
@@ -326,7 +327,7 @@ export function buildGoalPlanView(input: GoalPlanInput): GoalPlanView {
         }
       : null
 
-  const behind = behindOf(goal.id, mine, index, rates, today)
+  const behind = behindOf(goalOwner(goal.id), mine, index, rates, today)
   const awaiting = mine
     .filter((p) => p.status === 'open' && p.date <= today)
     .reduce((a, p) => a + inGoal(remainderOf(p, index, rates), p.currency), 0)

@@ -16,6 +16,7 @@ import {
   remainderOf,
   settledOf,
 } from './settle'
+import { goalOwner } from './owners'
 
 describe('settledOf / remainderOf', () => {
   it('sums the linked transactions and reservations, converted to the item currency', () => {
@@ -159,7 +160,7 @@ describe('behindOf', () => {
   )
 
   it('is what was due by today minus what settled it', () => {
-    const b = behindOf('umrah', plan, confirmed, RATES, '2026-09-24')
+    const b = behindOf(goalOwner('umrah'), plan, confirmed, RATES, '2026-09-24')
     expect(b.expected).toBe(m(4500))
     expect(b.settled).toBe(m(3000))
     expect(b.behind).toBe(m(1500))
@@ -170,7 +171,13 @@ describe('behindOf', () => {
     const skipped = plan.map((p) =>
       p.id === 'sep' ? { ...p, status: 'skipped' as const } : p,
     )
-    const b = behindOf('umrah', skipped, confirmed, RATES, '2026-09-24')
+    const b = behindOf(
+      goalOwner('umrah'),
+      skipped,
+      confirmed,
+      RATES,
+      '2026-09-24',
+    )
     expect(b.behind).toBe(m(1500))
     expect(b.skipped.map((p) => p.id)).toEqual(['sep'])
   })
@@ -184,8 +191,8 @@ describe('behindOf', () => {
         setAside({ plannedId: 'sep', amount: m(2000) }),
       ],
     )
-    expect(behindOf('umrah', plan, ahead, RATES, '2026-09-24').behind).toBe(
-      -m(500),
-    )
+    expect(
+      behindOf(goalOwner('umrah'), plan, ahead, RATES, '2026-09-24').behind,
+    ).toBe(-m(500))
   })
 })

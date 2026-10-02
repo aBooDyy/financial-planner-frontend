@@ -8,6 +8,7 @@ import {
   recordPlannerInputsPulled,
 } from '#/db/plannerInputs'
 import { notePlannerInputsPulled, resetPullState } from '#/db/pullState'
+import { goalOwner } from '#/features/planned/data/owners'
 import { requestPlanRecalc } from '#/features/planned/data/recalcRequests'
 import { useSessionStore } from '#/stores/session'
 import { usePlannedRunner } from './usePlannedRunner'
@@ -85,7 +86,7 @@ describe('usePlannedRunner', () => {
     await new Promise((resolve) => setTimeout(resolve, 700))
     const settled = runPlanner.mock.calls.length
 
-    act(() => requestPlanRecalc('g1'))
+    act(() => requestPlanRecalc(goalOwner('g1')))
 
     await waitFor(() => expect(runPlanner).toHaveBeenCalledTimes(settled + 1))
   })

@@ -38,7 +38,8 @@ Local row + outbox entry in one Dexie transaction (`db/enqueue.ts`), then `sched
 - `createIncome(draft)`, `updateIncome(id, patch)` (any field; undefined keeps it),
   `deleteIncome(id)` — also `forgetMainIncomeStream(id)` on the settings row, as the server does.
 - `createGoal(draft)`, `updateGoal(id, patch)` (partial; a change to `currency`, `amount`,
-  `target`, `dueDate` or `setAsideDay` files a plan-rewrite request — `changesPlan`),
+  `target`, `dueDate`, `mustHave` or `saveWalletId` files a plan-rewrite request —
+  `changesPlan`),
   `setGoalPlanSnapshot(id, header)` (the planner's), `swapGoalPositions(id, neighbourId)`,
   `deleteGoal(id)` — which mirrors the server's cascade: the goal's set-asides go
   (`dropSetAsidesOf`), and spending from it keeps its rows with `goalId` cleared
@@ -60,13 +61,10 @@ Local row + outbox entry in one Dexie transaction (`db/enqueue.ts`), then `sched
   `setAside` (Σ **live** set-asides, goal currency), `used` (Σ spends with its `goalId`),
   `progress = setAside + used`, `byWallet`, `outside`. Release is explicit, so nothing here
   re-derives what a payment consumed (the old consume-on-payment rule is gone).
-- **Funding plan (`data/fundingPlan.ts`) — interim.** `planGoals(income, goals, base, rates,
-  today, saved)` runs the time-phased simulation (`data/planning.ts` `simulatePlan`) over the
-  goals that are neither closed nor paused: a dated goal (`dueDate`) owes `target − saved` by its
-  date; an undated one is a steady monthly draw of `amount` (capped by `target` when set). Goals
-  whose target is met leave the plan. It still funds by earliest deadline with position breaking
-  ties and knows nothing of bills; the bills engine (two-tier priority, coverage) replaces it.
-  `isDatedGoal`, `isPlannable` are exported for the planner.
+- **Funding**: goals are funded by the planning engine alongside bills
+  ([planning.md](planning.md#the-funding-engine--datafundingts)) — two-tier priority, per
+  payday. `setAsideDay` is still stored and synced but no longer read: set-asides fall on
+  paydays.
 - **Paydays (`data/paydays.ts`)**: `paydaysOf(stream, from, to)` / `nextPaydayOf`. Monthly
   pays on `day` (clamped); with an `anchorDate`, weekly steps 7 days and quarterly / semi /
   annual whole months from it; without one they step from fixed epochs. **Custom** steps every N

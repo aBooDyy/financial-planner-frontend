@@ -72,7 +72,9 @@ describe('goals', () => {
     expect(takePlanRecalcRequests()).toEqual([])
 
     await updateGoal('g1', { amount: m(400) })
-    expect(takePlanRecalcRequests()).toEqual(['g1'])
+    expect(takePlanRecalcRequests()).toEqual([
+      { owner: { kind: 'goal', id: 'g1' }, quiet: false },
+    ])
     const [entry] = await queued()
     expect(entry.payload as UpdateGoalWire).toMatchObject({
       version: 'v1',

@@ -78,5 +78,3 @@ export const FREQUENCY_OPTIONS = Object.keys(FREQUENCIES) as GoalFrequency[]
 export const CUSTOM_INTERVAL_MAX = 365
 export const DEFAULT_CUSTOM_INTERVAL = 28
 export const DEFAULT_CUSTOM_UNIT: IntervalUnit = 'day'
-
-export type FundingStatus = 'green' | 'amber' | 'red'

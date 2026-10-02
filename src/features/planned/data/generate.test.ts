@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import type { LocalGoal, LocalIncomeStream } from '#/db/types'
-import { planGoals } from '#/features/goals/data/fundingPlan'
-import { RATES, goal, income, m } from '#/features/planned/testing/fixtures'
+import type { LocalBill, LocalGoal, LocalIncomeStream } from '#/db/types'
+import { planFunding } from '#/features/planning/data/funding'
+import { DEFAULT_PLANNING_SETTINGS } from '#/features/wallets/api/types'
+import type { PlanningSettings } from '#/features/wallets/api/types'
+import {
+  RATES,
+  bill,
+  goal,
+  income,
+  m,
+} from '#/features/planned/testing/fixtures'
+import { isoOf } from './dates'
 import { desiredPlanned, paydaysOf } from './generate'
 import type { DesiredPlanned } from './generate'
 
@@ -12,23 +21,40 @@ const SALARY = income({ amount: m(20000), day: 27, walletId: 'w1' })
 const generate = (
   opts: {
     goals?: LocalGoal[]
+    bills?: LocalBill[]
     income?: LocalIncomeStream[]
     today?: Date
     userId?: string
     /** Saved so far per goal; the Umrah goal starts with SR 1,000. */
     progress?: Record<string, number>
+    settings?: Partial<PlanningSettings>
   } = {},
 ): DesiredPlanned[] => {
-  const today = opts.today ?? SEP_24
+  const today = isoOf(opts.today ?? SEP_24)
   const goals = opts.goals ?? []
+  const bills = opts.bills ?? []
   const streams = opts.income ?? []
-  const saved = opts.progress ?? { umrah: m(1000) }
+  const settings = { ...DEFAULT_PLANNING_SETTINGS, ...opts.settings }
+  const funding = planFunding({
+    bills,
+    goals,
+    income: streams,
+    planned: [],
+    setAsides: [],
+    progress: opts.progress ?? { umrah: m(1000) },
+    index: new Map(),
+    settings,
+    base: 'SAR',
+    rates: RATES,
+    today,
+  })
   return desiredPlanned({
     userId: opts.userId ?? 'u1',
     income: streams,
-    plan: planGoals(streams, goals, 'SAR', RATES, today, saved),
-    base: 'SAR',
-    rates: RATES,
+    bills,
+    goals,
+    funding,
+    paydayMode: settings.paydayMode,
     today,
   })
 }
@@ -42,50 +68,51 @@ const umrah = (over: Partial<LocalGoal> = {}) =>
     ...over,
   })
 
-const rows = (all: DesiredPlanned[], goalId: string, role: string) =>
-  all.filter((r) => r.goalId === goalId && r.role === role)
+const rows = (all: DesiredPlanned[], ownerId: string, role: string) =>
+  all.filter((r) => (r.goalId ?? r.billId) === ownerId && r.role === role)
+
+const sum = (list: DesiredPlanned[]) => list.reduce((a, r) => a + r.amount, 0)
 
 describe('desiredPlanned — goals', () => {
-  it('plans a one-time goal as one set-aside per schedule month, on its set-aside day', () => {
+  it('plans a dated goal as one set-aside per payday through its date, flagged for review', () => {
     const out = generate({ goals: [umrah()], income: [SALARY], today: JUN_12 })
     const setAsides = rows(out, 'umrah', 'set_aside')
 
-    // The design's plan: SR 1,500 × 8, Jul 1 → Feb 1, and 8 × 1,500 + 1,000 = 13,000.
+    // Jun 27 → Feb 27: nine paydays for the SR 12,000 left.
     expect(setAsides.map((r) => r.occurrence)).toEqual([
-      '2026-07-01',
-      '2026-08-01',
-      '2026-09-01',
-      '2026-10-01',
-      '2026-11-01',
-      '2026-12-01',
-      '2027-01-01',
-      '2027-02-01',
+      '2026-06-27',
+      '2026-07-27',
+      '2026-08-27',
+      '2026-09-27',
+      '2026-10-27',
+      '2026-11-27',
+      '2026-12-27',
+      '2027-01-27',
+      '2027-02-27',
     ])
-    expect(new Set(setAsides.map((r) => r.amount))).toEqual(new Set([m(1500)]))
+    expect(sum(setAsides)).toBe(m(12000))
     expect(setAsides[0]).toMatchObject({
       origin: 'goal',
       name: 'Umrah trip set-aside',
       currency: 'SAR',
       status: 'open',
       pinned: false,
-      date: '2026-07-01',
+      review: true,
+      date: '2026-06-27',
     })
   })
 
-  it('dates set-asides on the goal’s own set-aside day', () => {
+  it('leaves set-asides out of review when pay is sorted automatically', () => {
     const out = generate({
-      goals: [umrah({ setAsideDay: 15 })],
+      goals: [umrah()],
       income: [SALARY],
-      today: JUN_12,
+      settings: { paydayMode: 'auto' },
     })
-    const dates = rows(out, 'umrah', 'set_aside').map((r) => r.occurrence)
-    expect(dates[0]).toBe('2026-06-15')
-    expect(dates.every((d) => d.endsWith('-15'))).toBe(true)
+    expect(rows(out, 'umrah', 'set_aside').every((r) => !r.review)).toBe(true)
   })
 
-  it('starts a deferred goal where the engine starts it and keeps its amounts', () => {
-    // 1,000/mo of income: the near goal takes all of it for three months, then the later
-    // one runs at 500/mo to its deadline.
+  it('funds the nearer goal first when pay is short, and the later one catches up', () => {
+    // 1,000 a month: the near goal needs 750 a payday, the later one 300.
     const near = goal({
       id: 'near',
       target: m(3000),
@@ -100,26 +127,18 @@ describe('desiredPlanned — goals', () => {
     })
     const out = generate({
       goals: [near, later],
-      income: [income({ amount: m(1000) })],
-      today: JUN_12,
-    })
-    const laterRows = rows(out, 'later', 'set_aside')
-    expect(laterRows[0].occurrence).toBe('2026-10-01')
-    expect(laterRows.map((r) => r.amount)).toEqual(Array(6).fill(m(500)))
-    expect(rows(out, 'near', 'set_aside').map((r) => r.amount)).toEqual(
-      Array(3).fill(m(1000)),
-    )
-  })
-
-  it('adds up to exactly what is left when a split does not divide evenly', () => {
-    const out = generate({
-      goals: [umrah({ target: m(10000), dueDate: '2027-02-01' })],
-      income: [SALARY],
+      income: [income({ amount: m(1000), day: 27 })],
       today: JUN_12,
       progress: {},
     })
-    const setAsides = rows(out, 'umrah', 'set_aside')
-    expect(setAsides.reduce((a, r) => a + r.amount, 0)).toBe(m(10000))
+    expect(rows(out, 'near', 'set_aside').map((r) => r.amount)).toEqual(
+      Array(4).fill(m(750)),
+    )
+    const laterRows = rows(out, 'later', 'set_aside')
+    expect(laterRows.slice(0, 4).map((r) => r.amount)).toEqual(
+      Array(4).fill(m(250)),
+    )
+    expect(sum(laterRows)).toBe(m(3000))
   })
 
   it('counts settled progress, so a goal ahead of plan needs less', () => {
@@ -137,9 +156,9 @@ describe('desiredPlanned — goals', () => {
       'umrah',
       'set_aside',
     )
-    // Sep 24: 12,000 left over Oct–Feb is 2,400/mo; with 3,000 more saved, 1,800/mo.
-    expect(behind[0].amount).toBe(m(2400))
-    expect(ahead[0].amount).toBe(m(1800))
+    // Sep 24: 12,000 left over six paydays (Sep 27 → Feb 27) is 2,000; with 3,000 more, 1,500.
+    expect(behind[0].amount).toBe(m(2000))
+    expect(ahead[0].amount).toBe(m(1500))
   })
 
   it('suggests the goal’s own save-in wallet on its set-asides', () => {
@@ -171,6 +190,91 @@ describe('desiredPlanned — goals', () => {
       income: [SALARY],
     })
     expect(out.filter((r) => r.origin === 'goal')).toEqual([])
+  })
+})
+
+describe('desiredPlanned — bills', () => {
+  const rent = bill({
+    id: 'rent',
+    name: 'Rent',
+    amount: m(3000),
+    nextDue: '2026-09-01',
+    walletId: 'w1',
+  })
+
+  it('plans a payment per occurrence from next due, an overdue one included', () => {
+    const payments = rows(
+      generate({ bills: [rent], income: [SALARY] }),
+      'rent',
+      'payment',
+    )
+    expect(payments.map((r) => r.occurrence)).toEqual([
+      '2026-09-01',
+      '2026-10-01',
+      '2026-11-01',
+      '2026-12-01',
+    ])
+    expect(payments[0]).toMatchObject({
+      origin: 'bill',
+      name: 'Rent',
+      walletId: 'w1',
+      categoryId: rent.categoryId,
+      amount: m(3000),
+      review: false,
+    })
+  })
+
+  it('covers each occurrence on the payday before it, into the save-in wallet', () => {
+    const setAsides = rows(
+      generate({
+        bills: [{ ...rent, saveWalletId: 'w2' }],
+        income: [SALARY],
+      }),
+      'rent',
+      'set_aside',
+    )
+    // The overdue Sep 1 has no payday before it; Oct 1 is covered on Sep 27, Nov 1 on Oct 27.
+    expect(setAsides.map((r) => [r.occurrence, r.amount / 100])).toEqual([
+      ['2026-09-27', 3000],
+      ['2026-10-27', 3000],
+      ['2026-11-27', 3000],
+    ])
+    expect(new Set(setAsides.map((r) => r.walletId))).toEqual(new Set(['w2']))
+  })
+
+  it('plans the whole saving-up schedule of the next occurrence, past the horizon', () => {
+    const insurance = bill({
+      id: 'ins',
+      amount: m(1200),
+      frequency: 'annual',
+      nextDue: '2027-06-01',
+    })
+    const setAsides = rows(
+      generate({ bills: [insurance], income: [SALARY] }),
+      'ins',
+      'set_aside',
+    )
+    expect(setAsides.at(-1)?.occurrence).toBe('2027-05-27')
+    expect(sum(setAsides)).toBe(m(1200))
+  })
+
+  it('plans a one-off once and nothing for a closed bill or after a bill ends', () => {
+    const out = generate({
+      bills: [
+        bill({ id: 'once', frequency: null, nextDue: '2026-11-15' }),
+        bill({ id: 'closed', closedAt: '2026-09-01' }),
+        { ...rent, id: 'ending', endsOn: '2026-10-15' },
+      ],
+      income: [SALARY],
+    })
+    expect(rows(out, 'once', 'payment').map((r) => r.occurrence)).toEqual([
+      '2026-11-15',
+    ])
+    expect(out.filter((r) => r.billId === 'closed')).toEqual([])
+    expect(rows(out, 'ending', 'payment').map((r) => r.occurrence)).toEqual([
+      '2026-09-01',
+      '2026-10-01',
+    ])
   })
 })
 

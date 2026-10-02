@@ -1,7 +1,8 @@
 /**
- * What a recalculation of one goal actually writes, and therefore what "From today" shows.
+ * What a recalculation of one goal's or bill's plan actually writes, and therefore what "From
+ * today" shows.
  *
- * The engine plans a goal's remaining money over every set-aside date from today. Some of
+ * The engine plans an owner's remaining money over every set-aside date from today. Some of
  * those dates may already be taken by a row the planner must not rewrite — confirmed early,
  * skipped, moved, partly settled — and a deterministic id means no second row can be made for
  * the same date. What those dates were meant to carry is spread over the rows that *can* be
@@ -16,13 +17,15 @@
 import type { LocalPlanned } from '#/db/types'
 import type { RatesMap } from '#/lib/config/rates'
 import type { DesiredPlanned } from './generate'
+import { isPlanRowOf, isSetAsideFor } from './owners'
+import type { PlanOwner } from './owners'
 import { hasSettlements, remainderOf } from './settle'
 import type { SettlementIndex } from './settle'
 import { planHeaderOf } from './snapshot'
 import type { PlanHeader } from './snapshot'
 
 export type FitInput = {
-  goalId: string
+  owner: PlanOwner
   desired: ReadonlyArray<DesiredPlanned>
   existing: ReadonlyArray<LocalPlanned>
   /** ISO date. */
@@ -32,7 +35,7 @@ export type FitInput = {
 }
 
 export type FittedPlan = {
-  /** The goal's desired rows with its set-asides fitted — what a recalc hands the reconciler. */
+  /** The owner's desired set-asides, fitted — what a recalc hands the reconciler. */
   rows: DesiredPlanned[]
   /** The set-asides a recalc writes (created or rewritten), with their fitted amounts. */
   writable: DesiredPlanned[]
@@ -63,19 +66,15 @@ function split(total: number, weights: ReadonlyArray<number>): number[] {
   return shares
 }
 
-export function fitGoalPlan(input: FitInput): FittedPlan {
-  const { goalId, today } = input
+export function fitPlan(input: FitInput): FittedPlan {
+  const { owner, today } = input
   const rewritable = (row: LocalPlanned) =>
     isRewritable(row, today, input.isSettled)
   const held = new Map(
     input.existing.filter((p) => p.deleted === 0).map((p) => [p.id, p]),
   )
-  const mine = input.desired.filter(
-    (d) => d.origin === 'goal' && d.goalId === goalId,
-  )
-  const planned = mine.filter(
-    (d) => d.role === 'set_aside' && d.occurrence >= today,
-  )
+  const mine = input.desired.filter((d) => isPlanRowOf(d, owner))
+  const planned = mine.filter((d) => d.occurrence >= today)
   const plannedIds = new Set(planned.map((d) => d.id))
 
   const slots: DesiredPlanned[] = []
@@ -97,13 +96,11 @@ export function fitGoalPlan(input: FitInput): FittedPlan {
   // Rows outside the new schedule that will still happen: hand-made ones, and generated ones
   // nobody may rewrite (a rewritable one outside the schedule is about to be removed).
   for (const row of held.values()) {
+    if (!isSetAsideFor(row, owner) || plannedIds.has(row.id)) continue
     if (
-      row.goalId !== goalId ||
-      row.role !== 'set_aside' ||
-      plannedIds.has(row.id)
+      row.origin === 'manual' ||
+      (isPlanRowOf(row, owner) && !rewritable(row))
     )
-      continue
-    if (row.origin === 'manual' || (row.origin === 'goal' && !rewritable(row)))
       commit(row)
   }
 
@@ -122,25 +119,21 @@ export function fitGoalPlan(input: FitInput): FittedPlan {
   const rows = mine
     .filter((d) => !plannedIds.has(d.id) || blocked.has(d.id))
     .concat(writable)
-  const header = planHeaderOf(
-    goalId,
-    mine.filter((d) => d.role !== 'set_aside').concat(writable),
-    today,
-  )
+  const header = planHeaderOf(owner, writable, today)
   return { rows, writable, header }
 }
 
 /** The same fit, from the planner's state. */
-export const fitGoalPlanFrom = (
-  goalId: string,
+export const fitPlanFrom = (
+  owner: PlanOwner,
   desired: ReadonlyArray<DesiredPlanned>,
   existing: ReadonlyArray<LocalPlanned>,
   index: SettlementIndex,
   rates: RatesMap,
   today: string,
 ): FittedPlan =>
-  fitGoalPlan({
-    goalId,
+  fitPlan({
+    owner,
     desired,
     existing,
     today,

@@ -10,6 +10,8 @@ import type {
   IntervalUnit,
   ObligationFrequency,
 } from '#/features/goals/api/types'
+import { billOwner } from '#/features/planned/data/owners'
+import { requestPlanRecalc } from '#/features/planned/data/recalcRequests'
 import { dropSetAsidesOf } from '#/features/setAsides/data/mutations'
 import { unlinkLedgerFrom } from '#/features/transactions/data/mutations'
 import type { CurrencyCode } from '#/lib/currency'
@@ -127,16 +129,63 @@ export async function createBill(draft: BillDraft): Promise<string> {
   return id
 }
 
-/** Change any of a bill's fields; the rest keep their stored values. */
-export async function updateBill(id: string, patch: BillPatch): Promise<void> {
+const PLAN_FIELDS = [
+  'amount',
+  'currency',
+  'frequency',
+  'customInterval',
+  'customUnit',
+  'nextDue',
+  'endsOn',
+  'mustPay',
+  'walletId',
+  'saveWalletId',
+] as const satisfies ReadonlyArray<keyof LocalBill>
+
+/** Name / colour / position edits leave the stored plan alone; these rewrite it. */
+export const changesBillPlan = (before: LocalBill, after: LocalBill): boolean =>
+  PLAN_FIELDS.some((field) => before[field] !== after[field])
+
+async function patched(
+  id: string,
+  patch: Partial<LocalBill>,
+): Promise<{ before: LocalBill; after: LocalBill } | null> {
   const existing = await db.bills.get(id)
-  if (!existing || existing.deleted !== 0) return
+  if (!existing || existing.deleted !== 0) return null
   const defined = Object.fromEntries(
     Object.entries(patch as Record<string, unknown>).filter(
       ([, v]) => v !== undefined,
     ),
   ) as Partial<LocalBill>
-  await persist(shaped({ ...existing, ...defined, updatedAt: now(), dirty: 1 }))
+  const after = shaped({ ...existing, ...defined, updatedAt: now(), dirty: 1 })
+  await persist(after)
+  return { before: existing, after }
+}
+
+/** Change any of a bill's fields; the rest keep their stored values. */
+export async function updateBill(id: string, patch: BillPatch): Promise<void> {
+  const change = await patched(id, patch)
+  if (change && changesBillPlan(change.before, change.after))
+    requestPlanRecalc(billOwner(id))
+}
+
+/** Move `nextDue` on as occurrences settle — bookkeeping, not a change of plan. */
+export async function setBillNextDue(
+  id: string,
+  nextDue: string,
+): Promise<void> {
+  await patched(id, { nextDue })
+}
+
+/** Record the plan the planner just wrote for this bill (no-op for a vanished bill). */
+export async function setBillPlanSnapshot(
+  id: string,
+  snapshot: Pick<
+    LocalBill,
+    'plannedAt' | 'planAmount' | 'planCount' | 'planStart'
+  >,
+): Promise<void> {
+  await patched(id, snapshot)
 }
 
 /**
