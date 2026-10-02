@@ -27,6 +27,8 @@ root product [`.agent-context/`](../../.agent-context/). Keep
   settlement links to planned rows, and transfers between wallets (two linked legs, the `transfer` outbox entity, the
   collapsed activity row and its scope rules, exclusion from totals), and balance adjustments
   (`adjustment_in`/`adjustment_out` rows outside every total).
+- [planning.md](planning.md) — the Planning engine (`features/planning/`): pay periods from
+  the main paycheck, the two-tier funding engine, money actions and the pure view models.
 - [planned.md](planned.md) — Planned transactions: the entity and its derived settled amount,
   deterministic UUIDv5 ids, the generator and reconciler, the app-level planner (fill /
   recalc + undo, orphan resolution), settlement mutations, the id-taken sync branch, the hooks

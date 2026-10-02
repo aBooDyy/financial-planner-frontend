@@ -23,6 +23,7 @@ pattern changes. Index: [`.agent-context/README.md`](.agent-context/README.md).
 - [bills.md](.agent-context/bills.md) — Bills: once or repeating, must pay / nice to have; entity, sync, mutations, cascades.
 - [set-asides.md](.agent-context/set-asides.md) — Set-asides: labels on money in real wallets for a bill or goal; live vs released, totals.
 - [transactions.md](.agent-context/transactions.md) — Spending: ledger + budgets, derived balances, settlement links, transfers between wallets, balance adjustments.
+- [planning.md](.agent-context/planning.md) — Planning engine: pay periods, two-tier funding, money actions, the pure view models the Planning/Wallets screens read.
 - [planned.md](.agent-context/planned.md) — Planned transactions: generator + reconciler, the app-level planner, deterministic ids, confirm/skip/recalc, the hooks the Planned tab and goal detail read.
 - [onboarding.md](.agent-context/onboarding.md) — the `/setup` first-run wizard, `SessionGate`, starter packs, the sessionStorage draft.
 - [settings.md](.agent-context/settings.md) — the Settings page and its routed panes, local preferences.
