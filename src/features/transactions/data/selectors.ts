@@ -1461,12 +1461,17 @@ export function buildBudgetsView(
         (s, b) => s + convertMinor(b.limit, b.currency, data.base, data.rates),
         0,
       )
+  // Each budget's burn is in its own currency; convert before adding them up in base.
+  const spentInBase = (b: LocalBudget) =>
+    convertMinor(
+      budgetSpentMinor(b, data, catalog, scope, today),
+      b.currency,
+      data.base,
+      data.rates,
+    )
   const capSpent = overall
-    ? budgetSpentMinor(overall, data, catalog, scope, today)
-    : others.reduce(
-        (s, b) => s + budgetSpentMinor(b, data, catalog, scope, today),
-        0,
-      )
+    ? spentInBase(overall)
+    : others.reduce((s, b) => s + spentInBase(b), 0)
   const capPct = capLimit > 0 ? capSpent / capLimit : 0
   const left = capLimit - capSpent
   const windows = new Set((overall ? [overall] : others).map(budgetWindowLabel))

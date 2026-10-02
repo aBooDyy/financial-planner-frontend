@@ -322,6 +322,34 @@ describe('buildBudgetsView', () => {
     expect(view.health.spentStr).toBe('SR 2,200')
   })
 
+  it('adds budgets in other currencies to the health rail in base currency', () => {
+    const txns = [
+      tx({ categoryId: 'cat-groceries', amount: 90_000 }),
+      tx({ categoryId: 'cat-dining', amount: 37_500 }),
+    ]
+    const view = buildBudgetsView(
+      data({
+        txns,
+        budgets: [
+          budget({ id: 'sar' }),
+          budget({
+            id: 'usd',
+            categoryId: 'cat-dining',
+            currency: 'USD',
+            limit: 20_000,
+          }),
+        ],
+      }),
+      CATALOG,
+      ALL,
+      TODAY,
+    )
+    expect(view.rows.map((r) => r.spentStr)).toEqual(['SR 900', '$100'])
+    // SR 900 + $100 (SR 375), not SR 900 + 10,000 USD minor units read as riyals
+    expect(view.health.spentStr).toBe('SR 1,275')
+    expect(view.health.totalStr).toBe('SR 2,250')
+  })
+
   it('measures a per-paycheck budget over the pay period, and says so', () => {
     const txns = [
       tx({ categoryId: 'cat-groceries', amount: 10_000, date: '2026-05-24' }),

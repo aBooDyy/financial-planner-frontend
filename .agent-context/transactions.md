@@ -90,7 +90,9 @@ and `recurrings` went with the planning rebuild: a repeating payment is a **bill
   `periodLabel` — the window it is measured over now ("This paycheck", "This week", "Last 14
   days", from `budgetWindowLabel`) — and `windowStr` ("Oct 25 – Nov 24"), drawn as the pill and
   after the scope line; the health rail's `periodStr` names the overall cap's window (or the
-  one all caps share; "across their periods" when they differ). `budgetPeriodLabel` stays the
+  one all caps share; "across their periods" when they differ). A budget's burn is in the
+  budget's own currency; the rail converts each to base before adding them up (it once summed
+  the raw minor units and printed them in base). `budgetPeriodLabel` stays the
   cadence name ("Per paycheck") and search shows "/paycheck". **`excludesBills`** is applied in
   `budgetSpentMinor` — the one place a budget's burn is summed, so the Budgets rows, the health
   rail's totals and on-track/over counts all follow it: a budget with it on skips every spend
