@@ -224,11 +224,29 @@ first, each a Dexie write plus outbox entries; errors are `MoneyActionError` wit
   stops the plan (the planner's fill removes future set-asides); reopen and resume file a
   quiet plan rewrite, so the owner is planned again from today.
 
+## Reading it — `hooks/`, `index.ts`
+
+Screens import from `features/planning` (`index.ts`) only. The hooks add no table reads of
+their own: they derive from `usePlannedData()` (the planner's one shared read and state, see
+[planned.md](planned.md#reading-it-hooks-dataviewsts-datapreviewts)), memoised on it.
+
+- `usePlanning()` → `PlanningView`: `calendar`, `funding`, `bills` / `goals` (statuses by id),
+  `paycheck`, `verdict`, `decisions`, `upcoming`, `reviews` (waiting paydays) and
+  `reviewCount`.
+- `useMoneyFigures()` → `{loading, figures, safe}`: `balanceFigures` over the ledger's running
+  totals (`readLedgerSummary` — never the whole ledger) and `safeToSpend` over the planner's
+  rows. Safe to spend counts planned rows, so it is only as current as the planner's last run.
+- `useYearAhead(months?)` → `buildYearAhead` + `loading`.
+
+Mutations are called directly (`payBill`, `addMoney`, `spendFromGoal`, `markGoalSpent`,
+`resolveLeftover`; `confirmPlanned`, `dismissFromReview`, recalc from `features/planned`;
+close / reopen / pause / resume from the bills and goals slices).
+
 ## Tests
 
 `data/{payPeriods,funding,leftover,balances,safeToSpend,status,paycheck,views}.test.ts`
 (leftover + fill; views = Upcoming, review, year ahead; `testing/state.ts` builds a planner
-state from rows, `plannedScenario` with the planner's rows written); `actions/actions.test.ts`
+state from rows, `plannedScenario` with the planner's rows written); `hooks/usePlanning.test.tsx`; `actions/actions.test.ts`
 (the testing plan's anytime actions); generation and the runner in
 `planned/data/{generate,reconcile,runner}.test.ts`; payments in
 `planned/data/billPayments.test.ts`.
