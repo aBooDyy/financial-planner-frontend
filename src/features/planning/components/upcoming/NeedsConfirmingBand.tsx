@@ -70,7 +70,7 @@ export function NeedsConfirmingBand({
                 {money(r.remainder, r.currency)}
               </span>
             </button>
-            <div className="flex gap-2">
+            <div className="flex w-full justify-end gap-2 md:w-auto">
               <Button
                 type="button"
                 variant="quiet"
