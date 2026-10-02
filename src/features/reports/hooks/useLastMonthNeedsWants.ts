@@ -47,7 +47,7 @@ export function useLastMonthNeedsWants(): NeedsWantsSummaryView {
 
   const summary = useMemo(
     () =>
-      loading || !rows
+      loading
         ? null
         : needsWantsSummary({ rows, from, to, catalog, base, rates }),
     [loading, rows, from, to, catalog, base, rates],
