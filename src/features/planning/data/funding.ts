@@ -388,7 +388,8 @@ function simulate(
         t.perSlot === null
           ? left[i] / (t.end - k + 1)
           : Math.min(t.perSlot, left[i])
-      const floor = later[i] ? left[i] - later[i][k] : 0
+      const room = later[i]
+      const floor = room ? left[i] - room[k] : 0
       const pace = Math.max(even, floor)
       const give = Math.min(pace, cap / toBase[i])
       if (give <= 0) continue
