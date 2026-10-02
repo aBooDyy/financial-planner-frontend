@@ -3,7 +3,9 @@ import type { OutboxEntry } from '#/db/types'
 import { setAsidesApi } from '#/features/setAsides/api/setAsidesApi'
 import type {
   CreateSetAsideWire,
+  MoveItemWire,
   MoveWire,
+  ReleaseItemWire,
   ReleaseWire,
   SetAside,
   UpdateSetAsideWire,
@@ -136,9 +138,54 @@ async function pushSetAsideBatch(entry: OutboxEntry): Promise<void> {
     })
   } catch (e) {
     if (!(e instanceof ApiError) || !BATCH_SETTLED.has(e.code)) throw e
+    if (e.code === ALREADY_RELEASED && (await retryWithoutReleased(entry)))
+      return
     await db.outbox.delete(entry.seq)
     await resyncSetAsides([entry.id, ...(entry.alsoRows ?? [])])
   }
+}
+
+const ALREADY_RELEASED = 'planning.set_aside.already_released'
+
+/** The rows one batch item writes: its source, and the remainder and new row it mints. */
+const rowsOfItem = (item: ReleaseItemWire | MoveItemWire): string[] => [
+  item.id,
+  ...(item.remainder_id ? [item.remainder_id] : []),
+  ...('new_id' in item ? [item.new_id] : []),
+]
+
+/**
+ * Some sources were released elsewhere (another device paid or freed them) while this batch
+ * waited. Those items settle on the server's rows; the rest of the user's batch is sent again
+ * without them rather than dropped. `false` when there is nothing to keep — every source is
+ * released there (a replay of this very batch, or all of them overtaken).
+ */
+async function retryWithoutReleased(entry: OutboxEntry): Promise<boolean> {
+  const releasedThere = new Set(
+    (await setAsidesApi.list())
+      .filter((a) => a.releasedAt !== null)
+      .map((a) => a.id),
+  )
+  const payload = entry.payload as ReleaseWire | MoveWire
+  const items: (ReleaseItemWire | MoveItemWire)[] = payload.items
+  const keep = items.filter((i) => !releasedThere.has(i.id))
+  if (keep.length === 0 || keep.length === items.length) return false
+  const dropped = new Set(
+    items.filter((i) => releasedThere.has(i.id)).flatMap(rowsOfItem),
+  )
+  const rows = [entry.id, ...(entry.alsoRows ?? [])].filter(
+    (id) => !dropped.has(id),
+  )
+  const next: OutboxEntry = {
+    ...entry,
+    id: rows[0],
+    alsoRows: rows.slice(1),
+    payload: { ...payload, items: keep },
+  }
+  await db.outbox.put(next)
+  await resyncSetAsides([...dropped])
+  await pushSetAsideBatch(next)
+  return true
 }
 
 /** Push one `setAside` outbox entry. Throws on network/unexpected errors. */

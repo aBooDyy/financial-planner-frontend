@@ -224,6 +224,67 @@ describe('pushing a batch', () => {
     expect(await db.setAsides.get(remainderId)).toBeUndefined()
   })
 
+  it('sends the rest of the batch again when only some sources were released elsewhere', async () => {
+    await releaseSetAsides([{ id: 'a1', amount: m(200) }, { id: 'a2' }], {
+      releasedAt: '2026-11-01',
+    })
+    const entry = await onlyEntry()
+    const remainderId = (entry.payload as ReleaseWire).items[0]
+      .remainder_id as string
+    api.release.mockRejectedValueOnce(
+      new ApiError({
+        status: 409,
+        code: 'planning.set_aside.already_released',
+        message: '',
+      }),
+    )
+    const serverA2 = setAside({
+      id: 'a2',
+      goalId: 'g1',
+      amount: m(300),
+      releasedAt: '2026-10-30',
+    })
+    const a1Before = setAside({
+      id: 'a1',
+      goalId: 'g1',
+      walletId: 'w1',
+      amount: m(500),
+      plannedId: 'p1',
+    })
+    api.list.mockResolvedValue([
+      asServer(a1Before, 'v1'),
+      asServer(serverA2, 'v9'),
+    ])
+    const a1 = (await db.setAsides.get('a1')) as LocalSetAside
+    const remainder = (await db.setAsides.get(remainderId)) as LocalSetAside
+    api.release.mockResolvedValueOnce({
+      released: [asServer(a1)],
+      created: [asServer(remainder)],
+    })
+
+    await pushSetAsidesEntry(entry)
+
+    expect(api.release).toHaveBeenCalledTimes(2)
+    const resent = api.release.mock.calls[1][0] as ReleaseWire
+    expect(resent.items.map((i) => i.id)).toEqual(['a1'])
+    expect(await queued()).toEqual([])
+    // The user's own release of a1 still lands; a2 takes the other device's release.
+    expect(await db.setAsides.get('a1')).toMatchObject({
+      amount: m(200),
+      releasedAt: '2026-11-01',
+      dirty: 0,
+    })
+    expect(await db.setAsides.get(remainderId)).toMatchObject({
+      amount: m(300),
+      releasedAt: null,
+      dirty: 0,
+    })
+    expect(await db.setAsides.get('a2')).toMatchObject({
+      releasedAt: '2026-10-30',
+      dirty: 0,
+    })
+  })
+
   it('waits behind a failed write of any row it touches', async () => {
     await db.outbox.add({
       op: 'update',

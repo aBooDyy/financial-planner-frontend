@@ -72,6 +72,11 @@ applies all-or-nothing (`POST /set-asides/release`, `/move`).
   not_found` and `409 id_taken` mean the batch no longer applies as written (applied before,
   or overtaken elsewhere): the entry settles and the touched rows are cleaned and re-pulled
   (`resyncSetAsides`). Anything else is flagged.
+- **`already_released` keeps the rest.** When only some sources were released elsewhere (another
+  device paid or freed them), `retryWithoutReleased` drops those items — and the remainder / new
+  rows they minted — from the entry, re-keys it on what is left, resyncs the dropped rows to the
+  server's state and sends the rest again, so the user's other releases are not lost. Only when
+  every source is released there (a replay of this very batch) does the whole entry settle.
 - **Batch size.** The server caps a batch at `limits.set_aside_batch_max` (200,
   `configLimits().setAsideBatchMax`, bundled fallback). `releaseSetAsides` / `moveSetAsides`
   queue longer lists as several entries of at most that many items, each all-or-nothing.
