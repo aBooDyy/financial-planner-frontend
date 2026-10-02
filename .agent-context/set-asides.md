@@ -97,6 +97,12 @@ decides (`planning/data/leftover.leftoverFor`).
 `createSetAside` takes an optional `id` in the draft: an id already held writes nothing, so a
 retried auto-confirm never sets aside twice.
 
+**Taking a payment back** (deleted, unlinked, re-priced — `planning/actions/paymentUndo`) does
+not un-release: `restoreReleasedBy(paymentIds)` writes a **new** live row per row the payment
+released (same owner, wallet, occurrence, amount, date and `plannedId`), under the
+deterministic id `uuidv5('<released id>:restored')`, so restoring twice is a no-op. The released
+row stays as the record, still carrying `releasedById`.
+
 ## Totals — `data/totals.ts` (pure)
 
 - `isLiveSetAside(row)`.

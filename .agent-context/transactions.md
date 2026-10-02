@@ -58,11 +58,18 @@ and `recurrings` went with the planning rebuild: a repeating payment is a **bill
   is asked about after a part payment) comes back as
   a `LeftoverPrompt` the caller hands to `stores/leftoverPrompt`; `LeftoverPromptHost` (mounted
   in `__root.tsx`, since the dialog and QuickAdd close as they save) shows Planning's
-  `LeftoverSheet` on any page. An edit pays only when it **newly** links a bill (an unchanged link
-  just re-syncs `nextDue`); unlinking, cutting or deleting a payment that reopens its occurrence
-  steps `nextDue` back to it (`syncBillNextDue` only moves forward). A bill that is closed or
-  gone saves the row as it is, unpaid. What an unlinked or deleted payment released stays
-  released (no un-release exists).
+  `LeftoverSheet` on any page. An edit pays when it **newly** links a bill; an unchanged link
+  just re-syncs `nextDue` — unless the amount, currency, wallet or type changed, which releases
+  afresh. **Taking a payment back gives back what it released** (`planning/actions/paymentUndo`):
+  deleting it (`removeTransaction`, `bulkDeleteTransactions` — import undo), unlinking it or
+  re-pricing it first `restoreReleasedBy([id])` — one new live set-aside per row the payment
+  released (same owner, wallet, occurrence, amount, date, planned link; id
+  `uuidv5('<released id>:restored')`, so a row is never restored twice; skipped when the owner is
+  closed/gone or the wallet archived/gone) — then a re-pricing edit releases again for the new
+  amount/wallet. A payment that reopens its occurrence steps `nextDue` back to it
+  (`stepNextDueBack`; `syncBillNextDue` only moves forward). A bill that is closed or gone saves
+  the row as it is, unpaid. The released rows keep `releasedById` (the server sets it null when
+  the transaction is deleted, without a version bump).
 - **selectors.ts** — pure view builders ported from the design's `renderVals`. Every builder
   that names a category takes **`catalog: CategoryCatalog` as its required second
   parameter** — `buildCashflow(data, catalog, …)`, and likewise `buildBreakdown`,

@@ -2,10 +2,11 @@
  * Saving a spend from the transaction dialog or QuickAdd. One that pays a bill takes the same
  * path as Pay now (03 §5): it settles the occurrence's planned payment, releases what that
  * occurrence had set aside in the paying wallet, moves the bill's `nextDue` on, and hands back
- * what other wallets still hold so the leftover prompt can ask about it.
+ * what other wallets still hold so the leftover prompt can ask about it. Deleting, unlinking or
+ * re-pricing a payment first gives back what it released (`planning/actions/paymentUndo`).
  */
 import { db } from '#/db/db'
-import { setBillNextDue } from '#/features/bills/data/mutations'
+import type { LocalTransaction } from '#/db/types'
 import { syncBillNextDue } from '#/features/planned/data/mutations'
 import {
   billPaymentTarget,
@@ -13,6 +14,10 @@ import {
 } from '#/features/planning/actions/payBill'
 import type { BillPaymentTarget } from '#/features/planning/actions/payBill'
 import { MoneyActionError } from '#/features/planning/actions/errors'
+import {
+  restoreReleasedBy,
+  stepNextDueBack,
+} from '#/features/planning/actions/paymentUndo'
 import type { LeftoverReport } from '#/features/planning/data/leftover'
 import {
   createTransaction,
@@ -44,37 +49,47 @@ async function targetFor(
   }
 }
 
+/** Release for the payment and report the leftover; a bill closed meanwhile is left alone. */
 async function settle(
   id: string,
   draft: TransactionDraft,
   billId: string,
   target: BillPaymentTarget,
 ): Promise<LeftoverPrompt | null> {
-  const report = await settleBillPayment(billId, target.occurrence, {
-    id,
-    walletId: draft.walletId,
-    amount: draft.amount,
-    currency: draft.currency,
-    date: draft.date,
-  })
+  let report: LeftoverReport
+  try {
+    report = await settleBillPayment(billId, target.occurrence, {
+      id,
+      walletId: draft.walletId,
+      amount: draft.amount,
+      currency: draft.currency,
+      date: draft.date,
+    })
+  } catch (err) {
+    if (err instanceof MoneyActionError) return null
+    throw err
+  }
   return report.lines.length > 0
     ? { report, payingWalletId: draft.walletId, date: draft.date }
     : null
 }
 
-/**
- * A payment unlinked, cut or deleted can reopen the occurrence it settled; `nextDue` then steps
- * back to it when it comes first (`syncBillNextDue` only ever moves forward).
- */
-async function stepBackTo(plannedId: string | null | undefined): Promise<void> {
-  if (!plannedId) return
-  const row = await db.plannedTransactions.get(plannedId)
-  if (!row || row.deleted !== 0 || row.status !== 'open') return
-  if (row.role !== 'payment' || !row.billId) return
-  const bill = await db.bills.get(row.billId)
-  if (bill && bill.deleted === 0 && row.occurrence < bill.nextDue)
-    await setBillNextDue(bill.id, row.occurrence)
+/** The row an unchanged link settles, to release for it again after a re-pricing edit. */
+async function sameTarget(
+  plannedId: string | null,
+): Promise<BillPaymentTarget | null> {
+  const row = plannedId ? await db.plannedTransactions.get(plannedId) : null
+  return row && row.deleted === 0
+    ? { plannedId: row.id, occurrence: row.occurrence }
+    : null
 }
+
+/** What a payment released depends on these; an edit of any of them releases afresh. */
+const movesMoney = (before: LocalTransaction, draft: TransactionDraft) =>
+  before.type !== draft.type ||
+  before.amount !== draft.amount ||
+  before.currency !== draft.currency ||
+  before.walletId !== draft.walletId
 
 /** A new spend or income entry. A bill payment comes back with its leftover prompt, if any. */
 export async function saveNewTransaction(
@@ -93,8 +108,9 @@ export async function saveNewTransaction(
 }
 
 /**
- * An edited entry. One newly linked to a bill is paid like a new payment; otherwise the bill's
- * `nextDue` is only brought back in line with what is settled.
+ * An edited entry. One newly linked to a bill is paid like a new payment. A change of link,
+ * amount or wallet first gives back what the payment released, then releases again for what
+ * it is now; otherwise the bill's `nextDue` is only brought back in line with what is settled.
  */
 export async function saveTransactionEdit(
   id: string,
@@ -108,24 +124,35 @@ export async function saveTransactionEdit(
     before !== undefined &&
     (before.billId ?? null) === billId &&
     (draft.plannedId === undefined || before.plannedId === draft.plannedId)
+  const repriced = before !== undefined && movesMoney(before, draft)
   const target =
     billId && draft.type === 'spend' && !sameLink
       ? await targetFor(billId, draft.plannedId ?? null)
       : null
 
+  if (!sameLink || repriced) await restoreReleasedBy([id])
   await updateTransaction(
     id,
     target ? { ...draft, plannedId: target.plannedId } : draft,
   )
-  await stepBackTo(before?.plannedId)
+  await stepNextDueBack([before?.plannedId])
   if (target && billId) return settle(id, draft, billId, target)
+  const again =
+    billId && draft.type === 'spend' && repriced
+      ? await sameTarget(before.plannedId)
+      : null
+  if (again && billId) return settle(id, draft, billId, again)
   if (billId) await syncBillNextDue(billId)
   return null
 }
 
-/** Deleting a bill payment reopens its occurrence, so `nextDue` steps back to it. */
+/**
+ * Deleting a payment gives back what it released and reopens its occurrence, so `nextDue`
+ * steps back to it.
+ */
 export async function removeTransaction(id: string): Promise<void> {
   const plannedId = (await db.transactions.get(id))?.plannedId
+  await restoreReleasedBy([id])
   await deleteTransaction(id)
-  await stepBackTo(plannedId)
+  await stepNextDueBack([plannedId])
 }

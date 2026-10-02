@@ -5,6 +5,10 @@ import { newId } from '#/lib/uuid'
 import type { LocalBudget, LocalTransaction, OutboxEntity } from '#/db/types'
 import type { CurrencyCode } from '#/lib/currency'
 import { closeCovered, reopenUnderSettled } from '#/features/planned/data/rows'
+import {
+  restoreReleasedBy,
+  stepNextDueBack,
+} from '#/features/planning/actions/paymentUndo'
 import type {
   AdjustmentType,
   BudgetPeriod,
@@ -303,7 +307,8 @@ export async function bulkAddTransactions(
 /**
  * Delete many transactions in one Dexie transaction, dropping a row whose create is still
  * queued outright rather than queueing a delete for something the server never saw. Like
- * `bulkAddTransactions`, it schedules no push — the caller pushes once.
+ * `bulkAddTransactions`, it schedules no push — the caller pushes once. A payment among them
+ * gives back what it released and steps its bill's `nextDue` back, as a single delete does.
  */
 export async function bulkDeleteTransactions(
   ids: ReadonlyArray<string>,
@@ -313,6 +318,7 @@ export async function bulkDeleteTransactions(
   const plannedIds = (await db.transactions.bulkGet([...ids])).map(
     (t) => t?.plannedId,
   )
+  await restoreReleasedBy(ids)
   const removed = await db.transaction(
     'rw',
     db.transactions,
@@ -345,6 +351,7 @@ export async function bulkDeleteTransactions(
     },
   )
   await reopenUnderSettled(plannedIds)
+  await stepNextDueBack(plannedIds)
   return removed
 }
 

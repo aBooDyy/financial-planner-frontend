@@ -20,6 +20,7 @@ import {
   saveNewTransaction,
   saveTransactionEdit,
 } from './billPayments'
+import { bulkDeleteTransactions } from './mutations'
 import type { TransactionDraft } from './mutations'
 
 vi.mock('#/db/sync', () => ({ schedulePush: () => undefined }))
@@ -191,6 +192,70 @@ describe('a bill payment saved from the dialog or QuickAdd', () => {
     await saveTransactionEdit(tx.id, spend())
     expect(await nextDue()).toBe('2026-11-05')
     await removeTransaction(tx.id)
+    expect(await nextDue()).toBe('2026-10-05')
+  })
+})
+
+describe('undoing a bill payment gives back what it released', () => {
+  const paid = async (over: Partial<TransactionDraft> = {}) => {
+    await saveNewTransaction(spend(over))
+    const [tx] = await db.transactions.toArray()
+    return tx.id
+  }
+  const liveRows = async () =>
+    (await db.setAsides.where('billId').equals('rent').toArray())
+      .filter(isLiveSetAside)
+      .map((a) => [a.walletId, a.occurrence, a.amount / 100])
+      .sort()
+
+  it('restores the paying wallet’s set-aside when the payment is deleted', async () => {
+    const id = await paid()
+    await removeTransaction(id)
+    expect(await liveRows()).toEqual([
+      ['main', '2026-10-05', 2000],
+      ['savings', '2026-10-05', 1000],
+    ])
+    expect(await nextDue()).toBe('2026-10-05')
+  })
+
+  it('restores it when the payment is unlinked from the bill', async () => {
+    const id = await paid()
+    await saveTransactionEdit(id, spend({ billId: null, plannedId: null }))
+    expect(await liveRows()).toEqual([
+      ['main', '2026-10-05', 2000],
+      ['savings', '2026-10-05', 1000],
+    ])
+  })
+
+  it('releases again for a new amount, however many times it is edited', async () => {
+    const id = await paid()
+    await saveTransactionEdit(id, spend({ amount: m(1500) }))
+    expect(await liveRows()).toEqual([
+      ['main', '2026-10-05', 500],
+      ['savings', '2026-10-05', 1000],
+    ])
+    expect(await nextDue()).toBe('2026-10-05')
+
+    await saveTransactionEdit(id, spend({ amount: m(1000) }))
+    expect((await liveRows()).filter(([w]) => w === 'main')).toEqual([
+      ['main', '2026-10-05', 1000],
+    ])
+  })
+
+  it('releases in the new wallet when the payment moves to another one', async () => {
+    const id = await paid()
+    await saveTransactionEdit(id, spend({ walletId: 'savings' }))
+    expect(await liveRows()).toEqual([['main', '2026-10-05', 2000]])
+    expect(await nextDue()).toBe('2026-11-05')
+  })
+
+  it('restores and steps next due back on a bulk delete', async () => {
+    const id = await paid()
+    await bulkDeleteTransactions([id])
+    expect(await liveRows()).toEqual([
+      ['main', '2026-10-05', 2000],
+      ['savings', '2026-10-05', 1000],
+    ])
     expect(await nextDue()).toBe('2026-10-05')
   })
 })
