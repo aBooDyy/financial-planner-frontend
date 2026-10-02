@@ -285,6 +285,36 @@ describe('pushing a batch', () => {
     })
   })
 
+  it('sends the rest of the batch again when a source is gone from the server', async () => {
+    await releaseSetAsides([{ id: 'a1' }, { id: 'a2' }], {
+      releasedAt: '2026-11-01',
+    })
+    const entry = await onlyEntry()
+    api.release.mockRejectedValueOnce(
+      new ApiError({
+        status: 404,
+        code: 'planning.set_aside.not_found',
+        message: '',
+      }),
+    )
+    const a1Before = setAside({ id: 'a1', goalId: 'g1', amount: m(500) })
+    api.list.mockResolvedValue([asServer(a1Before, 'v1')])
+    const a1 = (await db.setAsides.get('a1')) as LocalSetAside
+    api.release.mockResolvedValueOnce({ released: [asServer(a1)], created: [] })
+
+    await pushSetAsidesEntry(entry)
+
+    expect(api.release).toHaveBeenCalledTimes(2)
+    const resent = api.release.mock.calls[1][0] as ReleaseWire
+    expect(resent.items.map((i) => i.id)).toEqual(['a1'])
+    expect(await queued()).toEqual([])
+    expect(await db.setAsides.get('a1')).toMatchObject({
+      releasedAt: '2026-11-01',
+      dirty: 0,
+    })
+    expect(await db.setAsides.get('a2')).toBeUndefined()
+  })
+
   it('waits behind a failed write of any row it touches', async () => {
     await db.outbox.add({
       op: 'update',

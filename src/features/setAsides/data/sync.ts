@@ -154,6 +154,12 @@ const BATCH_SETTLED = new Set([
   'planning.set_aside.id_taken',
 ])
 
+/** Refusals naming sources that are no longer live there; the other items may still apply. */
+const SOURCES_OVERTAKEN = new Set([
+  'planning.set_aside.already_released',
+  'planning.set_aside.not_found',
+])
+
 async function pushSetAsideBatch(entry: OutboxEntry): Promise<void> {
   try {
     const batch =
@@ -166,14 +172,12 @@ async function pushSetAsideBatch(entry: OutboxEntry): Promise<void> {
     })
   } catch (e) {
     if (!(e instanceof ApiError) || !BATCH_SETTLED.has(e.code)) throw e
-    if (e.code === ALREADY_RELEASED && (await retryWithoutReleased(entry)))
+    if (SOURCES_OVERTAKEN.has(e.code) && (await retryWithoutOvertaken(entry)))
       return
     await db.outbox.delete(entry.seq)
     await resyncSetAsides([entry.id, ...(entry.alsoRows ?? [])])
   }
 }
-
-const ALREADY_RELEASED = 'planning.set_aside.already_released'
 
 /** The rows one batch item writes: its source, and the remainder and new row it mints. */
 const rowsOfItem = (item: ReleaseItemWire | MoveItemWire): string[] => [
@@ -183,23 +187,23 @@ const rowsOfItem = (item: ReleaseItemWire | MoveItemWire): string[] => [
 ]
 
 /**
- * Some sources were released elsewhere (another device paid or freed them) while this batch
- * waited. Those items settle on the server's rows; the rest of the user's batch is sent again
- * without them rather than dropped. `false` when there is nothing to keep — every source is
- * released there (a replay of this very batch, or all of them overtaken).
+ * Some sources stopped being live there while this batch waited — another device paid, freed or
+ * deleted them. Those items settle on the server's rows; the rest of the user's batch is sent
+ * again without them rather than dropped. `false` when there is nothing to keep — no source is
+ * live there (a replay of this very batch, or all of them overtaken).
  */
-async function retryWithoutReleased(entry: OutboxEntry): Promise<boolean> {
-  const releasedThere = new Set(
+async function retryWithoutOvertaken(entry: OutboxEntry): Promise<boolean> {
+  const liveThere = new Set(
     (await setAsidesApi.list())
-      .filter((a) => a.releasedAt !== null)
+      .filter((a) => a.releasedAt === null)
       .map((a) => a.id),
   )
   const payload = entry.payload as ReleaseWire | MoveWire
   const items: (ReleaseItemWire | MoveItemWire)[] = payload.items
-  const keep = items.filter((i) => !releasedThere.has(i.id))
+  const keep = items.filter((i) => liveThere.has(i.id))
   if (keep.length === 0 || keep.length === items.length) return false
   const dropped = new Set(
-    items.filter((i) => releasedThere.has(i.id)).flatMap(rowsOfItem),
+    items.filter((i) => !liveThere.has(i.id)).flatMap(rowsOfItem),
   )
   const rows = [entry.id, ...(entry.alsoRows ?? [])].filter(
     (id) => !dropped.has(id),

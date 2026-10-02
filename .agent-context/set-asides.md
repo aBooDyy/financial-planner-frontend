@@ -75,11 +75,13 @@ applies all-or-nothing (`POST /set-asides/release`, `/move`).
   not_found` and `409 id_taken` mean the batch no longer applies as written (applied before,
   or overtaken elsewhere): the entry settles and the touched rows are cleaned and re-pulled
   (`resyncSetAsides`). Anything else is flagged.
-- **`already_released` keeps the rest.** When only some sources were released elsewhere (another
-  device paid or freed them), `retryWithoutReleased` drops those items — and the remainder / new
-  rows they minted — from the entry, re-keys it on what is left, resyncs the dropped rows to the
-  server's state and sends the rest again, so the user's other releases are not lost. Only when
-  every source is released there (a replay of this very batch) does the whole entry settle.
+- **`already_released` and `not_found` keep the rest.** When only some sources stopped being
+  live there (another device paid, freed or deleted them), `retryWithoutOvertaken` drops those
+  items — and the remainder / new rows they minted — from the entry, re-keys it on what is left,
+  resyncs the dropped rows to the server's state and sends the rest again, so the user's other
+  releases and moves are not lost. Only when no source is live there (a replay of this very
+  batch, or all of them overtaken) does the whole entry settle. `id_taken` still settles the
+  whole entry: it means the batch already landed.
 - **Batch size.** The server caps a batch at `limits.set_aside_batch_max` (200,
   `configLimits().setAsideBatchMax`, bundled fallback). `releaseSetAsides` / `moveSetAsides`
   queue longer lists as several entries of at most that many items, each all-or-nothing.
@@ -117,7 +119,7 @@ Goal progress (`goals/data/progress.ts`) = live set-asides + spending from the g
 ## Elsewhere
 
 - Confirming a planned set-aside writes one (a bill's: one per occurrence its money reaches,
-  `planned/data/mutations.ts`); "Add contribution" on a goal writes one, now or as a hand-made
+  `planned/data/mutations.ts`); "Add money" on a goal writes one, now or as a hand-made
   planned row.
 - Spending's Activity lists set-asides as their own rows (`SetAsideRow`, `ownerId`), kept out of
   every total; the cashflow hero only captions Σ wallet set-asides made in the window (never in net).
