@@ -1,5 +1,6 @@
 import { walletsApi } from '#/features/wallets/api/walletsApi'
 import type {
+  BalanceSettings,
   CreateNodeWire,
   UpdateNodeWire,
   UpdateSettingsWire,
@@ -54,6 +55,7 @@ import { ApiError } from '#/lib/apiError'
 import { db } from './db'
 import { scheduleLedgerTotalsCheck } from './ledgerTotalsCheck'
 import { recordPlannerInputsPulled } from './plannerInputs'
+import { rebasedBody, withSynced } from './rebase'
 import { trackSync } from './syncActivity'
 import {
   failureOf,
@@ -63,7 +65,12 @@ import {
   rowKey,
 } from './syncFailure'
 import { SETTINGS_KEY } from './types'
-import type { OutboxEntity, OutboxEntry, OutboxOp } from './types'
+import type {
+  LocalBalanceSettings,
+  OutboxEntity,
+  OutboxEntry,
+  OutboxOp,
+} from './types'
 
 const PUSH_DEBOUNCE_MS = 800
 const SAFETY_FLUSH_MS = 30_000
@@ -510,27 +517,36 @@ async function pushNodeDelete(entry: OutboxEntry): Promise<void> {
   })
 }
 
+/** The server's settings as the local row, with the base a later rebase diffs against. */
+const settingsFromServer = (settings: BalanceSettings): LocalBalanceSettings =>
+  withSynced(serverSettingsToLocal(settings), localSettingsToUpdateWire)
+
 async function pushSettings(entry: OutboxEntry): Promise<void> {
   try {
     const settings = await walletsApi.updateSettings(
       entry.payload as UpdateSettingsWire,
     )
     await db.transaction('rw', db.balanceSettings, db.outbox, async () => {
-      await db.balanceSettings.put(serverSettingsToLocal(settings))
+      await db.balanceSettings.put(settingsFromServer(settings))
       await db.outbox.delete(entry.seq)
     })
   } catch (e) {
     if (statusOf(e) === 409) {
-      // The PATCH is a full representation, so the rebase re-sends the whole local row.
+      // Only what this device changed goes onto the server's copy: the PATCH is a full
+      // representation, and re-sending the whole row would undo another device's settings.
       const fresh = await walletsApi.getSettings()
       const local = await db.balanceSettings.get(SETTINGS_KEY)
       const settings = await walletsApi.updateSettings(
         local
-          ? localSettingsToUpdateWire({ ...local, version: fresh.version })
+          ? rebasedBody(
+              local,
+              localSettingsToUpdateWire(local),
+              localSettingsToUpdateWire(serverSettingsToLocal(fresh)),
+            )
           : (entry.payload as UpdateSettingsWire),
       )
       await db.transaction('rw', db.balanceSettings, db.outbox, async () => {
-        await db.balanceSettings.put(serverSettingsToLocal(settings))
+        await db.balanceSettings.put(settingsFromServer(settings))
         await db.outbox.delete(entry.seq)
       })
       return
@@ -600,7 +616,7 @@ export async function pullSettings(): Promise<void> {
   const settings = await walletsApi.getSettings()
   const local = await db.balanceSettings.get(SETTINGS_KEY)
   if (!local || local.dirty === 0) {
-    await db.balanceSettings.put(serverSettingsToLocal(settings))
+    await db.balanceSettings.put(settingsFromServer(settings))
   }
 }
 

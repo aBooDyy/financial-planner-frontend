@@ -452,10 +452,18 @@ many times the server has _rejected_ it) and `nextAttemptAt` (no automatic retry
   [api-contract-conventions.md](../../.agent-context/api-contract-conventions.md)).
 - **Strategy (locked): last-write-wins, client re-apply.** Conflicts are rare (single user,
   rarely editing the same record on two devices at once), so we deliberately keep this
-  simple — **no field-level merging**.
+  simple.
   - On `409`, the sync engine **pulls the current server record** (to get the latest
     `version`), **re-applies the pending local mutation** on top, and **retries once**. The
     user's most recent action wins.
+  - **Settings, bills, goals and income re-apply only the fields this device changed**
+    (`db/rebase.ts`). Their PATCH is a full representation, so a whole-row retry reset every
+    field another device had moved meanwhile — the planning settings, a bill's `next_due` or
+    stored plan. Whenever their sync stores the server's copy it keeps that copy's update body
+    on the row as `synced` (`withSynced`); `rebasedBody` diffs the user's row against it and
+    lays the differing fields over the fresh copy. A row with no base at its version (stored by
+    a path that keeps none) rebases whole, as before. `storeAnswer` moves the base along with
+    the version.
   - Whole-record LWW: a local delete still wins over a server update, and vice versa.
   - This never silently discards the user's own latest intent. If the retry conflicts
     again, the server copy is accepted rather than looping; if it fails any other way, the

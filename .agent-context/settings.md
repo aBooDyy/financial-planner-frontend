@@ -101,9 +101,10 @@ Notifications, Archived, Data & privacy. Each pane is its own route — see
   mutations stay in `features/wallets/` (`setBaseCurrency`, `updatePlanningSettings(patch)`),
   the wire maps in `wallets/api/types.ts`. **`PATCH /balance-settings` is a full
   representation**: anything omitted resets to its default, so `localSettingsToUpdateWire`
-  sends every field every time, and the `409` rebase in `db/sync.ts` re-sends the whole local
-  row on the fresh version (it used to send only `base_currency`, which would now reset the
-  rest). Like the server, the client drops a value its setting does not use
+  sends every field every time, and the `409` rebase in `db/sync.ts` puts **only the fields
+  this device changed** onto the server's copy (`rebasedBody`, `db/rebase.ts`, against the base
+  kept on the row when it was last synced) — re-sending the whole row wiped another device's
+  planning settings, and sending only `base_currency` once reset the rest. Like the server, the client drops a value its setting does not use
   (`normalizedPlanning`: days only with `days`, a floor only while income varies). The planning
   fields are optional on the local row (rows stored before them lack them); read them through
   `planningSettingsOf(row)`, which fills the defaults. Deleting an income stream calls

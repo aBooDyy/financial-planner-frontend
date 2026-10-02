@@ -174,6 +174,49 @@ describe('pushBillsEntry', () => {
     })
   })
 
+  it('re-applies only the fields this device changed when rebasing', async () => {
+    const stored = bill({ id: 'b1', name: 'Rent', nextDue: '2026-11-01' })
+    api.list.mockResolvedValueOnce([asServer(stored, 'v1')])
+    await pullBills()
+    const synced = (await db.bills.get('b1')) as LocalBill
+    await db.bills.put({ ...synced, name: 'Flat rent', dirty: 1 })
+    api.update
+      .mockRejectedValueOnce(failure(409, 'common.conflict'))
+      .mockImplementationOnce((_id: string, body: UpdateBillWire) =>
+        Promise.resolve({
+          ...asServer(stored, 'v3'),
+          name: body.name,
+          nextDue: body.next_due,
+        }),
+      )
+    api.list.mockResolvedValue([
+      asServer({ ...stored, nextDue: '2026-12-01' }, 'v2'),
+    ])
+    const entry = await queue({
+      op: 'update',
+      entity: 'bill',
+      id: 'b1',
+      payload: { version: 'v1' },
+      baseVersion: 'v1',
+    })
+
+    await pushBillsEntry(entry)
+
+    expect(api.update).toHaveBeenLastCalledWith(
+      'b1',
+      expect.objectContaining({
+        version: 'v2',
+        name: 'Flat rent',
+        next_due: '2026-12-01',
+      }),
+    )
+    expect(await db.bills.get('b1')).toMatchObject({
+      name: 'Flat rent',
+      nextDue: '2026-12-01',
+      dirty: 0,
+    })
+  })
+
   it('drops the local row when the server no longer has it', async () => {
     await db.bills.put(bill({ id: 'b1', dirty: 1 }))
     api.update.mockRejectedValue(failure(404, 'planning.bill.not_found'))

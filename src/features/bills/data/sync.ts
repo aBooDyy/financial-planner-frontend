@@ -1,11 +1,16 @@
 import { db } from '#/db/db'
 import { queuedBesides } from '#/db/enqueue'
 import { pushItemAction } from '#/db/itemAction'
+import { rebasedBody, withSynced } from '#/db/rebase'
 import { storeAnswer } from '#/db/storeAnswer'
 import { settleTakenCreate } from '#/db/takenCreate'
-import type { OutboxEntry } from '#/db/types'
+import type { LocalBill, OutboxEntry } from '#/db/types'
 import { billsApi } from '#/features/bills/api/billsApi'
-import type { CreateBillWire, UpdateBillWire } from '#/features/bills/api/types'
+import type {
+  Bill,
+  CreateBillWire,
+  UpdateBillWire,
+} from '#/features/bills/api/types'
 import type { CloseWire } from '#/features/setAsides/api/types'
 import {
   resyncSetAsides,
@@ -22,6 +27,10 @@ import { localBillToUpdateWire, serverBillToLocal } from './mappers'
 
 const statusOf = (e: unknown): number => (e instanceof ApiError ? e.status : -1)
 
+/** The server's bill as a local row, with the base a later rebase diffs against. */
+const billFromServer = (bill: Bill): LocalBill =>
+  withSynced(serverBillToLocal(bill), localBillToUpdateWire)
+
 async function storeBill(
   entry: OutboxEntry,
   bill: Parameters<typeof serverBillToLocal>[0],
@@ -29,7 +38,7 @@ async function storeBill(
   await db.transaction('rw', db.bills, db.outbox, async () => {
     await storeAnswer(
       db.bills,
-      serverBillToLocal(bill),
+      billFromServer(bill),
       await queuedBesides(entry),
     )
     await db.outbox.delete(entry.seq)
@@ -47,7 +56,7 @@ async function pushBillCreate(entry: OutboxEntry): Promise<void> {
     await settleTakenCreate(entry, {
       table: db.bills,
       find: async () => (await billsApi.list()).find((b) => b.id === entry.id),
-      toLocal: serverBillToLocal,
+      toLocal: billFromServer,
       rebased: (local, server) =>
         localBillToUpdateWire({ ...local, version: server.version }),
       update: (body) => billsApi.update(entry.id, body as UpdateBillWire),
@@ -76,7 +85,7 @@ async function pushBillUpdate(entry: OutboxEntry): Promise<void> {
   }
 }
 
-/** Last-write-wins, client re-apply: the local row on the server's version, once. */
+/** Client re-apply: this device's changes on the server's version, once (`db/rebase.ts`). */
 async function rebaseBill(entry: OutboxEntry): Promise<void> {
   const fresh = (await billsApi.list()).find((b) => b.id === entry.id)
   const local = await db.bills.get(entry.id)
@@ -89,7 +98,11 @@ async function rebaseBill(entry: OutboxEntry): Promise<void> {
       entry,
       await billsApi.update(
         entry.id,
-        localBillToUpdateWire({ ...local, version: fresh.version }),
+        rebasedBody(
+          local,
+          localBillToUpdateWire(local),
+          localBillToUpdateWire(serverBillToLocal(fresh)),
+        ),
       ),
     )
   } catch (e) {
@@ -121,7 +134,7 @@ async function adoptServerBill(entry: OutboxEntry): Promise<void> {
   if (fresh)
     await storeAnswer(
       db.bills,
-      serverBillToLocal(fresh),
+      billFromServer(fresh),
       await queuedBesides(entry),
     )
   else await db.bills.delete(entry.id)
@@ -136,7 +149,7 @@ async function pushBillClose(entry: OutboxEntry): Promise<void> {
     store: async ({ bill, released, created }) => {
       await storeAnswer(
         db.bills,
-        serverBillToLocal(bill),
+        billFromServer(bill),
         await queuedBesides(entry),
       )
       await storeServerSetAsides([...released, ...created])
@@ -165,7 +178,7 @@ async function pushBillReopen(entry: OutboxEntry): Promise<void> {
     store: async (bill) => {
       await storeAnswer(
         db.bills,
-        serverBillToLocal(bill),
+        billFromServer(bill),
         await queuedBesides(entry),
       )
     },
@@ -193,7 +206,7 @@ export async function pullBills(): Promise<void> {
       const local = await db.bills.get(b.id)
       // Local edits win until they have been pushed.
       if (!local || (local.dirty === 0 && local.deleted === 0)) {
-        await db.bills.put(serverBillToLocal(b))
+        await db.bills.put(billFromServer(b))
       }
     }
     for (const l of await db.bills.toArray()) {

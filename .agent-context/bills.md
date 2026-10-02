@@ -27,7 +27,9 @@ editors and lists.
 of `pullAll`). **Full pull** (a bounded list; absence is how a delete arrives). The PATCH is a
 **full representation** — `localBillToUpdateWire` sends every field; an omitted `must_pay`
 reads as true and `autopay` as false server-side. `409` on create = the id already landed (pull);
-`409 common.conflict` on update rebases the local row on the fresh version once; `404` drops the
+`409 common.conflict` on update re-applies only the fields this device changed onto the fresh
+copy, once (`rebasedBody`, `db/rebase.ts`) — a whole-row retry rolled back a `next_due` or stored
+plan another device had moved; `404` drops the
 row; anything else is flagged by the engine.
 
 ## Mutations — `data/mutations.ts`

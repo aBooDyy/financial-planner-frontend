@@ -1,14 +1,16 @@
 import { db } from '#/db/db'
 import { queuedBesides } from '#/db/enqueue'
 import { pushItemAction } from '#/db/itemAction'
+import { rebasedBody, withSynced } from '#/db/rebase'
 import { storeAnswer } from '#/db/storeAnswer'
 import { settleTakenCreate } from '#/db/takenCreate'
-import type { OutboxEntry } from '#/db/types'
+import type { LocalGoal, LocalIncomeStream, OutboxEntry } from '#/db/types'
 import { goalsApi } from '#/features/goals/api/goalsApi'
 import type {
   CreateGoalWire,
   CreateIncomeWire,
   Goal,
+  IncomeStream,
   UpdateGoalWire,
   UpdateIncomeWire,
 } from '#/features/goals/api/types'
@@ -34,6 +36,12 @@ import {
 
 const statusOf = (e: unknown): number => (e instanceof ApiError ? e.status : -1)
 
+/** Server rows as local ones, with the base a later rebase diffs against. */
+const incomeFromServer = (stream: IncomeStream): LocalIncomeStream =>
+  withSynced(serverIncomeToLocal(stream), localIncomeToUpdateWire)
+const goalFromServer = (goal: Goal): LocalGoal =>
+  withSynced(serverGoalToLocal(goal), localGoalToUpdateWire)
+
 // --- Income streams ------------------------------------------------------------------
 
 async function pushIncomeCreate(entry: OutboxEntry): Promise<void> {
@@ -44,7 +52,7 @@ async function pushIncomeCreate(entry: OutboxEntry): Promise<void> {
     await db.transaction('rw', db.incomeStreams, db.outbox, async () => {
       await storeAnswer(
         db.incomeStreams,
-        serverIncomeToLocal(stream),
+        incomeFromServer(stream),
         await queuedBesides(entry),
       )
       await db.outbox.delete(entry.seq)
@@ -55,7 +63,7 @@ async function pushIncomeCreate(entry: OutboxEntry): Promise<void> {
       table: db.incomeStreams,
       find: async () =>
         (await goalsApi.listIncome()).find((s) => s.id === entry.id),
-      toLocal: serverIncomeToLocal,
+      toLocal: incomeFromServer,
       rebased: (local, server) =>
         localIncomeToUpdateWire({ ...local, version: server.version }),
       update: (body) =>
@@ -75,7 +83,7 @@ async function pushIncomeUpdate(entry: OutboxEntry): Promise<void> {
     await db.transaction('rw', db.incomeStreams, db.outbox, async () => {
       await storeAnswer(
         db.incomeStreams,
-        serverIncomeToLocal(stream),
+        incomeFromServer(stream),
         await queuedBesides(entry),
       )
       await db.outbox.delete(entry.seq)
@@ -107,12 +115,16 @@ async function rebaseIncome(entry: OutboxEntry): Promise<void> {
   try {
     const stream = await goalsApi.updateIncome(
       entry.id,
-      localIncomeToUpdateWire({ ...local, version: fresh.version }),
+      rebasedBody(
+        local,
+        localIncomeToUpdateWire(local),
+        localIncomeToUpdateWire(serverIncomeToLocal(fresh)),
+      ),
     )
     await db.transaction('rw', db.incomeStreams, db.outbox, async () => {
       await storeAnswer(
         db.incomeStreams,
-        serverIncomeToLocal(stream),
+        incomeFromServer(stream),
         await queuedBesides(entry),
       )
       await db.outbox.delete(entry.seq)
@@ -122,7 +134,7 @@ async function rebaseIncome(entry: OutboxEntry): Promise<void> {
     await db.transaction('rw', db.incomeStreams, db.outbox, async () => {
       await storeAnswer(
         db.incomeStreams,
-        serverIncomeToLocal(fresh),
+        incomeFromServer(fresh),
         await queuedBesides(entry),
       )
       await db.outbox.delete(entry.seq)
@@ -150,7 +162,7 @@ async function pushGoalCreate(entry: OutboxEntry): Promise<void> {
     await db.transaction('rw', db.goals, db.outbox, async () => {
       await storeAnswer(
         db.goals,
-        serverGoalToLocal(goal),
+        goalFromServer(goal),
         await queuedBesides(entry),
       )
       await db.outbox.delete(entry.seq)
@@ -161,7 +173,7 @@ async function pushGoalCreate(entry: OutboxEntry): Promise<void> {
       table: db.goals,
       find: async () =>
         (await goalsApi.listGoals()).find((g) => g.id === entry.id),
-      toLocal: serverGoalToLocal,
+      toLocal: goalFromServer,
       rebased: (local, server) =>
         localGoalToUpdateWire({ ...local, version: server.version }),
       update: (body) => goalsApi.updateGoal(entry.id, body as UpdateGoalWire),
@@ -177,7 +189,7 @@ async function pushGoalUpdate(entry: OutboxEntry): Promise<void> {
     await db.transaction('rw', db.goals, db.outbox, async () => {
       await storeAnswer(
         db.goals,
-        serverGoalToLocal(goal),
+        goalFromServer(goal),
         await queuedBesides(entry),
       )
       await db.outbox.delete(entry.seq)
@@ -209,12 +221,16 @@ async function rebaseGoal(entry: OutboxEntry): Promise<void> {
   try {
     const goal = await goalsApi.updateGoal(
       entry.id,
-      localGoalToUpdateWire({ ...local, version: fresh.version }),
+      rebasedBody(
+        local,
+        localGoalToUpdateWire(local),
+        localGoalToUpdateWire(serverGoalToLocal(fresh)),
+      ),
     )
     await db.transaction('rw', db.goals, db.outbox, async () => {
       await storeAnswer(
         db.goals,
-        serverGoalToLocal(goal),
+        goalFromServer(goal),
         await queuedBesides(entry),
       )
       await db.outbox.delete(entry.seq)
@@ -224,7 +240,7 @@ async function rebaseGoal(entry: OutboxEntry): Promise<void> {
     await db.transaction('rw', db.goals, db.outbox, async () => {
       await storeAnswer(
         db.goals,
-        serverGoalToLocal(fresh),
+        goalFromServer(fresh),
         await queuedBesides(entry),
       )
       await db.outbox.delete(entry.seq)
@@ -255,7 +271,7 @@ async function adoptServerGoal(entry: OutboxEntry): Promise<void> {
   if (fresh)
     await storeAnswer(
       db.goals,
-      serverGoalToLocal(fresh),
+      goalFromServer(fresh),
       await queuedBesides(entry),
     )
   else await db.goals.delete(entry.id)
@@ -274,7 +290,7 @@ async function pushGoalAction(
     store: async (goal) => {
       await storeAnswer(
         db.goals,
-        serverGoalToLocal(goal),
+        goalFromServer(goal),
         await queuedBesides(entry),
       )
     },
@@ -293,7 +309,7 @@ async function pushGoalClose(entry: OutboxEntry): Promise<void> {
     store: async ({ goal, released, created }) => {
       await storeAnswer(
         db.goals,
-        serverGoalToLocal(goal),
+        goalFromServer(goal),
         await queuedBesides(entry),
       )
       await storeServerSetAsides([...released, ...created])
@@ -361,7 +377,7 @@ export async function pullIncome(): Promise<void> {
     for (const s of server) {
       const local = await db.incomeStreams.get(s.id)
       if (!local || (local.dirty === 0 && local.deleted === 0)) {
-        await db.incomeStreams.put(serverIncomeToLocal(s))
+        await db.incomeStreams.put(incomeFromServer(s))
       }
     }
     for (const l of await db.incomeStreams.toArray()) {
@@ -379,7 +395,7 @@ export async function pullGoals(): Promise<void> {
     for (const g of server) {
       const local = await db.goals.get(g.id)
       if (!local || (local.dirty === 0 && local.deleted === 0)) {
-        await db.goals.put(serverGoalToLocal(g))
+        await db.goals.put(goalFromServer(g))
       }
     }
     for (const l of await db.goals.toArray()) {
