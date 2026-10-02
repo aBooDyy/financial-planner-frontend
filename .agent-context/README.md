@@ -21,7 +21,8 @@ root product [`.agent-context/`](../../.agent-context/). Keep
   full-representation sync, the mutations and the cross-entity cascades.
 - [set-asides.md](set-asides.md) — set-asides: labels on money in real wallets for a bill or
   goal, live vs released, the mutations and the pure totals (wallet pots, per-owner sums).
-- [transactions.md](transactions.md) — the Spending feature: the ledger + budgets,
+- [transactions.md](transactions.md) — the Spending feature: the ledger + budgets (per-paycheck
+  windows, "Leave out planned bills"),
   the catalog-taking selectors, client-side derivation of wallet balances & goal contributions,
   settlement links to planned rows, and transfers between wallets (two linked legs, the `transfer` outbox entity, the
   collapsed activity row and its scope rules, exclusion from totals), and balance adjustments
@@ -34,11 +35,13 @@ root product [`.agent-context/`](../../.agent-context/). Keep
   the Planned tab reads, and the Planned tab + confirm dialog components.
 - [reports.md](reports.md) — Reports: the URL-held period/comparison/accounts, the preset
   periods and comparison windows, the windowed read + pre-period balance, and the pure builders
-  (summary, balance strip, trend buckets, category breakdown, largest expenses).
+  (summary, balance strip, trend buckets, category breakdown, largest expenses, the Needs /
+  Wants / Savings card and the reusable `needsWantsSummary`).
 - [search.md](search.md) — app-level search: the top-bar trigger + shortcut, the sheet, the
   Everywhere / current-tab scope, the on-device index and filters, and the `?open=` hand-off.
 - [categories.md](categories.md) — Categories: the two-level model, the synced tree and its
-  Dexie/sync branch, `buildCatalog` and the `CategoryCatalog` every surface reads, the shared
+  Dexie/sync branch, `buildCatalog` and the `CategoryCatalog` every surface reads (incl. the
+  inherited Needs / Wants / Savings tag, `classOf`, and its Settings chip), the shared
   searchable `CategoryPicker`, the Settings list/editor, and the subtree-aware delete.
 - [onboarding.md](onboarding.md) — the `/setup` first-run wizard: `SessionGate`, the
   sessionStorage draft, starter packs over the category catalog, the one commit call, the
