@@ -231,7 +231,10 @@ first, each a Dexie write plus outbox entries; errors are `MoneyActionError` wit
   settles the occurrence** (a part payment returns no lines: the money elsewhere still waits for
   the rest of the bill). It is `leftoverFor` plus, as one more line, what the **paying wallet**
   itself still holds for the occurrence (a settled occurrence would otherwise hold it for good
-  when an earlier part came from another wallet).
+  when an earlier part came from another wallet). A payment that settles the occurrence also
+  files a **quiet** plan rewrite for the bill (`requestPlanRecalc(billOwner(id), {quiet:
+  true})`), so an early payment doesn't leave the stored plan asking for that occurrence's
+  set-asides; `settleBillPayment` (the dialog / QuickAdd path) does the same.
 - **`billPaymentTarget(billId, plannedId)` + `settleBillPayment(billId, occurrence, payment)`**
   — the same path for a payment written elsewhere (the transaction dialog, QuickAdd —
   `transactions/data/billPayments.ts`): the first picks the open row to settle (the matched one,

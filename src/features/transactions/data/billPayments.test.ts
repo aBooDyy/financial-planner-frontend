@@ -14,6 +14,8 @@ import {
   setAside,
   wallet,
 } from '#/features/planned/testing/fixtures'
+import { billOwner } from '#/features/planned/data/owners'
+import { takePlanRecalcRequests } from '#/features/planned/data/recalcRequests'
 import { isLiveSetAside } from '#/features/setAsides/data/totals'
 import { useSessionStore } from '#/stores/session'
 import {
@@ -110,6 +112,16 @@ describe('a bill payment saved from the dialog or QuickAdd', () => {
     expect(prompt).toMatchObject({ payingWalletId: 'main', date: '2026-10-04' })
     expect(prompt?.report.lines).toEqual([
       expect.objectContaining({ walletId: 'savings', amount: m(1000) }),
+    ])
+  })
+
+  it('rewrites the bill’s stored plan quietly once the payment settles it', async () => {
+    takePlanRecalcRequests()
+    await saveNewTransaction(spend({ amount: m(1000) }))
+    expect(takePlanRecalcRequests()).toEqual([])
+    await saveNewTransaction(spend({ amount: m(2000) }))
+    expect(takePlanRecalcRequests()).toEqual([
+      { owner: billOwner('rent'), quiet: true },
     ])
   })
 

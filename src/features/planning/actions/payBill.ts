@@ -8,6 +8,8 @@
 import { db } from '#/db/db'
 import type { LocalBill, LocalPlanned, LocalSetAside } from '#/db/types'
 import { plannedIdFor } from '#/features/planned/data/ids'
+import { billOwner } from '#/features/planned/data/owners'
+import { requestPlanRecalc } from '#/features/planned/data/recalcRequests'
 import {
   confirmPlanned,
   syncBillNextDue,
@@ -141,10 +143,12 @@ function withPayingWallet(
 }
 
 /**
- * What the occurrence still holds after the payment landed — asked about only once the
- * occurrence is settled: until then that money is still waiting for the rest of the bill.
+ * After a payment landed: once it settles the occurrence, the bill's stored plan is rewritten
+ * quietly (the occurrence's planned set-asides are no longer needed — an early payment would
+ * otherwise leave the plan asking for them) and what the occurrence still holds is reported
+ * for the leftover prompt. Until then that money is still waiting for the rest of the bill.
  */
-async function leftoverAfter(
+async function afterPayment(
   bill: LocalBill,
   occurrence: string,
   payingWalletId: string,
@@ -166,6 +170,7 @@ async function leftoverAfter(
   })
   if (!isSettledOccurrence(after, occurrence))
     return { ...report, lines: [], total: 0 }
+  requestPlanRecalc(billOwner(bill.id), { quiet: true })
   return withPayingWallet(report, bill, setAsides, payingWalletId, rates)
 }
 
@@ -193,7 +198,7 @@ export async function payBill(
     transactionId: result.settlementId,
     occurrence,
     status: result.status,
-    leftover: await leftoverAfter(bill, occurrence, walletId),
+    leftover: await afterPayment(bill, occurrence, walletId),
   }
 }
 
@@ -230,7 +235,7 @@ export async function billPaymentTarget(
 /**
  * What Pay now does after its transaction, for one already written with the row's
  * `plannedId`: release the occurrence's set-asides in the paying wallet, move `nextDue` on, and
- * report what a settled occurrence still holds for the leftover prompt.
+ * — once the occurrence is settled — rewrite the plan and report what it still holds.
  */
 export async function settleBillPayment(
   billId: string,
@@ -250,5 +255,5 @@ export async function settleBillPayment(
     await currentRates(),
   )
   await syncBillNextDue(bill.id)
-  return leftoverAfter(bill, occurrence, payment.walletId)
+  return afterPayment(bill, occurrence, payment.walletId)
 }

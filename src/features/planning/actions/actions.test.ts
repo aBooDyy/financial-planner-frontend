@@ -196,6 +196,15 @@ describe('Pay now', () => {
     expect((await db.bills.get('rent'))?.nextDue).toBe('2026-11-05')
   })
 
+  it('rewrites the bill’s stored plan quietly once a payment settles an occurrence', async () => {
+    await payBill('rent', { amount: m(1000) })
+    expect(takePlanRecalcRequests()).toEqual([])
+    await payBill('rent')
+    expect(takePlanRecalcRequests()).toEqual([
+      { owner: billOwner('rent'), quiet: true },
+    ])
+  })
+
   it('pays part of an occurrence and leaves it open', async () => {
     const result = await payBill('rent', { amount: m(1000) })
     expect(result.status).toBe('open')
