@@ -18,6 +18,7 @@ import { currentRates, insertPlanned } from '#/features/planned/data/rows'
 import { leftoverFor } from '#/features/planning/data/leftover'
 import type { LeftoverReport } from '#/features/planning/data/leftover'
 import {
+  billOccurrences,
   firstOpenOccurrence,
   isSettledOccurrence,
   paymentRowsOf,
@@ -174,6 +175,13 @@ async function afterPayment(
   return withPayingWallet(report, bill, setAsides, payingWalletId, rates)
 }
 
+/** A date the bill falls due on, from `nextDue` on (before it everything is settled). */
+const onSchedule = (
+  bill: LocalBill,
+  payments: ReadonlyMap<string, LocalPlanned>,
+  occurrence: string,
+): boolean => billOccurrences(bill, payments, occurrence).includes(occurrence)
+
 export async function payBill(
   billId: string,
   input: PayBillInput = {},
@@ -181,6 +189,8 @@ export async function payBill(
   const bill = await liveBill(billId)
   const payments = await paymentsOf(bill)
   const occurrence = input.occurrence ?? firstOpenOccurrence(bill, payments)
+  if (!onSchedule(bill, payments, occurrence))
+    throw new MoneyActionError('bad_occurrence')
   const existing = payments.get(occurrence)
   if (existing && existing.status !== 'open')
     throw new MoneyActionError('closed')

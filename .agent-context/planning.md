@@ -223,10 +223,12 @@ Plus `progress` / `setAside` / `used` / `target` / `left`, `perPaycheck`,
 The anytime actions (02, D23) on top of the planned/set-aside/transaction write paths. Local
 first, each a Dexie write plus outbox entries; errors are `MoneyActionError` with a stable
 `code` (`not_found`, `closed`, `no_wallet`, `bad_amount`, `category_required`,
-`no_next_occurrence`, `signed_out`).
+`no_next_occurrence`, `bad_occurrence`, `signed_out`).
 
 - **`payBill(billId, {occurrence?, amount?, walletId?, date?, note?})`** — Pay now: any open
-  occurrence (default the first open one), in full (default) or in part, early or on time. It
+  occurrence (default the first open one), in full (default) or in part, early or on time. An
+  `occurrence` must be on the bill's schedule (`billOccurrences` from `nextDue` through it, so
+  within `endsOn`), else `bad_occurrence` — nothing is written. It
   confirms the occurrence's planned payment row — generating it under its deterministic id
   when the occurrence is beyond the planner's horizon — so the payment releases that
   occurrence's set-asides in the paying wallet and `nextDue` moves to the first occurrence

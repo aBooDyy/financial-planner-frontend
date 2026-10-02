@@ -5,6 +5,7 @@ export type MoneyActionCode =
   | 'bad_amount'
   | 'category_required'
   | 'no_next_occurrence'
+  | 'bad_occurrence'
   | 'signed_out'
 
 /** A money action the item's state does not allow. `code` is stable; show your own copy. */

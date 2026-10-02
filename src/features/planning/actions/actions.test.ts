@@ -205,6 +205,23 @@ describe('Pay now', () => {
     ])
   })
 
+  it('refuses an occurrence that is not on the bill’s schedule', async () => {
+    for (const occurrence of ['2026-10-06', '2026-09-05', '2027-01-05x'])
+      await expect(payBill('rent', { occurrence })).rejects.toMatchObject({
+        code: 'bad_occurrence',
+      })
+    await db.bills.update('rent', { endsOn: '2026-12-31' })
+    await expect(
+      payBill('rent', { occurrence: '2027-01-05' }),
+    ).rejects.toMatchObject({ code: 'bad_occurrence' })
+    expect(await db.transactions.count()).toBe(0)
+    expect(await db.plannedTransactions.count()).toBe(0)
+
+    expect((await payBill('rent', { occurrence: '2026-12-05' })).status).toBe(
+      'done',
+    )
+  })
+
   it('pays part of an occurrence and leaves it open', async () => {
     const result = await payBill('rent', { amount: m(1000) })
     expect(result.status).toBe('open')
