@@ -4,17 +4,12 @@
  * wallet needs. Pure; the sheet edits the lines and `transfersFor` re-totals them.
  */
 import type { LocalPlanned } from '#/db/types'
-import { addMonthsISO } from '#/features/planned/data/dates'
 import { remainderOf } from '#/features/planned/data/settle'
 import type { PlannerInputs, PlannerState } from '#/features/planned/data/state'
 import { convertMinor } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
 import type { RatesMap } from '#/lib/config/rates'
-import {
-  billOccurrences,
-  isSettledOccurrence,
-  paymentRowsOf,
-} from './occurrences'
+import { occurrenceFrom, paymentRowsByBill } from './occurrences'
 import { periodOf } from './payPeriods'
 import type { PayPeriod } from './payPeriods'
 
@@ -69,22 +64,6 @@ const GROUP_ORDER: ReviewGroupKey[] = [
   'saving_up',
   'goals',
 ]
-
-/** The occurrence a bill set-aside dated `date` goes toward. */
-function occurrenceFor(
-  billId: string,
-  date: string,
-  inputs: PlannerInputs,
-): string | null {
-  const bill = inputs.bills.find((b) => b.id === billId)
-  if (!bill) return null
-  const payments = paymentRowsOf(bill.id, inputs.planned)
-  return (
-    billOccurrences(bill, addMonthsISO(date, 24)).find(
-      (o) => o >= date && !isSettledOccurrence(payments, o),
-    ) ?? null
-  )
-}
 
 /** Plan priority of a line: must-pay bills, must-have goals, the rest; then by date, position. */
 function rankOf(
@@ -143,13 +122,14 @@ function lineOf(
   period: PayPeriod,
   inputs: PlannerInputs,
   state: PlannerState,
+  payments: ReadonlyMap<string, ReadonlyMap<string, LocalPlanned>>,
 ): ReviewLine | null {
   const amount = remainderOf(p, state.index, inputs.rates)
   if (amount <= 0) return null
   if (p.billId) {
     const bill = inputs.bills.find((b) => b.id === p.billId)
     if (!bill) return null
-    const due = occurrenceFor(bill.id, p.date, inputs)
+    const due = occurrenceFrom(bill, p.date, payments.get(bill.id) ?? new Map())
     return {
       plannedId: p.id,
       group:
@@ -194,6 +174,7 @@ export function paydayReview(
 ): PaydayReview {
   const calendar = state.funding.calendar
   const period = periodOf(calendar, payday)
+  const payments = paymentRowsByBill(inputs.planned)
   const lines = inputs.planned
     .filter(
       (p) =>
@@ -204,7 +185,7 @@ export function paydayReview(
         p.date <= period.end &&
         (!options.waitingOnly || p.review),
     )
-    .map((p) => lineOf(p, period, inputs, state))
+    .map((p) => lineOf(p, period, inputs, state, payments))
     .filter((l): l is ReviewLine => l !== null)
   const rank = (a: ReviewLine, b: ReviewLine) => {
     const [ta, da, pa] = rankOf(a, inputs)

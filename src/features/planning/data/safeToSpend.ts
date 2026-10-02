@@ -13,7 +13,6 @@
  * subtracted (D18). Pure.
  */
 import type { LocalBill, LocalPlanned, LocalSetAside } from '#/db/types'
-import { addMonthsISO } from '#/features/planned/data/dates'
 import { remainderOf } from '#/features/planned/data/settle'
 import type { SettlementIndex } from '#/features/planned/data/settle'
 import { isLiveSetAside } from '#/features/setAsides/data/totals'
@@ -25,11 +24,7 @@ import { convertMinor } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
 import type { RatesMap } from '#/lib/config/rates'
 import type { MoneyFigures } from './balances'
-import {
-  billOccurrences,
-  isSettledOccurrence,
-  paymentRowsOf,
-} from './occurrences'
+import { occurrenceFrom, paymentRowsByBill } from './occurrences'
 import { paydayAfter, safeHorizonEnd } from './payPeriods'
 import type { PayCalendar } from './payPeriods'
 
@@ -85,24 +80,11 @@ const term = (items: SafeLine[]): SafeTerm => ({
   items,
 })
 
-/** The occurrence a bill set-aside dated `date` goes toward: the first open one due from then. */
-function coveredOccurrence(
-  bill: LocalBill,
-  date: string,
-  planned: ReadonlyArray<LocalPlanned>,
-): string | null {
-  const payments = paymentRowsOf(bill.id, planned)
-  return (
-    billOccurrences(bill, addMonthsISO(date, 24)).find(
-      (o) => o >= date && !isSettledOccurrence(payments, o),
-    ) ?? null
-  )
-}
-
 export function safeToSpend(input: SafeToSpendInput): SafeToSpend {
   const { today, base, rates, index } = input
   const end = safeHorizonEnd(input.settings, input.calendar, today)
   const bills = new Map(input.bills.map((b) => [b.id, b]))
+  const payments = paymentRowsByBill(input.planned)
   const inBase = (amount: number, currency: CurrencyCode) =>
     convertMinor(amount, currency, base, rates)
   const line = (p: LocalPlanned, amount: number): SafeLine => ({
@@ -151,7 +133,7 @@ export function safeToSpend(input: SafeToSpendInput): SafeToSpend {
     } else {
       const bill = p.billId ? bills.get(p.billId) : undefined
       const covers = bill
-        ? coveredOccurrence(bill, p.date, input.planned)
+        ? occurrenceFrom(bill, p.date, payments.get(bill.id) ?? new Map())
         : null
       if (covers !== null && covers <= end) continue
       setAsideLines.push(line(p, left))

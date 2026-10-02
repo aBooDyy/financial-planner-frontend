@@ -37,7 +37,9 @@ Everything under `data/` is pure and clock-free: `today` is an ISO date passed i
 - An occurrence is **settled** when its planned PAYMENT row (`paymentRowsOf`) exists and is no
   longer open (paid in full, closed with the rest abandoned, or skipped).
   `firstOpenOccurrence(bill, rows)` is what `nextDue` should read; `openOccurrences` lists the
-  rest.
+  rest. `occurrenceFrom(bill, date, rows)` is the occurrence money set aside on `date` goes
+  toward (the first open one due from then); `paymentRowsByBill(planned)` indexes every bill's
+  payment rows in one pass for selectors that look up many.
 
 ## The funding engine — `data/funding.ts`
 
@@ -244,7 +246,7 @@ close / reopen / pause / resume from the bills and goals slices).
 
 ## Tests
 
-`data/{payPeriods,funding,leftover,balances,safeToSpend,status,paycheck,views}.test.ts`
+`data/{payPeriods,occurrences,funding,leftover,balances,safeToSpend,status,paycheck,views}.test.ts`
 (leftover + fill; views = Upcoming, review, year ahead; `testing/state.ts` builds a planner
 state from rows, `plannedScenario` with the planner's rows written); `hooks/usePlanning.test.tsx`; `actions/actions.test.ts`
 (the testing plan's anytime actions); generation and the runner in

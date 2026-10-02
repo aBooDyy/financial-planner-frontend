@@ -6,7 +6,7 @@
  */
 import type { LocalBill, LocalPlanned } from '#/db/types'
 import { frequencyMetaOf } from '#/features/goals/data/cadence'
-import { dateOf, isoOf } from '#/features/planned/data/dates'
+import { addMonthsISO, dateOf, isoOf } from '#/features/planned/data/dates'
 
 /** How many occurrences a list may hold — a daily bill over more than a year. */
 const MAX_OCCURRENCES = 600
@@ -69,6 +69,21 @@ export function paymentRowsOf(
   return out
 }
 
+/** Every bill's planned payment rows by occurrence, in one pass. */
+export function paymentRowsByBill(
+  planned: ReadonlyArray<LocalPlanned>,
+): Map<string, Map<string, LocalPlanned>> {
+  const out = new Map<string, Map<string, LocalPlanned>>()
+  for (const p of planned) {
+    if (p.deleted !== 0 || p.origin !== 'bill' || p.role !== 'payment') continue
+    if (!p.billId) continue
+    const rows = out.get(p.billId) ?? new Map<string, LocalPlanned>()
+    rows.set(p.occurrence, p)
+    out.set(p.billId, rows)
+  }
+  return out
+}
+
 /** Settled: its payment row exists and is no longer open. */
 export const isSettledOccurrence = (
   rows: ReadonlyMap<string, LocalPlanned>,
@@ -93,6 +108,19 @@ export function firstOpenOccurrence(
   }
   return bill.nextDue
 }
+
+/**
+ * The occurrence money set aside for a bill on `date` goes toward: its first open occurrence
+ * due on or after that date (within two years).
+ */
+export const occurrenceFrom = (
+  bill: LocalBill,
+  date: string,
+  rows: ReadonlyMap<string, LocalPlanned>,
+): string | null =>
+  billOccurrences(bill, addMonthsISO(date, 24)).find(
+    (o) => o >= date && !isSettledOccurrence(rows, o),
+  ) ?? null
 
 /** The bill's open occurrences through `through`, in date order. */
 export const openOccurrences = (
