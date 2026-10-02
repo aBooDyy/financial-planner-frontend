@@ -3,6 +3,7 @@ import { usePlanning } from '#/features/planning/hooks/usePlanning'
 import { usePlanningUi } from '#/features/planning/stores/planningUi'
 import { CountBadge } from '#/features/planning/components/kit/CountBadge'
 import { ByPaycheckList } from './ByPaycheckList'
+import { UpcomingRail } from './UpcomingRail'
 
 /** Upcoming (04 §5): what is coming, by paycheck, and the payday review. */
 export function UpcomingSection() {
@@ -36,7 +37,12 @@ export function UpcomingSection() {
           ) : null}
         </button>
       </div>
-      <ByPaycheckList planning={planning} />
+      <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="flex min-w-0 flex-col gap-[14px]">
+          <ByPaycheckList planning={planning} />
+        </div>
+        <UpcomingRail planning={planning} />
+      </div>
     </>
   )
 }

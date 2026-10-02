@@ -354,6 +354,17 @@ review for the oldest waiting payday, else the next one), then the view.
   *Overdue*, *Due in N days* (≤ 10), else the date. A row opens its bill's or goal's detail
   (income: the confirm dialog).
 
+- **Rail** (`UpcomingRail`, stacked below on mobile): **Balance ahead** (`view/ahead.ts#balanceAhead`,
+  `BalanceAheadCard`) — active wallets' Balance and Free to spend for 30 days from
+  `useMoneyFigures().figures.header`: income adds, payments subtract and **release their own
+  occurrence's set-aside** (`coverage.setAside`, F8 — the old forecast compared to a fixed
+  reserve and cried "Dips into goal money" on a bill that was saved for), planned set-asides
+  earmark more. Overdue rows land today. Dashed lines on paydays, a hover/drag readout, and a
+  note: *"Free to spend is lowest on Oct 20 at SR X, just before pay arrives."* / *"…goes below
+  zero on …"*. The SVG is `dir="ltr"` (time runs left to right in both directions).
+  **Where it's headed** (`HeadedCard`) — the next paycheck's Bills / Saving up for bills / Goals as
+  bars (share of pay) and *Left for spending*, from the same `paycheckBar` as Overview.
+
 ### Payday review — `components/review/PaydayReviewSheet.tsx`
 
 The one-sheet variant (design default, 03 §4, D31): `paydayReview` for the requested payday
