@@ -14,6 +14,7 @@ import {
   buildActivityList,
   buildBreakdown,
   buildBudgetsView,
+  budgetsLeft,
   buildCalendar,
   buildCashflow,
   calendarGridOf,
@@ -348,6 +349,28 @@ describe('buildBudgetsView', () => {
     // SR 900 + $100 (SR 375), not SR 900 + 10,000 USD minor units read as riyals
     expect(view.health.spentStr).toBe('SR 1,275')
     expect(view.health.totalStr).toBe('SR 2,250')
+  })
+
+  it('tells what each budget still allows, across every account', () => {
+    const txns = [
+      tx({ categoryId: 'cat-groceries', amount: 90_000 }),
+      tx({ categoryId: 'cat-dining', amount: 60_000 }),
+    ]
+    const left = budgetsLeft(
+      data({
+        txns,
+        budgets: [
+          budget({ id: 'g' }),
+          budget({ id: 'd', categoryId: 'cat-dining', limit: 50_000 }),
+        ],
+      }),
+      CATALOG,
+      TODAY,
+    )
+    expect(left.map((b) => [b.name, b.left, b.windowLabel])).toEqual([
+      ['Groceries', 60_000, 'this month'],
+      ['Dining', -10_000, 'this month'],
+    ])
   })
 
   it('measures a per-paycheck budget over the pay period, and says so', () => {

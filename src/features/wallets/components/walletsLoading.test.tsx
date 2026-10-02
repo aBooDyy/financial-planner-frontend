@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import type { LocalBalanceNode } from '#/db/types'
 import { buildWalletsView } from '#/features/wallets/data/selectors'
 import { BalanceNowStrip } from './BalanceNowStrip'
 import { MonthlyFlowCard } from './MonthlyFlowCard'
-import { TotalHeroCard } from './TotalHeroCard'
+import { SafeToSpendCard } from './SafeToSpendCard'
 import { WalletsGroupsCard } from './WalletsGroupsCard'
 
 /**
@@ -16,6 +16,16 @@ import { WalletsGroupsCard } from './WalletsGroupsCard'
  */
 
 afterEach(cleanup)
+
+beforeAll(() => {
+  window.matchMedia = (query: string) =>
+    ({
+      matches: true,
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }) as unknown as MediaQueryList
+})
 
 const noop = () => {}
 
@@ -62,9 +72,15 @@ const hasMoney = (el: HTMLElement) => /\d\.\d\d|SR\s?\d/.test(el.textContent)
 describe('Wallets while the balances load', () => {
   it('the hero keeps its title, base and counts, and no total', () => {
     const { container } = render(
-      <TotalHeroCard view={VIEW} loading base="SAR" />,
+      <SafeToSpendCard
+        view={VIEW}
+        header={null}
+        loading
+        base="SAR"
+        onLink={noop}
+      />,
     )
-    expect(screen.getByText('Total liquid cash')).toBeTruthy()
+    expect(screen.getAllByText('Safe to spend').length).toBeGreaterThan(0)
     expect(screen.getByText('SAR')).toBeTruthy()
     expect(screen.getByText(/2 wallets/)).toBeTruthy()
     expect(hasMoney(container)).toBe(false)

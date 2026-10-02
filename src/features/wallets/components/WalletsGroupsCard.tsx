@@ -8,6 +8,8 @@ import { GroupRow } from './GroupRow'
 import { WalletRow } from './WalletRow'
 
 type Props = {
+  /** The card's element id, for the headline's "Set aside" line to scroll to. */
+  id?: string
   rows: BalanceRow[]
   /** The balances are still loading: the tree draws, its figures do not. */
   loading: boolean
@@ -25,6 +27,7 @@ type Props = {
 }
 
 export function WalletsGroupsCard({
+  id,
   rows,
   loading,
   onAddWallet,
@@ -39,7 +42,10 @@ export function WalletsGroupsCard({
   archivedCount,
 }: Props) {
   return (
-    <div className="overflow-hidden rounded-[18px] border border-fp-border bg-fp-surface shadow-fp">
+    <div
+      id={id}
+      className="scroll-mt-4 overflow-hidden rounded-[18px] border border-fp-border bg-fp-surface shadow-fp"
+    >
       <div className="flex flex-col items-stretch gap-[10px] border-b border-fp-border p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 flex-col">
           <span className="text-[15px] font-bold">Wallets &amp; groups</span>

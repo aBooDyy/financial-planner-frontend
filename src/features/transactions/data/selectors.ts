@@ -1407,6 +1407,39 @@ export const budgetWindowLabel = (
 const capitalised = (s: string): string =>
   s.charAt(0).toUpperCase() + s.slice(1)
 
+/** What one budget still allows in its current window, in its own currency. */
+export type BudgetLeft = {
+  id: string
+  name: string
+  /** Negative when it is over. */
+  left: number
+  currency: CurrencyCode
+  /** "this paycheck", "this month", … */
+  windowLabel: string
+}
+
+/**
+ * Every live budget's room left right now, across all accounts — for the caption under
+ * Wallets' Safe to spend (D18: budgets are never subtracted from it, only shown beside it).
+ */
+export function budgetsLeft(
+  data: SpendingData,
+  catalog: CategoryCatalog,
+  today: Date,
+): BudgetLeft[] {
+  const nodeById = new Map(data.nodes.map((n) => [n.id, n]))
+  return data.budgets
+    .filter((b) => b.deleted === 0)
+    .map((b) => ({
+      id: b.id,
+      name: budgetIdentity(b, catalog, nodeById).name,
+      left:
+        b.limit - budgetSpentMinor(b, data, catalog, { type: 'all' }, today),
+      currency: b.currency,
+      windowLabel: budgetWindowLabel(b),
+    }))
+}
+
 /** "Oct 25 – Nov 24". */
 const windowCaption = (win: DateWindow): string =>
   `${fmtShort(win.start)} – ${fmtShort(win.end)}`

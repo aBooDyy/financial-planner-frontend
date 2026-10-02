@@ -9,7 +9,13 @@ import {
   deleteNode,
   toggleCollapse,
 } from '#/features/wallets/data/mutations'
+import { useMoneyFigures } from '#/features/planning'
+import { isoOf } from '#/features/planned/data/dates'
+import { startOfToday } from '#/features/transactions/data/planning'
+import { safeHeaderView } from '#/features/wallets/data/safeHeader'
+import type { SafeLineLink } from '#/features/wallets/data/safeHeader'
 import { useAdjustBalance } from '#/features/wallets/hooks/useAdjustBalance'
+import { useBudgetsLeft } from '#/features/wallets/hooks/useBudgetsLeft'
 import { useComingUp } from '#/features/wallets/hooks/useComingUp'
 import { useMonthlyFlow } from '#/features/wallets/hooks/useMonthlyFlow'
 import { useWallets } from '#/features/wallets/hooks/useWallets'
@@ -25,9 +31,11 @@ import { ComingUpCard } from './ComingUpCard'
 import { DeleteNodeDialog } from './DeleteNodeDialog'
 import { MonthlyFlowCard } from './MonthlyFlowCard'
 import { NodeEditor } from './NodeEditor'
-import { TotalHeroCard } from './TotalHeroCard'
+import { SafeToSpendCard } from './SafeToSpendCard'
 import { TransferDialog } from './TransferDialog'
 import { WalletsGroupsCard } from './WalletsGroupsCard'
+
+const WALLETS_TREE_ID = 'wallets-tree'
 
 export function WalletsPage() {
   const user = useSessionStore((s) => s.user)
@@ -55,6 +63,17 @@ export function WalletsPage() {
     balancesLoading,
   })
   const monthlyFlow = useMonthlyFlow(base, rates, !balancesLoading)
+  const money = useMoneyFigures()
+  const budgetsLeft = useBudgetsLeft(base, rates)
+  const header =
+    balancesLoading || money.loading
+      ? null
+      : safeHeaderView({
+          safe: money.safe,
+          base,
+          today: isoOf(startOfToday()),
+          budgets: budgetsLeft,
+        })
   const editingWallet = wallets.find((w) => w.id === editor.editing?.id)
   const navigate = useNavigate()
   const [archivingId, setArchivingId] = useState<string | null>(null)
@@ -69,6 +88,18 @@ export function WalletsPage() {
   const openEdit = (id: string) => {
     const node = nodes.find((n) => n.id === id)
     if (node) editor.openEdit(node)
+  }
+
+  const followSafeLine = (to: SafeLineLink) => {
+    if (to === 'upcoming')
+      void navigate({
+        to: '/planning/$section',
+        params: { section: 'upcoming' },
+      })
+    else
+      document
+        .getElementById(WALLETS_TREE_ID)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
   const confirmArchive = () => {
@@ -114,8 +145,15 @@ export function WalletsPage() {
           className="mx-auto grid w-full max-w-[1180px] grid-cols-1 items-start gap-4 px-[14px] py-4 pb-[30px] md:grid-cols-[minmax(0,1fr)_330px] md:gap-6 md:px-6 md:py-[26px] md:pb-[90px]"
         >
           <div className="flex min-w-0 flex-col gap-4">
-            <TotalHeroCard view={view} loading={balancesLoading} base={base} />
+            <SafeToSpendCard
+              view={view}
+              header={header}
+              loading={balancesLoading}
+              base={base}
+              onLink={followSafeLine}
+            />
             <WalletsGroupsCard
+              id={WALLETS_TREE_ID}
               rows={view.rows}
               loading={balancesLoading}
               onAddWallet={() => editor.openAdd('wallet')}

@@ -112,7 +112,7 @@ walletDeltas?, reservations?)` builds the flattened tree (honoring collapse), gr
 - **Skeletons for figures only.** The page renders every card, the tree (names, icons, child
   counts, actions), titles, labels, the base pill and the wallet/group/currency counts at once;
   each figure goes through the shared `ValueOrSkeleton` with `loading` passed down —
-  `TotalHeroCard` (total, group-bar values, the bar itself), `GroupRow` (subtotal), `WalletRow`
+  `SafeToSpendCard` (the headline and its sum, group-bar values, the bar itself), `GroupRow` (subtotal), `WalletRow`
   (balance; the foreign base line waits), and the editor's `BalanceNowStrip` (`currentBalance: null`). `ReservedWalletLines`/`PotRow`
   need no flag: with no set-asides while loading, no wallet has pots until the figures land.
   The page grid is `aria-busy` with one `sr-only` `role="status"`.
@@ -126,7 +126,7 @@ walletDeltas?, reservations?)` builds the flattened tree (honoring collapse), gr
 - Recreated shell: the **shared chrome** now lives in `src/components/chrome/` (`TopNav`,
   `MobileTabBar`, `AccountMenu`, `BrandMark`, `sections.ts`), section-aware via an `active`
   prop and reused by both Wallets and Goals — Wallets/Goals nav items navigate (TanStack
-  `Link`), Budget is disabled. Wallets-specific UI: `TotalHeroCard`, `WalletsGroupsCard`
+  `Link`), Budget is disabled. Wallets-specific UI: `SafeToSpendCard` (see [The headline](#the-headline--safe-to-spend)), `WalletsGroupsCard`
   (+ `GroupRow`/`WalletRow`), the rail (`ComingUpCard`, `MonthlyFlowCard` — see
   [The rail](#the-rail)), and
   `NodeEditor` (centered modal on desktop, bottom sheet on mobile). Every wallet and group row
@@ -135,8 +135,8 @@ walletDeltas?, reservations?)` builds the flattened tree (honoring collapse), gr
   `NodeEditor` puts a 56px chip above the name field as the `IconPicker`'s trigger; the picker
   is rendered **inside** the editor's `ResponsiveDialog` children, never beside it
   ([icons.md](icons.md#a-nested-picker-goes-inside-the-parent-dialogs-children)).
-  `TotalHeroCard` gains no icon — an aggregate has none to be.
-  `TotalHeroCard`'s group bar is the shared `SegmentedBar`: each root group's chunk names
+  `SafeToSpendCard` gains no icon — an aggregate has none to be.
+  `SafeToSpendCard`'s group bar is the shared `SegmentedBar`: each root group's chunk names
   itself, its base-currency total and its share on hover/focus/tap, which is what
   `GroupBar.pctStr` exists for. Only positive root nodes get a chunk, and shares are taken
   over their sum — not the netted grand total — so a negative root (a card in debt) can never
@@ -155,12 +155,32 @@ walletDeltas?, reservations?)` builds the flattened tree (honoring collapse), gr
   caption leaves, not what the headline amount leaves. Figures are `whitespace-nowrap` and
   `shrink-0`; a line that still runs out of room wraps (the caption or the "≈ base" part drops
   to the next line); **only the name truncates** — at 320px included. Tapping a pot navigates to `/goals?goal=<id>`, which redirects to `/planning/goals?open=goal:<id>` (that goal's detail panel). A
-  wallet with nothing reserved looks exactly as before. `TotalHeroCard` still shows the overall
-  available / "reserved for goals" split when anything is reserved. `ExchangeRatesCard` exists
+  wallet with nothing reserved looks exactly as before. The headline's *Set aside* line is the
+  overall split now (`SafeToSpendCard`). `ExchangeRatesCard` exists
   but is **not** mounted on the page (FX editing belongs to Settings).
 - Route `/wallets` (guarded like the auth routes); the index redirects authenticated users
   there (it replaced the old `SignedInHome` placeholder). API types/mappers in
   `api/types.ts`, calls in `api/walletsApi.ts` (the HTTP client gained `patch`/`del`).
+
+## The headline — Safe to spend
+
+`SafeToSpendCard` replaced the "Total liquid cash" hero (03 §8, D13, D18). **Safe to spend** is
+the big number (red below zero, with *"SR 300.00 short before payday"*), then the window —
+*until payday · Oct 25* / *until Oct 31* / *next 14 days* (the Settings › Planning choice) —
+then the sum: *Balance − Set aside − Bills before payday (not set aside yet) [− To set aside
+before payday] [+ Income before payday] = Safe to spend*, each line the engine's own term
+(`useMoneyFigures().safe`, `planning/data/safeToSpend.ts`), the optional ones only when
+non-zero. Pure copy in `data/safeHeader.ts#safeHeaderView` (tested). Figures are
+`formatMoney` (two decimals) so a calculator agrees with every line. Lines link: *Set aside* →
+scrolls to the tree (`WALLETS_TREE_ID`); *Bills* /
+*To set aside* / *Income* → Planning › Upcoming. Always visible on desktop; on a phone it folds
+behind *How it adds up*. **Budgets are never subtracted** (D18): `useBudgetsLeft` (live; reads
+only the rows inside the budgets' current windows) feeds `transactions/data/selectors#budgetsLeft`
+and `budgetsCaption` writes *"Budgets left until payday: Groceries SR 600.00 · Dining over by
+SR 50.00 · +1 more"* (the phrase is the budgets' shared window: per paycheck → "until payday",
+else "this month", "this week", …; mixed → none). The counts line and the group bar stay
+below. The whole card waits (`header: null` → skeletons) until both `useWallets` and
+`useMoneyFigures` have landed.
 
 ## The rail
 
