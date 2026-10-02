@@ -236,7 +236,7 @@ function billTracks(
 
   const out: FundingTrack[] = []
   let prevEnd = -1
-  for (const due of billOccurrences(bill, horizonEnd)) {
+  for (const due of billOccurrences(bill, rows, horizonEnd)) {
     const end = lastSlotOnOrBefore(slots, deadlineOf(due))
     let start = prevEnd + 1
     if (start > end && end >= 0) start = end

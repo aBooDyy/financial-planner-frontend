@@ -53,6 +53,7 @@ const generate = (
     income: streams,
     bills,
     goals,
+    planned: [],
     funding,
     paydayMode: settings.paydayMode,
     today,

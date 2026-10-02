@@ -1,7 +1,7 @@
 /**
  * A bill's occurrences — the due dates it falls on — and which of them are settled. A bill
- * steps from its `nextDue` on its cadence; a month step keeps `nextDue`'s day, clamped to
- * short months (Jan 31 → Feb 28 → Mar 31). A planned PAYMENT row that is no longer open
+ * steps from its schedule's anchor on its cadence; a month step keeps the anchor's day, clamped
+ * to short months (Jan 31 → Feb 28 → Mar 31). A planned PAYMENT row that is no longer open
  * (paid in full, closed with the rest abandoned, or skipped) settles its occurrence.
  */
 import type { LocalBill, LocalPlanned } from '#/db/types'
@@ -32,23 +32,82 @@ export function stepOccurrence(
   return isoOf(new Date(d.getFullYear(), d.getMonth(), d.getDate() + n * days))
 }
 
+/** Where a bill's occurrences step from: occurrence `n` is `anchor` stepped `offset + n` times. */
+type Schedule = { anchor: string; offset: number }
+
+const monthIndex = (iso: string): number =>
+  Number(iso.slice(0, 4)) * 12 + Number(iso.slice(5, 7)) - 1
+
+/**
+ * `nextDue`, unless it sits on a day a short month clamped it to: then the latest earlier
+ * payment occurrence that steps onto it exactly (Jan 31 for a Feb 28 `nextDue`), so the month
+ * after comes back to the 31st. Only `nextDue` is stored, so the day it was clamped from is
+ * read back from the bill's own payment rows.
+ */
+function scheduleOf(
+  bill: LocalBill,
+  payments: ReadonlyMap<string, LocalPlanned>,
+): Schedule {
+  const own: Schedule = { anchor: bill.nextDue, offset: 0 }
+  if (bill.frequency === null) return own
+  const { unit, every } = frequencyMetaOf(bill, 'monthly').cadence
+  if (unit !== 'month') return own
+  let best: Schedule | null = null
+  for (const occurrence of payments.keys()) {
+    if (occurrence >= bill.nextDue || (best && occurrence <= best.anchor))
+      continue
+    const months = monthIndex(bill.nextDue) - monthIndex(occurrence)
+    if (months % every !== 0) continue
+    const offset = months / every
+    if (stepOccurrence(occurrence, bill, offset) === bill.nextDue)
+      best = { anchor: occurrence, offset }
+  }
+  return best ?? own
+}
+
+const occurrenceAt = (
+  bill: LocalBill,
+  schedule: Schedule,
+  n: number,
+): string => stepOccurrence(schedule.anchor, bill, schedule.offset + n)
+
 /**
  * Every occurrence from `nextDue` through `through` (inclusive), stopping at `endsOn`. A
- * closed bill has none; a one-off has at most its `nextDue`.
+ * closed bill has none; a one-off has at most its `nextDue`. `payments` are the bill's payment
+ * rows by occurrence (`paymentRowsOf`), which keep a month-end bill on its day.
  */
-export function billOccurrences(bill: LocalBill, through: string): string[] {
+export function billOccurrences(
+  bill: LocalBill,
+  payments: ReadonlyMap<string, LocalPlanned>,
+  through: string,
+): string[] {
   if (bill.closedAt !== null) return []
   if (bill.frequency === null)
     return bill.nextDue <= through ? [bill.nextDue] : []
   const last =
     bill.endsOn !== null && bill.endsOn < through ? bill.endsOn : through
+  const schedule = scheduleOf(bill, payments)
   const out: string[] = []
   for (let n = 0; n < MAX_OCCURRENCES; n++) {
-    const at = stepOccurrence(bill.nextDue, bill, n)
+    const at = occurrenceAt(bill, schedule, n)
     if (at > last) break
     out.push(at)
   }
   return out
+}
+
+/** The occurrence before `occurrence` on the bill's schedule; '' for a one-off. */
+export function occurrenceBefore(
+  bill: LocalBill,
+  payments: ReadonlyMap<string, LocalPlanned>,
+  occurrence: string,
+): string {
+  if (bill.frequency === null) return ''
+  const schedule = scheduleOf(bill, payments)
+  let n = 0
+  while (n < MAX_OCCURRENCES && occurrenceAt(bill, schedule, n) < occurrence)
+    n++
+  return occurrenceAt(bill, schedule, n - 1)
 }
 
 /** A bill's planned payment rows by occurrence. */
@@ -102,8 +161,9 @@ export function firstOpenOccurrence(
   rows: ReadonlyMap<string, LocalPlanned>,
 ): string {
   if (bill.frequency === null) return bill.nextDue
+  const schedule = scheduleOf(bill, rows)
   for (let n = 0; n < MAX_OCCURRENCES; n++) {
-    const at = stepOccurrence(bill.nextDue, bill, n)
+    const at = occurrenceAt(bill, schedule, n)
     if (!isSettledOccurrence(rows, at)) return at
   }
   return bill.nextDue
@@ -118,7 +178,7 @@ export const occurrenceFrom = (
   date: string,
   rows: ReadonlyMap<string, LocalPlanned>,
 ): string | null =>
-  billOccurrences(bill, addMonthsISO(date, 24)).find(
+  billOccurrences(bill, rows, addMonthsISO(date, 24)).find(
     (o) => o >= date && !isSettledOccurrence(rows, o),
   ) ?? null
 
@@ -128,4 +188,6 @@ export const openOccurrences = (
   rows: ReadonlyMap<string, LocalPlanned>,
   through: string,
 ): string[] =>
-  billOccurrences(bill, through).filter((o) => !isSettledOccurrence(rows, o))
+  billOccurrences(bill, rows, through).filter(
+    (o) => !isSettledOccurrence(rows, o),
+  )

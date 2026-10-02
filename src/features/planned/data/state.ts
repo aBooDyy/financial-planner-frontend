@@ -86,6 +86,7 @@ export function derivePlannerState(
     income,
     bills,
     goals,
+    planned: inputs.planned,
     funding,
     paydayMode: inputs.settings.paydayMode,
     today,

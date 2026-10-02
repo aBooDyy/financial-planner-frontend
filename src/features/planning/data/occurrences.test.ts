@@ -4,6 +4,7 @@ import { bill, planned } from '#/features/planned/testing/fixtures'
 import {
   billOccurrences,
   firstOpenOccurrence,
+  occurrenceBefore,
   openOccurrences,
   paymentRowsOf,
   stepOccurrence,
@@ -50,14 +51,22 @@ describe('a bill’s occurrences', () => {
 
   it('run from next due to the end date, none once closed, one for a one-off', () => {
     expect(
-      billOccurrences({ ...rent, endsOn: '2026-12-15' }, '2027-06-01'),
+      billOccurrences(
+        { ...rent, endsOn: '2026-12-15' },
+        new Map(),
+        '2027-06-01',
+      ),
     ).toEqual(['2026-10-01', '2026-11-01', '2026-12-01'])
     expect(
-      billOccurrences({ ...rent, closedAt: '2026-09-01' }, '2027-06-01'),
+      billOccurrences(
+        { ...rent, closedAt: '2026-09-01' },
+        new Map(),
+        '2027-06-01',
+      ),
     ).toEqual([])
-    expect(billOccurrences({ ...rent, frequency: null }, '2027-06-01')).toEqual(
-      ['2026-10-01'],
-    )
+    expect(
+      billOccurrences({ ...rent, frequency: null }, new Map(), '2027-06-01'),
+    ).toEqual(['2026-10-01'])
   })
 
   it('are settled by a payment row that is no longer open', () => {
@@ -90,6 +99,55 @@ describe('a bill’s occurrences', () => {
     expect(openOccurrences(rent, rows, '2027-01-31')).toEqual([
       '2026-12-01',
       '2027-01-01',
+    ])
+  })
+})
+
+describe('a month-end bill', () => {
+  const paid = (occurrence: string) =>
+    planned({
+      origin: 'bill',
+      role: 'payment',
+      goalId: null,
+      billId: 'eom',
+      occurrence,
+      status: 'done',
+    })
+
+  it('keeps the 31st once a short month’s occurrence moved next due onto the 28th', () => {
+    const eom = bill({ id: 'eom', nextDue: '2027-02-28' })
+    const rows = paymentRowsOf('eom', [paid('2027-01-31')])
+    expect(billOccurrences(eom, rows, '2027-05-31')).toEqual([
+      '2027-02-28',
+      '2027-03-31',
+      '2027-04-30',
+      '2027-05-31',
+    ])
+  })
+
+  it('moves next due from Feb 28 to Mar 31, not Mar 28, once February is paid', () => {
+    const eom = bill({ id: 'eom', nextDue: '2027-02-28' })
+    const rows = paymentRowsOf('eom', [
+      paid('2027-01-31'),
+      paid('2027-02-28'),
+    ])
+    expect(firstOpenOccurrence(eom, rows)).toBe('2027-03-31')
+    const moved = { ...eom, nextDue: '2027-03-31' }
+    expect(billOccurrences(moved, rows, '2027-05-31')).toEqual([
+      '2027-03-31',
+      '2027-04-30',
+      '2027-05-31',
+    ])
+    expect(occurrenceBefore(moved, rows, '2027-04-30')).toBe('2027-03-31')
+  })
+
+  it('takes a next due moved by hand to another day as the new day', () => {
+    const eom = bill({ id: 'eom', nextDue: '2027-03-15' })
+    const rows = paymentRowsOf('eom', [paid('2027-01-31')])
+    expect(billOccurrences(eom, rows, '2027-05-31')).toEqual([
+      '2027-03-15',
+      '2027-04-15',
+      '2027-05-15',
     ])
   })
 })

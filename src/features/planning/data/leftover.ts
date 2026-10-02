@@ -43,7 +43,7 @@ function nextOpenAfter(
 ): string | null {
   if (bill.frequency === null) return null
   return (
-    billOccurrences(bill, addMonthsISO(occurrence, 24)).find(
+    billOccurrences(bill, payments, addMonthsISO(occurrence, 24)).find(
       (o) => o > occurrence && !isSettledOccurrence(payments, o),
     ) ?? null
   )

@@ -613,3 +613,48 @@ describe('runPlanner — bills', () => {
     expect(useRecalcUndoStore.getState().byOwner).toEqual({})
   })
 })
+
+describe('runPlanner — a bill whose schedule changed', () => {
+  /** Yearly, half of it already set aside for March 1. */
+  const INSURANCE = bill({
+    id: 'insurance',
+    name: 'Insurance',
+    amount: m(1200),
+    frequency: 'annual',
+    nextDue: '2027-03-01',
+    walletId: 'w1',
+  })
+  const HELD = setAside({
+    id: 'held',
+    goalId: null,
+    billId: 'insurance',
+    occurrence: '2027-03-01',
+    amount: m(600),
+    date: '2026-09-01',
+  })
+  const live = async () =>
+    (await db.setAsides.where('billId').equals('insurance').toArray())
+      .filter((a) => a.deleted === 0 && a.releasedAt === null)
+      .map((a) => [a.occurrence, a.amount / 100])
+  const plannedTotal = async () =>
+    (await db.plannedTransactions.where('billId').equals('insurance').toArray())
+      .filter((p) => p.role === 'set_aside' && p.status === 'open')
+      .reduce((sum, p) => sum + p.amount / 100, 0)
+
+  beforeEach(async () => {
+    await db.goals.clear()
+    await db.bills.put(INSURANCE)
+    await db.setAsides.put(HELD)
+  })
+
+  it('carries what is set aside onto the moved due date, so it is not set aside twice', async () => {
+    await runPlanner(USER, SEP_24)
+    expect(await plannedTotal()).toBe(600)
+
+    await updateBill('insurance', { nextDue: '2027-03-15' })
+    await runPlanner(USER, SEP_24)
+
+    expect(await live()).toEqual([['2027-03-15', 600]])
+    expect(await plannedTotal()).toBe(600)
+  })
+})

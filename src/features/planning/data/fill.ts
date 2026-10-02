@@ -38,7 +38,7 @@ export function occurrenceNeeds(
     )
   }
   const through = addMonthsISO(bill.nextDue, SPILL_YEARS * 12)
-  return billOccurrences(bill, through)
+  return billOccurrences(bill, payments, through)
     .filter((o) => !isSettledOccurrence(payments, o))
     .map((occurrence) => {
       const row = payments.get(occurrence)

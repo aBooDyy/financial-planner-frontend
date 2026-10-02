@@ -116,6 +116,8 @@ stamp of goals / income / bills and the settings row — payday mode, main paych
 varies), each pull, each plan-rewrite request, and day rollover.
 `runPlanner` is single-flight through one queue shared with recalc and undo:
 
+0. Bill set-asides stranded by a schedule change are moved onto the occurrence they now cover
+   (`planning/data/rekey.ts`), and the inputs read again, before anything is derived.
 1. Goals and bills being planned with no stored plan (`plannedAt === null`, i.e. new) and
    owners whose plan was asked to be rewritten are rewritten in `recalc` mode and get a
    snapshot (`plannedAt/planAmount/planCount/planStart` on the goal or bill — the headline of

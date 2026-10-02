@@ -22,7 +22,10 @@ import {
   roundedSchedule,
 } from '#/features/planning/data/funding'
 import type { FundingPlan, TrackPlan } from '#/features/planning/data/funding'
-import { billOccurrences } from '#/features/planning/data/occurrences'
+import {
+  billOccurrences,
+  paymentRowsByBill,
+} from '#/features/planning/data/occurrences'
 import type { PlannedOrigin, PlannedRole } from '#/features/planned/api/types'
 import type { PaydayMode } from '#/features/wallets/api/types'
 import type { CurrencyCode } from '#/lib/currency'
@@ -42,6 +45,8 @@ export type GeneratorInput = {
   income: ReadonlyArray<LocalIncomeStream>
   bills: ReadonlyArray<LocalBill>
   goals: ReadonlyArray<LocalGoal>
+  /** The stored rows — a bill's payment rows keep its schedule on its day. */
+  planned: ReadonlyArray<LocalPlanned>
   funding: FundingPlan
   paydayMode: PaydayMode
   /** ISO date. */
@@ -109,8 +114,12 @@ function incomeRows(
   }))
 }
 
-const paymentRows = (bill: LocalBill, until: string): RowSeed[] =>
-  billOccurrences(bill, until).map((due) => ({
+const paymentRows = (
+  bill: LocalBill,
+  payments: ReadonlyMap<string, LocalPlanned>,
+  until: string,
+): RowSeed[] =>
+  billOccurrences(bill, payments, until).map((due) => ({
     origin: 'bill',
     originId: bill.id,
     role: 'payment',
@@ -189,7 +198,11 @@ export function desiredPlanned(input: GeneratorInput): DesiredPlanned[] {
   const seeds: RowSeed[] = []
   for (const stream of input.income)
     seeds.push(...incomeRows(stream, today, until))
-  for (const bill of input.bills) seeds.push(...paymentRows(bill, until))
+  const payments = paymentRowsByBill(input.planned)
+  for (const bill of input.bills)
+    seeds.push(
+      ...paymentRows(bill, payments.get(bill.id) ?? new Map(), until),
+    )
   seeds.push(...setAsideRows(input, until))
   return seeds.map((seed) => rowFor(input.userId, seed))
 }

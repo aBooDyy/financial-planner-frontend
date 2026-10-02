@@ -11,7 +11,7 @@ import { isLiveSetAside } from '#/features/setAsides/data/totals'
 import { convertMinor } from '#/lib/currency'
 import { roundedSchedule, tracksOf } from './funding'
 import type { OwnerKind } from './funding'
-import { billOccurrences } from './occurrences'
+import { billOccurrences, paymentRowsByBill } from './occurrences'
 import { incomeBetween } from './payPeriods'
 import { cycleOf, goalStatusOf } from './status'
 
@@ -128,11 +128,16 @@ export function buildYearAhead(
   )
 
   const ramps: YearRamp[] = []
+  const payments = paymentRowsByBill(inputs.planned)
   for (const bill of inputs.bills) {
     if (bill.closedAt !== null) continue
     const tracks = tracksOf(funding, 'bill', bill.id)
     const savedUp = cycleOf(bill, tracks.at(0), funding) === 'save_up'
-    for (const occurrence of billOccurrences(bill, last)) {
+    for (const occurrence of billOccurrences(
+      bill,
+      payments.get(bill.id) ?? new Map(),
+      last,
+    )) {
       const month = months.get(monthOf(occurrence))
       if (!month) continue
       const line = {

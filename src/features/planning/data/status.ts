@@ -14,9 +14,9 @@ import { isGoalReached, roundedSchedule, tracksOf } from './funding'
 import type { FundingPlan, OwnerKind, TrackPlan } from './funding'
 import {
   isSettledOccurrence,
+  occurrenceBefore,
   openOccurrences,
   paymentRowsOf,
-  stepOccurrence,
 } from './occurrences'
 import { paydaysIn } from './payPeriods'
 
@@ -220,7 +220,7 @@ export function billStatusOf(
   const pace = atNextPayday(tracks)
   const previous =
     occurrence && bill.frequency !== null
-      ? stepOccurrence(occurrence, bill, -1)
+      ? occurrenceBefore(bill, payments, occurrence)
       : ''
   const behindBy = occurrence
     ? unmadeSetAsides('bill', bill.id, inputs, state, today, previous)

@@ -15,8 +15,11 @@ import { setBillPlanSnapshot } from '#/features/bills/data/mutations'
 import { DEFAULT_BASE_CURRENCY } from '#/features/goals/constants'
 import { setGoalPlanSnapshot } from '#/features/goals/data/mutations'
 import { isPlannableGoal } from '#/features/planning/data/funding'
+import { paymentRowsByBill } from '#/features/planning/data/occurrences'
+import { strandedSetAsides } from '#/features/planning/data/rekey'
 import { usePaydayNoticeStore } from '#/features/planned/stores/paydayNotice'
 import { useRecalcUndoStore } from '#/features/planned/stores/recalcUndo'
+import { moveSetAsides } from '#/features/setAsides/data/batches'
 import { walletSetAsides } from '#/features/setAsides/data/totals'
 import { readLedgerSummary } from '#/features/transactions/data/ledgerReads'
 import { convertMinor } from '#/lib/currency'
@@ -281,6 +284,36 @@ async function resolveOrphans(
   return plan.skip.length + plan.closeRest.length
 }
 
+/**
+ * Carry set-asides a bill's schedule lost (a moved due date, a new repeat or end, a skipped
+ * occurrence) onto the occurrence they now cover — before the plan is derived, so the new
+ * occurrence counts them instead of being set aside for again. Returns how many moved.
+ */
+async function rekeyStranded(
+  inputs: PlannerInputs,
+  today: string,
+): Promise<number> {
+  const payments = paymentRowsByBill(inputs.planned)
+  const parts = inputs.bills.flatMap((bill) =>
+    strandedSetAsides(
+      bill,
+      payments.get(bill.id) ?? new Map(),
+      inputs.setAsides,
+    ).map(({ id, occurrence }) => ({
+      id,
+      to: { owner: { billId: bill.id, occurrence } },
+    })),
+  )
+  if (parts.length === 0) return 0
+  try {
+    await moveSetAsides(parts, { date: today })
+  } catch {
+    // A row changed under us (released or moved elsewhere); the next run looks again.
+    return 0
+  }
+  return parts.length
+}
+
 /** Free to spend per live wallet, in its own currency: balance − what it holds set aside. */
 async function freeByWallet(
   inputs: PlannerInputs,
@@ -401,7 +434,8 @@ async function runOnce(
   todayDate: Date,
 ): Promise<PlannerRunSummary> {
   const today = isoOf(todayDate)
-  const inputs = await loadPlannerInputs()
+  let inputs = await loadPlannerInputs()
+  if (await rekeyStranded(inputs, today)) inputs = await loadPlannerInputs()
   const state = derivePlannerState(inputs, userId, todayDate)
 
   const loud = new Set<string>()

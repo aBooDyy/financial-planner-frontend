@@ -131,7 +131,11 @@ async function rollToNextOccurrence(item: LocalPlanned): Promise<void> {
   ).filter((a) => isLiveSetAside(a) && a.occurrence === item.occurrence)
   if (held.length === 0) return
   const payments = await billPayments(bill)
-  const next = billOccurrences(bill, addMonthsISO(item.occurrence, 24)).find(
+  const next = billOccurrences(
+    bill,
+    payments,
+    addMonthsISO(item.occurrence, 24),
+  ).find(
     (o) => o > item.occurrence && !isSettledOccurrence(payments, o),
   )
   if (!next) return

@@ -89,8 +89,10 @@ own outbox entry (`op: 'close' | 'reopen'`), which the server applies atomically
   wallet** and moves `nextDue` to the first occurrence still open; confirming a bill's planned
   set-aside fills the open occurrences from its date in order ([planned.md](planned.md)).
 - **Occurrences** (`planning/data/occurrences.ts`): stepped from `nextDue`, a month step keeping
-  its day clamped to short months. Because only `nextDue` anchors them, a bill due on the 31st
-  drifts to the 28th once February's occurrence settles.
+  its day clamped to short months. A bill due on the 31st does not drift once February's
+  occurrence moves `nextDue` to the 28th: the anchor is read back from its payment rows
+  ([planning.md](planning.md#bill-occurrences--dataoccurrencests)). Set-asides a schedule change
+  strands are moved onto the new occurrences by the planner (`planning/data/rekey.ts`).
 - Category delete `move_to` re-files bills; a merchant merge or adopt repoints them.
 
 ## Tests
