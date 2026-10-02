@@ -248,6 +248,66 @@ describe('pushing a close', () => {
     expect(await db.setAsides.get(copyId)).toBeUndefined()
   })
 
+  it('frees the leftover instead when the server refuses the move target', async () => {
+    await db.goals.put(goal({ id: 'trip' }))
+    await closeBill('rent', {
+      closedAt: CLOSED,
+      leftover: { kind: 'move', to: { goalId: 'trip' } },
+    })
+    const entry = await closeEntry()
+    const copyId = Object.values(
+      (entry.payload as CloseWire).move_to?.new_ids ?? {},
+    )[0]
+    const local = (await db.bills.get('rent')) as LocalBill
+    billsApi.close
+      .mockRejectedValueOnce(failure(422, 'planning.close.move_target_invalid'))
+      .mockResolvedValueOnce({
+        bill: asServerBill({ ...local, version: 'v2' }),
+        released: [],
+        created: [],
+      })
+    setAsidesApi.list.mockResolvedValue([])
+
+    await pushBillsEntry(entry)
+
+    expect(billsApi.close).toHaveBeenLastCalledWith('rent', {
+      closed_at: CLOSED,
+      leftover: 'FREE',
+      version: 'v1',
+    })
+    expect(await queued()).toEqual([])
+    expect(await db.setAsides.get(copyId)).toBeUndefined()
+    expect(await db.bills.get('rent')).toMatchObject({
+      closedAt: CLOSED,
+      dirty: 0,
+    })
+  })
+
+  it('keeps a close whose move target is still waiting to be created', async () => {
+    await db.goals.put(goal({ id: 'trip', dirty: 1 }))
+    await db.outbox.add({
+      op: 'create',
+      entity: 'goal',
+      id: 'trip',
+      payload: {},
+      baseVersion: null,
+      createdAt: '',
+    })
+    await closeBill('rent', {
+      closedAt: CLOSED,
+      leftover: { kind: 'move', to: { goalId: 'trip' } },
+    })
+    billsApi.close.mockRejectedValue(
+      failure(422, 'planning.close.move_target_invalid'),
+    )
+
+    await expect(pushBillsEntry(await closeEntry())).rejects.toBeInstanceOf(
+      ApiError,
+    )
+    expect(billsApi.close).toHaveBeenCalledTimes(1)
+    expect((await closeEntry()).payload).toMatchObject({ leftover: 'MOVE' })
+  })
+
   it('retries a stale close once on the fresh version', async () => {
     await closeBill('rent', { closedAt: CLOSED })
     const local = (await db.bills.get('rent')) as LocalBill
@@ -273,7 +333,12 @@ describe('pushing a close', () => {
 describe('reopenBill', () => {
   it('reopens locally and settles as done when the server says it is not closed', async () => {
     await db.bills.put(
-      bill({ id: 'rent', version: 'v1', closedAt: CLOSED, nextDue: '2099-01-01' }),
+      bill({
+        id: 'rent',
+        version: 'v1',
+        closedAt: CLOSED,
+        nextDue: '2099-01-01',
+      }),
     )
 
     await reopenBill('rent')
@@ -318,7 +383,12 @@ describe('reopenBill — where it picks up', () => {
 
   it('moves next due to the first occurrence from today, so the months it was closed are not owed', async () => {
     await db.bills.put(
-      bill({ id: 'rent', version: 'v1', nextDue: '2026-07-01', closedAt: CLOSED }),
+      bill({
+        id: 'rent',
+        version: 'v1',
+        nextDue: '2026-07-01',
+        closedAt: CLOSED,
+      }),
     )
 
     await reopenBill('rent')
@@ -333,7 +403,12 @@ describe('reopenBill — where it picks up', () => {
 
   it('keeps a next due that is still ahead', async () => {
     await db.bills.put(
-      bill({ id: 'rent', version: 'v1', nextDue: '2026-12-01', closedAt: CLOSED }),
+      bill({
+        id: 'rent',
+        version: 'v1',
+        nextDue: '2026-12-01',
+        closedAt: CLOSED,
+      }),
     )
     await reopenBill('rent')
     expect((await db.bills.get('rent'))?.nextDue).toBe('2026-12-01')

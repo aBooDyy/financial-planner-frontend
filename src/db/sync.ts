@@ -15,8 +15,16 @@ import {
   pullCategories,
   pushCategoryEntry,
 } from '#/features/categories/data/sync'
-import { pullBills, pushBillsEntry } from '#/features/bills/data/sync'
-import { pullGoalsAll, pushGoalsEntry } from '#/features/goals/data/sync'
+import {
+  abandonBillAction,
+  pullBills,
+  pushBillsEntry,
+} from '#/features/bills/data/sync'
+import {
+  abandonGoalAction,
+  pullGoalsAll,
+  pushGoalsEntry,
+} from '#/features/goals/data/sync'
 import {
   pullImportTemplates,
   pushImportTemplatesEntry,
@@ -42,6 +50,7 @@ import {
   pushTransferEntry,
 } from '#/features/transactions/data/transferSync'
 import {
+  abandonSetAsideBatch,
   pullSetAsides,
   pushSetAsidesEntry,
 } from '#/features/setAsides/data/sync'
@@ -70,6 +79,7 @@ import type {
   OutboxEntity,
   OutboxEntry,
   OutboxOp,
+  SyncFailure,
 } from './types'
 
 const PUSH_DEBOUNCE_MS = 800
@@ -400,9 +410,41 @@ async function pushEntry(entry: OutboxEntry): Promise<boolean> {
   } catch (e) {
     const failure = failureOf(e)
     if (!failure) return false
+    if (givesUp(entry, failure)) {
+      await abandon(entry)
+      return true
+    }
     await flagEntry(entry, failure)
     return failure.kind === 'rejected'
   }
+}
+
+/**
+ * Actions and batches the user cannot edit: a refusal of one would otherwise come back every
+ * hour forever, holding every later write of its rows behind it.
+ */
+const ACTION_OPS: ReadonlySet<OutboxOp> = new Set([
+  'close',
+  'reopen',
+  'pause',
+  'resume',
+  'release',
+  'move',
+])
+
+/** Refusals (shown as sync failures meanwhile) before an action takes the server's state. */
+const REFUSALS_BEFORE_GIVING_UP = 4
+
+const givesUp = (entry: OutboxEntry, failure: SyncFailure): boolean =>
+  ACTION_OPS.has(entry.op) &&
+  (failure.status === 400 || failure.status === 422) &&
+  (entry.attempts ?? 0) + 1 >= REFUSALS_BEFORE_GIVING_UP
+
+/** Drop an action the server keeps refusing; its rows take the server's state. */
+function abandon(entry: OutboxEntry): Promise<void> {
+  if (entry.entity === 'bill') return abandonBillAction(entry)
+  if (entry.entity === 'goal') return abandonGoalAction(entry)
+  return abandonSetAsideBatch(entry)
 }
 
 async function dispatch(entry: OutboxEntry): Promise<void> {

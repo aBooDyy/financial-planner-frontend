@@ -432,6 +432,17 @@ many times the server has _rejected_ it) and `nextAttemptAt` (no automatic retry
 - **Rebase fallbacks only accept the server copy on a second `409`.** They used to accept it on
   any error, so a `422` or an outage in the rebase retry silently threw the user's edit away;
   anything else now propagates and is classified above.
+- **An action or batch the server keeps refusing is given up.** The user cannot edit a
+  queued close, reopen, pause, resume, release or move, so a `400`/`422` refusal of one would
+  come back hourly forever and hold every later write of its rows. It is flagged (and shown)
+  like any refusal for its first three tries; the fourth refusal drops it and its rows take the
+  server's state (`givesUp` / `abandon` in `db/sync.ts` → `abandonBillAction`,
+  `abandonGoalAction`, `abandonSetAsideBatch`). Two refusals have a better answer first: a
+  close whose leftover target is refused (`planning.close.move_target_invalid`) frees the
+  leftover instead (`closeFreeingInstead`), and a release whose payment is not on the server
+  (`planning.set_aside.released_by_invalid`) goes again without `released_by_id` — each only
+  when the target's or payment's own create is not still queued, since then it lands first and
+  the action goes through as asked.
 - **Manual retry.** `retrySync(entity, id)` clears `nextAttemptAt` (keeps `attempts`) on that
   row's entries and flushes; `retryAllFailed()` does it for every flagged entry — exposed for a
   future global indicator, with no UI yet.

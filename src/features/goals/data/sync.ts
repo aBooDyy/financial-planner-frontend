@@ -16,6 +16,7 @@ import type {
 } from '#/features/goals/api/types'
 import type { CloseWire } from '#/features/setAsides/api/types'
 import {
+  closeFreeingInstead,
   resyncSetAsides,
   storeServerSetAsides,
 } from '#/features/setAsides/data/sync'
@@ -300,7 +301,28 @@ async function pushGoalAction(
   })
 }
 
+/** Take the server's word for the goal and every set-aside a close of it touches here. */
+async function adoptServerClose(entry: OutboxEntry): Promise<void> {
+  const payload = entry.payload as CloseWire
+  const own = await db.setAsides.where('goalId').equals(entry.id).primaryKeys()
+  await adoptServerGoal(entry)
+  await resyncSetAsides([
+    ...own,
+    ...Object.values(payload.move_to?.new_ids ?? {}),
+  ])
+}
+
 async function pushGoalClose(entry: OutboxEntry): Promise<void> {
+  try {
+    await sendGoalClose(entry)
+  } catch (e) {
+    const freeing = await closeFreeingInstead(entry, e)
+    if (!freeing) throw e
+    await sendGoalClose(freeing)
+  }
+}
+
+async function sendGoalClose(entry: OutboxEntry): Promise<void> {
   const payload = entry.payload as CloseWire
   await pushItemAction(entry, {
     localVersion: async () => (await db.goals.get(entry.id))?.version,
@@ -314,20 +336,17 @@ async function pushGoalClose(entry: OutboxEntry): Promise<void> {
       )
       await storeServerSetAsides([...released, ...created])
     },
-    adopt: async () => {
-      const own = await db.setAsides
-        .where('goalId')
-        .equals(entry.id)
-        .primaryKeys()
-      await adoptServerGoal(entry)
-      await resyncSetAsides([
-        ...own,
-        ...Object.values(payload.move_to?.new_ids ?? {}),
-      ])
-    },
+    adopt: () => adoptServerClose(entry),
     gone: () => db.goals.delete(entry.id),
     doneCodes: ['goals.goal.already_closed'],
   })
+}
+
+/** Give up an action the server keeps refusing: the goal takes the server's state. */
+export async function abandonGoalAction(entry: OutboxEntry): Promise<void> {
+  await db.outbox.delete(entry.seq)
+  if (entry.op === 'close') await adoptServerClose(entry)
+  else await adoptServerGoal(entry)
 }
 
 function pushGoalOtherAction(entry: OutboxEntry): Promise<void> {

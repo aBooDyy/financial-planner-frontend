@@ -87,6 +87,14 @@ applies all-or-nothing (`POST /set-asides/release`, `/move`).
   releases and moves are not lost. Only when no source is live there (a replay of this very
   batch, or all of them overtaken) does the whole entry settle. `id_taken` still settles the
   whole entry: it means the batch already landed.
+- **`released_by_invalid` releases without the payment** (`withoutPayment`) once the payment's
+  own create is no longer queued — it was deleted; while it is queued the refusal stands and the
+  batch retries after it lands. Any other refusal is flagged, and a batch refused four times is
+  dropped with its rows resynced (`abandonSetAsideBatch`,
+  [data-layer-and-sync.md](data-layer-and-sync.md#failed-pushes-flag-hold-retry--never-drop)).
+- **A close whose leftover target is refused frees the leftover** (`closeFreeingInstead`, used
+  by bills and goals): the entry is rewritten to `FREE` and the copies minted for the target
+  are resynced away, unless the target's create is still queued.
 - **Batch size.** The server caps a batch at `limits.set_aside_batch_max` (200,
   `configLimits().setAsideBatchMax`, bundled fallback). `releaseSetAsides` / `moveSetAsides`
   queue longer lists as several entries of at most that many items, each all-or-nothing.

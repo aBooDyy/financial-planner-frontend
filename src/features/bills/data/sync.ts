@@ -13,6 +13,7 @@ import type {
 } from '#/features/bills/api/types'
 import type { CloseWire } from '#/features/setAsides/api/types'
 import {
+  closeFreeingInstead,
   resyncSetAsides,
   storeServerSetAsides,
 } from '#/features/setAsides/data/sync'
@@ -140,7 +141,28 @@ async function adoptServerBill(entry: OutboxEntry): Promise<void> {
   else await db.bills.delete(entry.id)
 }
 
+/** Take the server's word for the bill and every set-aside a close of it touches here. */
+async function adoptServerClose(entry: OutboxEntry): Promise<void> {
+  const payload = entry.payload as CloseWire
+  const own = await db.setAsides.where('billId').equals(entry.id).primaryKeys()
+  await adoptServerBill(entry)
+  await resyncSetAsides([
+    ...own,
+    ...Object.values(payload.move_to?.new_ids ?? {}),
+  ])
+}
+
 async function pushBillClose(entry: OutboxEntry): Promise<void> {
+  try {
+    await sendBillClose(entry)
+  } catch (e) {
+    const freeing = await closeFreeingInstead(entry, e)
+    if (!freeing) throw e
+    await sendBillClose(freeing)
+  }
+}
+
+async function sendBillClose(entry: OutboxEntry): Promise<void> {
   const payload = entry.payload as CloseWire
   await pushItemAction(entry, {
     localVersion: async () => (await db.bills.get(entry.id))?.version,
@@ -154,17 +176,7 @@ async function pushBillClose(entry: OutboxEntry): Promise<void> {
       )
       await storeServerSetAsides([...released, ...created])
     },
-    adopt: async () => {
-      const own = await db.setAsides
-        .where('billId')
-        .equals(entry.id)
-        .primaryKeys()
-      await adoptServerBill(entry)
-      await resyncSetAsides([
-        ...own,
-        ...Object.values(payload.move_to?.new_ids ?? {}),
-      ])
-    },
+    adopt: () => adoptServerClose(entry),
     gone: () => db.bills.delete(entry.id),
     doneCodes: ['planning.bill.already_closed'],
   })
@@ -186,6 +198,13 @@ async function pushBillReopen(entry: OutboxEntry): Promise<void> {
     gone: () => db.bills.delete(entry.id),
     doneCodes: ['planning.bill.not_closed'],
   })
+}
+
+/** Give up a close or reopen the server keeps refusing: the bill takes the server's state. */
+export async function abandonBillAction(entry: OutboxEntry): Promise<void> {
+  await db.outbox.delete(entry.seq)
+  if (entry.op === 'close') await adoptServerClose(entry)
+  else await adoptServerBill(entry)
 }
 
 /** Push one `bill` outbox entry. Throws on network/unexpected errors. */

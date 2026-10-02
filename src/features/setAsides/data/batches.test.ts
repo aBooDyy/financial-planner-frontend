@@ -388,6 +388,86 @@ describe('pushing a batch', () => {
     expect(await db.setAsides.get('a2')).toBeUndefined()
   })
 
+  it('releases without the payment when the server no longer has it', async () => {
+    await releaseSetAsides([{ id: 'a1' }], {
+      releasedAt: '2026-11-01',
+      releasedById: 't1',
+    })
+    const a1 = (await db.setAsides.get('a1')) as LocalSetAside
+    api.release
+      .mockRejectedValueOnce(
+        new ApiError({
+          status: 422,
+          code: 'planning.set_aside.released_by_invalid',
+          message: '',
+        }),
+      )
+      .mockResolvedValueOnce({
+        released: [asServer({ ...a1, releasedById: null })],
+        created: [],
+      })
+
+    await pushSetAsidesEntry(await onlyEntry())
+
+    const resent = api.release.mock.calls[1][0] as ReleaseWire
+    expect(resent).not.toHaveProperty('released_by_id')
+    expect(await queued()).toEqual([])
+    expect(await db.setAsides.get('a1')).toMatchObject({
+      releasedAt: '2026-11-01',
+      releasedById: null,
+      dirty: 0,
+    })
+  })
+
+  it('keeps a release whose payment is still waiting to be created', async () => {
+    await db.outbox.add({
+      op: 'create',
+      entity: 'transaction',
+      id: 't1',
+      payload: {},
+      baseVersion: null,
+      createdAt: '',
+    })
+    await releaseSetAsides([{ id: 'a1' }], { releasedById: 't1' })
+    api.release.mockRejectedValue(
+      new ApiError({
+        status: 422,
+        code: 'planning.set_aside.released_by_invalid',
+        message: '',
+      }),
+    )
+    const batch = (await queued()).find(
+      (e) => e.op === 'release',
+    ) as OutboxEntry
+
+    await expect(pushSetAsidesEntry(batch)).rejects.toBeInstanceOf(ApiError)
+    expect(api.release).toHaveBeenCalledTimes(1)
+  })
+
+  it('gives up a batch the server keeps refusing and takes its rows', async () => {
+    await releaseSetAsides([{ id: 'a1' }], { releasedAt: '2026-11-01' })
+    const entry = await onlyEntry()
+    await db.outbox.update(entry.seq, { attempts: 3 })
+    api.release.mockRejectedValue(
+      new ApiError({
+        status: 422,
+        code: 'planning.set_aside.date_invalid',
+        message: '',
+      }),
+    )
+    api.list.mockResolvedValue([
+      asServer(setAside({ id: 'a1', goalId: 'g1', amount: m(500) }), 'v1'),
+    ])
+
+    await flushOutbox()
+
+    expect(await queued()).toEqual([])
+    expect(await db.setAsides.get('a1')).toMatchObject({
+      releasedAt: null,
+      dirty: 0,
+    })
+  })
+
   it('waits behind a failed write of any row it touches', async () => {
     await db.outbox.add({
       op: 'update',

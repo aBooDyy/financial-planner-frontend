@@ -1,9 +1,11 @@
 import { db } from '#/db/db'
+import { pendingFor } from '#/db/enqueue'
 import { storeAnswer } from '#/db/storeAnswer'
 import { settleTakenCreate } from '#/db/takenCreate'
 import type { LocalSetAside, OutboxEntry } from '#/db/types'
 import { setAsidesApi } from '#/features/setAsides/api/setAsidesApi'
 import type {
+  CloseWire,
   CreateSetAsideWire,
   MoveItemWire,
   MoveWire,
@@ -171,12 +173,34 @@ async function pushSetAsideBatch(entry: OutboxEntry): Promise<void> {
       await storeServerSetAsides([...batch.released, ...batch.created])
     })
   } catch (e) {
-    if (!(e instanceof ApiError) || !BATCH_SETTLED.has(e.code)) throw e
+    if (!(e instanceof ApiError)) throw e
+    if (e.code === RELEASED_BY_INVALID) {
+      const next = await withoutPayment(entry)
+      if (!next) throw e
+      return pushSetAsideBatch(next)
+    }
+    if (!BATCH_SETTLED.has(e.code)) throw e
     if (SOURCES_OVERTAKEN.has(e.code) && (await retryWithoutOvertaken(entry)))
       return
     await db.outbox.delete(entry.seq)
     await resyncSetAsides([entry.id, ...(entry.alsoRows ?? [])])
   }
+}
+
+const RELEASED_BY_INVALID = 'planning.set_aside.released_by_invalid'
+
+/**
+ * The payment a release names is not on the server. While its create is still queued it lands
+ * first and the release goes through as written later (`null`: keep the refusal). Otherwise the
+ * payment was deleted: the money is still released, just by no payment.
+ */
+async function withoutPayment(entry: OutboxEntry): Promise<OutboxEntry | null> {
+  const { released_by_id: paymentId, ...payload } = entry.payload as ReleaseWire
+  if (!paymentId || (await pendingFor('transaction', paymentId).count()) > 0)
+    return null
+  const next: OutboxEntry = { ...entry, payload }
+  await db.outbox.put(next)
+  return next
 }
 
 /** The rows one batch item writes: its source, and the remainder and new row it mints. */
@@ -218,6 +242,42 @@ async function retryWithoutOvertaken(entry: OutboxEntry): Promise<boolean> {
   await resyncSetAsides([...dropped])
   await pushSetAsideBatch(next)
   return true
+}
+
+const MOVE_TARGET_INVALID = 'planning.close.move_target_invalid'
+
+/**
+ * A close whose leftover target the server refuses — closed, deleted, or never created there —
+ * frees the leftover instead: the entry is rewritten to `FREE` and the copies minted for the
+ * target are resynced away. While the target's own create is still queued it lands first and
+ * the close goes through as asked later (`null`: keep the refusal). Bills and goals share it.
+ */
+export async function closeFreeingInstead(
+  entry: OutboxEntry,
+  error: unknown,
+): Promise<OutboxEntry | null> {
+  const payload = entry.payload as CloseWire
+  const target = payload.move_to
+  if (!(error instanceof ApiError) || error.code !== MOVE_TARGET_INVALID)
+    return null
+  if (!target) return null
+  const targetRow = target.goal_id
+    ? pendingFor('goal', target.goal_id)
+    : pendingFor('bill', target.bill_id ?? '')
+  if ((await targetRow.count()) > 0) return null
+  const next: OutboxEntry = {
+    ...entry,
+    payload: { closed_at: payload.closed_at, leftover: 'FREE' },
+  }
+  await db.outbox.put(next)
+  await resyncSetAsides(Object.values(target.new_ids ?? {}))
+  return next
+}
+
+/** Give up a batch the server keeps refusing: its rows take the server's state. */
+export async function abandonSetAsideBatch(entry: OutboxEntry): Promise<void> {
+  await db.outbox.delete(entry.seq)
+  await resyncSetAsides([entry.id, ...(entry.alsoRows ?? [])])
 }
 
 /** Push one `setAside` outbox entry. Throws on network/unexpected errors. */
