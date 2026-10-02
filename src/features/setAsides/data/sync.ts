@@ -82,6 +82,11 @@ async function pushSetAsideUpdate(entry: OutboxEntry): Promise<void> {
   }
 }
 
+/**
+ * The edit on the server's version. Releasing is never an edit — it rides a batch or a close —
+ * so the release fields are the server's: re-sending ours would un-release money another device
+ * paid or freed, counting it as both spent and set aside.
+ */
 async function rebaseSetAside(entry: OutboxEntry): Promise<void> {
   const fresh = (await setAsidesApi.list()).find((a) => a.id === entry.id)
   const local = await db.setAsides.get(entry.id)
@@ -94,7 +99,13 @@ async function rebaseSetAside(entry: OutboxEntry): Promise<void> {
       entry,
       await setAsidesApi.update(
         entry.id,
-        localSetAsideToUpdateWire({ ...local, version: fresh.version }),
+        localSetAsideToUpdateWire({
+          ...local,
+          version: fresh.version,
+          releasedAt: fresh.releasedAt,
+          releasedById: fresh.releasedById,
+          movedByTransferId: fresh.movedByTransferId,
+        }),
       ),
     )
   } catch (e) {

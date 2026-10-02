@@ -63,6 +63,50 @@ describe('pushSetAsidesEntry', () => {
     expect((await db.setAsides.get('a1'))?.id).toBe('a1')
   })
 
+  it('never un-releases a row another device released while rebasing an edit', async () => {
+    const local = setAside({ id: 'a1', dirty: 1, version: 'v1', note: 'mine' })
+    await db.setAsides.put(local)
+    const fresh = asServer(
+      {
+        ...local,
+        note: null,
+        releasedAt: '2026-10-01',
+        releasedById: 't9',
+        movedByTransferId: 'x1',
+      },
+      'v2',
+    )
+    api.update
+      .mockRejectedValueOnce(
+        new ApiError({ status: 409, code: 'common.conflict', message: '' }),
+      )
+      .mockImplementationOnce((_id: string, body: Record<string, unknown>) =>
+        Promise.resolve({ ...fresh, note: body.note, version: 'v3' }),
+      )
+    api.list.mockResolvedValue([fresh])
+    const entry = await queue({
+      op: 'update',
+      entity: 'setAside',
+      id: 'a1',
+      payload: {},
+      baseVersion: 'v1',
+    })
+
+    await pushSetAsidesEntry(entry)
+
+    expect(api.update.mock.calls[1][1]).toMatchObject({
+      version: 'v2',
+      note: 'mine',
+      released_at: '2026-10-01',
+      released_by_id: 't9',
+      moved_by_transfer_id: 'x1',
+    })
+    expect(await db.setAsides.get('a1')).toMatchObject({
+      releasedAt: '2026-10-01',
+      dirty: 0,
+    })
+  })
+
   it('treats a delete the server already applied as done', async () => {
     await db.setAsides.put(setAside({ id: 'a1' }))
     api.del.mockRejectedValue(

@@ -28,7 +28,10 @@ goal allocations and serves bills and goals alike (working docs:
 `pushSetAsidesEntry` / `pullSetAsides`. **Full pull, live and released alike** (no delta
 stream yet — the backend's follow-up if the list grows). PATCH is a full representation; the
 owner is fixed at create and never sent on update; `position` and `date` are kept by the server
-when omitted. Usual `409` / `404` handling.
+when omitted. Usual `409` / `404` handling, with one exception: **a rebase never touches the
+release.** Releasing rides a batch or a close, never an edit, so `rebaseSetAside` takes
+`released_at`, `released_by_id` and `moved_by_transfer_id` from the server's copy — re-sending
+this device's would un-release money another device paid or freed.
 
 ## Mutations — `data/mutations.ts`
 
