@@ -8,6 +8,7 @@ import { isPlanningSection } from '#/features/planning/sections'
 import type { PlanningSection } from '#/features/planning/sections'
 import { usePlanningUi } from '#/features/planning/stores/planningUi'
 import { useSessionStore } from '#/stores/session'
+import { PlanningSheets } from './PlanningSheets'
 import { PlanningHeader } from './shell/PlanningHeader'
 import { PlanningSectionStrip } from './shell/PlanningSectionStrip'
 import { PlanningTabCard } from './shell/PlanningTabCard'
@@ -47,6 +48,7 @@ export function PlanningPage() {
         </main>
       </div>
       <MobileTabBar active="planning" />
+      <PlanningSheets />
       <PlanningToastView />
     </div>
   )
