@@ -328,11 +328,18 @@ export function useTxEditor(
       const categoryId = isOfType(catalog, prev.draft.categoryId, type)
         ? prev.draft.categoryId
         : firstCategoryOf(catalog, type)
-      // A payday and a payment are different planned items; a new type drops the link.
-      const plannedId = type === prev.draft.type ? prev.draft.plannedId : null
+      // A payday and a payment are different planned items, and only a spend pays a bill: a
+      // new type drops both links.
+      const changed = type !== prev.draft.type
       return {
         ...prev,
-        draft: { ...prev.draft, type, categoryId, plannedId },
+        draft: {
+          ...prev.draft,
+          type,
+          categoryId,
+          plannedId: changed ? null : prev.draft.plannedId,
+          billId: changed ? null : prev.draft.billId,
+        },
       }
     })
 
@@ -465,7 +472,11 @@ export function useTxEditor(
         walletId: draft.walletId,
         goalId: draft.type === 'spend' ? (link?.goalId ?? draft.goalId) : null,
         billId:
-          draft.type === 'spend' && link ? (link.billId ?? null) : undefined,
+          draft.type !== 'spend'
+            ? null
+            : link
+              ? (link.billId ?? null)
+              : undefined,
         plannedId: link ? link.plannedId : draft.plannedId,
         merchantId: draft.merchantId,
         date: draft.date,

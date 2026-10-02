@@ -267,6 +267,28 @@ describe('undoing a bill payment gives back what it released', () => {
     expect(await liveRows()).toEqual([['savings', '2026-10-05', 1000]])
   })
 
+  it('drops the bill link and gives the money back when a payment becomes income', async () => {
+    const id = await paid()
+    await saveTransactionEdit(
+      id,
+      spend({
+        type: 'income',
+        categoryId: catId('salary'),
+        billId: undefined,
+        plannedId: null,
+      }),
+    )
+    expect((await db.transactions.get(id))?.billId).toBeNull()
+    const [entry] = await db.outbox
+      .filter((e) => e.entity === 'transaction')
+      .toArray()
+    expect((entry.payload as { bill_id: unknown }).bill_id).toBeNull()
+    expect(await liveRows()).toEqual([
+      ['main', '2026-10-05', 2000],
+      ['savings', '2026-10-05', 1000],
+    ])
+  })
+
   it('restores it when the payment is unlinked from the bill', async () => {
     const id = await paid()
     await saveTransactionEdit(id, spend({ billId: null, plannedId: null }))

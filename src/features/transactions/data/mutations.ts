@@ -122,7 +122,7 @@ const linksOf = (draft: LedgerDraft): Links =>
     : {
         categoryId: draft.categoryId,
         goalId: draft.goalId,
-        billId: draft.billId ?? null,
+        billId: draft.type === 'spend' ? (draft.billId ?? null) : null,
         merchantId: draft.merchantId ?? null,
         plannedId: draft.plannedId ?? null,
       }
@@ -194,8 +194,13 @@ export async function updateTransaction(
     categoryId: draft.categoryId,
     walletId: draft.walletId,
     goalId: draft.goalId,
+    // Only a spend pays a bill; the server refuses the link on anything else.
     billId:
-      draft.billId !== undefined ? draft.billId : (existing.billId ?? null),
+      draft.type !== 'spend'
+        ? null
+        : draft.billId !== undefined
+          ? draft.billId
+          : (existing.billId ?? null),
     merchantId:
       draft.merchantId !== undefined ? draft.merchantId : existing.merchantId,
     date: draft.date,

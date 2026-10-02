@@ -147,7 +147,11 @@ export async function saveTransactionEdit(
   const before = await db.transactions.get(id)
   // Mirrors `updateTransaction`: an undefined link leaves the stored one alone.
   const billId =
-    draft.billId !== undefined ? draft.billId : (before?.billId ?? null)
+    draft.type !== 'spend'
+      ? null
+      : draft.billId !== undefined
+        ? draft.billId
+        : (before?.billId ?? null)
   const sameLink =
     before !== undefined &&
     (before.billId ?? null) === billId &&

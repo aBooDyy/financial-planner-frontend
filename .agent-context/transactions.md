@@ -38,6 +38,11 @@ and `recurrings` went with the planning rebuild: a repeating payment is a **bill
   + used ([goals.md](goals.md#derivations)).
 - **Planning links.** A ledger row may carry `goalId` (money used from a goal) **or** `billId`
   (a payment for a bill; wire `bill_id`, never both, never on a transfer leg or adjustment).
+  **Only a spend carries `billId`** (the server refuses it otherwise —
+  `spending.transaction.bill_type_mismatch`): `buildTransaction` / `updateTransaction` store
+  null for any other type, `saveTransactionEdit` treats a type change away from spend as an
+  unlink (gives back what it released), and the dialog's `setType` drops the bill link with the
+  planned one.
   Both are always sent on create and PATCH (PATCH replaces). Rows stored before bills lack
   `billId`; it reads as null. A deleted goal or bill clears the link locally and in queued
   payloads (`unlinkLedgerFrom`), as the server does.
