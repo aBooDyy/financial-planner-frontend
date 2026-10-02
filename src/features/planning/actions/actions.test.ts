@@ -360,14 +360,54 @@ describe('Use it and I spent it', () => {
     ])
   })
 
-  it('spends everything set aside and closes the goal, freeing the rest', async () => {
+  const spends = async () =>
+    (await db.transactions.toArray())
+      .map((t) => [t.walletId, t.amount / 100])
+      .sort()
+
+  it('spends what the paying wallet held and closes the goal, freeing the rest', async () => {
     await db.goals.update('trip', { useCategoryId: catId('travel') })
-    const id = await markGoalSpent('trip', {
-      walletId: 'main',
+    await db.setAsides.put(
+      setAside({
+        goalId: 'trip',
+        source: 'outside',
+        walletId: null,
+        externalLabel: 'Cash with mom',
+        amount: m(100),
+      }),
+    )
+    await markGoalSpent('trip', { walletId: 'main', date: '2026-09-24' })
+    expect(await spends()).toEqual([['main', 800]])
+    expect((await db.goals.get('trip'))?.closedAt).toBe('2026-09-24')
+    expect((await db.setAsides.toArray()).filter(isLiveSetAside)).toEqual([])
+    const freed = (await db.setAsides.toArray()).filter(
+      (a) => a.releasedAt !== null && a.releasedById === null,
+    )
+    expect(freed.map((a) => a.amount / 100).sort()).toEqual([100, 400])
+  })
+
+  it('records one spend per wallet a split names, each releasing its own wallet', async () => {
+    await db.goals.update('trip', { useCategoryId: catId('travel') })
+    const ids = await markGoalSpent('trip', {
+      parts: [
+        { walletId: 'main', amount: m(800) },
+        { walletId: 'savings', amount: m(300) },
+      ],
       date: '2026-09-24',
     })
-    expect((await db.transactions.get(id ?? ''))?.amount).toBe(m(1200))
-    expect((await db.goals.get('trip'))?.closedAt).toBe('2026-09-24')
+    expect(ids).toHaveLength(2)
+    expect(await spends()).toEqual([
+      ['main', 800],
+      ['savings', 300],
+    ])
+    const usedBy = (await db.setAsides.toArray())
+      .filter((a) => a.releasedById !== null)
+      .map((a) => [a.walletId, a.amount / 100])
+      .sort()
+    expect(usedBy).toEqual([
+      ['main', 800],
+      ['savings', 300],
+    ])
     expect((await db.setAsides.toArray()).filter(isLiveSetAside)).toEqual([])
   })
 })

@@ -26,7 +26,7 @@ import { money } from '#/features/planning/view/format'
 import type { Leftover } from '#/features/setAsides/data/leftover'
 import { cn } from '#/lib/utils'
 import { ProgressBar } from '#/features/planning/components/kit/ProgressBar'
-import { WalletPills } from '#/features/planning/components/editors/fields/WalletPills'
+import { SpentFrom, useSpentFrom } from './SpentFrom'
 
 type Choice = 'spent' | 'free' | 'move'
 
@@ -51,12 +51,16 @@ function MarkDoneSheetBody({ owner, onClose }: Props) {
   const held = goalStatus?.setAside ?? billStatus?.setAside ?? 0
   const [choice, setChoice] = useState<Choice>(isGoal ? 'spent' : 'free')
   const [moveTo, setMoveTo] = useState('')
-  const [walletId, setWalletId] = useState(
-    goalStatus?.heldIn.find((h) => h.walletId)?.walletId ??
+  const spentFrom = useSpentFrom({
+    heldIn: goalStatus?.heldIn ?? [],
+    held,
+    currency: info?.currency ?? wallets.base,
+    defaultWalletId:
+      goalStatus?.heldIn.find((h) => h.walletId)?.walletId ??
       (info?.kind === 'goal' ? info.goal.saveWalletId : null) ??
       wallets.list.at(0)?.id ??
       '',
-  )
+  })
   const [categoryId, setCategoryId] = useState<string | null>(
     info?.kind === 'goal' ? info.goal.useCategoryId : null,
   )
@@ -98,8 +102,8 @@ function MarkDoneSheetBody({ owner, onClose }: Props) {
       ? null
       : choice === 'move' && !moveTo
         ? 'Pick where the money goes'
-        : choice === 'spent' && !walletId
-          ? 'Pick the wallet it was paid from'
+        : choice === 'spent' && spentFrom.block
+          ? spentFrom.block
           : choice === 'spent' && !categoryId
             ? 'Pick what it was spent on'
             : null
@@ -111,7 +115,7 @@ function MarkDoneSheetBody({ owner, onClose }: Props) {
       if (info.kind === 'goal') {
         if (held > 0 && choice === 'spent')
           await markGoalSpent(owner.id, {
-            walletId,
+            parts: spentFrom.parts,
             categoryId: categoryId ?? undefined,
           })
         else await closeGoal(owner.id, { leftover: leftover() })
@@ -129,7 +133,7 @@ function MarkDoneSheetBody({ owner, onClose }: Props) {
           {
             value: 'spent' as const,
             title: 'I spent it',
-            sub: `It was used for ${info.name}. We record the spending.`,
+            sub: `It was used for ${info.name}. We record what each wallet paid.`,
           },
         ]
       : []),
@@ -276,15 +280,11 @@ function MarkDoneSheetBody({ owner, onClose }: Props) {
           ) : null}
           {choice === 'spent' ? (
             <>
-              <div>
-                <FieldLabel>Paid from</FieldLabel>
-                <WalletPills
-                  label="Paid from"
-                  wallets={wallets.list}
-                  value={walletId}
-                  onChange={setWalletId}
-                />
-              </div>
+              <SpentFrom
+                state={spentFrom}
+                wallets={wallets.list}
+                currency={currency}
+              />
               <div>
                 <FieldLabel>What was it spent on?</FieldLabel>
                 <CategoryPicker

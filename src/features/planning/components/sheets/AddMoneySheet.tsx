@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Plus, TriangleAlert, X } from 'lucide-react'
+import { TriangleAlert } from 'lucide-react'
 import { AmountWell } from '#/components/dialog/AmountWell'
 import { DialogActions } from '#/components/dialog/DialogActions'
 import { NoteBox } from '#/components/dialog/NoteBox'
@@ -32,14 +32,14 @@ import {
   overCommits,
 } from '#/features/planning/view/addMoney'
 import { money } from '#/features/planning/view/format'
-import { amountInputProps, parseAmountToMinor } from '#/lib/currency'
+import { parseAmountToMinor } from '#/lib/currency'
 import { cn } from '#/lib/utils'
 import { usePreferencesStore } from '#/stores/preferences'
 import { Dot } from '#/features/planning/components/kit/Spine'
+import { SplitRows } from './SplitRows'
+import type { SplitRow } from './SplitRows'
 
 const OUTSIDE = '__outside__'
-
-type Row = { key: number; walletId: string; amount: string }
 
 type Props = {
   /** Null when started from a wallet ("Set aside…"): the sheet asks which bill or goal. */
@@ -77,7 +77,7 @@ function AddMoneySheetBody({ owner, walletId: startIn, onClose }: Props) {
   const [walletId, setWalletId] = useState<string>(defaultWallet)
   const [outsideLabel, setOutsideLabel] = useState('')
   const [split, setSplit] = useState(false)
-  const [rows, setRows] = useState<Row[]>(() => [
+  const [rows, setRows] = useState<SplitRow[]>(() => [
     {
       key: 1,
       walletId: defaultWallet === OUTSIDE ? '' : defaultWallet,
@@ -317,99 +317,6 @@ function WalletCard({
         {note}
       </span>
     </button>
-  )
-}
-
-function SplitRows({
-  rows,
-  setRows,
-  currency,
-  wallets,
-  left,
-}: {
-  rows: Row[]
-  setRows: (update: (rows: Row[]) => Row[]) => void
-  currency: string
-  wallets: ReadonlyArray<{ id: string; name: string; color: string }>
-  left: number
-}) {
-  const update = (key: number, patch: Partial<Row>) =>
-    setRows((list) => list.map((r) => (r.key === key ? { ...r, ...patch } : r)))
-  return (
-    <div className="flex flex-col gap-2">
-      <FieldLabel>Split across</FieldLabel>
-      {rows.map((r, i) => (
-        <div key={r.key} className="flex items-center gap-2">
-          <Select
-            value={r.walletId || undefined}
-            onValueChange={(walletId) => update(r.key, { walletId })}
-          >
-            <SelectTrigger
-              aria-label={`Wallet ${i + 1}`}
-              className="min-w-0 flex-1"
-            >
-              <SelectValue placeholder="Pick a wallet" />
-            </SelectTrigger>
-            <SelectContent>
-              {wallets.map((w) => (
-                <SelectItem key={w.id} value={w.id}>
-                  {w.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Input
-            aria-label={`Amount ${i + 1}`}
-            {...amountInputProps(currency, r.amount, (amount) =>
-              update(r.key, { amount }),
-            )}
-            className="w-[120px] text-end tabular-nums"
-          />
-          <button
-            type="button"
-            aria-label={`Remove wallet ${i + 1}`}
-            disabled={rows.length <= 1}
-            onClick={() =>
-              setRows((list) => list.filter((x) => x.key !== r.key))
-            }
-            className="flex size-8 flex-none items-center justify-center rounded-[9px] text-fp-text-3 hover:bg-fp-surface-2 disabled:opacity-40"
-          >
-            <X size={15} />
-          </button>
-        </div>
-      ))}
-      <div className="flex items-center justify-between">
-        <button
-          type="button"
-          onClick={() =>
-            setRows((list) => [
-              ...list,
-              {
-                key: Math.max(0, ...list.map((x) => x.key)) + 1,
-                walletId: '',
-                amount: '',
-              },
-            ])
-          }
-          className="flex items-center gap-1 text-[13px] font-bold text-fp-accent-ink"
-        >
-          <Plus size={14} /> Another wallet
-        </button>
-        <span
-          role="status"
-          className={cn(
-            'text-[12.5px] font-bold',
-            left === 0 ? 'text-fp-accent-ink' : 'text-fp-warn',
-          )}
-        >
-          {left === 0
-            ? 'Adds up'
-            : left > 0
-              ? `${money(left, currency)} left to place`
-              : `${money(-left, currency)} too much`}
-        </span>
-      </div>
-    </div>
   )
 }
 

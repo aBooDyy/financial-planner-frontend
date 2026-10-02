@@ -249,9 +249,12 @@ first, each a Dexie write plus outbox entries; errors are `MoneyActionError` wit
 - **`spendFromGoal(goalId, {amount, walletId, categoryId?, date?, note?})`** — Use it: a spend
   with the goal's id under `categoryId ?? goal.useCategoryId` (required the first time, then
   remembered on the goal), releasing the goal's set-asides in the paying wallet.
-- **`markGoalSpent(goalId, {walletId, categoryId?, date?, amount?})`** — I spent it (D30): a
-  spend of everything still set aside (or `amount`), then `closeGoal` with the leftover freed.
-  Not atomic; a failure in between leaves an open goal with a payment, which is harmless.
+- **`markGoalSpent(goalId, {parts | walletId + amount?, categoryId?, date?})`** — I spent
+  it (D30): one `spendFromGoal` per paying wallet (`parts` `{walletId, amount}` in the goal's
+  currency; one `walletId` without `amount` spends **what that wallet holds** for the goal),
+  then `closeGoal` with the rest freed (other wallets, money held outside). Never one spend of
+  everything from one wallet: that wallet's Balance would stop matching its bank. Returns the
+  spends' ids. Not atomic; a failure in between leaves an open goal with payments, harmless.
 - **Close / reopen / pause / resume** stay in their slices (`bills/data/actions`,
   `goals/data/actions`). Close drops the open unsettled rows after the close date and pause
   stops the plan (the planner's fill removes future set-asides); reopen and resume file a
@@ -486,7 +489,7 @@ Delete**). Reopen / Pause / Resume act at once with a toast; the rest open a she
 - **Add money** (`AddMoneySheet`, 03 §3): the amount on the blue tint ("It stays in the wallet.
   We just label it."), *Set aside in* wallet cards with each one's free money
   (`useMoneyFigures`) plus **Held outside your wallets** (+ where), **Split across wallets**
-  (rows of wallet + amount, "SR X left to place" / "Adds up", saving blocked until it adds up),
+  (`SplitRows`: rows of wallet + amount, "SR X left to place" / "Adds up", saving blocked until it adds up),
   When?. The guardrail (`view/addMoney.ts#overCommits`, parts summed per wallet in its own
   currency) shows *"Main bank has SR 300 free. Setting aside SR 500 leaves it SR 200
   over-committed."* and the button turns into **Set aside anyway** — a warning, never a block
@@ -501,8 +504,11 @@ Delete**). Reopen / Pause / Resume act at once with a toast; the rest open a she
   settles it (never after a part payment) — **Move it to {paying wallet}** (a real transfer; only when some is in another
   wallet), **Free it up**, **Keep it for next time** (repeating bills). `resolveLeftover`.
 - **Mark as done** (`MarkDoneSheet`): goals — progress box, then *What happens to the SR X set
-  aside?*: **I spent it** (default, D30: paid-from wallet + category, remembered on the goal →
-  `markGoalSpent`), **Free it up**, **Move it to another bill or goal** (a picker of open ones; a
+  aside?*: **I spent it** (default, D30: `SpentFrom` — *Paid from* wallet + *How much did you
+  spend?*, prefilled with what that wallet holds and reset on a wallet change; **Paid from
+  several wallets** switches to `SplitRows` prefilled one row per holding wallet; *The other SR X
+  set aside is freed.* — plus the category, remembered on the goal → `markGoalSpent` with the
+  parts), **Free it up**, **Move it to another bill or goal** (a picker of open ones; a
   bill gets its next due occurrence) → `closeGoal`. Bills: *End {name}* / *Mark {name} as paid*
   with Free / Move → `closeBill`. Nothing set aside → no question.
 - **Use it** (`UseItSheet`, D20): amount, paid from, category (asked until the goal remembers

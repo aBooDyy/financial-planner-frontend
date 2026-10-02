@@ -11,8 +11,10 @@ import { updateGoal } from '#/features/goals/data/mutations'
 import { isoOf } from '#/features/planned/data/dates'
 import { walletCurrency } from '#/features/planned/data/mutations'
 import { currentRates } from '#/features/planned/data/rows'
-import { releaseForPayment } from '#/features/setAsides/data/payment'
-import { setAsideFor } from '#/features/setAsides/data/totals'
+import {
+  heldInWallet,
+  releaseForPayment,
+} from '#/features/setAsides/data/payment'
 import { addTransactionWithId } from '#/features/transactions/data/mutations'
 import { convertMinor } from '#/lib/currency'
 import { newId } from '#/lib/uuid'
@@ -75,26 +77,69 @@ export async function spendFromGoal(
   return id
 }
 
+/** One wallet's share of "I spent it", in the goal's currency. */
+export type GoalSpendPart = { walletId: string; amount: number }
+
+export type MarkGoalSpentInput = Pick<GoalSpendInput, 'categoryId' | 'date'> &
+  (
+    | { parts: ReadonlyArray<GoalSpendPart> }
+    /** One wallet; the amount defaults to what that wallet holds for the goal. */
+    | { walletId: string; amount?: number }
+  )
+
+/** What `walletId` holds for the goal, in the goal's currency. */
+async function heldInWalletFor(
+  goal: LocalGoal,
+  walletId: string,
+): Promise<number> {
+  const rates = await currentRates()
+  return heldInWallet(
+    await db.setAsides.where('goalId').equals(goal.id).toArray(),
+    { goalId: goal.id },
+    walletId,
+  ).reduce(
+    (sum, a) => sum + convertMinor(a.amount, a.currency, goal.currency, rates),
+    0,
+  )
+}
+
 /**
- * "I spent it" in Mark as done: a spend of everything still set aside for the goal from one
- * wallet, then the close — which frees whatever other wallets still held. Not atomic: a
- * failure between the two leaves an open goal with a payment, which is harmless and retryable.
+ * "I spent it" in Mark as done: one spend per paying wallet — each releasing what that wallet
+ * held for the goal, so every wallet's Balance still matches its bank — then the close, which
+ * frees whatever is still set aside (other wallets, money held outside). Not atomic: a failure
+ * between the spends and the close leaves an open goal with payments, which is harmless and
+ * retryable. Returns the spends' ids.
  */
 export async function markGoalSpent(
   goalId: string,
-  input: Omit<GoalSpendInput, 'amount'> & { amount?: number },
-): Promise<string | null> {
+  input: MarkGoalSpentInput,
+): Promise<string[]> {
   const goal = await liveGoal(goalId)
-  const held = setAsideFor(
-    goalId,
-    await db.setAsides.where('goalId').equals(goalId).toArray(),
-    goal.currency,
-    await currentRates(),
-  )
-  const amount = input.amount ?? held
+  const parts =
+    'parts' in input
+      ? input.parts
+      : [
+          {
+            walletId: input.walletId,
+            amount:
+              input.amount ?? (await heldInWalletFor(goal, input.walletId)),
+          },
+        ]
+  const spending = parts.filter((p) => p.amount > 0)
+  for (const p of spending)
+    if (!(await walletCurrency(p.walletId)))
+      throw new MoneyActionError('no_wallet')
   const date = input.date ?? isoOf(new Date())
-  const spent =
-    amount > 0 ? await spendFromGoal(goalId, { ...input, amount, date }) : null
+  const ids: string[] = []
+  for (const p of spending)
+    ids.push(
+      await spendFromGoal(goalId, {
+        amount: p.amount,
+        walletId: p.walletId,
+        categoryId: input.categoryId,
+        date,
+      }),
+    )
   await closeGoal(goalId, { closedAt: date, leftover: { kind: 'free' } })
-  return spent
+  return ids
 }

@@ -283,6 +283,52 @@ describe('Mark as done', () => {
     })
   })
 
+  const spends = async () =>
+    (await db.transactions.toArray())
+      .map((t) => [t.walletId, t.amount / 100])
+      .sort()
+
+  it('spends only what the paying wallet holds, and frees the rest', async () => {
+    await db.goals.update('umrah', { useCategoryId: catId('travel') })
+    await db.setAsides.put(
+      setAside({ goalId: 'umrah', walletId: 'savings', amount: m(500) }),
+    )
+    const onClose = vi.fn()
+    render(<MarkDoneSheet owner={goalOwner('umrah')} onClose={onClose} />)
+    expect(
+      (await screen.findByLabelText('How much did you spend?')).value,
+    ).toBe('2,000.00')
+    expect(
+      screen.getByText('The other SR 500 set aside is freed.'),
+    ).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Mark as done' }))
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(await spends()).toEqual([['main', 2000]])
+    expect(
+      (await db.setAsides.toArray()).filter((a) => a.releasedAt === null),
+    ).toEqual([])
+  })
+
+  it('records what each wallet paid when it was paid from several', async () => {
+    await db.goals.update('umrah', { useCategoryId: catId('travel') })
+    await db.setAsides.put(
+      setAside({ goalId: 'umrah', walletId: 'savings', amount: m(500) }),
+    )
+    const onClose = vi.fn()
+    render(<MarkDoneSheet owner={goalOwner('umrah')} onClose={onClose} />)
+    fireEvent.click(
+      await screen.findByRole('switch', { name: /Paid from several wallets/ }),
+    )
+    expect(screen.getByLabelText('Amount 1').value).toBe('2,000.00')
+    expect(screen.getByLabelText('Amount 2').value).toBe('500.00')
+    fireEvent.click(screen.getByRole('button', { name: 'Mark as done' }))
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(await spends()).toEqual([
+      ['main', 2000],
+      ['savings', 500],
+    ])
+  })
+
   it('moves the money to another goal', async () => {
     await db.goals.put(goal({ id: 'car', name: 'New car', amount: m(500) }))
     const onClose = vi.fn()
