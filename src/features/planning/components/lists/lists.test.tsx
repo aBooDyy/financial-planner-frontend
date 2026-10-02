@@ -142,10 +142,10 @@ describe('Bills', () => {
 
   it('moves bills from the row menu on a phone, where there is no drag', async () => {
     const desktopMedia = window.matchMedia
-    window.matchMedia = ((query: string) => ({
+    window.matchMedia = (query: string) => ({
       ...desktopMedia(query),
       matches: false,
-    }))
+    })
     try {
       render(<BillsSection />)
       const open = async (name: string) =>
@@ -224,6 +224,39 @@ describe('Goals', () => {
     const nice = screen.getByRole('region', { name: 'Nice to have' })
     expect(within(nice).getByText('Paused')).toBeTruthy()
     expect(within(nice).getByText('—')).toBeTruthy()
+  })
+
+  it('moves a goal to Must have from the row menu on a phone', async () => {
+    await db.goals.bulkPut([
+      goal({ id: 'umrah', name: 'Umrah', mustHave: true, position: 0 }),
+      goal({ id: 'car', name: 'New car', mustHave: false, position: 1 }),
+    ])
+    const desktopMedia = window.matchMedia
+    window.matchMedia = (query: string) => ({
+      ...desktopMedia(query),
+      matches: false,
+    })
+    try {
+      render(<GoalsSection />)
+      fireEvent.keyDown(
+        await screen.findByRole('button', { name: 'More for New car' }),
+        { key: 'Enter' },
+      )
+      expect(screen.queryByRole('menuitem', { name: 'Move up' })).toBeNull()
+      expect(screen.queryByRole('menuitem', { name: 'Move down' })).toBeNull()
+      fireEvent.click(
+        await screen.findByRole('menuitem', { name: 'Move to Must have' }),
+      )
+      await waitFor(async () =>
+        expect(await db.goals.get('car')).toMatchObject({
+          mustHave: true,
+          position: 1,
+        }),
+      )
+      expect((await db.goals.get('umrah'))?.position).toBe(0)
+    } finally {
+      window.matchMedia = desktopMedia
+    }
   })
 
   it('offers the emergency fund when there are no goals', async () => {
