@@ -296,7 +296,11 @@ describe('Mark as done', () => {
     const onClose = vi.fn()
     render(<MarkDoneSheet owner={goalOwner('umrah')} onClose={onClose} />)
     expect(
-      (await screen.findByLabelText('How much did you spend?')).value,
+      (
+        await screen.findByLabelText<HTMLInputElement>(
+          'How much did you spend?',
+        )
+      ).value,
     ).toBe('2,000.00')
     expect(
       screen.getByText('The other SR 500 set aside is freed.'),
@@ -319,8 +323,12 @@ describe('Mark as done', () => {
     fireEvent.click(
       await screen.findByRole('switch', { name: /Paid from several wallets/ }),
     )
-    expect(screen.getByLabelText('Amount 1').value).toBe('2,000.00')
-    expect(screen.getByLabelText('Amount 2').value).toBe('500.00')
+    expect(screen.getByLabelText<HTMLInputElement>('Amount 1').value).toBe(
+      '2,000.00',
+    )
+    expect(screen.getByLabelText<HTMLInputElement>('Amount 2').value).toBe(
+      '500.00',
+    )
     fireEvent.click(screen.getByRole('button', { name: 'Mark as done' }))
     await waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(await spends()).toEqual([
