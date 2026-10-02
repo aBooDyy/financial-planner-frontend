@@ -2,21 +2,16 @@ import type { LocalSetAside } from '#/db/types'
 
 type Row = Pick<
   LocalSetAside,
-  'goalId' | 'deleted' | 'releasedAt' | 'releasedById' | 'movedByTransferId'
+  'goalId' | 'deleted' | 'releasedAt' | 'releasedById'
 >
 
 /**
- * Whether a set-aside counts as money **set aside for goals** on the day it is dated. Money
- * later spent from the goal still counts (it was saved, then used); money freed again does not;
- * a move's new row does not either — the money was already counted when it was first set
- * aside. A move with no transfer leaves no mark on either row, so its source reads as freed
- * and its new row as fresh: that money counts once, on the move's date.
+ * Whether a set-aside counts as money **set aside for goals** on the day it is dated: one still
+ * held, or one a payment used (it was saved, then spent). One released without a payment does
+ * not — freed, closed, or the source of a move, whose money counts through the row the move
+ * wrote instead. So moved money counts once, dated the move.
  */
 export function countsAsGoalSaving(a: Row): boolean {
   if (a.goalId === null || a.deleted !== 0) return false
-  const releasedUnused = a.releasedAt !== null && a.releasedById === null
-  const moved = a.movedByTransferId !== null
-  const freed = releasedUnused && !moved
-  const movedIn = moved && !releasedUnused
-  return !freed && !movedIn
+  return a.releasedAt === null || a.releasedById !== null
 }

@@ -22,19 +22,25 @@ describe('countsAsGoalSaving', () => {
     expect(countsAsGoalSaving(setAside({ deleted: 1 }))).toBe(false)
   })
 
-  it('counts a moved set-aside once: its source, not the row the move wrote', () => {
+  it('counts a moved set-aside once, through the row it ended up in', () => {
     const source = setAside({
       releasedAt: '2026-10-05',
       movedByTransferId: 't1',
     })
     const movedIn = setAside({ date: '2026-10-05', movedByTransferId: 't1' })
-    const movedInThenUsed = setAside({
-      movedByTransferId: 't1',
+    // A release clears the move's mark, so a paid or freed moved-in row has none.
+    const movedInThenPaid = setAside({
+      date: '2026-10-05',
       releasedAt: '2026-10-20',
       releasedById: 'tx9',
     })
-    expect(countsAsGoalSaving(source)).toBe(true)
-    expect(countsAsGoalSaving(movedIn)).toBe(false)
-    expect(countsAsGoalSaving(movedInThenUsed)).toBe(false)
+    const movedInThenFreed = setAside({
+      date: '2026-10-05',
+      releasedAt: '2026-10-20',
+    })
+    expect(countsAsGoalSaving(source)).toBe(false)
+    expect(countsAsGoalSaving(movedIn)).toBe(true)
+    expect(countsAsGoalSaving(movedInThenPaid)).toBe(true)
+    expect(countsAsGoalSaving(movedInThenFreed)).toBe(false)
   })
 })
