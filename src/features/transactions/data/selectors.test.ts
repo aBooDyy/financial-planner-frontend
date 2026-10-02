@@ -33,6 +33,7 @@ import type {
   TransferRow,
   TxRow,
 } from './selectors'
+import { buildMonthlyFlow } from '#/features/wallets/data/monthlyFlow'
 import { addDays, fmtK, parseISO, periodOf, ymd } from './planning'
 import type { Period } from './planning'
 
@@ -195,6 +196,33 @@ describe('buildCashflow', () => {
     expect(view.netPositive).toBe(true)
     expect(view.txCount).toBe(2)
     expect(view.segments.map((s) => s.label)).toEqual(['Groceries'])
+  })
+
+  it('agrees with Wallets’ Money in & out on the month’s net', () => {
+    const txns = [
+      tx({ type: 'income', amount: 1_200_000, categoryId: 'cat-salary' }),
+      tx({ type: 'spend', amount: 240_000, categoryId: 'cat-groceries' }),
+      tx({
+        type: 'spend',
+        amount: 10_000,
+        currency: 'USD',
+        categoryId: 'cat-dining',
+      }),
+    ]
+    const cashflow = buildCashflow(
+      data({ txns, setAsides: [allocationRow({ amount: 60_000 })] }),
+      CATALOG,
+      ALL,
+      periodOf(ANCHOR, 'month'),
+    )
+    const june = buildMonthlyFlow(
+      txns,
+      'SAR',
+      RATES,
+      new Date(2026, 5, 30),
+    ).months.at(-1)
+    expect(cashflow.netStr).toBe('+SR 9,225')
+    expect(june?.netStr).toBe(cashflow.netStr)
   })
 
   it('counts a goal-linked payment as Spent, not Saved', () => {
