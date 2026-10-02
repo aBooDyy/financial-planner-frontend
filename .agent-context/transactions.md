@@ -56,9 +56,11 @@ and `recurrings` went with the planning rebuild: a repeating payment is a **bill
   catalog is a donut saying "Dining" while the editor two inches away says "Eating out", and
   making it required means the compiler enumerates every call site. `buildCalendar` takes no
   catalog — it counts money per period and never names a category. The builders:
-  `buildCashflow` (income / spent / **saved** / net — net = income − spent − saved, i.e. the
-  period's free cash; **saved = Σ wallet-held set-asides dated in the period and scope**,
-  hidden when 0, and drawn as a grey "Set aside" segment after the categories),
+  `buildCashflow` (income / spent / net — **net = income − spent**; set-asides are never an
+  outflow, because the money stays in its wallet (F3: subtracting them double counted a goal
+  paid later, and disagreed with Wallets' Money in & out). Σ wallet-held set-asides dated in
+  the period and scope is only a caption under the figures, `setAsideNote` — "SR 600 set aside
+  — still in your wallets" — hidden when 0; no bar segment),
   `buildCalendar` (see below), `buildActivityList` (day groups), `buildBreakdown` (donut),
   `buildBudgetsView` (burn vs cap, health rail). `Scope` = all | wallet | group (group matches
   descendant wallets).
@@ -592,7 +594,7 @@ pass them).
   its wallet is in scope; one held outside only unscoped. `SetAsideActivityRow` draws it
   like a transfer (dashed neutral chip, grey amount, "not in totals"). They are **never** in a
   day total, Spent, the donut, the calendar or a budget — those read `txns` only — and a day
-  holding only set-asides totals `—`. Wallet-held ones do feed the hero's **Saved**. Tapping one opens `/goals` (the route has no goal selector yet).
+  holding only set-asides totals `—`. Wallet-held ones feed only the hero's set-aside caption. Tapping one opens `/goals` (the route has no goal selector yet).
 - **Nudge.** When `usePlanned().dueCount > 0` the Activity tab leads with `PlannedNudge`
   ("● N planned waiting for you to confirm · Review →"), which switches to the Planned tab; the
   tab's label carries the same count as an amber pill.

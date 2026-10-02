@@ -25,8 +25,6 @@ export function CashflowHeroCard({ view, periodLabel, header }: Props) {
     { label: 'Income', value: view?.incomeStr },
     { op: '−', label: 'Spent', value: view?.spentStr },
   ]
-  if (view?.hasSaved)
-    stats.push({ op: '−', label: 'Saved', value: view.savedStr })
   stats.push({
     op: '=',
     label: 'Net',
@@ -75,6 +73,12 @@ export function CashflowHeroCard({ view, periodLabel, header }: Props) {
           </div>
         ))}
       </div>
+
+      {view?.setAsideNote ? (
+        <div className="fp-sensitive mt-[10px] text-[12px] text-fp-text-3">
+          {view.setAsideNote}
+        </div>
+      ) : null}
 
       {view ? (
         <SegmentedBar segments={view.segments} className="mt-[18px]" />

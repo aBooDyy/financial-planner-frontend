@@ -111,7 +111,7 @@ Goal progress (`goals/data/progress.ts`) = live set-asides + spending from the g
   `planned/data/mutations.ts`); "Add contribution" on a goal writes one, now or as a hand-made
   planned row.
 - Spending's Activity lists set-asides as their own rows (`SetAsideRow`, `ownerId`), kept out of
-  every total; the cashflow hero's "Saved" is Σ wallet set-asides made in the window.
+  every total; the cashflow hero only captions Σ wallet set-asides made in the window (never in net).
 
 ## Tests
 

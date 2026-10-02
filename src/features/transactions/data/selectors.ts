@@ -320,9 +320,9 @@ const flowTxns = (data: SpendingData, scope: Scope): FlowTxn[] =>
   liveTxns(data, scope).filter(isFlow)
 
 /**
- * Σ wallet-held set-asides dated in the window, in base currency — the hero's "Saved". A
- * set-aside keeps the money in its wallet, so it is never a spend; a spend linked to a goal or
- * bill is a payment that left the wallet and counts as Spent like any other.
+ * Σ wallet-held set-asides dated in the window, in base currency — the hero's caption. A
+ * set-aside keeps the money in its wallet, so it is never an outflow and never part of net; a
+ * spend linked to a goal or bill is a payment that left the wallet and counts as Spent.
  */
 function savedInWindow(
   data: SpendingData,
@@ -346,8 +346,6 @@ function savedInWindow(
     )
 }
 
-const SAVED_SEGMENT = '__saved__'
-
 // --- Cashflow hero -------------------------------------------------------------------
 
 export type CashflowSegment = {
@@ -367,6 +365,8 @@ export type CashflowView = {
   savedStr: string
   netStr: string
   hasSaved: boolean
+  /** "SR 600 set aside — still in your wallets", or null when nothing was set aside. */
+  setAsideNote: string | null
   netPositive: boolean
   pillLabel: string
   txCount: number
@@ -399,32 +399,21 @@ export function buildCashflow(
     byCat.set(root, (byCat.get(root) ?? 0) + v)
   }
   const saved = savedInWindow(data, scope, win)
-  const net = income - spent - saved
-  const outflow = spent + saved
+  const net = income - spent
   const sorted = [...byCat.entries()].sort((a, b) => b[1] - a[1])
-  const denom = Math.max(outflow, 1)
-  const savedSegment =
-    saved > 0
-      ? [
-          {
-            key: SAVED_SEGMENT,
-            label: 'Set aside',
-            color: 'var(--fp-text-3)',
-            pct: (saved / denom) * 100,
-            valueStr: formatMoneyRounded(saved, data.base),
-            pctStr: `${formatShare((saved / denom) * 100)} of outflow`,
-          },
-        ]
-      : []
+  const denom = Math.max(spent, 1)
+  const savedStr = formatMoneyRounded(saved, data.base)
 
   return {
     title: 'Cashflow',
     sub: periodCaption(win, dateFormat),
     incomeStr: formatMoneyRounded(income, data.base),
     spentStr: formatMoneyRounded(spent, data.base),
-    savedStr: formatMoneyRounded(saved, data.base),
+    savedStr,
     netStr: `${net >= 0 ? '+' : '−'}${formatMoneyRounded(Math.abs(net), data.base)}`,
     hasSaved: saved > 0,
+    setAsideNote:
+      saved > 0 ? `${savedStr} set aside — still in your wallets` : null,
     netPositive: net >= 0,
     pillLabel: net >= 0 ? 'Net positive' : 'Net negative',
     txCount: txns.length,
@@ -441,7 +430,6 @@ export function buildCashflow(
           pctStr: `${formatShare(pct)} of outflow`,
         }
       }),
-      ...savedSegment,
     ],
     topLabel: sorted.length
       ? `Top: ${catalog.get(sorted[0][0]).name} ${formatMoneyRounded(sorted[0][1], data.base)}`

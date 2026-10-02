@@ -161,10 +161,9 @@ const data = (over: Partial<SpendingData>): SpendingData => ({
 })
 
 describe('buildCashflow', () => {
-  // Saved used to be goal-linked spends. Under ADR-3 a set-aside is a reservation (an
-  // allocation), and a goal-linked spend is a payment that left the wallet — so Saved is now
-  // the period's wallet reservations and every spend is Spent.
-  it('splits income, spend and set-asides; net subtracts both outflows', () => {
+  // A set-aside labels money that stays in its wallet, so it is never an outflow: net is
+  // income − spent (F3), and the period's wallet set-asides are only a caption.
+  it('leaves set-asides out of net and names them in a caption', () => {
     const txns = [
       tx({ type: 'income', amount: 1_200_000, categoryId: 'cat-salary' }),
       tx({ type: 'spend', amount: 240_000, categoryId: 'cat-groceries' }),
@@ -189,14 +188,12 @@ describe('buildCashflow', () => {
     expect(view.spentStr).toBe('SR 2,400')
     expect(view.hasSaved).toBe(true)
     expect(view.savedStr).toBe('SR 600')
-    // net = 12,000 − 2,400 − 600 = +9,000
-    expect(view.netStr).toBe('+SR 9,000')
+    expect(view.setAsideNote).toBe('SR 600 set aside — still in your wallets')
+    // net = 12,000 − 2,400 = +9,600; the set-aside never left the wallet
+    expect(view.netStr).toBe('+SR 9,600')
     expect(view.netPositive).toBe(true)
     expect(view.txCount).toBe(2)
-    expect(view.segments.map((s) => s.label)).toEqual([
-      'Groceries',
-      'Set aside',
-    ])
+    expect(view.segments.map((s) => s.label)).toEqual(['Groceries'])
   })
 
   it('counts a goal-linked payment as Spent, not Saved', () => {
@@ -216,6 +213,7 @@ describe('buildCashflow', () => {
     )
     expect(view.spentStr).toBe('SR 3,500')
     expect(view.hasSaved).toBe(false)
+    expect(view.setAsideNote).toBeNull()
     expect(view.netStr).toBe('−SR 3,500')
   })
 
@@ -1136,7 +1134,7 @@ describe('confirmed planned items in Activity', () => {
     })
   })
 
-  it('gives a day holding only set-asides no total; they feed Saved, not Spent', () => {
+  it('gives a day holding only set-asides no total; they are captioned, not Spent', () => {
     const d = data({
       goals: [umrah],
       setAsides: [allocation({ date: '2026-06-03' })],
@@ -1153,6 +1151,7 @@ describe('confirmed planned items in Activity', () => {
     expect(hero.spentStr).toBe('SR 0')
     expect(hero.txCount).toBe(0)
     expect(hero.savedStr).toBe('SR 1,500')
+    expect(hero.netStr).toBe('+SR 0')
   })
 
   it('shows an external set-aside only when no account scope is set', () => {

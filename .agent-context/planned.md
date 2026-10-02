@@ -301,7 +301,7 @@ its list, rail (`ForecastCard`, `HeadedCard`, `data/forecast.ts`, `data/headed.t
 
 `walletDeltas`, budgets, the cashflow hero, day totals, `goalProgress`, set-aside totals — none of
 them read `plannedTransactions`. Pinned by a regression test in `data/mutations.test.ts`. A confirmed
-set-aside does reach the Spending hero's **Saved** — never Spent, day totals or
+set-aside does reach the Spending hero's set-aside caption — never net, Spent, day totals or
 budgets ([transactions.md](transactions.md)).
 
 ## Tests
