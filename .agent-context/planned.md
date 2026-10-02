@@ -148,7 +148,8 @@ varies), each pull, each plan-rewrite request, and day rollover.
    the pay:** while the main paycheck's income row on that payday (matched by `date` or
    `occurrence`, `ctx.mainStreamId`) is still open and unconfirmed — and is not being logged
    automatically in the same pass — the payday's lines are left alone, neither set aside nor
-   flagged; the next run after the income is confirmed takes them. A closed bill's or a closed
+   flagged; the next run after the income is confirmed takes them. A payday whose main pay was
+   **skipped** brought no money: its lines go to the review (`skippedPaydays`). A closed bill's or a closed
    or paused goal's set-asides are neither set aside nor flagged (`isStoppedOwner`). Auto-confirms
    write under `autoSettlementId(plannedId)` (UUIDv5), so two devices write one row. A failed
    confirm is left for the user. The run's `auto` summary counts them, and Automatic mode posts

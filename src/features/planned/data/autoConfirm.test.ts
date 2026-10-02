@@ -23,6 +23,7 @@ import {
   closeRest,
   confirmPlanned,
   dismissFromReview,
+  skipPlanned,
 } from './mutations'
 import { runPlanner } from './runner'
 
@@ -52,6 +53,7 @@ describe('autoPlan', () => {
     ]),
     rates: RATES,
     isSettled: () => false,
+    skippedPaydays: new Set(),
     ...over,
   })
   const pay = (billId: string, date = TODAY) =>
@@ -154,6 +156,13 @@ describe('autoPlan', () => {
     expect(confirmed.setAsides.map((a) => a.id)).toEqual(['trip-line'])
     expect(autoPlan([line], ctx({ streams: manual })).setAsides).toHaveLength(1)
     expect(autoPlan([payday, line], ctx()).setAsides).toHaveLength(1)
+  })
+
+  it('sends a skipped payday’s set-asides to review: no pay came in for them', () => {
+    const line = save('trip-line', 'trip', 'main', m(100))
+    const plan = autoPlan([line], ctx({ skippedPaydays: new Set([TODAY]) }))
+    expect(plan.setAsides).toEqual([])
+    expect(plan.review).toEqual(['trip-line'])
   })
 
   it('neither sets aside nor reviews for a paused goal or a closed bill', () => {
@@ -406,5 +415,19 @@ describe('the planner’s auto pass', () => {
         (a) => isLiveSetAside(a) && a.goalId === 'trip',
       ),
     ).toEqual([])
+  })
+
+  it('reviews a skipped payday’s set-asides instead of making them', async () => {
+    await settle('auto')
+    await db.goals.put(
+      goal({ id: 'trip', amount: m(500), saveWalletId: 'main' }),
+    )
+    await runPlanner('u1', new Date(2026, 8, 30))
+    await skipPlanned((await paydayOn('2026-10-01'))?.id ?? '')
+
+    await runPlanner('u1', new Date(2026, 9, 1))
+
+    expect(await db.setAsides.count()).toBe(0)
+    expect(await tripLine()).toMatchObject({ status: 'open', review: true })
   })
 })

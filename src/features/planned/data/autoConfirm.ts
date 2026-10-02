@@ -7,8 +7,9 @@
  *   deposit wallet and still has the free money for it (03 §4, D17) — once that payday's pay
  *   has arrived: while the main paycheck's income row for the day is open and unconfirmed (and
  *   not being logged automatically in this same pass) the line waits, untouched. Every other
- *   due set-aside — another wallet (the money must really move), not enough free money, or no
- *   deposit wallet at all — is flagged for the payday review instead.
+ *   due set-aside — another wallet (the money must really move), not enough free money, a
+ *   payday whose pay was skipped, or no deposit wallet at all — is flagged for the payday
+ *   review instead.
  *
  * Only open rows nothing settles yet are considered, and never a pinned set-aside: dismissing
  * the review ("Not now") pins it, so it is never picked up again. A closed bill or a closed or
@@ -43,6 +44,8 @@ export type AutoContext = {
   walletCurrency: ReadonlyMap<string, CurrencyCode>
   rates: RatesMap
   isSettled: (row: LocalPlanned) => boolean
+  /** Dates (and occurrences) of the main paycheck's paydays the user skipped. */
+  skippedPaydays: ReadonlySet<string>
 }
 
 export type AutoSetAside = { id: string; walletId: string; amount: number }
@@ -134,7 +137,8 @@ export function autoConfirms(
  * Automatic mode's payday set-asides, against `ctx.free` as it stands — the runner confirms
  * `autoConfirms` first and reads free money again, so the pay just logged funds them and what
  * auto-pay just paid is already out. `logging` names paydays being logged in the same pass
- * (when the two are planned together, as `autoPlan` does).
+ * (when the two are planned together, as `autoPlan` does). A payday whose main pay was skipped
+ * brought no money for its lines: they go to the review.
  */
 export function autoSetAsides(
   rows: ReadonlyArray<LocalPlanned>,
@@ -173,7 +177,12 @@ export function autoSetAsides(
     if (payNotIn.has(p.date)) continue
     const walletId = p.walletId
     const currency = walletId ? ctx.walletCurrency.get(walletId) : undefined
-    if (!walletId || !currency || walletId !== ctx.depositWalletId) {
+    if (
+      !walletId ||
+      !currency ||
+      walletId !== ctx.depositWalletId ||
+      ctx.skippedPaydays.has(p.date)
+    ) {
       plan.review.push(p.id)
       continue
     }

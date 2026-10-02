@@ -355,6 +355,22 @@ async function freeByWallet(
 const openRows = () =>
   db.plannedTransactions.where('status').equals('open').toArray()
 
+/** The main paycheck's paydays the user skipped: no pay came in on them. */
+async function skippedPaydaysOf(
+  mainStreamId: string | null,
+): Promise<Set<string>> {
+  if (!mainStreamId) return new Set()
+  const rows = await db.plannedTransactions
+    .where('incomeStreamId')
+    .equals(mainStreamId)
+    .toArray()
+  return new Set(
+    rows
+      .filter((p) => p.deleted === 0 && p.status === 'skipped')
+      .flatMap((p) => [p.date, p.occurrence]),
+  )
+}
+
 /**
  * Confirm what is due to happen on its own; flag what the payday review must look at. Auto-pay
  * and auto-logged pay go first, so the free money the Automatic payday sort reads afterwards
@@ -390,6 +406,7 @@ async function runAuto(
     walletCurrency: new Map(),
     rates: inputs.rates,
     isSettled: (row) => hasSettlements(row, state.index),
+    skippedPaydays: new Set(),
   }
   const confirms = autoConfirms(rows, ctx)
   const byId = new Map(rows.map((r) => [r.id, r]))
@@ -419,6 +436,7 @@ async function runAuto(
     ...ctx,
     free: wallets.free,
     walletCurrency: wallets.currency,
+    skippedPaydays: await skippedPaydaysOf(mainStreamId),
   })
   for (const line of plan.setAsides) {
     if (!(await confirm(line.id, line.walletId))) continue
