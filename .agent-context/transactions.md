@@ -70,6 +70,11 @@ and `recurrings` went with the planning rebuild: a repeating payment is a **bill
   (`stepNextDueBack`; `syncBillNextDue` only moves forward). A bill that is closed or gone saves
   the row as it is, unpaid. The released rows keep `releasedById` (the server sets it null when
   the transaction is deleted, without a version bump).
+- **Goal spends go through Use it's rule** (same module): a spend saved with a `goalId` (and no
+  bill) releases that goal's set-asides **in the paying wallet**, oldest first, up to the amount
+  (`releaseForPayment({goalId}, …)`, as `spendFromGoal` does) — never other wallets'. An edit
+  that changes the goal link, amount, currency, wallet or type restores what it released, then
+  releases again; deleting or unlinking restores it.
 - **selectors.ts** — pure view builders ported from the design's `renderVals`. Every builder
   that names a category takes **`catalog: CategoryCatalog` as its required second
   parameter** — `buildCashflow(data, catalog, …)`, and likewise `buildBreakdown`,

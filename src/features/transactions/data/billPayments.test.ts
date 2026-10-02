@@ -8,6 +8,7 @@ import {
 } from '#/features/categories/__fixtures__/categories'
 import {
   bill,
+  goal,
   m,
   planned,
   setAside,
@@ -257,5 +258,81 @@ describe('undoing a bill payment gives back what it released', () => {
       ['savings', '2026-10-05', 1000],
     ])
     expect(await nextDue()).toBe('2026-10-05')
+  })
+})
+
+describe('a spend from a goal saved from the dialog or QuickAdd', () => {
+  const fromGoal = (over: Partial<TransactionDraft> = {}) =>
+    spend({
+      billId: null,
+      plannedId: null,
+      goalId: 'trip',
+      amount: m(300),
+      ...over,
+    })
+  /** Live money per wallet: restores and re-releases may split it over several rows. */
+  const liveTrip = async () => {
+    const byWallet = new Map<string | null, number>()
+    for (const a of (
+      await db.setAsides.where('goalId').equals('trip').toArray()
+    ).filter(isLiveSetAside))
+      byWallet.set(a.walletId, (byWallet.get(a.walletId) ?? 0) + a.amount / 100)
+    return [...byWallet].sort()
+  }
+
+  beforeEach(async () => {
+    await db.goals.put(goal({ id: 'trip', name: 'Trip', target: m(5000) }))
+    await db.setAsides.bulkPut([
+      setAside({ goalId: 'trip', walletId: 'main', amount: m(800) }),
+      setAside({ goalId: 'trip', walletId: 'savings', amount: m(400) }),
+    ])
+  })
+
+  it('releases the goal’s set-aside in the paying wallet only', async () => {
+    expect(await saveNewTransaction(fromGoal())).toBeNull()
+    const [tx] = await db.transactions.toArray()
+    expect(await liveTrip()).toEqual([
+      ['main', 500],
+      ['savings', 400],
+    ])
+    expect(
+      (await db.setAsides.toArray()).filter((a) => a.releasedById === tx.id),
+    ).toHaveLength(1)
+  })
+
+  it('releases when an edit links a spend to the goal', async () => {
+    await saveNewTransaction(fromGoal({ goalId: null }))
+    const [tx] = await db.transactions.toArray()
+    expect(await liveTrip()).toEqual([
+      ['main', 800],
+      ['savings', 400],
+    ])
+    await saveTransactionEdit(tx.id, fromGoal())
+    expect(await liveTrip()).toEqual([
+      ['main', 500],
+      ['savings', 400],
+    ])
+  })
+
+  it('gives it back when the spend is re-priced, unlinked or deleted', async () => {
+    await saveNewTransaction(fromGoal())
+    const [tx] = await db.transactions.toArray()
+
+    await saveTransactionEdit(tx.id, fromGoal({ amount: m(600) }))
+    expect(await liveTrip()).toEqual([
+      ['main', 200],
+      ['savings', 400],
+    ])
+    await saveTransactionEdit(tx.id, fromGoal({ goalId: null }))
+    expect(await liveTrip()).toEqual([
+      ['main', 800],
+      ['savings', 400],
+    ])
+    await saveTransactionEdit(tx.id, fromGoal())
+    await removeTransaction(tx.id)
+    expect(await liveTrip()).toEqual([
+      ['main', 800],
+      ['savings', 400],
+    ])
   })
 })

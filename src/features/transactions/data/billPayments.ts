@@ -2,12 +2,14 @@
  * Saving a spend from the transaction dialog or QuickAdd. One that pays a bill takes the same
  * path as Pay now (03 §5): it settles the occurrence's planned payment, releases what that
  * occurrence had set aside in the paying wallet, moves the bill's `nextDue` on, and hands back
- * what other wallets still hold so the leftover prompt can ask about it. Deleting, unlinking or
- * re-pricing a payment first gives back what it released (`planning/actions/paymentUndo`).
+ * what other wallets still hold so the leftover prompt can ask about it. One spent from a goal
+ * releases the goal's set-asides in the paying wallet, as Use it does. Deleting, unlinking or
+ * re-pricing either first gives back what it released (`planning/actions/paymentUndo`).
  */
 import { db } from '#/db/db'
 import type { LocalTransaction } from '#/db/types'
 import { syncBillNextDue } from '#/features/planned/data/mutations'
+import { currentRates } from '#/features/planned/data/rows'
 import {
   billPaymentTarget,
   settleBillPayment,
@@ -19,6 +21,7 @@ import {
   stepNextDueBack,
 } from '#/features/planning/actions/paymentUndo'
 import type { LeftoverReport } from '#/features/planning/data/leftover'
+import { releaseForPayment } from '#/features/setAsides/data/payment'
 import {
   createTransaction,
   deleteTransaction,
@@ -35,6 +38,28 @@ export type LeftoverPrompt = {
 
 const billOf = (draft: TransactionDraft): string | null =>
   draft.type === 'spend' ? (draft.billId ?? null) : null
+
+const goalOf = (draft: TransactionDraft): string | null =>
+  draft.type === 'spend' && !draft.billId ? draft.goalId : null
+
+/** A spend from a goal releases the goal's set-asides in the paying wallet (03 §5). */
+async function releaseForGoal(
+  id: string,
+  draft: TransactionDraft,
+  goalId: string,
+): Promise<void> {
+  await releaseForPayment(
+    { goalId },
+    {
+      id,
+      walletId: draft.walletId,
+      amount: draft.amount,
+      currency: draft.currency,
+      date: draft.date,
+    },
+    await currentRates(),
+  )
+}
 
 /** The row to settle, or null when the bill can no longer be paid (closed, deleted). */
 async function targetFor(
@@ -100,7 +125,9 @@ export async function saveNewTransaction(
     ? await targetFor(billId, draft.plannedId ?? null)
     : null
   if (!billId || !target) {
-    await createTransaction(draft)
+    const id = await createTransaction(draft)
+    const goalId = goalOf(draft)
+    if (goalId) await releaseForGoal(id, draft, goalId)
     return null
   }
   const id = await createTransaction({ ...draft, plannedId: target.plannedId })
@@ -108,9 +135,10 @@ export async function saveNewTransaction(
 }
 
 /**
- * An edited entry. One newly linked to a bill is paid like a new payment. A change of link,
- * amount or wallet first gives back what the payment released, then releases again for what
- * it is now; otherwise the bill's `nextDue` is only brought back in line with what is settled.
+ * An edited entry. One newly linked to a bill is paid like a new payment. A change of link
+ * (bill or goal), amount or wallet first gives back what the payment released, then releases
+ * again for what it is now; otherwise the bill's `nextDue` is only brought back in line with
+ * what is settled.
  */
 export async function saveTransactionEdit(
   id: string,
@@ -125,17 +153,20 @@ export async function saveTransactionEdit(
     (before.billId ?? null) === billId &&
     (draft.plannedId === undefined || before.plannedId === draft.plannedId)
   const repriced = before !== undefined && movesMoney(before, draft)
+  const goalId = goalOf(draft)
+  const sameGoal = before !== undefined && before.goalId === draft.goalId
   const target =
     billId && draft.type === 'spend' && !sameLink
       ? await targetFor(billId, draft.plannedId ?? null)
       : null
 
-  if (!sameLink || repriced) await restoreReleasedBy([id])
+  if (!sameLink || !sameGoal || repriced) await restoreReleasedBy([id])
   await updateTransaction(
     id,
     target ? { ...draft, plannedId: target.plannedId } : draft,
   )
   await stepNextDueBack([before?.plannedId])
+  if (goalId && (!sameGoal || repriced)) await releaseForGoal(id, draft, goalId)
   if (target && billId) return settle(id, draft, billId, target)
   const again =
     billId && draft.type === 'spend' && repriced
