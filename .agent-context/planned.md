@@ -133,14 +133,17 @@ varies), each pull, each plan-rewrite request, and day rollover.
    goal or bill. (Deleting a goal or bill deletes its set-asides locally, as the server does,
    so its past set-aside rows read as unsettled and are skipped.)
 
-4. **The auto pass** (`data/autoConfirm.ts` — pure `autoPlan`, applied by `runAuto`): open,
+4. **The auto pass** (`data/autoConfirm.ts` — pure `autoConfirms` then `autoSetAsides`,
+   applied by `runAuto`; `autoPlan` runs both over one snapshot): open,
    unsettled rows that have come due are confirmed on their own — a bill payment when the bill
    is on **auto-pay** (from the bill's wallet, dated its due date — so the payment releases its
    set-asides there and moves `nextDue`), a payday when its stream **logs automatically**
    (into the stream's wallet). In **Automatic** payday mode (settings `paydayMode`), a due
    goal/bill set-aside is set aside without a tap when its wallet is the main paycheck's
    deposit wallet and that wallet's free money (balance from `readLedgerSummary` − its live
-   set-asides) still covers it, lines taken in plan priority; any other line is flagged
+   set-asides, read again **after** this pass's auto-pay and auto-logged pay were confirmed, so
+   that pay funds the payday's lines and those bills are already out) still covers it, lines
+   taken in plan priority; any other line is flagged
    `review: true` (another wallet, not enough free money, no main paycheck). **It waits for
    the pay:** while the main paycheck's income row on that payday (matched by `date` or
    `occurrence`, `ctx.mainStreamId`) is still open and unconfirmed — and is not being logged

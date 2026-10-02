@@ -95,12 +95,11 @@ function byPriority(ctx: AutoContext) {
   }
 }
 
-export function autoPlan(
+const dueRows = (
   rows: ReadonlyArray<LocalPlanned>,
   ctx: AutoContext,
-): AutoPlan {
-  const plan: AutoPlan = { payments: [], income: [], setAsides: [], review: [] }
-  const due = rows.filter(
+): LocalPlanned[] =>
+  rows.filter(
     (p) =>
       p.deleted === 0 &&
       p.status === 'open' &&
@@ -108,7 +107,16 @@ export function autoPlan(
       !ctx.isSettled(p),
   )
 
-  for (const p of due) {
+/** The auto-pay bill payments and auto-logged paydays that have come due. */
+export function autoConfirms(
+  rows: ReadonlyArray<LocalPlanned>,
+  ctx: AutoContext,
+): Pick<AutoPlan, 'payments' | 'income'> {
+  const plan: Pick<AutoPlan, 'payments' | 'income'> = {
+    payments: [],
+    income: [],
+  }
+  for (const p of dueRows(rows, ctx)) {
     if (p.origin === 'bill' && p.role === 'payment') {
       const bill = ctx.bills.get(p.billId ?? '')
       if (bill?.autopay && bill.closedAt === null && bill.walletId)
@@ -119,9 +127,26 @@ export function autoPlan(
         plan.income.push({ id: p.id, walletId: stream.walletId })
     }
   }
+  return plan
+}
 
+/**
+ * Automatic mode's payday set-asides, against `ctx.free` as it stands — the runner confirms
+ * `autoConfirms` first and reads free money again, so the pay just logged funds them and what
+ * auto-pay just paid is already out. `logging` names paydays being logged in the same pass
+ * (when the two are planned together, as `autoPlan` does).
+ */
+export function autoSetAsides(
+  rows: ReadonlyArray<LocalPlanned>,
+  ctx: AutoContext,
+  logging: ReadonlySet<string> = new Set(),
+): Pick<AutoPlan, 'setAsides' | 'review'> {
+  const plan: Pick<AutoPlan, 'setAsides' | 'review'> = {
+    setAsides: [],
+    review: [],
+  }
   if (ctx.paydayMode !== 'auto') return plan
-  const logging = new Set(plan.income.map((i) => i.id))
+  const due = dueRows(rows, ctx)
   const payNotIn = new Set(
     due
       .filter(
@@ -161,4 +186,14 @@ export function autoPlan(
     plan.setAsides.push({ id: p.id, walletId, amount })
   }
   return plan
+}
+
+/** Both passes over the same rows and free money (the runner splits them; see `autoSetAsides`). */
+export function autoPlan(
+  rows: ReadonlyArray<LocalPlanned>,
+  ctx: AutoContext,
+): AutoPlan {
+  const confirms = autoConfirms(rows, ctx)
+  const logging = new Set(confirms.income.map((i) => i.id))
+  return { ...confirms, ...autoSetAsides(rows, ctx, logging) }
 }

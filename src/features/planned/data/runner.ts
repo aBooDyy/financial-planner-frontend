@@ -24,7 +24,7 @@ import { walletSetAsides } from '#/features/setAsides/data/totals'
 import { readLedgerSummary } from '#/features/transactions/data/ledgerReads'
 import { convertMinor } from '#/lib/currency'
 import { planningSettingsOf } from '#/features/wallets/data/mappers'
-import { autoPlan, autoSettlementId } from './autoConfirm'
+import { autoConfirms, autoSetAsides, autoSettlementId } from './autoConfirm'
 import type { AutoContext } from './autoConfirm'
 import { isoOf } from './dates'
 import { fitPlanFrom } from './fit'
@@ -322,16 +322,21 @@ async function rekeyStranded(
   return parts.length
 }
 
-/** Free to spend per live wallet, in its own currency: balance − what it holds set aside. */
+/**
+ * Free to spend per live wallet, in its own currency: balance − what it holds set aside. Read
+ * from the tables, not the run's inputs: the auto pass's payments and paydays just moved both.
+ */
 async function freeByWallet(
   inputs: PlannerInputs,
 ): Promise<{ free: Record<string, number>; currency: Map<string, string> }> {
-  const nodes = (await db.balanceNodes.toArray()).filter(
-    (n) => n.deleted === 0 && n.kind === 'wallet',
-  )
+  const [allNodes, setAsides] = await Promise.all([
+    db.balanceNodes.toArray(),
+    db.setAsides.toArray(),
+  ])
+  const nodes = allNodes.filter((n) => n.deleted === 0 && n.kind === 'wallet')
   const { deltas } = await readLedgerSummary(inputs.rates)
   const held = walletSetAsides(
-    inputs.setAsides,
+    setAsides.filter((a) => a.deleted === 0),
     inputs.goals,
     inputs.bills,
     nodes,
@@ -347,7 +352,14 @@ async function freeByWallet(
   return { free, currency }
 }
 
-/** Confirm what is due to happen on its own; flag what the payday review must look at. */
+const openRows = () =>
+  db.plannedTransactions.where('status').equals('open').toArray()
+
+/**
+ * Confirm what is due to happen on its own; flag what the payday review must look at. Auto-pay
+ * and auto-logged pay go first, so the free money the Automatic payday sort reads afterwards
+ * already has that pay in it and those bills out of it.
+ */
 async function runAuto(
   inputs: PlannerInputs,
   state: PlannerState,
@@ -360,14 +372,11 @@ async function runAuto(
     setAsideTotal: 0,
     review: 0,
   }
-  const rows = await db.plannedTransactions
-    .where('status')
-    .equals('open')
-    .toArray()
+  const rows = await openRows()
   if (!rows.some((p) => p.date <= today)) return summary
   const calendar = state.funding.calendar
   const auto = inputs.settings.paydayMode === 'auto'
-  const wallets = auto ? await freeByWallet(inputs) : null
+  const mainStreamId = calendar.kind === 'paycheck' ? calendar.stream.id : null
   const ctx: AutoContext = {
     today,
     paydayMode: inputs.settings.paydayMode,
@@ -376,13 +385,13 @@ async function runAuto(
     streams: new Map(inputs.income.map((s) => [s.id, s])),
     depositWalletId:
       calendar.kind === 'paycheck' ? calendar.stream.walletId : null,
-    mainStreamId: calendar.kind === 'paycheck' ? calendar.stream.id : null,
-    free: wallets?.free ?? {},
-    walletCurrency: wallets?.currency ?? new Map(),
+    mainStreamId,
+    free: {},
+    walletCurrency: new Map(),
     rates: inputs.rates,
     isSettled: (row) => hasSettlements(row, state.index),
   }
-  const plan = autoPlan(rows, ctx)
+  const confirms = autoConfirms(rows, ctx)
   const byId = new Map(rows.map((r) => [r.id, r]))
   const confirm = async (id: string, walletId: string): Promise<boolean> => {
     try {
@@ -397,10 +406,20 @@ async function runAuto(
       return false
     }
   }
-  for (const { id, walletId } of plan.payments)
+  for (const { id, walletId } of confirms.payments)
     if (await confirm(id, walletId)) summary.payments += 1
-  for (const { id, walletId } of plan.income)
+  for (const { id, walletId } of confirms.income)
     if (await confirm(id, walletId)) summary.income += 1
+  if (!auto) return summary
+
+  const after = await openRows()
+  for (const r of after) byId.set(r.id, r)
+  const wallets = await freeByWallet(inputs)
+  const plan = autoSetAsides(after, {
+    ...ctx,
+    free: wallets.free,
+    walletCurrency: wallets.currency,
+  })
   for (const line of plan.setAsides) {
     if (!(await confirm(line.id, line.walletId))) continue
     summary.setAsides += 1
@@ -416,7 +435,7 @@ async function runAuto(
     if (row) await savePlanned({ ...row, review: true })
   }
   summary.review = plan.review.length
-  if (auto && (summary.setAsides > 0 || summary.review > 0))
+  if (summary.setAsides > 0 || summary.review > 0)
     usePaydayNoticeStore.getState().show({
       at: today,
       count: summary.setAsides,

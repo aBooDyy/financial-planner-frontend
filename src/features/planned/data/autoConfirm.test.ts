@@ -19,7 +19,11 @@ import {
 import { usePaydayNoticeStore } from '#/features/planned/stores/paydayNotice'
 import { autoPlan, autoSettlementId } from './autoConfirm'
 import type { AutoContext } from './autoConfirm'
-import { confirmPlanned, dismissFromReview } from './mutations'
+import {
+  closeRest,
+  confirmPlanned,
+  dismissFromReview,
+} from './mutations'
 import { runPlanner } from './runner'
 
 vi.mock('#/db/sync', () => ({ schedulePush: () => undefined }))
@@ -346,5 +350,61 @@ describe('the planner’s auto pass', () => {
     await runPlanner('u1', new Date(2026, 9, 1))
     const live = (await db.setAsides.toArray()).filter(isLiveSetAside)
     expect(live.map((a) => [a.goalId, a.amount / 100])).toEqual([['trip', 500]])
+  })
+
+  const paydayOn = async (date: string) =>
+    (await db.plannedTransactions.toArray()).find(
+      (p) => p.role === 'income' && p.occurrence === date,
+    )
+  const tripLine = async () =>
+    (await db.plannedTransactions.where('goalId').equals('trip').toArray()).find(
+      (p) => p.date === '2026-10-01',
+    )
+
+  it('sets aside from the pay it logs in the same pass', async () => {
+    await settle('auto')
+    await db.balanceNodes.put({ ...MAIN, amount: 0 })
+    await db.incomeStreams.put({ ...SALARY, autolog: true })
+    await db.goals.put(
+      goal({ id: 'trip', amount: m(500), saveWalletId: 'main' }),
+    )
+    await runPlanner('u1', new Date(2026, 9, 1))
+    const live = (await db.setAsides.toArray()).filter(isLiveSetAside)
+    expect(live.map((a) => [a.goalId, a.amount / 100])).toEqual([['trip', 500]])
+  })
+
+  it('takes what auto-pay paid out of the free money before setting aside', async () => {
+    await settle('auto')
+    await db.balanceNodes.put({ ...MAIN, amount: m(1000) })
+    await db.bills.put(
+      bill({
+        id: 'gym',
+        autopay: true,
+        mustPay: false,
+        amount: m(800),
+        nextDue: '2026-10-01',
+        walletId: 'main',
+        position: 1,
+      }),
+    )
+    await db.goals.put(
+      goal({ id: 'trip', amount: m(500), saveWalletId: 'main', mustHave: true }),
+    )
+    await runPlanner('u1', new Date(2026, 8, 30))
+    // A small payday, already confirmed by hand: Main bank holds 1,100.
+    const payday = await paydayOn('2026-10-01')
+    await confirmPlanned(payday?.id ?? '', { walletId: 'main', amount: m(100) })
+    await closeRest(payday?.id ?? '')
+
+    await runPlanner('u1', new Date(2026, 9, 1))
+
+    expect(await db.transactions.where('billId').equals('gym').count()).toBe(1)
+    // 1,100 − 800 paid leaves 300: not enough for the 500.
+    expect(await tripLine()).toMatchObject({ status: 'open', review: true })
+    expect(
+      (await db.setAsides.toArray()).filter(
+        (a) => isLiveSetAside(a) && a.goalId === 'trip',
+      ),
+    ).toEqual([])
   })
 })
