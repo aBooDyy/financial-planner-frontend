@@ -1,6 +1,8 @@
 /**
- * A bill's or goal's history for its detail panel: set-asides made (and taken back), payments or
- * spending, and skipped occurrences — latest first. Pure.
+ * A bill's or goal's history for its detail panel: set-asides made (and taken back, or moved to
+ * another wallet), payments or spending, and skipped occurrences — latest first. Money a transfer
+ * moved is told once: the row it left reads "Moved to <wallet>", and the row it landed in adds
+ * nothing of its own until it is used, freed or moved on. Pure.
  */
 import type { LocalPlanned, LocalSetAside, LocalTransaction } from '#/db/types'
 import { autoSettlementId } from '#/features/planned/data/autoConfirm'
@@ -8,6 +10,7 @@ import { convertMinor } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
 import type { RatesMap } from '#/lib/config/rates'
 import { money } from './format'
+import { setAsideMoves } from './setAsideMoves'
 
 export type HistoryLine = {
   key: string
@@ -41,30 +44,41 @@ export function historyOf(args: {
     convertMinor(amount, from, currency, rates)
   const lines: HistoryLine[] = []
 
-  for (const a of args.setAsides) {
-    if (a.deleted !== 0 || !mine(a)) continue
+  const owned = args.setAsides.filter((a) => a.deleted === 0 && mine(a))
+  const moves = setAsideMoves(owned)
+  for (const a of owned) {
     const where =
       a.source === 'outside'
         ? (a.externalLabel ?? 'Outside your wallets')
         : args.walletName(a.walletId)
     const amount = money(inOwner(a.amount, a.currency), currency)
-    lines.push({
-      key: `a:${a.id}`,
-      date: a.date,
-      label: a.movedByTransferId ? 'Moved in' : 'Set aside',
-      sub: where,
-      amount: `+${amount}`,
-      tone: 'in',
-    })
-    if (a.releasedAt && !a.releasedById && !a.movedByTransferId)
+    const movedTo = moves.movedTo.get(a.id)
+    if (!moves.carried.has(a.id))
       lines.push({
-        key: `f:${a.id}`,
-        date: a.releasedAt.slice(0, 10),
-        label: 'Taken back',
+        key: `a:${a.id}`,
+        date: a.date,
+        label:
+          a.movedByTransferId && movedTo === undefined
+            ? 'Moved in'
+            : 'Set aside',
         sub: where,
-        amount,
-        tone: 'none',
+        amount: `+${amount}`,
+        tone: 'in',
       })
+    if (!a.releasedAt || a.releasedById) continue
+    lines.push({
+      key: `${movedTo === undefined ? 'f' : 'm'}:${a.id}`,
+      date: a.releasedAt.slice(0, 10),
+      label:
+        movedTo === undefined
+          ? 'Taken back'
+          : movedTo
+            ? `Moved to ${args.walletName(movedTo)}`
+            : 'Moved',
+      sub: where,
+      amount,
+      tone: 'none',
+    })
   }
   for (const t of args.txns) {
     if (t.deleted !== 0 || t.type !== 'spend' || !mine(t)) continue

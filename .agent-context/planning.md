@@ -520,9 +520,17 @@ to Bills and open a bill in one go). Header (both): colour dot, name, "Semi-annu
   recalc's, *"Your plan sets aside SR 1,750 × 2 from Oct 25; today it works out to SR 3,500 on
   Nov 25."* — + **Recalculate**, then *Plan updated · Undo* from the recalc-undo store),
   `NextOccurrences` (repeating bills), `HistoryList` (`view/history.ts`: Set aside / Moved in /
-  Taken back (a set-aside released by no transaction — freed, the docs' word) / Paid /
-  Paid · auto-pay (the settlement's id is `autoSettlementId`) / Used (sub "Visa fees · Main bank": leaf category · wallet) / Skipped,
-  latest first, 15 shown).
+  Moved to *wallet* / Taken back (a set-aside released by no transaction — freed, the docs'
+  word) / Paid / Paid · auto-pay (the settlement's id is `autoSettlementId`) / Used (sub "Visa
+  fees · Main bank": leaf category · wallet) / Skipped, latest first, 15 shown). **Money a
+  transfer moved is told once** (`view/setAsideMoves.ts`): both rows of a move carry the
+  transfer's id, so they are told apart by wallet — the side holding a live or paid row (failing
+  one, the rows created last) is where it arrived; the released rows in the other wallet are the
+  sources. A source reads *Set aside* + *Moved to Main bank* (unsigned, on its release date); the
+  arrival adds no line of its own until it is freed (*Taken back*) or moved on (its own *Moved
+  to*). A source whose arrival a second transfer re-stamped is paired with it by wallet, day and
+  amount. *Moved in* is left for an arrival whose source is not among the item's rows. Moves
+  with no transfer keep the plain story: *Taken back* there, *Set aside* in the new row.
 
 ### Anytime-action sheets — `components/sheets/`
 
