@@ -8,13 +8,16 @@ import type {
 } from '#/features/planning/data/upcoming'
 import type { PlanningView } from '#/features/planning/hooks/usePlanning'
 import { usePlanningUi } from '#/features/planning/stores/planningUi'
+import { toast } from '#/features/planning/stores/toast'
 import { money, signedMoney } from '#/features/planning/view/format'
 import {
+  confirmedText,
   paymentMeta,
   paymentState,
   periodHead,
   periodSummary,
   setAsideMeta,
+  skippedText,
   stillToPay,
 } from '#/features/planning/view/upcoming'
 import { EmptyPlanCard } from '#/features/planning/components/lists/EmptyPlanCard'
@@ -57,6 +60,12 @@ export function ByPaycheckList({ planning }: { planning: PlanningView }) {
 
   const nameOf = (row: UpcomingRow) =>
     billOf(row.item.billId)?.name ?? goalOf(row.item.goalId)?.name ?? row.name
+  const confirmRow = async (row: UpcomingRow) => {
+    if (await actions.confirm(row)) toast(confirmedText(row, nameOf(row)))
+  }
+  const skipRow = async (row: UpcomingRow) => {
+    if (await actions.skip(row)) toast(skippedText(nameOf(row)))
+  }
 
   const renderRow = (row: UpcomingRow) => {
     const bill = billOf(row.item.billId)
@@ -91,7 +100,7 @@ export function ByPaycheckList({ planning }: { planning: PlanningView }) {
           action={{
             label: 'Set aside now',
             busy: actions.busyId === row.id,
-            onClick: () => void actions.confirm(row),
+            onClick: () => void confirmRow(row),
           }}
           onOpen={() => open(row)}
         />
@@ -155,8 +164,8 @@ export function ByPaycheckList({ planning }: { planning: PlanningView }) {
         nameOf={nameOf}
         busyId={actions.busyId}
         onOpen={open}
-        onConfirm={(r) => void actions.confirm(r)}
-        onSkip={(r) => void actions.skip(r)}
+        onConfirm={(r) => void confirmRow(r)}
+        onSkip={(r) => void skipRow(r)}
       />
       {upcoming.periods.map((p) =>
         p.rows.length === 0 && p.kind !== 'this' ? null : (

@@ -28,6 +28,7 @@ import {
 import { plannedScenario } from '#/features/planning/testing/state'
 import { seedPlanningDb, stubBrowser } from '#/features/planning/testing/dom'
 import { usePlanningUi } from '#/features/planning/stores/planningUi'
+import { usePlanningToast } from '#/features/planning/stores/toast'
 import { UpcomingSection } from './UpcomingSection'
 
 vi.mock('#/db/sync', () => ({ schedulePush: () => undefined }))
@@ -84,6 +85,7 @@ beforeEach(async () => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date(2026, 9, 2))
   usePlanningUi.setState({ sheet: null, detail: null })
+  usePlanningToast.setState({ toast: null })
   await seedPlanningDb()
   await seedPlan()
 })
@@ -131,6 +133,31 @@ describe('Upcoming by paycheck', () => {
       goalId: 'umrah',
       walletId: 'main',
     })
+    await waitFor(() =>
+      expect(usePlanningToast.getState().toast?.message).toBe(
+        'SR 1,000 set aside for Umrah',
+      ),
+    )
+  })
+
+  it('confirms a due payment and says so', async () => {
+    render(<UpcomingSection />)
+    const band = await screen.findByRole('region', { name: 'Needs confirming' })
+    fireEvent.click(within(band).getByRole('button', { name: 'Confirm' }))
+    await waitFor(() =>
+      expect(usePlanningToast.getState().toast?.message).toBe(
+        'Gym marked as paid',
+      ),
+    )
+  })
+
+  it('skips a due payment and says so', async () => {
+    render(<UpcomingSection />)
+    const band = await screen.findByRole('region', { name: 'Needs confirming' })
+    fireEvent.click(within(band).getByRole('button', { name: 'Skip' }))
+    await waitFor(() =>
+      expect(usePlanningToast.getState().toast?.message).toBe('Gym skipped'),
+    )
   })
 
   it('opens the payday review', async () => {

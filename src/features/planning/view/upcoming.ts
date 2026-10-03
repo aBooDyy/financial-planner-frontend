@@ -148,3 +148,13 @@ export function setAsideMeta(
     .filter(Boolean)
     .join(' · ')
 }
+
+/** The toast after a row's one-tap confirm: "Rent marked as paid", "SR 940 set aside for Umrah". */
+export function confirmedText(row: UpcomingRow, name: string): string {
+  if (row.item.role === 'set_aside')
+    return `${money(row.remainder, row.currency)} set aside for ${name}`
+  if (row.item.role === 'income') return `${name} marked as received`
+  return `${name} marked as paid`
+}
+
+export const skippedText = (name: string): string => `${name} skipped`
