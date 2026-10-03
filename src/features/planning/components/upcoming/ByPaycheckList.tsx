@@ -24,6 +24,7 @@ import {
 import { EmptyPlanCard } from '#/features/planning/components/lists/EmptyPlanCard'
 import { NeedsConfirmingBand } from './NeedsConfirmingBand'
 import { PeriodCard } from './PeriodCard'
+import { PeriodCardSkeleton } from './PeriodCardSkeleton'
 import type { PeriodGroup } from './PeriodCard'
 import { UpcomingRowItem } from './UpcomingRowItem'
 
@@ -38,6 +39,13 @@ export function ByPaycheckList({ planning }: { planning: PlanningView }) {
   const { upcoming, calendar, today } = planning
   const base = inputs.base
 
+  if (planning.loading)
+    return (
+      <>
+        <PeriodCardSkeleton rows={3} />
+        <PeriodCardSkeleton rows={2} />
+      </>
+    )
   if (upcoming.isEmpty)
     return (
       <EmptyPlanCard

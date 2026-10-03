@@ -4,6 +4,7 @@ import type { PlanningView } from '#/features/planning/hooks/usePlanning'
 import { useYearAhead } from '#/features/planning/hooks/useYearAhead'
 import { usePlanningUi } from '#/features/planning/stores/planningUi'
 import { useIsDesktop } from '#/hooks/useMediaQuery'
+import { YearAheadSkeleton } from './YearAheadSkeleton'
 import { YearLanes } from './YearLanes'
 import { YearMonthCards } from './YearMonthCards'
 
@@ -14,7 +15,8 @@ export function YearAheadView({ planning }: { planning: PlanningView }) {
   const isDesktop = useIsDesktop()
   const openDetail = usePlanningUi((s) => s.openDetail)
   const openSheet = usePlanningUi((s) => s.openSheet)
-  if (ahead.loading || ahead.months.length === 0) return null
+  if (ahead.loading) return <YearAheadSkeleton desktop={isDesktop} />
+  if (ahead.months.length === 0) return null
   const open = (kind: 'bill' | 'goal', id: string) =>
     openDetail(kind === 'bill' ? billOwner(id) : goalOwner(id))
   return isDesktop ? (

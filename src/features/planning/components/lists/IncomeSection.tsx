@@ -20,6 +20,7 @@ import { ItemMenu } from '#/features/planning/components/kit/ItemMenu'
 import { PlanCard } from '#/features/planning/components/kit/PlanCard'
 import { Spine } from '#/features/planning/components/kit/Spine'
 import { EmptyPlanCard } from './EmptyPlanCard'
+import { LoadingList } from './LoadingList'
 import { SectionHeading } from './SectionHeading'
 import { PLANNING_PREFS_ID } from '#/features/settings/data/planningPrefs'
 
@@ -56,7 +57,8 @@ export function IncomeSection() {
   const mainId = calendar.kind === 'paycheck' ? calendar.stream.id : null
 
   const add = () => openSheet({ kind: 'income', id: null })
-  if (planning.loading) return null
+  if (planning.loading)
+    return <LoadingList title="Income" addLabel="Add income" onAdd={add} />
   const streams = [...inputs.income].sort((a, b) => a.position - b.position)
   if (streams.length === 0)
     return (

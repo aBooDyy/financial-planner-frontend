@@ -33,10 +33,9 @@ export function PlanningPage() {
 
   if (!user) return null
 
-  const badges = sectionBadges(
-    planning.upcoming.dueCount,
-    planning.decisions.length,
-  )
+  const badges = planning.loading
+    ? {}
+    : sectionBadges(planning.upcoming.dueCount, planning.decisions.length)
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-fp-bg text-fp-text">
@@ -44,7 +43,13 @@ export function PlanningPage() {
       <PlanningSectionStrip section={section} badges={badges} />
       <div className="relative flex min-h-0 flex-1">
         <main className="min-w-0 flex-1 overflow-auto">
-          <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-[14px] px-[14px] pt-[14px] pb-[30px] md:px-6 md:pt-[22px] md:pb-[60px]">
+          <span role="status" className="sr-only">
+            {planning.loading ? 'Loading your plan…' : ''}
+          </span>
+          <div
+            aria-busy={planning.loading}
+            className="mx-auto flex w-full max-w-[1180px] flex-col gap-[14px] px-[14px] pt-[14px] pb-[30px] md:px-6 md:pt-[22px] md:pb-[60px]"
+          >
             <PlanningHeader onPlan={() => openSheet({ kind: 'chooser' })} />
             <PlanningTabCard section={section} badges={badges} />
             <SectionView section={section} />

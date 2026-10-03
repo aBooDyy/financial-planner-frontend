@@ -29,15 +29,28 @@ export function OverviewSection() {
   const navigate = useNavigate()
   const openSheet = usePlanningUi((s) => s.openSheet)
   const openDetail = usePlanningUi((s) => s.openDetail)
-  if (planning.loading) return null
+  const show = (section: PlanningSection) =>
+    void navigate({ to: '/planning/$section', params: { section } })
+  if (planning.loading)
+    return (
+      <>
+        <VerdictCard copy={null} onAction={() => undefined} />
+        <PaycheckCard bar={null} base={inputs.base} onSection={show} />
+        <Next30Card
+          events={null}
+          due={[]}
+          today={planning.today}
+          onSeeAll={() => show('upcoming')}
+          onEvent={() => undefined}
+        />
+      </>
+    )
 
   const base = inputs.base
   const ownerOf = (d: Decision) =>
     d.kind === 'bill'
       ? inputs.bills.find((b) => b.id === d.ownerId)
       : inputs.goals.find((g) => g.id === d.ownerId)
-  const show = (section: PlanningSection) =>
-    void navigate({ to: '/planning/$section', params: { section } })
 
   const copy = verdictCopy({
     verdict: planning.verdict,

@@ -1,6 +1,7 @@
 import { Plus } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Button } from '#/components/ui/button'
+import { Skeleton } from '#/components/ui/skeleton'
 
 type Props = {
   title: string
@@ -11,6 +12,8 @@ type Props = {
   /** "+ Add bill" — skips the chooser. */
   addLabel: string
   onAdd: () => void
+  /** The summary line waits as a skeleton. */
+  loading?: boolean
 }
 
 /** A list section's head: "Bills 8", its one-line summary and its add button. */
@@ -21,6 +24,7 @@ export function SectionHeading({
   subLink,
   addLabel,
   onAdd,
+  loading,
 }: Props) {
   return (
     <div className="flex items-start gap-3">
@@ -33,7 +37,11 @@ export function SectionHeading({
             </span>
           ) : null}
         </h2>
-        {sub ? (
+        {loading ? (
+          <p aria-hidden className="mt-[2px] flex h-[19px] items-center">
+            <Skeleton className="h-3 w-64 max-w-full" />
+          </p>
+        ) : sub ? (
           <p className="mt-[2px] text-[12.5px] text-fp-text-3">
             <span className="fp-sensitive">{sub}</span>
             {subLink ? <> · {subLink}</> : null}

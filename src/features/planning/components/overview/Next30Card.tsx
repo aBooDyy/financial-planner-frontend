@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import { ChevronRight } from 'lucide-react'
+import { Skeleton } from '#/components/ui/skeleton'
 import { addDaysISO } from '#/features/planned/data/dates'
 import type { UpcomingRow } from '#/features/planning/data/upcoming'
 import { dayMonth } from '#/features/planning/view/format'
@@ -17,9 +18,12 @@ const LABEL_GAP_PX = 104
 /** Used until the axis is measured. */
 const FALLBACK_WIDTH = 700
 const TICKS = [0, 7, 14, 21, 28]
+/** Where placeholder events sit on the axis while the plan loads. */
+const LOADING_DAYS = [4, 12, 19, 26]
 
 type Props = {
-  events: ReadonlyArray<DayEvent>
+  /** `null` while the plan loads. */
+  events: ReadonlyArray<DayEvent> | null
   due: ReadonlyArray<UpcomingRow>
   today: string
   onSeeAll: () => void
@@ -68,7 +72,12 @@ export function Next30Card({ events, due, today, onSeeAll, onEvent }: Props) {
             />
           </button>
         ) : null}
-        {events.length === 0 ? (
+        {events === null ? (
+          <>
+            <Timeline events={[]} today={today} onEvent={onEvent} loading />
+            <MobileListSkeleton />
+          </>
+        ) : events.length === 0 ? (
           <p className="text-[13px] text-fp-text-3">
             No bills or paydays in the next 30 days.
           </p>
@@ -91,10 +100,13 @@ function Timeline({
   events,
   today,
   onEvent,
+  loading,
 }: {
   events: ReadonlyArray<DayEvent>
   today: string
   onEvent: (e: DayEvent) => void
+  /** Placeholder dots and labels stand where the events will be. */
+  loading?: boolean
 }) {
   const axis = useRef<HTMLDivElement>(null)
   const width = useElementWidth(axis, FALLBACK_WIDTH)
@@ -106,6 +118,7 @@ function Timeline({
   return (
     <div ref={axis} className="relative mx-11 hidden h-[152px] md:block">
       <div className="absolute inset-x-0 top-[61px] h-[2px] rounded-full bg-fp-border-strong" />
+      {loading ? <TimelineSkeleton /> : null}
       {placed.map(({ e, side, at, labelled }) => (
         <button
           key={e.key}
@@ -169,6 +182,55 @@ function Timeline({
           </span>
         ))}
       </div>
+    </div>
+  )
+}
+
+/** The axis's events while the plan loads: dots, with labels alternating above and below. */
+function TimelineSkeleton() {
+  return (
+    <div aria-hidden>
+      {LOADING_DAYS.map((day, i) => (
+        <span
+          key={day}
+          className="absolute top-[56px] -translate-x-1/2 rtl:translate-x-1/2"
+          style={{ insetInlineStart: `${pctOf(day)}%` }}
+        >
+          <Skeleton className="size-3 rounded-full" />
+          <span
+            className={cn(
+              'absolute start-1/2 flex -translate-x-1/2 flex-col items-center gap-[5px] rtl:translate-x-1/2',
+              i % 2 === 0 ? 'bottom-[22px]' : 'top-[22px]',
+            )}
+          >
+            <Skeleton className="h-2.5 w-10" />
+            <Skeleton className="h-3 w-16" />
+            <Skeleton className="h-2.5 w-12" />
+          </span>
+        </span>
+      ))}
+    </div>
+  )
+}
+
+/** Mobile while the plan loads: the bare strip, then placeholder rows. */
+function MobileListSkeleton() {
+  return (
+    <div aria-hidden className="flex flex-col gap-2 md:hidden">
+      <div className="relative mx-2 h-[26px]">
+        <div className="absolute inset-x-0 top-[12px] h-[2px] rounded-full bg-fp-border-strong" />
+      </div>
+      <ul className="flex flex-col">
+        {LOADING_DAYS.map((day) => (
+          <li key={day} className="flex h-[34px] items-center gap-[10px]">
+            <Skeleton className="h-3 w-[38px] flex-none" />
+            <Skeleton className="size-2 flex-none rounded-full" />
+            <Skeleton className="h-3.5 w-2/5" />
+            <span className="flex-1" />
+            <Skeleton className="h-3.5 w-16" />
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

@@ -16,6 +16,7 @@ import { convertMinor } from '#/lib/currency'
 import { ProgressBar } from '#/features/planning/components/kit/ProgressBar'
 import { DoneCard } from './DoneCard'
 import { EmptyPlanCard } from './EmptyPlanCard'
+import { LoadingList } from './LoadingList'
 import { ItemRow } from './ItemRow'
 import { SectionHeading } from './SectionHeading'
 import { TierCard } from './TierCard'
@@ -61,7 +62,8 @@ export function BillsSection() {
   const done = inputs.bills.filter((b) => !isOpen(b))
 
   const add = () => openSheet({ kind: 'bill', id: null })
-  if (planning.loading) return null
+  if (planning.loading)
+    return <LoadingList title="Bills" addLabel="Add bill" onAdd={add} />
   const doneCard = (
     <DoneCard
       title="Done"

@@ -15,7 +15,6 @@ export function UpcomingSection() {
   const planning = usePlanning()
   const openSheet = usePlanningUi((s) => s.openSheet)
   const [view, setView] = useState<View>('paycheck')
-  if (planning.loading) return null
   return (
     <>
       <div className="flex items-center gap-3">
@@ -34,17 +33,18 @@ export function UpcomingSection() {
         <span className="flex-1" />
         <button
           type="button"
+          disabled={planning.loading}
           onClick={() =>
             openSheet({
               kind: 'review',
               payday: planning.reviews.at(0)?.payday ?? null,
             })
           }
-          className="flex flex-none items-center gap-[7px] rounded-[11px] border border-fp-border-strong bg-fp-surface px-[13px] py-[8px] text-[13px] font-bold hover:bg-fp-surface-2"
+          className="flex flex-none items-center gap-[7px] rounded-[11px] border border-fp-border-strong bg-fp-surface px-[13px] py-[8px] text-[13px] font-bold hover:bg-fp-surface-2 disabled:opacity-60"
         >
           <ListChecks size={15} aria-hidden />
           Review
-          {planning.reviewCount > 0 ? (
+          {!planning.loading && planning.reviewCount > 0 ? (
             <CountBadge
               count={planning.reviewCount}
               tone="accent"

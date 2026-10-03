@@ -30,7 +30,11 @@ export function UpcomingRail({ planning }: { planning: PlanningView }) {
     <div className="flex flex-col gap-4">
       <BalanceAheadCard view={view} base={inputs.base} />
       <HeadedCard
-        bar={paycheckBar(planning.paycheck, inputs.base, planning.calendar)}
+        bar={
+          planning.loading
+            ? null
+            : paycheckBar(planning.paycheck, inputs.base, planning.calendar)
+        }
         base={inputs.base}
       />
     </div>

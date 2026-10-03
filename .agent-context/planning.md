@@ -330,6 +330,15 @@ Nice to have for bills, **Must have** / Nice to have for goals, "Left for spendi
   "Oct 18" / "Jun 2027", "a paycheck" vs "a month" by the pay calendar), `repeat.ts` (the docs'
   repeat names: Just once · Weekly · Monthly · Quarterly · Semi-annual · Annual · Custom),
   `colors.ts` (the item palette), `emergencyFund.ts`, and one `*Draft.ts` per editor.
+- **Loading** (the Spending/Wallets rule: skeletons for figures only, never zeros, never whole
+  cards). While `usePlanning().loading`, each section draws its real chrome — headings, the
+  *By paycheck · Year ahead* switch, Review (disabled, no count), Add buttons, the Next 30 days
+  axis and its dated ticks — and skeletons where the data goes: `VerdictCard copy={null}`,
+  `PaycheckCard bar={null}`, `Next30Card events={null}`, `HeadedCard bar={null}`,
+  `SectionHeading loading` + `SkeletonItemRows` (`lists/LoadingList`), `PeriodCardSkeleton`,
+  `YearAheadSkeleton`. Empty states, Needs a decision and the section badges wait for the
+  load. The page is `aria-busy` with one `sr-only` `role="status"`.
+  `components/planningLoading.test.tsx` pins chrome present, skeletons in place, no figure.
 
 ### Plan something and the editors
 

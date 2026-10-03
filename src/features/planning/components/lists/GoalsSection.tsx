@@ -21,6 +21,7 @@ import { convertMinor } from '#/lib/currency'
 import { ProgressBar } from '#/features/planning/components/kit/ProgressBar'
 import { DoneCard } from './DoneCard'
 import { EmptyPlanCard } from './EmptyPlanCard'
+import { LoadingList } from './LoadingList'
 import { ItemRow } from './ItemRow'
 import { SectionHeading } from './SectionHeading'
 import { TierCard } from './TierCard'
@@ -69,7 +70,8 @@ export function GoalsSection() {
   const done = inputs.goals.filter((g) => g.closedAt !== null)
 
   const add = () => openSheet({ kind: 'goal', id: null })
-  if (planning.loading) return null
+  if (planning.loading)
+    return <LoadingList title="Goals" addLabel="Add goal" onAdd={add} />
   const doneCard = (
     <DoneCard
       title="Reached"
