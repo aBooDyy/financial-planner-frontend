@@ -29,13 +29,13 @@ export function VerdictCard({
     <section
       aria-label="Verdict"
       className={cn(
-        'flex flex-col gap-3 rounded-[18px] border px-4 py-4 md:flex-row md:items-center md:px-5 md:py-[18px]',
+        'rounded-[18px] border px-4 py-4 md:px-5 md:py-[18px]',
         danger
           ? 'border-fp-danger-line bg-fp-danger-soft'
           : 'border-fp-border bg-fp-surface shadow-fp',
       )}
     >
-      <div className="flex min-w-0 flex-1 items-start gap-3">
+      <div className="flex items-start gap-[13px]">
         <span
           aria-hidden
           className={cn(
@@ -45,7 +45,7 @@ export function VerdictCard({
         >
           <Icon size={19} strokeWidth={2.2} />
         </span>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h2
             className={cn(
               'text-[18px] leading-[1.25] font-extrabold tracking-[-0.015em] md:text-[20px]',
@@ -57,16 +57,18 @@ export function VerdictCard({
           <p className="fp-sensitive mt-1 max-w-[64ch] text-[13.5px] leading-[1.5] text-fp-text-2">
             {copy.sub}
           </p>
+          <div className="mt-[14px] flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant={copy.action.primary ? 'default' : 'quiet'}
+              onClick={onAction}
+              className="rounded-[11px] px-[15px] py-[9px] text-[13px]"
+            >
+              {copy.action.label}
+            </Button>
+          </div>
         </div>
       </div>
-      <Button
-        type="button"
-        variant={copy.action.primary ? 'default' : 'quiet'}
-        onClick={onAction}
-        className="flex-none self-start rounded-[11px] px-[15px] py-[9px] text-[13px] md:self-center"
-      >
-        {copy.action.label}
-      </Button>
     </section>
   )
 }
