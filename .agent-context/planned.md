@@ -301,7 +301,8 @@ its list, rail (`ForecastCard`, `HeadedCard`, `data/forecast.ts`, `data/headed.t
 - **One-tap confirm** (`hooks/usePlannedRowActions`): `confirmPlanned(id)` when `row.oneTap`
   (known wallet, nothing settled), else the dialog. A refused one-tap or skip (e.g.
   `origin_gone` for a deleted goal's leftover set-aside) opens the dialog, which shows why and
-  still offers Skip. Upcoming's Needs confirming band and its *Set aside now* use it.
+  still offers Skip. Each action resolves true only when its own write landed (the caller's
+  cue to toast). Upcoming's Needs confirming band and its *Set aside now* use it.
 - **`ConfirmPlannedDialog`** (1d) — `{ plannedId: string | null; onOpenChange }`, open while
   `plannedId` is set; Planning shows it as its `confirmPlanned` sheet. State lives in `hooks/useConfirmForm`
   (seeded once per opening from `useConfirmPlanned().defaults`: remainder, suggested wallet or

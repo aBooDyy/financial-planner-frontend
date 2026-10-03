@@ -397,7 +397,8 @@ review for the oldest waiting payday, else the next one), then the view.
 - **By paycheck** (`ByPaycheckList`, copy in `view/upcoming.ts`): the warn **Needs confirming**
   band (`upcoming.due`; *Was due Oct 1 · Main bank*, **Skip** / **Confirm** through
   `usePlannedRowActions` — one tap when the row knows its wallet, else the confirm dialog as the
-  `confirmPlanned` sheet), then one `PeriodCard` per pay period: *Until payday* · *Now → Oct
+  `confirmPlanned` sheet; a one-tap write toasts *Gym marked as paid* / *Gym skipped* /
+  *SR 940 set aside for Umrah*, copy in `confirmedText` / `skippedText`), then one `PeriodCard` per pay period: *Until payday* · *Now → Oct
   24* · *N days left* (footer *Still to pay before payday*: payments less what their occurrence
   holds), *Next paycheck · Oct 25* · *Oct 25 – Nov 24* · *+SR 12,000 in* with sub-heads
   Paycheck / Bills due / Set aside for later (footer *Left for spending*, danger when
@@ -442,9 +443,11 @@ review for the oldest waiting payday, else the next one), then the view.
 ### Payday review — `components/review/PaydayReviewSheet.tsx`
 
 The one-sheet variant (design default, 03 §4, D31): `paydayReview` for the requested payday
-(the oldest waiting one from **Review**, else the next payday), groups **Bills due before next
+(none given — **Review**, the Automatic notice, the year view — means the oldest waiting one,
+else the next payday), groups **Bills due before next
 payday** · **Saving up for bills** · **Goals** (each with its base total). Each line: tick, name
-+ "Due Nov 1" / "By Jun 2027" / "Goal" (no date), a wallet select, an amount field (its own
++ "Due Nov 1" / "By Jun 2027" / an undated goal's "SR 4,500 of SR 30,000" (else "Ongoing"), a
+wallet select, an amount field (its own
 currency). Per destination other than the deposit wallet a ticked-by-default **"I've moved SR X
 to Savings"** card (`transfersFor` over the ticked, edited lines). The over-commit guardrail
 reads free money after those transfers and turns the button into **Set aside anyway**.
