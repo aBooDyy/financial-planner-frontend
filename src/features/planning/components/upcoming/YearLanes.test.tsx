@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { YearAhead, YearMonth } from '#/features/planning/data/yearAhead'
 import type { PayCalendar } from '#/features/planning/data/payPeriods'
@@ -92,5 +98,12 @@ describe('year lanes', () => {
     fireEvent.click(nov)
     expect(await screen.findByText('Nov 2026')).toBeTruthy()
     expect(nov.className).toContain('bg-fp-accent-soft')
+  })
+
+  it('closes the month popover from its close button', async () => {
+    renderLanes()
+    fireEvent.click(screen.getByRole('button', { name: 'Nov' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Close' }))
+    await waitFor(() => expect(screen.queryByText('Nov 2026')).toBeNull())
   })
 })

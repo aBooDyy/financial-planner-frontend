@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
+import { X } from 'lucide-react'
 import type { LocalBill, LocalGoal } from '#/db/types'
 import {
   Popover,
@@ -133,9 +134,19 @@ export function YearLanes({
                       </button>
                     </PopoverTrigger>
                     <PopoverContent className="w-[290px] p-3">
-                      <p className="mb-2 text-[14px] font-extrabold">
-                        {monthYear(`${m.month}-01`)}
-                      </p>
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <p className="text-[14px] font-extrabold">
+                          {monthYear(`${m.month}-01`)}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setOpenMonth(null)}
+                          aria-label="Close"
+                          className="flex size-[26px] flex-none items-center justify-center rounded-[8px] bg-fp-surface-2 text-fp-text-2 transition hover:text-fp-text"
+                        >
+                          <X size={15} strokeWidth={2} />
+                        </button>
+                      </div>
                       {lines.length === 0 ? (
                         <p className="text-[12.5px] text-fp-text-3">
                           Nothing planned this month.
