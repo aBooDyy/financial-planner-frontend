@@ -4,6 +4,7 @@
  */
 import type { LocalBill, LocalGoal } from '#/db/types'
 import type { PayCalendar } from '#/features/planning/data/payPeriods'
+import type { GoalStatus } from '#/features/planning/data/status'
 import type { YearAhead, YearMonth } from '#/features/planning/data/yearAhead'
 import { frequencyMetaOf } from '#/features/goals/data/cadence'
 import type { RatesMap } from '#/lib/config/rates'
@@ -174,6 +175,8 @@ export type GoalLane = {
   goalId: string
   name: string
   color: string
+  /** "SR 5,500 of SR 13,000", or "SR 800 saved" without a target. */
+  sub: string
   /** Inclusive month columns; null when the plan sets nothing aside in the window. */
   span: { from: number; to: number } | null
   label: string
@@ -186,6 +189,7 @@ export function goalLanes(
   ahead: YearAhead,
   goals: ReadonlyArray<LocalGoal>,
   calendar: PayCalendar,
+  status: Readonly<Record<string, Pick<GoalStatus, 'progress'> | undefined>>,
 ): GoalLane[] {
   const last = ahead.months.length - 1
   return ahead.goals.flatMap((y) => {
@@ -205,11 +209,15 @@ export function goalLanes(
             ? `${pace} · done ${monthYear(y.finish)}`
             : pace
     const targetIndex = y.target ? monthIndex(ahead.months, y.target) : -1
+    const saved = money(status[goal.id]?.progress ?? 0, goal.currency)
     return [
       {
         goalId: y.goalId,
         name: goal.name,
         color: goal.color,
+        sub: goal.target
+          ? `${saved} of ${money(goal.target, goal.currency)}`
+          : `${saved} saved`,
         span: y.from || y.paused ? { from, to: Math.max(from, to) } : null,
         label,
         target:

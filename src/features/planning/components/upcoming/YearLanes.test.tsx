@@ -9,6 +9,7 @@ import {
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { YearAhead, YearMonth } from '#/features/planning/data/yearAhead'
 import type { PayCalendar } from '#/features/planning/data/payPeriods'
+import type { GoalStatus } from '#/features/planning/data/status'
 import { bill, goal, m, RATES } from '#/features/planned/testing/fixtures'
 import { stubBrowser } from '#/features/planning/testing/dom'
 import { YearLanes } from './YearLanes'
@@ -71,6 +72,7 @@ function renderLanes() {
       base="SAR"
       rates={RATES}
       calendar={calendar}
+      goalStatus={{ car: { progress: m(5500) } as GoalStatus }}
       onOpen={vi.fn()}
       onReview={vi.fn()}
     />,
@@ -129,6 +131,7 @@ describe('year lanes', () => {
         base="SAR"
         rates={RATES}
         calendar={calendar}
+        goalStatus={{ car: { progress: m(5500) } as GoalStatus }}
         onOpen={onOpen}
         onReview={vi.fn()}
       />,
@@ -152,5 +155,10 @@ describe('year lanes', () => {
     expect(screen.getByText('Goals').parentElement?.textContent).toBe(
       'GoalsSR 1,000 a month',
     )
+  })
+
+  it("shows each goal's progress under its name", () => {
+    renderLanes()
+    expect(screen.getByText('SR 5,500 of SR 13,000')).toBeTruthy()
   })
 })

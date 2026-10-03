@@ -421,7 +421,7 @@ review for the oldest waiting payday, else the next one), then the view.
   payday to the month before it is due, filled by what is set aside; a gem marker on the due
   month; the Bills group head notes what the paycheck-covered bills cost a month, the Goals
   head what goals set aside a paycheck — `groupNotes`; the group labels are sticky spans, as a
-  sticky full-width row can't stick) · one bar per goal to its finish (its colour at 15 %, *"SR 940 a paycheck"*, *"… ·
+  sticky full-width row can't stick) · one bar per goal (its label adds *"SR 5,500 of SR 13,000"* / *"SR 800 saved"*) to its finish (its colour at 15 %, *"SR 940 a paycheck"*, *"… ·
   ongoing"*, *"… · done Dec 2028"*, amber *"… · slips to Aug 2027"*, dimmed *Paused*) with an
   outlined target cell · *Total set aside* per month with a stacked bar (its label opens the
   review; each month's cell opens that month's popover). Rows are placed on explicit grid rows so a target cell can sit over its bar; columns

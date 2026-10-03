@@ -8,6 +8,7 @@ import {
   PopoverTrigger,
 } from '#/components/ui/popover'
 import type { PayCalendar } from '#/features/planning/data/payPeriods'
+import type { GoalStatus } from '#/features/planning/data/status'
 import type { YearAhead } from '#/features/planning/data/yearAhead'
 import type { RatesMap } from '#/lib/config/rates'
 import type { CurrencyCode } from '#/lib/currency'
@@ -35,6 +36,7 @@ type Props = {
   base: CurrencyCode
   rates: RatesMap
   calendar: PayCalendar
+  goalStatus: Readonly<Record<string, GoalStatus | undefined>>
   onOpen: (kind: 'bill' | 'goal', id: string) => void
   onReview: () => void
 }
@@ -63,6 +65,7 @@ export function YearLanes({
   base,
   rates,
   calendar,
+  goalStatus,
   onOpen,
   onReview,
 }: Props) {
@@ -77,7 +80,7 @@ export function YearLanes({
   const bigLanes = billLanes(ahead, bills, calendar)
   const monthlyLanes = monthlyBillLanes(ahead, bills)
   const notes = groupNotes(ahead, bills, goals, base, rates, calendar)
-  const goalRows = goalLanes(ahead, goals, calendar)
+  const goalRows = goalLanes(ahead, goals, calendar, goalStatus)
   const maxSet = Math.max(1, ...months.map((m) => m.setAside.total))
   const range = `${monthYear(`${months[0].month}-01`)} – ${monthYear(`${months[n - 1].month}-01`)}`
 
@@ -368,10 +371,15 @@ export function YearLanes({
               <button
                 type="button"
                 onClick={() => onOpen('goal', g.goalId)}
-                className="flex min-w-0 items-center gap-[6px] text-start text-[13px] font-bold"
+                className="flex min-w-0 flex-col text-start"
               >
-                <Dot color={g.color} />
-                <span className="truncate">{g.name}</span>
+                <span className="flex items-center gap-[6px] text-[13px] font-bold">
+                  <Dot color={g.color} />
+                  <span className="truncate">{g.name}</span>
+                </span>
+                <span className="fp-sensitive truncate text-[11px] text-fp-text-3">
+                  {g.sub}
+                </span>
               </button>,
               (col) => (
                 <>
