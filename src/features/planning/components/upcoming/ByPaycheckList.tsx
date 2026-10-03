@@ -126,7 +126,7 @@ export function ByPaycheckList({ planning }: { planning: PlanningView }) {
         state={paymentState(row, today)}
         autopay={bill?.autopay}
         action={
-          bill && !bill.autopay
+          bill
             ? {
                 label: 'Pay now',
                 onClick: () =>

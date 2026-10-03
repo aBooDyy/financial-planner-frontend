@@ -122,6 +122,18 @@ describe('Upcoming by paycheck', () => {
     })
   })
 
+  it('offers Pay now on an auto-pay bill too', async () => {
+    await db.bills.put({ ...rent, autopay: true })
+    render(<UpcomingSection />)
+    await screen.findAllByText('Auto-pay')
+    const rentRow = screen
+      .getAllByText('Rent')
+      .map((el) => el.closest('li'))
+      .find((li) => li && within(li).queryByText('Auto-pay'))
+    if (!rentRow) throw new Error('no auto-pay Rent row')
+    expect(within(rentRow).getByRole('button', { name: 'Pay now' })).toBeTruthy()
+  })
+
   it('sets a future set-aside aside now', async () => {
     render(<UpcomingSection />)
     const rows = await screen.findAllByText('Umrah')

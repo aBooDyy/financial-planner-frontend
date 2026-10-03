@@ -404,7 +404,7 @@ review for the oldest waiting payday, else the next one), then the view.
   Jan 15". Calendar months read *This month* / *Next month*.
 - Rows (`UpcomingRowItem`) show the **owner's** name (a planned set-aside row's own name has a
   " set-aside" suffix), a Bill / Goal / Income tag and Auto-pay. Every future bill payment
-  (not auto-pay) offers **Pay now** for that occurrence; every set-aside **Set aside now**
+  (auto-pay too, D23) offers **Pay now** for that occurrence; every set-aside **Set aside now**
   (confirms the planned row early). State line: *Set aside ✓* (covered, within 40 days),
   *Overdue*, *Due in N days* (≤ 10), else the date. A row opens its bill's or goal's detail
   (income: the confirm dialog).
