@@ -5,6 +5,8 @@
  * whether their occurrence is set aside. Pure, over the Planned tab's row views.
  */
 import type { LocalBalanceNode } from '#/db/types'
+import { addDaysISO } from '#/features/planned/data/dates'
+import { HORIZON_DAYS } from '#/features/planned/data/generate'
 import type { PlannedRowView } from '#/features/planned/data/views'
 import { buildPlannedList } from '#/features/planned/data/views'
 import type { PlannerInputs, PlannerState } from '#/features/planned/data/state'
@@ -138,16 +140,16 @@ export function buildUpcoming(args: {
   const coversOf = (r: UpcomingRow): string | null => {
     const bill = r.item.billId ? bills.get(r.item.billId) : undefined
     return bill
-      ? occurrenceFrom(
-          bill,
-          r.item.date,
-          paymentRows.get(bill.id) ?? new Map(),
-        )
+      ? occurrenceFrom(bill, r.item.date, paymentRows.get(bill.id) ?? new Map())
       : null
   }
 
-  const periods = periodsBetween(state.funding.calendar, today, last).map(
-    (period, i): UpcomingPeriod => {
+  // Paydays and bill payments are generated only this far ahead; a period past it would
+  // show a dated goal's set-asides with no pay or bills around them.
+  const planned = addDaysISO(today, HORIZON_DAYS)
+  const periods = periodsBetween(state.funding.calendar, today, last)
+    .filter((period, i) => i < 2 || period.end <= planned)
+    .map((period, i): UpcomingPeriod => {
       const rows = ahead.filter(
         (r) => r.item.date >= period.start && r.item.date <= period.end,
       )
@@ -173,8 +175,7 @@ export function buildUpcoming(args: {
         setAsideOut,
         left: incomeIn - uncovered(payments) - sum(forLater),
       }
-    },
-  )
+    })
   return {
     due,
     dueCount: due.length,

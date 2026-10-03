@@ -244,6 +244,14 @@ describe('Upcoming by payday', () => {
     expect(coverage).toEqual({ Rent: 'covered', Internet: 'partial' })
   })
 
+  it('lists only pay periods whose paydays and bills are already planned', () => {
+    const { inputs, state, today } = world({ today: '2026-10-02' })
+    const view = buildUpcoming({ inputs, state, nodes, today })
+    const later = view.periods.filter((p) => p.kind !== 'this')
+    expect(later.length).toBeGreaterThan(1)
+    for (const p of later) expect(p.incomeIn).toBe(m(12000))
+  })
+
   it('puts what came due first, under Needs confirming', () => {
     const { inputs, state, today } = world({
       today: '2026-11-02',
