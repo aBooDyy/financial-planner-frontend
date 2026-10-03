@@ -102,7 +102,7 @@ describe('BillEditor', () => {
     setDate('When is it due?', '2026-10-10')
     expect(
       await screen.findByText(
-        'Due before your next paycheck. It comes out of what is free now.',
+        'Due before your next paycheck. It will come out of what is free now.',
       ),
     ).toBeTruthy()
   })

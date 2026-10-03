@@ -131,7 +131,7 @@ export function billPreview(
   if (!form.nextDue) return 'Pick a due date to see how it fits.'
   const paydays = paydaysIn(ctx.calendar, ctx.today, form.nextDue)
   if (paydays.length === 0)
-    return 'Due before your next paycheck. It comes out of what is free now.'
+    return 'Due before your next paycheck. It will come out of what is free now.'
   const perYear = perYearOf(form.repeat)
   if (perYear > 0 && perYear >= ctx.calendar.perYear - 1e-9)
     return `Covered from ${ctx.calendar.kind === 'paycheck' ? 'each paycheck' : 'each month’s income'}.`

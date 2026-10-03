@@ -343,7 +343,7 @@ Nice to have for bills, **Must have** / Nice to have for goals, "Left for spendi
   `MerchantOptions` in a popover), Note, Colour. Preview (`billPreview`): *Covered from each
   paycheck.* when it repeats at least as often as pay; *We'll set aside SR X a paycheck so it's
   ready on Mar 1.* (amount ÷ the paydays from today through the due date — the engine's first
-  window); *Due before your next paycheck. It comes out of what is free now.* when no payday comes
+  window); *Due before your next paycheck. It will come out of what is free now.* when no payday comes
   first.
 - **Goal** (`GoalEditor`): What are you saving for? · How much do you need? (optional) · By when?
   (optional, with **No date**) · How much each month? (only without a date) · Save in · How
