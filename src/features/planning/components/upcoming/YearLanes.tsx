@@ -358,9 +358,12 @@ export function YearLanes({
             </button>,
             (col) =>
               months.map((m, i) => (
-                <span
+                <button
                   key={m.month}
-                  className="flex flex-col items-center justify-center gap-1 px-2 py-2"
+                  type="button"
+                  onClick={() => setOpenMonth(i)}
+                  aria-label={`${monthYear(`${m.month}-01`)}: ${money(m.setAside.total, base)} set aside`}
+                  className="flex flex-col items-center justify-center gap-1 px-2 py-2 hover:bg-fp-surface-2"
                   style={col(i)}
                 >
                   <span className="fp-sensitive text-[11.5px] font-extrabold text-fp-transfer tabular-nums">
@@ -382,7 +385,7 @@ export function YearLanes({
                       />
                     ))}
                   </span>
-                </span>
+                </button>
               )),
             'setaside',
           )}

@@ -106,4 +106,15 @@ describe('year lanes', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Close' }))
     await waitFor(() => expect(screen.queryByText('Nov 2026')).toBeNull())
   })
+
+  it("opens a month's popover from its set-aside cell", async () => {
+    renderLanes()
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Dec 2026: SR 1,000 set aside' }),
+    )
+    expect(await screen.findByText('Dec 2026')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Dec' }).className).toContain(
+      'bg-fp-accent-soft',
+    )
+  })
 })

@@ -420,7 +420,7 @@ review for the oldest waiting payday, else the next one), then the view.
   month) · one bar per goal to its finish (its colour at 15 %, *"SR 940 a paycheck"*, *"… ·
   ongoing"*, *"… · done Dec 2028"*, amber *"… · slips to Aug 2027"*, dimmed *Paused*) with an
   outlined target cell · *Total set aside* per month with a stacked bar (its label opens the
-  review). Rows are placed on explicit grid rows so a target cell can sit over its bar; columns
+  review; each month's cell opens that month's popover). Rows are placed on explicit grid rows so a target cell can sit over its bar; columns
   follow the document direction. Mobile: **month cards** (`YearMonthCards`, D22).
 - **Rail** (`UpcomingRail`, stacked below on mobile): **Balance ahead** (`view/ahead.ts#balanceAhead`,
   `BalanceAheadCard`) — active wallets' Balance and Free to spend for 30 days from
