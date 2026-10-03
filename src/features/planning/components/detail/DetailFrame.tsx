@@ -17,8 +17,8 @@ type Props = {
 }
 
 /**
- * Where a bill or goal is read: a 400px panel over the page's end edge on desktop (the page
- * underneath never reflows), a bottom sheet on mobile.
+ * Where a bill or goal is read: a 400px panel down the page's end edge on desktop, under the nav
+ * (the page underneath never reflows), a bottom sheet on mobile.
  */
 export function DetailFrame({
   color,
@@ -64,7 +64,7 @@ export function DetailFrame({
     <aside
       aria-label={title}
       data-side-pane
-      className="absolute inset-y-3 end-3 z-30 flex w-[400px] max-w-[86%] animate-in flex-col rounded-[18px] border border-fp-border bg-fp-surface text-fp-text shadow-[-20px_0_50px_-20px_rgba(20,18,12,0.35)] duration-200 ease-out slide-in-from-end rtl:shadow-[20px_0_50px_-20px_rgba(20,18,12,0.35)]"
+      className="absolute inset-y-0 end-0 z-30 flex w-[400px] max-w-full animate-in flex-col border-s border-fp-border bg-fp-surface text-fp-text shadow-[-24px_0_50px_-30px_rgba(0,0,0,0.35)] duration-200 ease-out slide-in-from-end rtl:shadow-[24px_0_50px_-30px_rgba(0,0,0,0.35)]"
     >
       <div className="flex flex-none items-start gap-[10px] px-5 pt-[18px]">
         <span className="mt-[7px]">
