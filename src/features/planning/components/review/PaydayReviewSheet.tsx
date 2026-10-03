@@ -23,7 +23,11 @@ import {
   confirmReview,
   postponeReview,
 } from '#/features/planning/actions/confirmReview'
-import { paydayReview, transfersFor } from '#/features/planning/data/review'
+import {
+  paydayReview,
+  transfersFor,
+  waitingReviews,
+} from '#/features/planning/data/review'
 import type {
   ReviewGroupKey,
   ReviewLine,
@@ -77,14 +81,15 @@ function PaydayReviewBody({ payday, onClose }: Props) {
       ),
     [wallets.byId],
   )
-  const [review] = useState(() =>
-    paydayReview(
-      inputs,
-      state,
-      payday ?? state.funding.slots.at(0)?.date ?? today,
-      { today, walletCurrency },
-    ),
-  )
+  const [review] = useState(() => {
+    const options = { today, walletCurrency }
+    const day =
+      payday ??
+      waitingReviews(inputs, state, options).at(0)?.payday ??
+      state.funding.slots.at(0)?.date ??
+      today
+    return paydayReview(inputs, state, day, options)
+  })
   const lines = review.groups.flatMap((g) => g.lines)
   const [drafts, setDrafts] = useState<Record<string, Draft>>(() =>
     Object.fromEntries(

@@ -22,6 +22,7 @@ import {
   goal,
   income,
   m,
+  planned,
   wallet,
 } from '#/features/planned/testing/fixtures'
 import { plannedScenario } from '#/features/planning/testing/state'
@@ -112,6 +113,23 @@ describe('PaydayReviewSheet', () => {
     expect(usePlanningToast.getState().toast?.message).toBe(
       'SR 1,000 set aside across 1 item',
     )
+  })
+
+  it('opens the oldest waiting payday when none is given', async () => {
+    await db.plannedTransactions.put(
+      planned({
+        goalId: 'umrah',
+        name: 'Umrah set-aside',
+        amount: m(500),
+        occurrence: '2026-09-25',
+        walletId: 'savings',
+        review: true,
+      }),
+    )
+    render(<PaydayReviewSheet payday={null} onClose={vi.fn()} />)
+    expect(
+      await screen.findByText('Set aside from your Sep 25 paycheck'),
+    ).toBeTruthy()
   })
 
   it('edits an amount before setting it aside', async () => {
