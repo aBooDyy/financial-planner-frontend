@@ -33,6 +33,7 @@ describe('usePlannedData', () => {
     await waitFor(() => expect(seen.a.loading).toBe(false))
 
     const reads = openPlannerReads()
+    const rates = seen.a.inputs.rates
     expect(reads).toBeGreaterThan(0)
     expect(seen.b.inputs).toBe(seen.a.inputs)
     expect(seen.b.state).toBe(seen.a.state)
@@ -54,6 +55,8 @@ describe('usePlannedData', () => {
     })
     await waitFor(() => expect(seen.a.inputs.goals).toHaveLength(2))
     expect(seen.b.inputs).toBe(seen.a.inputs)
+    // Same rates, same object: reads keyed on them aren't restarted by other tables.
+    expect(seen.a.inputs.rates).toBe(rates)
 
     view.unmount()
     expect(openPlannerReads()).toBe(0)

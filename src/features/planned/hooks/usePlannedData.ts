@@ -48,6 +48,10 @@ function memoLast<TArgs extends unknown[], TResult>(
   }
 }
 
+// One object per set of rates, so a table landing doesn't hand consumers new rates.
+const sharedRates = memoLast(
+  (ratesKey: string): RatesMap => JSON.parse(ratesKey),
+)
 // Shared by every consumer: mounted together, they read the same table arrays, so the
 // first one derives and the rest reuse it.
 const sharedInputs = memoLast(
@@ -60,7 +64,7 @@ const sharedInputs = memoLast(
     setAsides: PlannerInputs['setAsides'],
     settings: LocalBalanceSettings | null,
     base: CurrencyCode,
-    ratesKey: string,
+    rates: RatesMap,
   ): PlannerInputs =>
     liveInputs({
       goals,
@@ -71,7 +75,7 @@ const sharedInputs = memoLast(
       setAsides,
       settings: planningSettingsOf(settings),
       base,
-      rates: JSON.parse(ratesKey) as RatesMap,
+      rates,
     }),
 )
 const sharedState = memoLast(
@@ -108,7 +112,7 @@ export function usePlannedData(): PlannedData {
     tables.setAsides ?? NONE,
     tables.settings ?? null,
     base,
-    JSON.stringify(rates),
+    sharedRates(JSON.stringify(rates)),
   )
 
   return {
