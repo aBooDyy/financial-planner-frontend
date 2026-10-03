@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { YearAhead, YearMonth } from '#/features/planning/data/yearAhead'
 import type { PayCalendar } from '#/features/planning/data/payPeriods'
@@ -83,5 +83,14 @@ describe('year lanes', () => {
     )
     expect(guide?.style.gridColumn).toBe('2')
     expect(guide?.style.gridRow).toBe(`1 / ${rows + 1}`)
+  })
+
+  it('tints the header of the month whose popover is open', async () => {
+    renderLanes()
+    const nov = screen.getByRole('button', { name: 'Nov' })
+    expect(nov.className).not.toContain('bg-fp-accent-soft')
+    fireEvent.click(nov)
+    expect(await screen.findByText('Nov 2026')).toBeTruthy()
+    expect(nov.className).toContain('bg-fp-accent-soft')
   })
 })

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import type { LocalBill, LocalGoal } from '#/db/types'
 import {
@@ -54,6 +55,7 @@ export function YearLanes({
   onOpen,
   onReview,
 }: Props) {
+  const [openMonth, setOpenMonth] = useState<number | null>(null)
   const { months } = ahead
   const n = months.length
   const grid: CSSProperties = {
@@ -103,13 +105,22 @@ export function YearLanes({
                 const head = monthHead(months, i)
                 const lines = monthLines(m, bills, goals, base)
                 return (
-                  <Popover key={m.month}>
+                  <Popover
+                    key={m.month}
+                    open={openMonth === i}
+                    onOpenChange={(open) =>
+                      setOpenMonth((cur) => (open ? i : cur === i ? null : cur))
+                    }
+                  >
                     <PopoverTrigger asChild>
                       <button
                         type="button"
                         className={cn(
-                          'flex flex-col items-center justify-center py-2 text-[13px] font-extrabold hover:bg-fp-surface-2',
+                          'flex flex-col items-center justify-center py-2 text-[13px] font-extrabold',
                           i === 0 && 'text-fp-accent-ink',
+                          openMonth === i
+                            ? 'bg-fp-accent-soft'
+                            : 'hover:bg-fp-surface-2',
                         )}
                         style={col(i)}
                       >
