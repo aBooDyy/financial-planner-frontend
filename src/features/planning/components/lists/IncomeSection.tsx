@@ -135,7 +135,7 @@ export function IncomeSection() {
                       {incomeMeta(s, walletName, today)}
                     </span>
                   </span>
-                  <span className="fp-sensitive flex-none text-[13.5px] font-extrabold tabular-nums">
+                  <span className="fp-sensitive flex-none text-[14px] font-extrabold tabular-nums">
                     {money(s.amount, s.currency)}
                     <span className="ms-[2px] text-[11px] font-semibold text-fp-text-3">
                       {frequencyMetaOf(s, 'monthly').short}
@@ -182,7 +182,7 @@ export function IncomeSection() {
       </PlanCard>
       <p className="px-1 text-[12.5px] leading-[1.5] text-fp-text-3">
         Your plan splits each paycheck from the income marked &ldquo;Sets my pay
-        periods&rdquo;. Other income is added to the paycheck it lands in.
+        periods&rdquo;. Other income is added to the same paycheck.
       </p>
     </>
   )
