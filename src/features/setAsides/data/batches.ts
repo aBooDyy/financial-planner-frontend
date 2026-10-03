@@ -57,12 +57,18 @@ type Split = {
   item: ReleaseItemWire
 }
 
+/**
+ * What a release records on the row. `carriedBy` is the transfer that took the money off, when
+ * one did; otherwise the row keeps the one that brought it, as the server keeps it.
+ */
+type Release = { releasedById: string | null; carriedBy?: string | null }
+
 /** Release `part` of a live row on `on`; the rest, if any, stays live under a new id. */
 function split(
   row: LocalSetAside,
   part: SetAsidePart,
   on: string,
-  release: Pick<LocalSetAside, 'releasedById' | 'movedByTransferId'>,
+  release: Release,
   ts: string,
 ): Split {
   const amount = part.amount ?? row.amount
@@ -71,7 +77,8 @@ function split(
     ...row,
     amount: partial ? amount : row.amount,
     releasedAt: on,
-    ...release,
+    releasedById: release.releasedById,
+    movedByTransferId: release.carriedBy ?? row.movedByTransferId,
     updatedAt: ts,
     dirty: 1,
   }
@@ -150,13 +157,7 @@ export async function releaseSetAsides(
   await db.transaction('rw', db.setAsides, db.outbox, async () => {
     const ts = now()
     const splits = (await liveRows(parts)).map((row, i) =>
-      split(
-        row,
-        parts[i],
-        releasedAt,
-        { releasedById, movedByTransferId: null },
-        ts,
-      ),
+      split(row, parts[i], releasedAt, { releasedById }, ts),
     )
     for (const chunk of chunks(splits)) {
       await queueBatch(
@@ -264,7 +265,7 @@ async function movedCopy(
  * Move set-asides — wholly or in part — to another wallet and/or another bill or goal. The
  * source is released on `date` (default today) and a new row written for the target, dated
  * `date`; `transferId` (the transfer the money rode on, possibly still queued) is stamped on
- * both. Throws `SetAsideBatchError` for a row that is not live; nothing is written then.
+ * both — without one, the source keeps the transfer that brought it. Throws `SetAsideBatchError` for a row that is not live; nothing is written then.
  */
 export async function moveSetAsides(
   parts: ReadonlyArray<MovePart>,
@@ -283,7 +284,7 @@ export async function moveSetAsides(
         source,
         part,
         date,
-        { releasedById: null, movedByTransferId: transferId },
+        { releasedById: null, carriedBy: transferId },
         ts,
       )
       const copy = await movedCopy(

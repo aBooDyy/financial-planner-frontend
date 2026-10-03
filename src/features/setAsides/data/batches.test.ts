@@ -98,6 +98,18 @@ describe('releaseSetAsides', () => {
     expect(new Set(entry.alsoRows)).toEqual(new Set([remainderId, 'a2']))
   })
 
+  it('keeps the transfer that brought the money, as the server does', async () => {
+    await db.setAsides.update('a1', { movedByTransferId: 'tr0' })
+
+    await releaseSetAsides([{ id: 'a1', amount: m(200) }])
+
+    const [item] = ((await onlyEntry()).payload as ReleaseWire).items
+    expect((await db.setAsides.get('a1'))?.movedByTransferId).toBe('tr0')
+    expect(
+      (await db.setAsides.get(item.remainder_id as string))?.movedByTransferId,
+    ).toBe('tr0')
+  })
+
   it('refuses a row that is not live, writing nothing', async () => {
     await db.setAsides.update('a2', { releasedAt: '2026-10-01' })
     await expect(
@@ -144,6 +156,16 @@ describe('moveSetAsides', () => {
     expect((await db.setAsides.get(item.remainder_id as string))?.amount).toBe(
       m(400),
     )
+  })
+
+  it('keeps the source’s transfer on a move no transfer carried, as the server does', async () => {
+    await db.setAsides.update('a1', { movedByTransferId: 'tr0' })
+
+    await moveSetAsides([{ id: 'a1', to: { walletId: 'w2' } }])
+
+    const [item] = ((await onlyEntry()).payload as MoveWire).items
+    expect((await db.setAsides.get('a1'))?.movedByTransferId).toBe('tr0')
+    expect((await db.setAsides.get(item.new_id))?.movedByTransferId).toBeNull()
   })
 
   it('sends a move within the same goal as a wallet move, keeping the planned link', async () => {

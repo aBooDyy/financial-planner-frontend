@@ -20,7 +20,10 @@ goal allocations and serves bills and goals alike (working docs:
   Choosing the leg over the payment keeps taking the payment back (`restoreReleasedBy`) from
   setting aside again money the transfer already moved; the server takes any of the user's
   transactions and nulls the link if the transfer is deleted (FK `SET NULL`). A row is wholly
-  live or wholly released: a partial release splits it. `movedByTransferId` links a release and the new row of a move.
+  live or wholly released: a partial release splits it. `movedByTransferId` is the transfer
+  that last carried the row's money: stamped on both rows of a move a transfer carried (the
+  source as it is released, the new row from its creation), and kept by every other release —
+  a payment, a free, a close, a move with no transfer — exactly as the server keeps it.
 - `plannedId` = the planned SET_ASIDE row it settles. It settles it while **live**, and still
   does once a **payment** released it (`releasedById` — the money was set aside, then used). One
   freed, moved or released by a close does not (`settlesItsRow` in `planned/data/settle.ts`): the
@@ -75,7 +78,9 @@ applies all-or-nothing (`POST /set-asides/release`, `/move`).
   the moved amount for the target: another wallet (it becomes a wallet set-aside), and/or
   another bill or goal (planned link dropped; a bill target's occurrence = the one named, else
   the source's when it is the same bill, else the target's `nextDue`; a goal's is null).
-  Anything not named keeps the source's. `transferId` is stamped on the released and new rows.
+  Anything not named keeps the source's. `transferId` is stamped on the released and new rows;
+  without one the source keeps its own and the new row has none (the server's rule — the
+  device copy must not drift from it, as a later full PATCH would send the drift back).
   **A move to the source's own owner** — its goal, or its bill and occurrence — is a wallet
   move: it keeps the planned link and `to` carries only `wallet_id` (`ownerAfterMove`), so the
   server keeps the link too, whether or not it reads a named same owner as "keep" (it does since
