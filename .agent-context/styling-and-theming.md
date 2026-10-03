@@ -145,14 +145,18 @@ overflow hatch):
 
 | Token | Light | Dark | Use |
 | ----- | ----- | ---- | --- |
+| `fp-accent-fill` / `fp-on-accent-fill` | `#17855A` / `#FFFFFF` | `#2FBD8B` / `#141619` | solid green (accent count badge) and the text on it |
 | `fp-warn-fill` / `fp-on-warn-fill` | `#D9882B` / `#1B1A17` | `#E39A45` / `#141619` | solid amber (count badge, status dot) and the text on it |
 | `fp-warn-soft` / `fp-warn-line` | `rgba(217,136,43,.12)` / `.30` | `rgba(227,154,69,.14)` / `.30` | amber wash and its border |
 | `fp-danger-fill` / `fp-on-danger-fill` | `#D83B40` / `#FFFFFF` | `#F2555A` / `#141619` | solid red (count badge, "your pay" mark, hatch) and the text on it |
 | `fp-danger-soft` / `fp-danger-line` | `rgba(229,72,77,.10)` / `.28` | `rgba(242,85,90,.14)` / `.30` | red wash and its border |
 
 Text on a fill uses its `fp-on-*-fill` partner, never `text-white`: white on the design's amber is
-2.3–2.8:1 and on its dark red 3.4:1. Each pair is ≥ 4.5:1 (amber 6.2 / 7.8, red 4.6 / 5.4). The
-light red fill is the design's `#E5484D` deepened to `#D83B40` so white text passes.
+2.3–2.8:1, on its dark red 3.4:1 and on the dark accent 2.4:1. Each pair is ≥ 4.5:1 (amber
+6.2 / 7.8, red 4.6 / 5.4, green 4.6 / 7.6), checked by `src/styles/theme.test.ts`. The light red
+fill is the design's `#E5484D` deepened to `#D83B40`, and the light green fill the accent
+`#1F9D6B` (3.4:1) deepened to `#17855A`, so white text passes. Washes and borders use the
+`-soft` / `-line` tokens, not an opacity of the ink (`bg-fp-warn/10`).
 The transaction dialog's type tints: `fp-spend` / `fp-spend-soft` (light `#B4561A` on
 `rgba(232,131,58,.11)`, dark `#F4A66E`) and `fp-transfer` / `fp-transfer-soft` (light `#2457B8` on
 `rgba(59,130,246,.10)`, dark `#8DB4F8`); income uses the accent.

@@ -19,7 +19,7 @@ export function CountBadge({
         'inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-[5px] text-[10.5px] font-extrabold tabular-nums',
         tone === 'warn' && 'bg-fp-warn-fill text-fp-on-warn-fill',
         tone === 'danger' && 'bg-fp-danger-fill text-fp-on-danger-fill',
-        tone === 'accent' && 'bg-fp-accent text-white',
+        tone === 'accent' && 'bg-fp-accent-fill text-fp-on-accent-fill',
         className,
       )}
     >

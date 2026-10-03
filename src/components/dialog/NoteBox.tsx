@@ -6,7 +6,7 @@ export type NoteTone = 'accent' | 'warn' | 'danger' | 'neutral'
 const TONE: Record<NoteTone, string> = {
   accent: 'bg-fp-accent-soft text-fp-accent-ink',
   warn: 'bg-fp-spend-soft text-fp-spend',
-  danger: 'bg-fp-danger/10 text-fp-danger',
+  danger: 'bg-fp-danger-soft text-fp-danger',
   neutral: 'bg-fp-surface-2 text-fp-text-2',
 }
 

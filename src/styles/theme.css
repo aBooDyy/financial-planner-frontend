@@ -27,6 +27,8 @@
   --color-fp-accent: var(--fp-accent);
   --color-fp-accent-ink: var(--fp-accent-ink);
   --color-fp-accent-soft: var(--fp-accent-soft);
+  --color-fp-accent-fill: var(--fp-accent-fill);
+  --color-fp-on-accent-fill: var(--fp-on-accent-fill);
   --color-fp-danger: var(--fp-danger);
   --color-fp-warn: var(--fp-warn);
   --color-fp-warn-fill: var(--fp-warn-fill);
@@ -92,6 +94,8 @@
   --fp-danger: #b42318;
   --fp-warn: #b54708;
   /* Solid fills and tints beside those inks; each fill pairs with a text colour that reads on it. */
+  --fp-accent-fill: #17855a;
+  --fp-on-accent-fill: #ffffff;
   --fp-warn-fill: #d9882b;
   --fp-on-warn-fill: #1b1a17;
   --fp-warn-soft: rgba(217, 136, 43, 0.12);
@@ -154,6 +158,8 @@
   --fp-accent-soft: rgba(47, 189, 139, 0.14);
   --fp-danger: #f2998e;
   --fp-warn: #f5b35c;
+  --fp-accent-fill: #2fbd8b;
+  --fp-on-accent-fill: #141619;
   --fp-warn-fill: #e39a45;
   --fp-on-warn-fill: #141619;
   --fp-warn-soft: rgba(227, 154, 69, 0.14);
