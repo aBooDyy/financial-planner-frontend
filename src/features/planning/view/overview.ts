@@ -161,7 +161,9 @@ export function paycheckBar(
     part(
       'bills',
       'Bills',
-      plural(p.bills.count, 'bill') + ' each paycheck',
+      calendar.perYear === 12
+        ? `${p.bills.count} monthly`
+        : plural(p.bills.count, 'bill') + ' each paycheck',
       p.bills.total,
       'bills',
     ),

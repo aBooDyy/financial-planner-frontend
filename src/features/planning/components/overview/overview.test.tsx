@@ -81,6 +81,7 @@ describe('Overview', () => {
     ).toBeTruthy()
     expect(screen.getByText('SR 12,000 · paid on the 25th')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Bills: SR 3,000' })).toBeTruthy()
+    expect(screen.getByText('1 monthly')).toBeTruthy()
     expect(
       screen.getByRole('button', { name: 'Left for spending: SR 9,000' }),
     ).toBeTruthy()
