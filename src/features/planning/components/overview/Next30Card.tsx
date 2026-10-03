@@ -1,8 +1,10 @@
+import { useEffect, useRef, useState } from 'react'
+import type { RefObject } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { addDaysISO } from '#/features/planned/data/dates'
 import type { UpcomingRow } from '#/features/planning/data/upcoming'
 import { dayMonth } from '#/features/planning/view/format'
-import { NEXT_DAYS } from '#/features/planning/view/overview'
+import { NEXT_DAYS, placeLabels } from '#/features/planning/view/overview'
 import type { DayEvent } from '#/features/planning/view/overview'
 import { cn } from '#/lib/utils'
 import {
@@ -10,8 +12,10 @@ import {
   PlanCard,
 } from '#/features/planning/components/kit/PlanCard'
 
-/** A label closer than this share of the axis to the last one on its side hides (its dot stays). */
-const LABEL_GAP_PCT = 15
+/** The least room (px) between two labels on the same side of the axis. */
+const LABEL_GAP_PX = 104
+/** Used until the axis is measured. */
+const FALLBACK_WIDTH = 700
 const TICKS = [0, 7, 14, 21, 28]
 
 type Props = {
@@ -60,7 +64,7 @@ export function Next30Card({ events, due, today, onSeeAll, onEvent }: Props) {
             <ChevronRight
               size={15}
               aria-hidden
-              className="flex-none text-fp-text-3 rtl:-scale-x-100"
+              className="flex-none text-fp-warn rtl:-scale-x-100"
             />
           </button>
         ) : null}
@@ -92,20 +96,16 @@ function Timeline({
   today: string
   onEvent: (e: DayEvent) => void
 }) {
-  const lastShown: Record<'above' | 'below', number> = {
-    above: -Infinity,
-    below: -Infinity,
-  }
-  const placed = events.map((e, i) => {
-    const side = i % 2 === 0 ? ('above' as const) : ('below' as const)
-    const at = pctOf(e.day)
-    const labelled = at - lastShown[side] >= LABEL_GAP_PCT
-    if (labelled) lastShown[side] = at
-    return { e, side, at, labelled }
-  })
+  const axis = useRef<HTMLDivElement>(null)
+  const width = useWidth(axis)
+  const sides = placeLabels(
+    events.map((e) => (pctOf(e.day) / 100) * width),
+    LABEL_GAP_PX,
+  )
+  const placed = events.map((e, i) => ({ e, at: pctOf(e.day), ...sides[i] }))
   return (
-    <div className="relative mx-8 hidden h-[152px] md:block">
-      <div className="absolute inset-x-0 top-[61px] h-[2px] rounded-full bg-fp-border" />
+    <div ref={axis} className="relative mx-11 hidden h-[152px] md:block">
+      <div className="absolute inset-x-0 top-[61px] h-[2px] rounded-full bg-fp-border-strong" />
       {placed.map(({ e, side, at, labelled }) => (
         <button
           key={e.key}
@@ -173,6 +173,20 @@ function Timeline({
   )
 }
 
+function useWidth(ref: RefObject<HTMLElement | null>): number {
+  const [width, setWidth] = useState(FALLBACK_WIDTH)
+  useEffect(() => {
+    const el = ref.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry.contentRect.width > 0) setWidth(entry.contentRect.width)
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [ref])
+  return width
+}
+
 /** Mobile: a strip of dots, then the list. */
 function MobileList({
   events,
@@ -184,7 +198,7 @@ function MobileList({
   return (
     <div className="flex flex-col gap-2 md:hidden">
       <div className="relative mx-2 h-[26px]">
-        <div className="absolute inset-x-0 top-[12px] h-[2px] bg-fp-border" />
+        <div className="absolute inset-x-0 top-[12px] h-[2px] rounded-full bg-fp-border-strong" />
         {events.map((e) => (
           <span
             key={e.key}

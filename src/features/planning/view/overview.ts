@@ -256,6 +256,27 @@ export function next30Events(
     .sort((a, b) => a.date.localeCompare(b.date) || a.key.localeCompare(b.key))
 }
 
+export type LabelSide = 'above' | 'below'
+
+/**
+ * Sides and visibility for the timeline's labels, at their x positions (px, ascending). Labels
+ * alternate; one too close to the last label on its side tries the other side, and hides (its
+ * dot stays) when that side is crowded too.
+ */
+export function placeLabels(
+  xs: ReadonlyArray<number>,
+  minGap: number,
+): Array<{ side: LabelSide; labelled: boolean }> {
+  const last: Record<LabelSide, number> = { above: -Infinity, below: -Infinity }
+  return xs.map((x, i) => {
+    let side: LabelSide = i % 2 === 0 ? 'above' : 'below'
+    if (x - last[side] < minGap) side = side === 'above' ? 'below' : 'above'
+    const labelled = x - last[side] >= minGap
+    if (labelled) last[side] = x
+    return { side, labelled }
+  })
+}
+
 /** "Needs SR 7,500 a paycheck to reach SR 75,000 by Aug 2027." */
 export function decisionNote(
   d: Decision,
