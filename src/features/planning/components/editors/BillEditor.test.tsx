@@ -128,6 +128,26 @@ describe('BillEditor', () => {
     })
   })
 
+  it('ends a bill after a number of times on that occurrence’s date', async () => {
+    await db.bills.put(
+      bill({ id: 'b1', name: 'Gym', nextDue: '2026-10-01', walletId: 'main' }),
+    )
+    const onClose = vi.fn()
+    render(<BillEditor id="b1" onClose={onClose} onDelete={vi.fn()} />)
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'After 12 times' }),
+    )
+    expect(screen.getByText('Last one on Sep 1, 2027')).toBeTruthy()
+    fireEvent.change(screen.getByLabelText('How many times'), {
+      target: { value: '3' },
+    })
+    expect(screen.getByText('Last one on Dec 1, 2026')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect((await db.bills.get('b1'))?.endsOn).toBe('2026-12-01')
+  })
+
   it('asks before discarding edits', async () => {
     const onClose = vi.fn()
     render(<BillEditor id={null} onClose={onClose} onDelete={vi.fn()} />)

@@ -35,6 +35,12 @@ export function stepOccurrence(
 /** Where a bill's occurrences step from: occurrence `n` is `anchor` stepped `offset + n` times. */
 type Schedule = { anchor: string; offset: number }
 
+/** What a bill's schedule reads: its repeat and the occurrence it stands on. */
+type Stepped = Pick<
+  LocalBill,
+  'nextDue' | 'frequency' | 'customInterval' | 'customUnit'
+>
+
 const monthIndex = (iso: string): number =>
   Number(iso.slice(0, 4)) * 12 + Number(iso.slice(5, 7)) - 1
 
@@ -45,7 +51,7 @@ const monthIndex = (iso: string): number =>
  * read back from the bill's own payment rows.
  */
 function scheduleOf(
-  bill: LocalBill,
+  bill: Stepped,
   payments: ReadonlyMap<string, LocalPlanned>,
 ): Schedule {
   const own: Schedule = { anchor: bill.nextDue, offset: 0 }
@@ -65,11 +71,21 @@ function scheduleOf(
   return best ?? own
 }
 
-const occurrenceAt = (
-  bill: LocalBill,
-  schedule: Schedule,
-  n: number,
-): string => stepOccurrence(schedule.anchor, bill, schedule.offset + n)
+const occurrenceAt = (bill: Stepped, schedule: Schedule, n: number): string =>
+  stepOccurrence(schedule.anchor, bill, schedule.offset + n)
+
+/**
+ * The bill's `count`th occurrence, `nextDue` being the first; `nextDue` for a one-off.
+ * `payments` keep a month-end bill on its day, as in `billOccurrences`.
+ */
+export function nthOccurrence(
+  bill: Stepped,
+  payments: ReadonlyMap<string, LocalPlanned>,
+  count: number,
+): string {
+  if (bill.frequency === null) return bill.nextDue
+  return occurrenceAt(bill, scheduleOf(bill, payments), Math.max(count, 1) - 1)
+}
 
 /**
  * Every occurrence from `nextDue` through `through` (inclusive), stopping at `endsOn`. A

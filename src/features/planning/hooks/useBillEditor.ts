@@ -2,15 +2,18 @@ import { useMemo, useState } from 'react'
 import { createBill, updateBill } from '#/features/bills/data/mutations'
 import { useCategoryCatalog } from '#/features/categories/hooks/useCategoryCatalog'
 import { usePlannedData } from '#/features/planned/hooks/usePlannedData'
+import { paymentRowsOf } from '#/features/planning/data/occurrences'
 import { toast } from '#/features/planning/stores/toast'
 import {
   billBlock,
   billFormOf,
   billPreview,
   billWriteOf,
+  lastOneLine,
   newBillForm,
+  withEnds,
 } from '#/features/planning/view/billDraft'
-import type { BillForm } from '#/features/planning/view/billDraft'
+import type { BillForm, EndsPick } from '#/features/planning/view/billDraft'
 import { nextColor } from '#/features/planning/view/colors'
 import { usePlanningWallets } from './usePlanningWallets'
 
@@ -20,6 +23,11 @@ export function useBillEditor(id: string | null, onDone: () => void) {
   const wallets = usePlanningWallets()
   const catalog = useCategoryCatalog()
   const bill = id ? inputs.bills.find((b) => b.id === id) : undefined
+  const billId = bill?.id
+  const payments = useMemo(
+    () => paymentRowsOf(billId ?? '', billId ? inputs.planned : []),
+    [billId, inputs.planned],
+  )
 
   const [initial] = useState<BillForm>(() =>
     bill
@@ -53,11 +61,13 @@ export function useBillEditor(id: string | null, onDone: () => void) {
 
   const set = <TKey extends keyof BillForm>(key: TKey, value: BillForm[TKey]) =>
     setForm((f) => ({ ...f, [key]: value }))
+  const pickEnds = (ends: EndsPick) =>
+    setForm((f) => withEnds(f, ends, payments))
 
   const save = async () => {
     setSubmitted(true)
     if (block) return
-    const write = billWriteOf(form, currency)
+    const write = billWriteOf(form, currency, payments)
     if (bill) {
       await updateBill(bill.id, write)
       toast('Saved')
@@ -77,6 +87,8 @@ export function useBillEditor(id: string | null, onDone: () => void) {
     block,
     showErrors: submitted,
     preview,
+    lastOne: lastOneLine(form, payments),
+    pickEnds,
     dirty: JSON.stringify(form) !== JSON.stringify(initial),
     save,
   }

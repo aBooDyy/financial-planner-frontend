@@ -1,5 +1,4 @@
 import { AmountWell } from '#/components/dialog/AmountWell'
-import { Chip, ChipRow } from '#/components/dialog/Chip'
 import { ColorSwatches } from '#/components/dialog/ColorSwatches'
 import { DialogActions } from '#/components/dialog/DialogActions'
 import { PillSwitch } from '#/components/dialog/PillSwitch'
@@ -18,6 +17,7 @@ import { perYearOf } from '#/features/planning/view/repeat'
 import type { RepeatPick } from '#/features/planning/view/repeat'
 import { usePreferencesStore } from '#/stores/preferences'
 import { InfoLine } from '#/features/planning/components/kit/InfoLine'
+import { BillEndsField } from './fields/BillEndsField'
 import { MerchantField } from './fields/MerchantField'
 import { MoreOptions } from './fields/MoreOptions'
 import { RepeatField } from './fields/RepeatField'
@@ -125,36 +125,14 @@ function BillEditorForm({ id, onClose, onDelete }: Props) {
         <InfoLine>{e.preview}</InfoLine>
         <MoreOptions defaultOpen={!!e.bill}>
           {once ? null : (
-            <div>
-              <FieldLabel>Ends</FieldLabel>
-              <ChipRow label="Ends">
-                <Chip
-                  size="sm"
-                  active={!form.endsOn}
-                  onClick={() => set('endsOn', '')}
-                >
-                  Never
-                </Chip>
-                <Chip
-                  size="sm"
-                  active={!!form.endsOn}
-                  onClick={() =>
-                    set('endsOn', form.endsOn || form.nextDue || '')
-                  }
-                >
-                  On a date
-                </Chip>
-              </ChipRow>
-              {form.endsOn ? (
-                <DateField
-                  className="mt-[10px]"
-                  value={form.endsOn}
-                  onChange={(iso) => set('endsOn', iso)}
-                  dateFormat={dateFormat}
-                  ariaLabel="Ends on"
-                />
-              ) : null}
-            </div>
+            <BillEndsField
+              form={form}
+              lastOne={e.lastOne}
+              dateFormat={dateFormat}
+              onPick={e.pickEnds}
+              onCount={(count) => set('endsCount', count)}
+              onDate={(iso) => set('endsOn', iso)}
+            />
           )}
           <ToggleCard
             title="Auto-pay"

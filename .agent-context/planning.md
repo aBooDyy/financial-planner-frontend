@@ -42,7 +42,8 @@ Everything under `data/` is pure and clock-free: `today` is an ISO date passed i
   a day the old one also clamps to (Apr 30 after the 31st) keeps the old day.
 - `billOccurrences(bill, payments, through)` — from `nextDue`, stopping at `endsOn`; a closed
   bill has none, a one-off at most its `nextDue`. `occurrenceBefore(bill, payments, o)` is the
-  one before (status's Behind window).
+  one before (status's Behind window). `nthOccurrence(bill, payments, n)` is the Nth, `nextDue`
+  being the first (the bill editor's "After N times").
 - An occurrence is **settled** when its planned PAYMENT row (`paymentRowsOf`) exists and is no
   longer open (paid in full, closed with the rest abandoned, or skipped).
   `firstOpenOccurrence(bill, rows)` is what `nextDue` should read; `openOccurrences` lists the
@@ -342,9 +343,14 @@ Nice to have for bills, **Must have** / Nice to have for goals, "Left for spendi
 - **Bill** (`BillEditor`): What is it? · How much? (`AmountWell`, the currency follows the
   "Paid from" wallet pill, which also offers *Decide when paying*) · Repeats · *When is it due?* /
   *Next due date* · Category (`CategoryPicker`, default Housing) · the preview line · More
-  options: Ends (Never / On a date), Auto-pay ("Log it automatically on the due date"), Must pay ↔
+  options: Ends (`BillEndsField`: Never / After N times / On a date), Auto-pay ("Log it automatically on the due date"), Must pay ↔
   Nice to have, Save up in (bills not covered by each paycheck), Merchant (the shared
-  `MerchantOptions` in a popover), Note, Colour. Preview (`billPreview`): *Covered from each
+  `MerchantOptions` in a popover), Note, Colour. **After N times** (1–999, default 12) is an
+  editor convenience, not stored: the draft (`endsOnOf`) saves it as `endsOn` = the Nth
+  occurrence from the form's next due date (`nthOccurrence`, so custom repeats and month-end
+  clamping hold, and the bill's payments keep a clamped 31st), with *Last one on Mar 1, 2027*
+  under the count. A stored end always **re-opens as On a date** — the count isn't kept and
+  would shrink as occurrences settle; switching to On a date starts from the count's date. Preview (`billPreview`): *Covered from each
   paycheck.* when it repeats at least as often as pay; *We'll set aside SR X a paycheck so it's
   ready on Mar 1.* (amount ÷ the paydays from today through the due date — the engine's first
   window); *Due before your next paycheck. It will come out of what is free now.* when no payday comes
