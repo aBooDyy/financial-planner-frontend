@@ -105,7 +105,22 @@ describe('Upcoming by paycheck', () => {
     expect(screen.getByText('Now → Oct 24')).toBeTruthy()
     expect(screen.getByText('Next paycheck · Oct 25')).toBeTruthy()
     expect(screen.getByText('Oct 25 – Nov 24')).toBeTruthy()
-    expect(screen.getAllByText('+SR 12,000 in').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('+SR 12,000 in').length).toBeGreaterThan(1)
+  })
+
+  it('labels the run of later pay periods once', async () => {
+    await db.incomeStreams.put({
+      ...salary,
+      frequency: 'weekly',
+      amount: m(3000),
+      anchorDate: '2026-10-06',
+    })
+    render(<UpcomingSection />)
+    await screen.findByText('Until payday')
+    expect(
+      screen.getAllByRole('button', { expanded: false }).length,
+    ).toBeGreaterThan(1)
+    expect(screen.getAllByText('Later')).toHaveLength(1)
   })
 
   it('pays a future bill now, for that occurrence', async () => {

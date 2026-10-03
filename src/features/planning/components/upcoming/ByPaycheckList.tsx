@@ -157,6 +157,10 @@ export function ByPaycheckList({ planning }: { planning: PlanningView }) {
           { title: 'Set aside for later', rows: p.setAsides.map(renderRow) },
         ]
 
+  const shown = upcoming.periods.filter(
+    (p) => p.rows.length > 0 || p.kind === 'this',
+  )
+
   return (
     <>
       <NeedsConfirmingBand
@@ -167,31 +171,30 @@ export function ByPaycheckList({ planning }: { planning: PlanningView }) {
         onConfirm={(r) => void confirmRow(r)}
         onSkip={(r) => void skipRow(r)}
       />
-      {upcoming.periods.map((p) =>
-        p.rows.length === 0 && p.kind !== 'this' ? null : (
-          <PeriodCard
-            key={p.period.start}
-            head={periodHead(p, calendar, today, base)}
-            groups={groupsOf(p)}
-            summary={p.kind === 'later' ? periodSummary(p, base) : undefined}
-            footer={
-              p.kind === 'this'
-                ? {
-                    label:
-                      calendar.kind === 'paycheck'
-                        ? 'Still to pay before payday'
-                        : 'Still to pay this month',
-                    value: money(stillToPay(p, base, inputs.rates), base),
-                  }
-                : {
-                    label: 'Left for spending',
-                    value: signedMoney(p.left, base),
-                    tone: p.left < 0 ? 'danger' : 'ok',
-                  }
-            }
-          />
-        ),
-      )}
+      {shown.map((p, i) => (
+        <PeriodCard
+          key={p.period.start}
+          head={periodHead(p, calendar, today, base)}
+          showLabel={p.kind !== 'later' || shown[i - 1]?.kind !== 'later'}
+          groups={groupsOf(p)}
+          summary={p.kind === 'later' ? periodSummary(p, base) : undefined}
+          footer={
+            p.kind === 'this'
+              ? {
+                  label:
+                    calendar.kind === 'paycheck'
+                      ? 'Still to pay before payday'
+                      : 'Still to pay this month',
+                  value: money(stillToPay(p, base, inputs.rates), base),
+                }
+              : {
+                  label: 'Left for spending',
+                  value: signedMoney(p.left, base),
+                  tone: p.left < 0 ? 'danger' : 'ok',
+                }
+          }
+        />
+      ))}
     </>
   )
 }

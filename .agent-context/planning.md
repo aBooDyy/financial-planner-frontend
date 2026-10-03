@@ -400,8 +400,8 @@ review for the oldest waiting payday, else the next one), then the view.
   24* · *N days left* (footer *Still to pay before payday*: payments less what their occurrence
   holds), *Next paycheck · Oct 25* · *Oct 25 – Nov 24* · *+SR 12,000 in* with sub-heads
   Paycheck / Bills due / Set aside for later (footer *Left for spending*, danger when
-  negative), and *Later* cards folded to "Bills SR X · Set aside SR Y · Left SR Z · Car service
-  Jan 15". Calendar months read *This month* / *Next month*.
+  negative), and one *Later* label over the later cards, each folded to "Bills SR X · Set aside
+  SR Y · Left SR Z · Car service Jan 15". Calendar months read *This month* / *Next month*.
 - Rows (`UpcomingRowItem`) show the **owner's** name (a planned set-aside row's own name has a
   " set-aside" suffix), a Bill / Goal / Income tag and Auto-pay. Every future bill payment
   (auto-pay too, D23) offers **Pay now** for that occurrence; every set-aside **Set aside now**

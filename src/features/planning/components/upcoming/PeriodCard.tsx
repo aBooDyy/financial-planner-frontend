@@ -14,10 +14,18 @@ type Props = {
   footer: { label: string; value: string; tone?: 'ok' | 'danger' }
   /** Later periods start folded, showing this line instead of their rows. */
   summary?: string
+  /** False under a label already shown (the run of Later cards shares one). */
+  showLabel?: boolean
 }
 
 /** One pay period on Upcoming: its label, title and range, its rows by kind, and a footer. */
-export function PeriodCard({ head, groups, footer, summary }: Props) {
+export function PeriodCard({
+  head,
+  groups,
+  footer,
+  summary,
+  showLabel = true,
+}: Props) {
   const [open, setOpen] = useState(summary === undefined)
   const collapsible = summary !== undefined
   const titleRow = (
@@ -42,7 +50,9 @@ export function PeriodCard({ head, groups, footer, summary }: Props) {
   )
   return (
     <div className="flex flex-col gap-2">
-      <MicroLabel className="px-1">{head.label}</MicroLabel>
+      {showLabel ? (
+        <MicroLabel className="px-1">{head.label}</MicroLabel>
+      ) : null}
       <PlanCard className="overflow-hidden">
         {collapsible ? (
           <button
