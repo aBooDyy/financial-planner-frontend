@@ -74,6 +74,12 @@ describe('bill coverage', () => {
     expect(nov.shortfall).toBe(0)
   })
 
+  it('keeps a prepaid occurrence’s payday, so the next one is still covered on its own', () => {
+    const p = plan({ bills: [{ ...RENT, nextDue: '2026-12-01' }] })
+    const [dec] = tracksOf(p, 'bill', 'rent')
+    expect(funded(p, dec)).toEqual([['2026-11-25', 3000]])
+  })
+
   it('saves up for a yearly bill in equal installments each payday', () => {
     const insurance = bill({
       id: 'ins',

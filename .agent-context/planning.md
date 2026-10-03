@@ -67,7 +67,9 @@ view read the same plan.
   `[start, end]`, a `tier` and a `deadline`.
   - A bill occurrence's window runs from the slot after the previous occurrence's last slot
     through the last slot on or before its due date; if that is empty it shares the previous
-    one (several weekly occurrences covered from one monthly payday). So a bill due within one
+    one (several weekly occurrences covered from one monthly payday). The occurrence before
+    the first open one counts as previous even once paid early, so prepaying never spreads
+    the next one over its paydays. So a bill due within one
     pay period is covered whole on its payday; a longer cycle (or a far one-off) saves up in
     equal installments. With `incomeVaries` the window ends on the slot **before** the due
     month (next month's bills from this month's income). An occurrence due before the first

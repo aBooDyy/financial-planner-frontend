@@ -44,6 +44,7 @@ import type { RatesMap } from '#/lib/config/rates'
 import {
   billOccurrences,
   isSettledOccurrence,
+  occurrenceBefore,
   paymentRowsOf,
 } from './occurrences'
 import {
@@ -251,8 +252,13 @@ function billTracks(
     input.settings.incomeVaries ? lastDayBeforeMonth(due) : due
 
   const out: FundingTrack[] = []
-  let prevEnd = -1
-  for (const due of billOccurrences(bill, rows, horizonEnd)) {
+  const occurrences = billOccurrences(bill, rows, horizonEnd)
+  // `nextDue` moves past a prepaid occurrence; its paydays still belong to it.
+  const before = occurrences.length
+    ? occurrenceBefore(bill, rows, occurrences[0])
+    : ''
+  let prevEnd = before ? lastSlotOnOrBefore(slots, deadlineOf(before)) : -1
+  for (const due of occurrences) {
     const end = lastSlotOnOrBefore(slots, deadlineOf(due))
     let start = prevEnd + 1
     if (start > end && end >= 0) start = end
