@@ -83,7 +83,7 @@ export function YearLanes({
   }
   const group = (title: string) => (
     <div
-      className="sticky start-0 bg-fp-surface-2 px-3 py-[6px] text-[11px] font-extrabold tracking-[0.06em] text-fp-text-3 uppercase"
+      className="sticky start-0 border-t border-fp-border px-3 pt-[14px] pb-[6px] text-[11px] font-extrabold tracking-[0.06em] text-fp-text-3 uppercase"
       style={{ gridRow: next++, gridColumn: `1 / span ${n + 1}` }}
     >
       {title}
@@ -93,7 +93,7 @@ export function YearLanes({
   return (
     <div className="overflow-hidden rounded-[16px] border border-fp-border bg-fp-surface shadow-fp">
       <div className="overflow-x-auto">
-        <div className="grid" style={grid}>
+        <div className="isolate grid" style={grid}>
           {row(
             <span className="text-[11px] font-extrabold text-fp-text-3 uppercase">
               {range}
@@ -109,7 +109,7 @@ export function YearLanes({
                         type="button"
                         className={cn(
                           'flex flex-col items-center justify-center py-2 text-[13px] font-extrabold hover:bg-fp-surface-2',
-                          i === 0 && 'bg-fp-accent-soft text-fp-accent-ink',
+                          i === 0 && 'text-fp-accent-ink',
                         )}
                         style={col(i)}
                       >
@@ -364,6 +364,11 @@ export function YearLanes({
               )),
             'setaside',
           )}
+          <div
+            aria-hidden
+            className="pointer-events-none -z-1 bg-fp-accent-soft opacity-60"
+            style={{ gridRow: `1 / ${next}`, gridColumn: 2 }}
+          />
         </div>
       </div>
       <p className="border-t border-fp-border px-4 py-2 text-[12px] text-fp-text-3">
