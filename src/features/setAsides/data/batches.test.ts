@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '#/db/db'
-import type { LocalSetAside, OutboxEntry } from '#/db/types'
+import type { LocalSetAside, LocalTransaction, OutboxEntry } from '#/db/types'
 import type {
   MoveWire,
   ReleaseWire,
@@ -42,7 +42,9 @@ const onlyEntry = async (): Promise<OutboxEntry> => {
 
 beforeEach(async () => {
   vi.clearAllMocks()
-  await Promise.all([db.setAsides, db.bills, db.outbox].map((t) => t.clear()))
+  await Promise.all(
+    [db.setAsides, db.bills, db.transactions, db.outbox].map((t) => t.clear()),
+  )
   await db.setAsides.bulkPut([
     setAside({
       id: 'a1',
@@ -429,6 +431,35 @@ describe('pushing a batch', () => {
       createdAt: '',
     })
     await releaseSetAsides([{ id: 'a1' }], { releasedById: 't1' })
+    api.release.mockRejectedValue(
+      new ApiError({
+        status: 422,
+        code: 'planning.set_aside.released_by_invalid',
+        message: '',
+      }),
+    )
+    const batch = (await queued()).find(
+      (e) => e.op === 'release',
+    ) as OutboxEntry
+
+    await expect(pushSetAsidesEntry(batch)).rejects.toBeInstanceOf(ApiError)
+    expect(api.release).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps a release whose transfer leg is still waiting to be created', async () => {
+    await db.transactions.put({
+      id: 'leg',
+      transferId: 'tr',
+    } as LocalTransaction)
+    await db.outbox.add({
+      op: 'create',
+      entity: 'transfer',
+      id: 'tr',
+      payload: {},
+      baseVersion: null,
+      createdAt: '',
+    })
+    await releaseSetAsides([{ id: 'a1' }], { releasedById: 'leg' })
     api.release.mockRejectedValue(
       new ApiError({
         status: 422,

@@ -222,15 +222,24 @@ async function pushSetAsideBatch(entry: OutboxEntry): Promise<void> {
 
 const RELEASED_BY_INVALID = 'planning.set_aside.released_by_invalid'
 
+/** Whether a transaction's create is still queued — its own, or its transfer's for a leg. */
+async function createQueued(transactionId: string): Promise<boolean> {
+  if ((await pendingFor('transaction', transactionId).count()) > 0) return true
+  const transferId = (await db.transactions.get(transactionId))?.transferId
+  if (!transferId) return false
+  return (await pendingFor('transfer', transferId).toArray()).some(
+    (e) => e.op === 'create',
+  )
+}
+
 /**
- * The payment a release names is not on the server. While its create is still queued it lands
- * first and the release goes through as written later (`null`: keep the refusal). Otherwise the
- * payment was deleted: the money is still released, just by no payment.
+ * The payment (or transfer leg) a release names is not on the server. While its create is still
+ * queued it lands first and the release goes through as written later (`null`: keep the
+ * refusal). Otherwise it was deleted: the money is still released, just by no transaction.
  */
 async function withoutPayment(entry: OutboxEntry): Promise<OutboxEntry | null> {
   const { released_by_id: paymentId, ...payload } = entry.payload as ReleaseWire
-  if (!paymentId || (await pendingFor('transaction', paymentId).count()) > 0)
-    return null
+  if (!paymentId || (await createQueued(paymentId))) return null
   const next: OutboxEntry = { ...entry, payload }
   await db.outbox.put(next)
   return next

@@ -135,9 +135,10 @@ function chunks<T>(items: ReadonlyArray<T>): T[][] {
 }
 
 /**
- * Release set-asides — wholly, or in part. `releasedById` names the payment that released
- * them (it must be one of the user's transactions). Throws `SetAsideBatchError` for a row that
- * is not live; nothing is written then.
+ * Release set-asides — wholly, or in part. `releasedById` names the transaction that used
+ * them — a payment, or the transfer leg that carried a leftover to one (it must be one of the
+ * user's transactions). Throws `SetAsideBatchError` for a row that is not live; nothing is
+ * written then.
  */
 export async function releaseSetAsides(
   parts: ReadonlyArray<SetAsidePart>,

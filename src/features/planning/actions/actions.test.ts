@@ -21,6 +21,7 @@ import {
   wallet,
 } from '#/features/planned/testing/fixtures'
 import { isLiveSetAside } from '#/features/setAsides/data/totals'
+import { historyOf } from '#/features/planning/view/history'
 import { useSessionStore } from '#/stores/session'
 import { addMoney } from './addMoney'
 import { MoneyActionError } from './errors'
@@ -282,6 +283,73 @@ describe('Pay now', () => {
     ).toEqual([
       ['transfer_in', 'main', 300],
       ['transfer_out', 'savings', 300],
+    ])
+  })
+})
+
+describe('the leftover in a bill’s history', () => {
+  const HELD = setAside({
+    id: 'held',
+    goalId: null,
+    billId: 'ins',
+    occurrence: '2027-03-01',
+    walletId: 'savings',
+    amount: m(480),
+    date: '2027-02-01',
+  })
+
+  const historyOfInsurance = async () =>
+    historyOf({
+      kind: 'bill',
+      id: 'ins',
+      currency: 'SAR',
+      txns: await db.transactions.toArray(),
+      setAsides: await db.setAsides.toArray(),
+      planned: await db.plannedTransactions.toArray(),
+      walletName: (id) => (id === 'savings' ? 'Savings' : 'Main bank'),
+      categoryName: () => null,
+      rates: {},
+    }).map((l) => [l.label, l.sub, l.amount])
+
+  it('reads money moved to the paying wallet as used by the payment, not taken back', async () => {
+    await db.setAsides.put(HELD)
+    const { leftover } = await payBill('ins', {
+      walletId: 'main',
+      date: '2027-03-01',
+    })
+    await resolveLeftover(leftover, 'move', {
+      payingWalletId: 'main',
+      date: '2027-03-01',
+    })
+
+    const out = (await db.transactions.toArray()).find(
+      (t) => t.type === 'transfer_out',
+    )
+    expect(await db.setAsides.get('held')).toMatchObject({
+      releasedAt: '2027-03-01',
+      releasedById: out?.id,
+    })
+    expect(await historyOfInsurance()).toEqual([
+      ['Paid', 'Main bank', '−SR 1,200'],
+      ['Set aside', 'Savings', '+SR 480'],
+    ])
+  })
+
+  it('still reads freed money as taken back', async () => {
+    await db.setAsides.put(HELD)
+    const { leftover } = await payBill('ins', {
+      walletId: 'main',
+      date: '2027-03-01',
+    })
+    await resolveLeftover(leftover, 'free', {
+      payingWalletId: 'main',
+      date: '2027-03-01',
+    })
+
+    expect(await historyOfInsurance()).toEqual([
+      ['Taken back', 'Savings', 'SR 480'],
+      ['Paid', 'Main bank', '−SR 1,200'],
+      ['Set aside', 'Savings', '+SR 480'],
     ])
   })
 })

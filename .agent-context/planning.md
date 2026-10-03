@@ -254,8 +254,10 @@ first, each a Dexie write plus outbox entries; errors are `MoneyActionError` wit
   bill's).
 - **`resolveLeftover(report, 'move' | 'free' | 'keep', {payingWalletId, date?})`** — the
   leftover prompt's answers: *move* records a transfer from each holding wallet to the paying
-  wallet and releases those set-asides (the paying wallet's own line is released without a
-  transfer; outside money stays as it is); *free* releases them;
+  wallet and releases those set-asides with `releasedById` = the transfer's **out leg** (the
+  money was used for the payment, so history shows no *Taken back* and the row still settles
+  its planned row; the paying wallet's own line is released without a transfer; outside money
+  stays as it is); *free* releases them with no link (history: *Taken back*);
   *keep* moves them to `report.nextOccurrence` (repeating bills only).
 - **`addMoney(owner, parts, {date?, note?})`** — Add money / Split: `parts` are
   `{walletId, amount}` or `{externalLabel, amount}` in the owner's currency. A goal gets one
@@ -508,8 +510,8 @@ to Bills and open a bill in one go). Header (both): colour dot, name, "Semi-annu
   says the stored plan is off — *"Your plan says SR 500 a paycheck; today it works out to SR
   1,000."* + **Recalculate**, then *Plan updated · Undo* from the recalc-undo store),
   `NextOccurrences` (repeating bills), `HistoryList` (`view/history.ts`: Set aside / Moved in /
-  Taken back (a freed set-aside, the docs' word) / Paid / Paid · auto-pay (the settlement's id is
-  `autoSettlementId`) / Used (sub "Visa fees · Main bank": leaf category · wallet) / Skipped,
+  Taken back (a set-aside released by no transaction — freed, the docs' word) / Paid /
+  Paid · auto-pay (the settlement's id is `autoSettlementId`) / Used (sub "Visa fees · Main bank": leaf category · wallet) / Skipped,
   latest first, 15 shown).
 
 ### Anytime-action sheets — `components/sheets/`

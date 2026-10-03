@@ -15,8 +15,12 @@ goal allocations and serves bills and goals alike (working docs:
 - `source`: `wallet` (a wallet id; the label is dropped) or `outside` (an `externalLabel`; the
   wallet is dropped) — wire `WALLET` / `OUTSIDE` (it was `EXTERNAL` on allocations).
 - **Live while `releasedAt` is null.** A released row stays as history, with `releasedById`
-  (the payment that released it) when there was one. A row is wholly live or wholly released: a
-  partial release splits it. `movedByTransferId` links a release and the new row of a move.
+  (the transaction that used it) when there was one: the payment, or — for a leftover the
+  prompt moved to the paying wallet — the transfer's out leg (`planning/actions/leftover.ts`).
+  Choosing the leg over the payment keeps taking the payment back (`restoreReleasedBy`) from
+  setting aside again money the transfer already moved; the server takes any of the user's
+  transactions and nulls the link if the transfer is deleted (FK `SET NULL`). A row is wholly
+  live or wholly released: a partial release splits it. `movedByTransferId` links a release and the new row of a move.
 - `plannedId` = the planned SET_ASIDE row it settles. It settles it while **live**, and still
   does once a **payment** released it (`releasedById` — the money was set aside, then used). One
   freed, moved or released by a close does not (`settlesItsRow` in `planned/data/settle.ts`): the
@@ -99,9 +103,9 @@ applies all-or-nothing (`POST /set-asides/release`, `/move`).
   batch, or all of them overtaken) does the whole entry settle. `id_taken` still settles the
   whole entry: it means the batch already landed.
 - **`released_by_invalid` releases without the payment** (`withoutPayment`) once the payment's
-  own create is no longer queued — it was deleted; while it is queued the refusal stands and the
-  batch retries after it lands. Any other refusal is flagged, and a batch refused four times is
-  dropped with its rows resynced (`abandonSetAsideBatch`,
+  own create — or, for a transfer leg, its transfer's create — is no longer queued: it was
+  deleted; while it is queued the refusal stands and the batch retries after it lands. Any
+  other refusal is flagged, and a batch refused four times is dropped with its rows resynced (`abandonSetAsideBatch`,
   [data-layer-and-sync.md](data-layer-and-sync.md#failed-pushes-flag-hold-retry--never-drop)).
 - **A close whose leftover target is refused frees the leftover** (`closeFreeingInstead`, used
   by bills and goals): the entry is rewritten to `FREE` and the copies minted for the target

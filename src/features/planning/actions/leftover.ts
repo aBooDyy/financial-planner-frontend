@@ -2,9 +2,10 @@
  * The leftover prompt's three answers (03 §5), for money a settled occurrence still holds:
  *
  * - **move** — "Move it to <paying wallet>": records a transfer from each wallet that held some
- *   and releases those set-asides (the payment already used the money). What the paying wallet
- *   itself still holds is released without a transfer. Money held outside the app cannot ride
- *   a transfer and is left as it is.
+ *   and releases those set-asides by its outgoing leg — the transaction that took the money to
+ *   the payment — so they read as used, not freed. What the paying wallet itself still holds is
+ *   released without a transfer. Money held outside the app cannot ride a transfer and is left
+ *   as it is.
  * - **free** — releases them where they are; that wallet's free money goes up.
  * - **keep** — repeating bills only: they move to the next open occurrence.
  */
@@ -16,7 +17,10 @@ import {
   moveSetAsides,
   releaseSetAsides,
 } from '#/features/setAsides/data/batches'
-import { createTransfer } from '#/features/transactions/data/transfers'
+import {
+  createTransfer,
+  heldLegs,
+} from '#/features/transactions/data/transfers'
 import { convertMinor } from '#/lib/currency'
 import { MoneyActionError } from './errors'
 
@@ -65,7 +69,7 @@ export async function resolveLeftover(
       continue
     }
     const toCurrency = paying.currency ?? line.currency
-    await createTransfer({
+    const transferId = await createTransfer({
       fromWalletId: line.walletId,
       toWalletId: paying.id,
       amount: line.amount,
@@ -77,7 +81,10 @@ export async function resolveLeftover(
     })
     await releaseSetAsides(
       line.ids.map((id) => ({ id })),
-      { releasedAt: date },
+      {
+        releasedAt: date,
+        releasedById: (await heldLegs(transferId)).out?.id ?? null,
+      },
     )
   }
 }
