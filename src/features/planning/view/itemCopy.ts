@@ -138,7 +138,7 @@ export function goalMeta(
     s.state === 'short' && s.slipsTo
       ? `slips to ${monthYear(s.slipsTo)}`
       : null,
-    s.heldIn.some((h) => h.walletId === null) ? 'some held outside' : null,
+    s.heldIn.some((h) => h.walletId === null) ? 'held outside' : null,
   ]
     .filter(Boolean)
     .join(' · ')
