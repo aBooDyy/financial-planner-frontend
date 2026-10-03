@@ -131,17 +131,25 @@ export function GoalsSection() {
       0,
     )
   const total = paceOf(open)
+  const active = open.filter((g) => statusOf(g)?.state !== 'paused').length
+  const summary = [
+    active > 0
+      ? `${money(total, base)} ${perPeriod(calendar)} toward ${plural(active, 'goal')}`
+      : null,
+    desktop
+      ? 'drag between groups to change priority'
+      : 'move between groups from ⋯ to change priority',
+  ]
+    .filter(Boolean)
+    .join(' · ')
+  const sub = summary.charAt(0).toUpperCase() + summary.slice(1)
 
   return (
     <>
       <SectionHeading
         title="Goals"
         count={open.length}
-        sub={
-          total > 0
-            ? `${money(total, base)} ${perPeriod(calendar)} toward ${plural(open.length, 'goal')} · drag between groups to change priority`
-            : undefined
-        }
+        sub={sub}
         addLabel="Add goal"
         onAdd={add}
       />

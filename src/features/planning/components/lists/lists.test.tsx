@@ -243,6 +243,11 @@ describe('Goals', () => {
     const nice = screen.getByRole('region', { name: 'Nice to have' })
     expect(within(nice).getByText('Paused')).toBeTruthy()
     expect(within(nice).getByText('—')).toBeTruthy()
+    expect(
+      screen.getByText(
+        'SR 1,000 a paycheck toward 1 goal · drag between groups to change priority',
+      ),
+    ).toBeTruthy()
   })
 
   it('moves a goal to Must have from the row menu on a phone', async () => {
@@ -257,6 +262,11 @@ describe('Goals', () => {
     })
     try {
       render(<GoalsSection />)
+      expect(
+        await screen.findByText(
+          /move between groups from ⋯ to change priority$/,
+        ),
+      ).toBeTruthy()
       fireEvent.keyDown(
         await screen.findByRole('button', { name: 'More for New car' }),
         { key: 'Enter' },
