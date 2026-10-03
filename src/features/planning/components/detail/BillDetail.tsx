@@ -137,7 +137,12 @@ export function BillDetail({
       <DetailActions actions={buttons} />
       <HeldIn lines={status.heldIn} currency={c} wallets={wallets} />
       <PlanBox
-        text={billPlanText(bill, status, paidFrom, planning.calendar)}
+        text={billPlanText(
+          bill,
+          status,
+          walletName(bill.saveWalletId ?? bill.walletId),
+          planning.calendar,
+        )}
         plan={closed ? null : plan.plan}
         currency={c}
         calendar={planning.calendar}

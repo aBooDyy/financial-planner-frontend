@@ -18,7 +18,13 @@ import {
   vi,
 } from 'vitest'
 import { db } from '#/db/db'
-import { bill, goal, m, setAside } from '#/features/planned/testing/fixtures'
+import {
+  bill,
+  goal,
+  m,
+  setAside,
+  wallet,
+} from '#/features/planned/testing/fixtures'
 import { useRecalcUndoStore } from '#/features/planned/stores/recalcUndo'
 import { seedPlanningDb, stubBrowser } from '#/features/planning/testing/dom'
 import { usePlanningUi } from '#/features/planning/stores/planningUi'
@@ -80,6 +86,28 @@ describe('BillDetail', () => {
     expect(within(panel).getByText('Mar 1, 2027')).toBeTruthy()
     expect(within(panel).getByText('Sep 1, 2027')).toBeTruthy()
     expect(within(panel).getByText('+SR 800')).toBeTruthy()
+  })
+
+  it('names the wallet it saves up in', async () => {
+    await db.balanceNodes.put(
+      wallet({ id: 'savings', name: 'Savings', amount: m(5000) }),
+    )
+    await db.bills.put(
+      bill({
+        id: 'reg',
+        name: 'Registration',
+        amount: m(1200),
+        frequency: 'annual',
+        nextDue: '2027-11-15',
+        walletId: 'main',
+        saveWalletId: 'savings',
+      }),
+    )
+    render(<BillDetail billId="reg" onClose={vi.fn()} />)
+    const panel = await screen.findByRole('complementary', {
+      name: 'Registration',
+    })
+    expect(within(panel).getByText(/in Savings for Nov 15\.$/)).toBeTruthy()
   })
 
   it('opens Pay now from its main button', async () => {
