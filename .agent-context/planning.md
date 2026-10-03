@@ -382,8 +382,9 @@ Copy and shapes in `view/overview.ts`; the cards only draw them.
   all accounts), opening `/reports?range=last_month`; nothing while last month has no split.
 - `Next30Card` (`next30Events`): bill payments and paydays in the next 30 days from Upcoming's
   periods; a warn pill "N to confirm" with the names; desktop a 152px axis (dots in the bill's
-  colour, paydays ringed in accent, labels alternating above/below on stems and hidden when
-  within 15 % of the last on their side, ticks Today / +7 / … logical-positioned); mobile a dot
+  colour, paydays ringed in accent, labels alternating above/below on stems — `placeLabels` on
+  the measured axis width: a label within 104px of the last on its side tries the other side,
+  then hides (dot stays) — ticks Today / +7 / … logical-positioned); mobile a dot
   strip and a list. A bill's dot opens its detail, a payday the Income section.
 - `DecisionsCard` (`decisionNote`): goals get **Push out** (to `pushOutTo`, +6 months, with a
   toast) and **Adjust**; bills **Adjust**.
