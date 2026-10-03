@@ -477,7 +477,8 @@ the root layout, not by `PlanningPage`.
   (`SectionHeading`'s `subLink`) to `/settings/preferences#planning`; a footnote explains the
   main paycheck.
 - Empty states are dashed cards (`EmptyPlanCard`) with the docs' copy; Goals adds the
-  **Emergency fund** pill.
+  **Emergency fund** pill. They show whenever nothing is **active** (finished items don't count),
+  with the Done / Reached card still under them.
 
 ### Detail panels — `components/detail/`
 
