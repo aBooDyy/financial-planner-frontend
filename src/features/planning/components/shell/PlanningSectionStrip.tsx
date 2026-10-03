@@ -38,7 +38,7 @@ export function PlanningSectionStrip({ section, badges }: Props) {
               'relative flex min-w-0 flex-1 flex-col items-center gap-[3px] pt-2 pb-[7px] text-[11px] font-bold',
               active
                 ? 'text-fp-accent-ink shadow-[inset_0_-2px_0_var(--fp-accent)]'
-                : 'text-fp-text-3',
+                : 'text-fp-text-2',
             )}
           >
             <Icon size={18} strokeWidth={1.9} aria-hidden />

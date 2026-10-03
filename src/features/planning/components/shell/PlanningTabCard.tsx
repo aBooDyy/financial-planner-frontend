@@ -38,7 +38,7 @@ export function PlanningTabCard({ section, badges }: Props) {
               'flex flex-none items-center gap-[7px] pt-[14px] pb-3 text-[13.5px] font-bold whitespace-nowrap',
               active
                 ? 'text-fp-text shadow-[inset_0_-2px_0_var(--fp-accent)]'
-                : 'text-fp-text-3 hover:text-fp-text-2',
+                : 'text-fp-text-2 hover:text-fp-text',
             )}
           >
             <Icon size={15} strokeWidth={2} aria-hidden />
