@@ -15,7 +15,15 @@ import type { CurrencyCode } from '#/lib/currency'
 import type { RatesMap } from '#/lib/config/rates'
 import { addDaysISO, dateOf, daysBetween } from './dates'
 import type { DesiredPlanned } from './generate'
-import { behindOf, remainderOf, settledOf, settlementsFor } from './settle'
+import { rowDrift } from './drift'
+import type { RowDrift } from './drift'
+import {
+  behindOf,
+  hasSettlements,
+  remainderOf,
+  settledOf,
+  settlementsFor,
+} from './settle'
 import type { Behind, SettlementIndex } from './settle'
 import { fitPlanFrom } from './fit'
 import { goalOwner } from './owners'
@@ -260,7 +268,9 @@ export type PlanCompare = {
   live: PlanHeader
   /** `live.amount − stored.amount` — the drift a Recalculate would apply. */
   offBy: number
-  /** A stored plan exists and today's numbers disagree with it. */
+  /** The written rows a recalc would change, against what it would write. */
+  rows: RowDrift
+  /** A stored plan exists and today's numbers disagree with it, or with its rows. */
   isOffPlan: boolean
 }
 
@@ -273,14 +283,22 @@ export function comparePlan(args: {
   rates: RatesMap
   today: string
 }): PlanCompare {
-  const live = fitPlanFrom(
+  const fitted = fitPlanFrom(
     args.owner,
     args.desired,
     args.planned,
     args.index,
     args.rates,
     args.today,
-  ).header
+  )
+  const live = fitted.header
+  const rows = rowDrift({
+    owner: args.owner,
+    writable: fitted.writable,
+    existing: args.planned,
+    today: args.today,
+    isSettled: (row) => hasSettlements(row, args.index),
+  })
   const { snapshot } = args
   const stored =
     snapshot.plannedAt !== null
@@ -295,7 +313,9 @@ export function comparePlan(args: {
     stored,
     live,
     offBy: stored ? live.amount - stored.amount : 0,
-    isOffPlan: stored !== null && live.amount !== stored.amount,
+    rows,
+    isOffPlan:
+      stored !== null && (live.amount !== stored.amount || rows.differ),
   }
 }
 

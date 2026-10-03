@@ -3,10 +3,12 @@
  * how the stored plan compares with today's numbers (04 §6). Pure.
  */
 import type { LocalBill, LocalGoal } from '#/db/types'
+import type { PlanRun } from '#/features/planned/data/drift'
+import type { PlanCompare } from '#/features/planned/data/views'
 import type { PayCalendar } from '#/features/planning/data/payPeriods'
 import type { BillStatus, GoalStatus } from '#/features/planning/data/status'
 import type { CurrencyCode } from '#/lib/currency'
-import { dueDay, money, monthYear, perPeriod } from './format'
+import { dueDay, money, monthYear, perPeriod, plural } from './format'
 
 export function billPlanText(
   bill: LocalBill,
@@ -53,11 +55,58 @@ export function goalPlanText(
 }
 
 /** "Your plan says SR 900 a paycheck; today it works out to SR 940." */
-export function planDrift(
+const perPeriodDrift = (
   stored: number,
   live: number,
   currency: CurrencyCode,
   calendar: PayCalendar,
+): string =>
+  `Your plan says ${money(stored, currency)} ${perPeriod(calendar)}; today it works out to ${money(live, currency)}.`
+
+/** "SR 1,750 × 2 from Oct 25", "SR 3,500 on Nov 25", "SR 5,250 over 3 paychecks from Oct 25". */
+function runText(
+  run: PlanRun,
+  currency: CurrencyCode,
+  calendar: PayCalendar,
+  today: string,
 ): string {
-  return `Your plan says ${money(stored, currency)} ${perPeriod(calendar)}; today it works out to ${money(live, currency)}.`
+  if (run.count === 0 || run.start === null) return 'nothing more'
+  const from = dueDay(run.start, today)
+  if (run.count === 1) return `${money(run.total, currency)} on ${from}`
+  if (run.each !== null)
+    return `${money(run.each, currency)} × ${run.count} from ${from}`
+  const periods = plural(
+    run.count,
+    calendar.kind === 'paycheck' ? 'paycheck' : 'month',
+  )
+  return `${money(run.total, currency)} over ${periods} from ${from}`
+}
+
+/**
+ * The drift line under the plan: the per-paycheck figure when only that moved, else the
+ * set-asides as written against what a recalc would write.
+ */
+export function planDrift(
+  plan: PlanCompare,
+  currency: CurrencyCode,
+  calendar: PayCalendar,
+  today: string,
+): string {
+  const { rows } = plan
+  if (!rows.differ)
+    return perPeriodDrift(
+      plan.stored?.amount ?? 0,
+      plan.live.amount,
+      currency,
+      calendar,
+    )
+  const { stored, live } = rows
+  if (
+    stored.count === live.count &&
+    stored.start === live.start &&
+    stored.each !== null &&
+    live.each !== null
+  )
+    return perPeriodDrift(stored.each, live.each, currency, calendar)
+  return `Your plan sets aside ${runText(stored, currency, calendar, today)}; today it works out to ${runText(live, currency, calendar, today)}.`
 }

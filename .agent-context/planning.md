@@ -507,8 +507,10 @@ to Bills and open a bill in one go). Header (both): colour dot, name, "Semi-annu
   closed **Reopen** · Edit (Mark as done / End this bill / Pause live in the ⋯ menu).
 - `HeldIn` (`BillStatus.heldIn` / `GoalStatus.heldIn`), `PlanBox` (`view/planText.ts`: one
   sentence per shape, *SR X behind / ahead of plan*, and — when `useBillPlan` / `useGoalPlan`
-  says the stored plan is off — *"Your plan says SR 500 a paycheck; today it works out to SR
-  1,000."* + **Recalculate**, then *Plan updated · Undo* from the recalc-undo store),
+  says the stored plan is off — `planDrift`: *"Your plan says SR 500 a paycheck; today it works
+  out to SR 1,000."* when only the per-paycheck figure moved, else the rows as written against a
+  recalc's, *"Your plan sets aside SR 1,750 × 2 from Oct 25; today it works out to SR 3,500 on
+  Nov 25."* — + **Recalculate**, then *Plan updated · Undo* from the recalc-undo store),
   `NextOccurrences` (repeating bills), `HistoryList` (`view/history.ts`: Set aside / Moved in /
   Taken back (a set-aside released by no transaction — freed, the docs' word) / Paid /
   Paid · auto-pay (the settlement's id is `autoSettlementId`) / Used (sub "Visa fees · Main bank": leaf category · wallet) / Skipped,

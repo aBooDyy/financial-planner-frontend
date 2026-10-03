@@ -14,6 +14,7 @@ type Props = {
   plan: (PlanCompare & { behind: Pick<Behind, 'behind'> }) | null
   currency: string
   calendar: PayCalendar
+  today: string
   lastRecalc: RecalcResult | null
   onRecalc: () => Promise<RecalcResult | null>
   onDismiss: () => void
@@ -28,6 +29,7 @@ export function PlanBox({
   plan,
   currency,
   calendar,
+  today,
   lastRecalc,
   onRecalc,
   onDismiss,
@@ -72,12 +74,7 @@ export function PlanBox({
         {plan?.isOffPlan && plan.stored ? (
           <div className="flex flex-wrap items-center gap-2 border-t border-fp-transfer/20 pt-2 text-[12.5px] font-medium text-fp-text-2">
             <span className="fp-sensitive min-w-0 flex-1">
-              {planDrift(
-                plan.stored.amount,
-                plan.live.amount,
-                currency,
-                calendar,
-              )}
+              {planDrift(plan, currency, calendar, today)}
             </span>
             <button
               type="button"

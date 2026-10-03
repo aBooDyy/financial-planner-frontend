@@ -256,7 +256,14 @@ within −45/+15 days), `useRecalcAll()` (`offPlan`: every open goal and bill wh
 today's numbers disagree with, and `recalcAll`), `useBillPlan(billId)` (a bill's
 `comparePlan` + `behind`, `recalc`, `lastRecalc` with its undo). `comparePlan({owner,
 snapshot, …})` in `data/views.ts` is the stored-vs-live comparison both owners share (the goal
-view spreads it). QuickAdd's stricter hint (exact open amount, ±3 days,
+view spreads it). It is off plan when the headline's amount moved **or the rows do**
+(`data/drift.ts` `rowDrift`): a recalc would change one of the owner's rewritable set-asides
+(`isRewritable`) — rewrite its amount, remove it, or add a row up to the plan's last set-aside
+(past it the fill writes the live rows anyway). The headline alone misses a plan whose rows
+were written by an older engine under the same per-row amount (Rent's 1,750 × 2 where 3,500
+once is wanted), and since `fill` never rewrites a stored set-aside, that prompt is the only
+way back. `rows.stored` / `rows.live` (`PlanRun`: total, count, each, start) give the drift line
+both sides. QuickAdd's stricter hint (exact open amount, ±3 days,
 no origin chosen) is the Spending slice's own `transactions/data/quickAddMatch.ts`, fed by
 `usePlannedData` + `remainderOf` — see [transactions.md](transactions.md). They all sit on
 `usePlannedData()`, which derives `PlannerState` (`data/state.ts`) — the same derivation the

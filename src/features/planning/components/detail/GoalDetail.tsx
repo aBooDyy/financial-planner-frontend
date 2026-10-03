@@ -137,6 +137,7 @@ export function GoalDetail({
         plan={closed || paused ? null : plan.view}
         currency={c}
         calendar={planning.calendar}
+        today={planning.today}
         lastRecalc={plan.lastRecalc}
         onRecalc={plan.recalc}
         onDismiss={plan.dismissRecalc}

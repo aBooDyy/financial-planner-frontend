@@ -1,17 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import {
   RATES,
+  bill,
   goal,
   m,
   planned,
   setAside,
   wallet,
 } from '#/features/planned/testing/fixtures'
+import { billOwner } from './owners'
 import { indexSettlements } from './settle'
 import {
   buildGoalPlanView,
   buildPlannedList,
   collapseContributions,
+  comparePlan,
   relativeDue,
 } from './views'
 import type { ContributionEntry } from './views'
@@ -231,5 +234,76 @@ describe('buildGoalPlanView', () => {
     )
     expect(view.nextPlanned?.id).toBe('umrah:2026-10-01')
     expect(view.stored).toMatchObject({ amount: m(1500), count: 8 })
+  })
+})
+
+describe('comparePlan — a bill whose rows drifted under the same headline', () => {
+  const TODAY_OCT = '2026-10-03'
+  /** Monthly SR 3,500 due on the 1st; set-asides fall on the 25th paydays. */
+  const RENT = bill({
+    id: 'rent',
+    name: 'Rent',
+    amount: m(3500),
+    nextDue: '2026-12-01',
+    plannedAt: '2026-09-01',
+    planAmount: m(3500),
+    planCount: 1,
+    planStart: '2026-11-25',
+  })
+  const rentSetAside = (occurrence: string, amount: number) =>
+    planned({
+      id: `rent:${occurrence}`,
+      origin: 'bill',
+      goalId: null,
+      billId: 'rent',
+      name: 'Rent',
+      occurrence,
+      amount: m(amount),
+    })
+  const compare = (rows: ReturnType<typeof rentSetAside>[]) =>
+    comparePlan({
+      owner: billOwner('rent'),
+      snapshot: RENT,
+      desired: [rentSetAside('2026-11-25', 3500)],
+      planned: rows,
+      index: indexSettlements([], []),
+      rates: RATES,
+      today: TODAY_OCT,
+    })
+
+  it('is off plan when an older engine split it 1,750 × 2 and today wants 3,500 once', () => {
+    const plan = compare([
+      rentSetAside('2026-10-25', 1750),
+      rentSetAside('2026-11-25', 1750),
+    ])
+    expect(plan.live.amount).toBe(plan.stored?.amount)
+    expect(plan.rows).toEqual({
+      stored: { total: m(3500), count: 2, each: m(1750), start: '2026-10-25' },
+      live: { total: m(3500), count: 1, each: m(3500), start: '2026-11-25' },
+      differ: true,
+    })
+    expect(plan.isOffPlan).toBe(true)
+  })
+
+  it('is on plan once its rows are what a recalc would write', () => {
+    expect(compare([rentSetAside('2026-11-25', 3500)]).isOffPlan).toBe(false)
+  })
+
+  it('leaves to the background fill the rows past its last set-aside', () => {
+    expect(compare([]).isOffPlan).toBe(false)
+    expect(
+      compare([{ ...rentSetAside('2026-09-25', 3500), status: 'done' }])
+        .isOffPlan,
+    ).toBe(false)
+  })
+
+  it('leaves rows a recalc may not rewrite out of it', () => {
+    const plan = compare([
+      { ...rentSetAside('2026-10-25', 1750), pinned: true },
+      rentSetAside('2026-11-25', 1750),
+    ])
+    expect(plan.rows.stored).toMatchObject({ count: 1, total: m(1750) })
+    expect(plan.rows.live).toMatchObject({ count: 1, total: m(1750) })
+    expect(plan.rows.differ).toBe(false)
   })
 })

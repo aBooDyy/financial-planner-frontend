@@ -147,6 +147,7 @@ export function BillDetail({
         plan={closed ? null : plan.plan}
         currency={c}
         calendar={planning.calendar}
+        today={planning.today}
         lastRecalc={plan.lastRecalc}
         onRecalc={plan.recalc}
         onDismiss={plan.dismissRecalc}

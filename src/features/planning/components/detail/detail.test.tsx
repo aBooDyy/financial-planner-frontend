@@ -18,10 +18,12 @@ import {
   vi,
 } from 'vitest'
 import { db } from '#/db/db'
+import { plannedIdFor } from '#/features/planned/data/ids'
 import {
   bill,
   goal,
   m,
+  planned,
   setAside,
   wallet,
 } from '#/features/planned/testing/fixtures'
@@ -119,6 +121,76 @@ describe('BillDetail', () => {
       kind: 'payNow',
       billId: 'ins',
     })
+  })
+})
+
+describe('BillDetail — a plan whose rows drifted', () => {
+  const rentId = (occurrence: string) =>
+    plannedIdFor('u1', 'bill', 'rent', 'set_aside', occurrence)
+  const rentSetAsides = async () =>
+    (await db.plannedTransactions.where('billId').equals('rent').toArray())
+      .filter((p) => p.role === 'set_aside' && p.deleted === 0)
+      .sort((a, b) => a.occurrence.localeCompare(b.occurrence))
+      .map((p) => [p.occurrence, p.amount / 100])
+
+  beforeEach(async () => {
+    // Its headline still reads SR 3,500, as today's plan does.
+    await db.bills.put(
+      bill({
+        id: 'rent',
+        name: 'Rent',
+        amount: m(3500),
+        nextDue: '2026-12-01',
+        walletId: 'main',
+        plannedAt: '2026-09-01',
+        planAmount: m(3500),
+        planCount: 2,
+        planStart: '2026-10-25',
+      }),
+    )
+    // An older engine split December's rent over two paydays; today's covers it from Nov 25.
+    await db.plannedTransactions.bulkPut(
+      ['2026-10-25', '2026-11-25'].map((occurrence) =>
+        planned({
+          id: rentId(occurrence),
+          origin: 'bill',
+          goalId: null,
+          billId: 'rent',
+          name: 'Rent',
+          occurrence,
+          amount: m(1750),
+        }),
+      ),
+    )
+  })
+
+  it('offers to recalculate the rows, rewrites them, then offers to undo', async () => {
+    render(<BillDetail billId="rent" onClose={vi.fn()} />)
+    expect(
+      await screen.findByText(
+        'Your plan sets aside SR 1,750 × 2 from Oct 25; today it works out to SR 3,500 on Nov 25.',
+      ),
+    ).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Recalculate' }))
+    await waitFor(() =>
+      expect(usePlanningToast.getState().toast?.message).toBe('Plan updated'),
+    )
+    expect(await rentSetAsides()).toEqual([
+      ['2026-11-25', 3500],
+      ['2026-12-25', 3500],
+    ])
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Recalculate' })).toBeNull(),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Undo' }))
+    await waitFor(async () =>
+      expect(await rentSetAsides()).toEqual([
+        ['2026-10-25', 1750],
+        ['2026-11-25', 1750],
+      ]),
+    )
   })
 })
 
