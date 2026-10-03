@@ -491,11 +491,11 @@ the root layout, not by `PlanningPage`.
 
 ### Detail panels — `components/detail/`
 
-`DetailHost` renders the open `PlanOwner` (a row's click) in `DetailFrame`: a 400px panel
-floating over the page's end edge on desktop (no reflow, Esc closes, the design's width rather
-than the kit's 330), a bottom sheet on mobile. A section tab's click closes it (not the section
-change itself, so Overview can switch to Bills and open a bill in one go). Header: colour dot,
-name, "Semi-annual · Insurance · Must pay" / "Must have goal · by Jun 2027", the ⋯ menu.
+`DetailHost` renders the open `PlanOwner` (a row's click) in `DetailFrame`: on desktop a 400px
+edge panel over the page, from under the nav to the bottom at the end edge with an inline-start
+border (no reflow, Esc closes, the design's width rather than the kit's 330); a bottom sheet on
+mobile. A section tab's click closes it (not the section change itself, so Overview can switch
+to Bills and open a bill in one go). Header (both): colour dot, name, "Semi-annual · Insurance · Must pay" / "Must have goal · by Jun 2027", the ⋯ menu.
 
 - `DetailHero`: *Set aside so far* (a bill saved up for, blue bar) / *Next payment* (covered
   each paycheck) / *Saved so far* (goal, its own colour), a note and the chip.

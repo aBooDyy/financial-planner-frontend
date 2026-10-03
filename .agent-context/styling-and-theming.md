@@ -212,8 +212,9 @@ values sit in field wells.
 - `UndoToast` — the dark line floating over a dialog's bottom ("Import ignored · Undo"); it is
   absolutely positioned against the dialog content, so render it inside the dialog's body.
 - `DateField` takes `hint` ("in 5d" / "12 days ago" via `relativeDayLabel`, or a fixed word).
-- Side pane (P6): the goals `DetailPanel` — a 330px rail floating 12px in from the page's end
-  edge, same header as a dialog, footer pinned; a bottom sheet on mobile.
+- Side pane (P6): Planning's `DetailFrame` — a 400px edge panel from under the nav to the
+  bottom at the page's end edge (inline-start border, no rounding), same header as a dialog;
+  a bottom sheet on mobile.
 
 ## shadcn/ui integration
 
