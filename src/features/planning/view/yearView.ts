@@ -94,6 +94,42 @@ export function billLanes(
   return [...lanes.values()]
 }
 
+export type MonthlyBillLane = {
+  billId: string
+  name: string
+  color: string
+  sub: string
+  /** Per month column, the dates it falls due there ("Oct 1"); empty when none. */
+  dates: string[][]
+}
+
+/** One lane per bill covered from each paycheck, under the Monthly bills total. */
+export function monthlyBillLanes(
+  ahead: YearAhead,
+  bills: ReadonlyArray<LocalBill>,
+): MonthlyBillLane[] {
+  const lanes = new Map<string, MonthlyBillLane>()
+  ahead.months.forEach((m, index) => {
+    for (const item of m.monthlyBills.items) {
+      const bill = bills.find((b) => b.id === item.billId)
+      if (!bill) continue
+      let lane = lanes.get(bill.id)
+      if (!lane) {
+        lane = {
+          billId: bill.id,
+          name: bill.name,
+          color: bill.color,
+          sub: `${repeatLabel(bill)} · ${money(bill.amount, bill.currency)}`,
+          dates: ahead.months.map(() => []),
+        }
+        lanes.set(bill.id, lane)
+      }
+      lane.dates[index].push(dayMonth(item.occurrence))
+    }
+  })
+  return [...lanes.values()]
+}
+
 export type GoalLane = {
   goalId: string
   name: string

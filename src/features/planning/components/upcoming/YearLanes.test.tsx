@@ -117,4 +117,28 @@ describe('year lanes', () => {
       'bg-fp-accent-soft',
     )
   })
+
+  it('expands monthly bills into a row per bill with its dates', () => {
+    const onOpen = vi.fn()
+    render(
+      <YearLanes
+        ahead={ahead}
+        bills={[rent]}
+        goals={[car]}
+        base="SAR"
+        calendar={calendar}
+        onOpen={onOpen}
+        onReview={vi.fn()}
+      />,
+    )
+    const toggle = screen.getByRole('button', { name: /Monthly bills/ })
+    expect(toggle.textContent).toContain('1 bill')
+    expect(screen.queryByText('Oct 1')).toBeNull()
+    fireEvent.click(toggle)
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByText('Oct 1')).toBeTruthy()
+    expect(screen.getByText('Jan 1')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /^Rent/ }))
+    expect(onOpen).toHaveBeenCalledWith('bill', 'rent')
+  })
 })

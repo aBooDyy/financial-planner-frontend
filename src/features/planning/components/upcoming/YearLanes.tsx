@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
-import { X } from 'lucide-react'
+import { ChevronDown, X } from 'lucide-react'
 import type { LocalBill, LocalGoal } from '#/db/types'
 import {
   Popover,
@@ -10,12 +10,18 @@ import {
 import type { PayCalendar } from '#/features/planning/data/payPeriods'
 import type { YearAhead } from '#/features/planning/data/yearAhead'
 import type { CurrencyCode } from '#/lib/currency'
-import { figure, money, monthYear } from '#/features/planning/view/format'
+import {
+  figure,
+  money,
+  monthYear,
+  plural,
+} from '#/features/planning/view/format'
 import {
   billLanes,
   goalLanes,
   monthHead,
   monthLines,
+  monthlyBillLanes,
 } from '#/features/planning/view/yearView'
 import { cn } from '#/lib/utils'
 import { Dot } from '#/features/planning/components/kit/Spine'
@@ -57,6 +63,7 @@ export function YearLanes({
   onReview,
 }: Props) {
   const [openMonth, setOpenMonth] = useState<number | null>(null)
+  const [monthlyOpen, setMonthlyOpen] = useState(false)
   const { months } = ahead
   const n = months.length
   const grid: CSSProperties = {
@@ -64,6 +71,7 @@ export function YearLanes({
     minWidth: 168 + n * 86,
   }
   const bigLanes = billLanes(ahead, bills, calendar)
+  const monthlyLanes = monthlyBillLanes(ahead, bills)
   const goalRows = goalLanes(ahead, goals, calendar)
   const maxSet = Math.max(1, ...months.map((m) => m.setAside.total))
   const range = `${monthYear(`${months[0].month}-01`)} – ${monthYear(`${months[n - 1].month}-01`)}`
@@ -212,12 +220,27 @@ export function YearLanes({
             `Bills · ${money(months[0].monthlyBills.total, base)} this month`,
           )}
           {row(
-            <>
-              <span className="text-[13px] font-bold">Monthly bills</span>
-              <span className="text-[11px] text-fp-text-3">
-                {months[0].monthlyBills.items.length} this month
+            <button
+              type="button"
+              aria-expanded={monthlyOpen}
+              onClick={() => setMonthlyOpen((o) => !o)}
+              className="flex min-w-0 items-center gap-2 text-start"
+            >
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="text-[13px] font-bold">Monthly bills</span>
+                <span className="text-[11px] text-fp-text-3">
+                  {plural(monthlyLanes.length, 'bill')}
+                </span>
               </span>
-            </>,
+              <ChevronDown
+                aria-hidden
+                size={15}
+                className={cn(
+                  'flex-none text-fp-text-3 transition-transform',
+                  monthlyOpen && 'rotate-180',
+                )}
+              />
+            </button>,
             (col) =>
               months.map((m, i) => (
                 <span
@@ -232,6 +255,41 @@ export function YearLanes({
               )),
             'monthly',
           )}
+          {monthlyOpen
+            ? monthlyLanes.map((lane) =>
+                row(
+                  <button
+                    type="button"
+                    onClick={() => onOpen('bill', lane.billId)}
+                    className="flex min-w-0 flex-col text-start"
+                  >
+                    <span className="flex items-center gap-[6px] text-[13px] font-bold">
+                      <Dot color={lane.color} />
+                      <span className="truncate">{lane.name}</span>
+                    </span>
+                    <span className="truncate text-[11px] text-fp-text-3">
+                      {lane.sub}
+                    </span>
+                  </button>,
+                  (col) =>
+                    lane.dates.map((dates, i) =>
+                      dates.length > 0 ? (
+                        <span
+                          key={months[i].month}
+                          title={dates.join(', ')}
+                          className="flex items-center justify-center py-2 text-[11px] font-semibold text-fp-text-3"
+                          style={col(i)}
+                        >
+                          {dates.length > 1
+                            ? `${dates[0]} +${dates.length - 1}`
+                            : dates[0]}
+                        </span>
+                      ) : null,
+                    ),
+                  `monthly-${lane.billId}`,
+                ),
+              )
+            : null}
           {bigLanes.map((lane) =>
             row(
               <button

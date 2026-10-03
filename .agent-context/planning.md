@@ -415,7 +415,8 @@ review for the oldest waiting payday, else the next one), then the view.
   the full height (a guide cell under the rows, `-z-1` in an `isolate` grid), month heads that
   open a popover of
   everything in the month (`monthLines`; one controlled open month, its head tinted while open, a close button by the title); lanes Income (the brief's lane the mock lacked) ·
-  Monthly bills (a total per month) · one lane per bill saved up for (a blue ramp from its first
+  Monthly bills (a total per month; its chevron expands a row per bill with its dates in each
+  month, `monthlyBillLanes`) · one lane per bill saved up for (a blue ramp from its first
   payday to the month before it is due, filled by what is set aside; a gem marker on the due
   month) · one bar per goal to its finish (its colour at 15 %, *"SR 940 a paycheck"*, *"… ·
   ongoing"*, *"… · done Dec 2028"*, amber *"… · slips to Aug 2027"*, dimmed *Paused*) with an
