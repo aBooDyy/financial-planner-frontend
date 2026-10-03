@@ -206,7 +206,12 @@ describe('Upcoming by paycheck', () => {
 
   it('opens the payday review', async () => {
     render(<UpcomingSection />)
-    fireEvent.click(await screen.findByRole('button', { name: /Review/ }))
+    // The button draws while the plan loads, disabled until it has.
+    const review = await screen.findByRole<HTMLButtonElement>('button', {
+      name: /Review/,
+    })
+    await waitFor(() => expect(review.disabled).toBe(false))
+    fireEvent.click(review)
     expect(usePlanningUi.getState().sheet).toMatchObject({ kind: 'review' })
   })
 
