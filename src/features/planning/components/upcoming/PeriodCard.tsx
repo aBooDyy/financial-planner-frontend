@@ -75,13 +75,13 @@ export function PeriodCard({ head, groups, footer, summary }: Props) {
                 </div>
               ),
             )}
-            <div className="flex items-center justify-between gap-3 bg-fp-surface-2 px-4 py-[10px] text-[13px]">
-              <span className="font-semibold text-fp-text-2">
+            <div className="flex items-center justify-between gap-3 border-t border-fp-border bg-fp-surface-2 px-4 py-3">
+              <span className="text-[13px] font-semibold text-fp-text-2">
                 {footer.label}
               </span>
               <span
                 className={cn(
-                  'fp-sensitive font-extrabold tabular-nums',
+                  'fp-sensitive text-[15px] font-extrabold tabular-nums',
                   footer.tone === 'ok' && 'text-fp-accent-ink',
                   footer.tone === 'danger' && 'text-fp-danger',
                 )}
