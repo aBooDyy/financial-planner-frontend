@@ -1,5 +1,5 @@
 import { useNavigate } from '@tanstack/react-router'
-import { ChevronRight } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { useLastMonthNeedsWants } from '#/features/reports/hooks/useLastMonthNeedsWants'
 
 /**
@@ -14,16 +14,18 @@ export function LastMonthLine() {
     <button
       type="button"
       onClick={() => void navigate({ to: '/reports', search: reportSearch })}
-      className="flex w-full items-center gap-[6px] border-t border-fp-border px-[18px] py-[11px] text-start text-[12.5px] text-fp-text-2 hover:bg-fp-surface-2"
+      className="flex w-full items-center gap-[6px] border-t border-fp-border px-[18px] py-[11px] text-start text-[12.5px] font-semibold text-fp-text-2 hover:bg-fp-surface-2"
     >
-      <span className="min-w-0 flex-1 truncate">
-        <span className="font-bold text-fp-text">Last month:</span>{' '}
-        <span className="fp-sensitive">{summary.line}</span>
+      <span className="min-w-0 truncate">
+        Last month:{' '}
+        <span className="fp-sensitive font-bold text-fp-text">
+          {summary.line}
+        </span>
       </span>
-      <ChevronRight
-        size={15}
+      <ArrowRight
+        size={14}
         aria-hidden
-        className="flex-none text-fp-text-3 rtl:-scale-x-100"
+        className="flex-none text-fp-accent-ink rtl:-scale-x-100"
       />
     </button>
   )
