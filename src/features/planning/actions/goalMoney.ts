@@ -2,14 +2,17 @@
  * Spending a goal's money: "Use it" on a goal, and "I spent it" when marking one done (D20,
  * D30). Either records a spend linked to the goal — filed under the category the user picks,
  * remembered on the goal for next time — and releases the goal's set-asides in the paying
- * wallet, as any payment does.
+ * wallet, as any payment does. "Use it" on an open goal then has its stored plan rewritten
+ * quietly, like Add money: a spend beyond what was held counts as progress too.
  */
 import { db } from '#/db/db'
 import type { LocalGoal } from '#/db/types'
 import { closeGoal } from '#/features/goals/data/actions'
 import { updateGoal } from '#/features/goals/data/mutations'
 import { isoOf } from '#/features/planned/data/dates'
+import { goalOwner } from '#/features/planned/data/owners'
 import { walletCurrency } from '#/features/planned/data/mutations'
+import { requestPlanRecalc } from '#/features/planned/data/recalcRequests'
 import { currentRates } from '#/features/planned/data/rows'
 import {
   heldInWallet,
@@ -36,12 +39,12 @@ async function liveGoal(id: string): Promise<LocalGoal> {
   return goal
 }
 
-/** "Use it": a spend from the goal. Returns the transaction's id. */
-export async function spendFromGoal(
-  goalId: string,
+/** The spend and the release it makes. Returns the transaction's id. */
+async function recordGoalSpend(
+  goal: LocalGoal,
   input: GoalSpendInput,
 ): Promise<string> {
-  const goal = await liveGoal(goalId)
+  const goalId = goal.id
   if (!Number.isFinite(input.amount) || input.amount <= 0)
     throw new MoneyActionError('bad_amount')
   const categoryId = input.categoryId ?? goal.useCategoryId
@@ -74,6 +77,18 @@ export async function spendFromGoal(
     { id, walletId: input.walletId, amount, currency, date },
     rates,
   )
+  return id
+}
+
+/** "Use it": a spend from the goal. Returns the transaction's id. */
+export async function spendFromGoal(
+  goalId: string,
+  input: GoalSpendInput,
+): Promise<string> {
+  const goal = await liveGoal(goalId)
+  const id = await recordGoalSpend(goal, input)
+  if (goal.closedAt === null)
+    requestPlanRecalc(goalOwner(goalId), { quiet: true })
   return id
 }
 
@@ -133,7 +148,7 @@ export async function markGoalSpent(
   const ids: string[] = []
   for (const p of spending)
     ids.push(
-      await spendFromGoal(goalId, {
+      await recordGoalSpend(await liveGoal(goalId), {
         amount: p.amount,
         walletId: p.walletId,
         categoryId: input.categoryId,

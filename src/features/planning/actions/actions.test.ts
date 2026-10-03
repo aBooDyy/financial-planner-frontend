@@ -454,6 +454,23 @@ describe('Use it and I spent it', () => {
     ])
   })
 
+  it('rewrites the goal’s plan quietly after Use it, even past what was held', async () => {
+    await db.goals.update('trip', { useCategoryId: catId('travel') })
+    await spendFromGoal('trip', { amount: m(1500), walletId: 'main' })
+    expect(takePlanRecalcRequests()).toEqual([
+      { owner: goalOwner('trip'), quiet: true },
+    ])
+  })
+
+  it('leaves a closed goal’s plan alone after Use it', async () => {
+    await db.goals.update('trip', {
+      useCategoryId: catId('travel'),
+      closedAt: '2026-09-01',
+    })
+    await spendFromGoal('trip', { amount: m(100), walletId: 'main' })
+    expect(takePlanRecalcRequests()).toEqual([])
+  })
+
   const spends = async () =>
     (await db.transactions.toArray())
       .map((t) => [t.walletId, t.amount / 100])
@@ -473,6 +490,7 @@ describe('Use it and I spent it', () => {
     await markGoalSpent('trip', { walletId: 'main', date: '2026-09-24' })
     expect(await spends()).toEqual([['main', 800]])
     expect((await db.goals.get('trip'))?.closedAt).toBe('2026-09-24')
+    expect(takePlanRecalcRequests()).toEqual([])
     expect((await db.setAsides.toArray()).filter(isLiveSetAside)).toEqual([])
     const freed = (await db.setAsides.toArray()).filter(
       (a) => a.releasedAt !== null && a.releasedById === null,

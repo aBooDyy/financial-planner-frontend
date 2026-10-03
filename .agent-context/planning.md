@@ -269,9 +269,11 @@ first, each a Dexie write plus outbox entries; errors are `MoneyActionError` wit
   what later paydays set aside. The over-commit guardrail is the UI's (03 §3).
 - **`spendFromGoal(goalId, {amount, walletId, categoryId?, date?, note?})`** — Use it: a spend
   with the goal's id under `categoryId ?? goal.useCategoryId` (required the first time, then
-  remembered on the goal), releasing the goal's set-asides in the paying wallet.
+  remembered on the goal), releasing the goal's set-asides in the paying wallet. On an open
+  goal the plan is then rewritten **quietly**, as after Add money: a spend past what was held
+  comes out of free money and still counts as progress, so the stored plan would go stale.
 - **`markGoalSpent(goalId, {parts | walletId + amount?, categoryId?, date?})`** — I spent
-  it (D30): one `spendFromGoal` per paying wallet (`parts` `{walletId, amount}` in the goal's
+  it (D30): one spend per paying wallet, as `spendFromGoal` records it but with no recalc (`parts` `{walletId, amount}` in the goal's
   currency; one `walletId` without `amount` spends **what that wallet holds** for the goal),
   then `closeGoal` with the rest freed (other wallets, money held outside). Never one spend of
   everything from one wallet: that wallet's Balance would stop matching its bank. Returns the
