@@ -146,7 +146,24 @@ describe('Upcoming by paycheck', () => {
       .map((el) => el.closest('li'))
       .find((li) => li && within(li).queryByText('Auto-pay'))
     if (!rentRow) throw new Error('no auto-pay Rent row')
-    expect(within(rentRow).getByRole('button', { name: 'Pay now' })).toBeTruthy()
+    expect(
+      within(rentRow).getByRole('button', { name: 'Pay now' }),
+    ).toBeTruthy()
+  })
+
+  it('counts the paychecks left toward a set-aside’s date', async () => {
+    render(<UpcomingSection />)
+    const row = (await screen.findAllByText('Umrah'))[0].closest('li')
+    if (!row) throw new Error('no Umrah row')
+    expect(within(row).getByText('9 paychecks left')).toBeTruthy()
+  })
+
+  it('calls an undated set-aside ongoing', async () => {
+    await db.goals.put({ ...umrah, dueDate: null, amount: m(1000) })
+    render(<UpcomingSection />)
+    const row = (await screen.findAllByText('Umrah'))[0].closest('li')
+    if (!row) throw new Error('no Umrah row')
+    expect(within(row).getByText('ongoing')).toBeTruthy()
   })
 
   it('sets a future set-aside aside now', async () => {

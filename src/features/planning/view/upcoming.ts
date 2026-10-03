@@ -4,6 +4,7 @@
  */
 import type { LocalBill, LocalGoal } from '#/db/types'
 import { daysBetween } from '#/features/planned/data/dates'
+import type { FundingPlan } from '#/features/planning/data/funding'
 import type { PayCalendar } from '#/features/planning/data/payPeriods'
 import type { BillStatus, GoalStatus } from '#/features/planning/data/status'
 import type {
@@ -106,6 +107,33 @@ export function paymentState(row: UpcomingRow, today: string): RowState {
       tone: 'warn',
     }
   return { label: dayMonth(row.item.date), tone: 'muted' }
+}
+
+/**
+ * A set-aside's line under its amount: the paychecks from this one through the last that can
+ * still fund what it goes toward, or "ongoing" when that has no date.
+ */
+export function setAsideState(
+  row: UpcomingRow,
+  funding: FundingPlan,
+): RowState | undefined {
+  const { billId, goalId } = row.item
+  const slot = funding.slots.findIndex((s) => s.date === row.item.date)
+  const track = funding.tracks.find((t) =>
+    billId
+      ? t.kind === 'bill' &&
+        t.ownerId === billId &&
+        t.start <= slot &&
+        slot <= t.end
+      : t.kind === 'goal' && t.ownerId === goalId,
+  )
+  if (!track) return undefined
+  if (track.deadline === null) return { label: 'ongoing', tone: 'muted' }
+  if (slot < 0 || slot > track.end) return undefined
+  return {
+    label: `${plural(track.end - slot + 1, 'paycheck')} left`,
+    tone: 'muted',
+  }
 }
 
 /** "Oct 18 · Main bank · saved SR 3,000". */

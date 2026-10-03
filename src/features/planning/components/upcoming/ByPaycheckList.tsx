@@ -17,6 +17,7 @@ import {
   periodHead,
   periodSummary,
   setAsideMeta,
+  setAsideState,
   skippedText,
   stillToPay,
 } from '#/features/planning/view/upcoming'
@@ -97,6 +98,7 @@ export function ByPaycheckList({ planning }: { planning: PlanningView }) {
                   }
                 : null,
           )}
+          state={setAsideState(row, planning.funding)}
           action={{
             label: 'Set aside now',
             busy: actions.busyId === row.id,
