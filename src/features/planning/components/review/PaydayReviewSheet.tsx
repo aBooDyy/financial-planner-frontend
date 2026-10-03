@@ -231,14 +231,19 @@ function PaydayReviewBody({ payday, onClose }: Props) {
     }
   }
 
+  const goalSub = (l: ReviewLine) => {
+    if (l.dueDate) return `By ${monthYear(l.dueDate)}`
+    const goal = inputs.goals.find((g) => g.id === l.ownerId)
+    if (!goal?.target) return 'Ongoing'
+    const saved = state.progress[goal.id]?.progress ?? 0
+    return `${money(saved, goal.currency)} of ${money(goal.target, goal.currency)}`
+  }
   const subOf = (l: ReviewLine) =>
-    l.kind === 'bill'
-      ? l.dueDate
+    l.kind === 'goal'
+      ? goalSub(l)
+      : l.dueDate
         ? `Due ${dayMonth(l.dueDate)}`
         : 'Bill'
-      : l.dueDate
-        ? `By ${monthYear(l.dueDate)}`
-        : 'Goal'
 
   return (
     <ResponsiveDialog

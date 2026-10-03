@@ -132,6 +132,31 @@ describe('PaydayReviewSheet', () => {
     ).toBeTruthy()
   })
 
+  it('says how far an undated goal has come, or that it is ongoing', async () => {
+    await db.goals.bulkPut([
+      { ...umrah, dueDate: null, amount: m(500) },
+      goal({
+        id: 'travel',
+        name: 'Travel',
+        target: null,
+        amount: m(300),
+        saveWalletId: 'savings',
+      }),
+    ])
+    await db.plannedTransactions.put(
+      planned({
+        goalId: 'travel',
+        name: 'Travel set-aside',
+        amount: m(300),
+        occurrence: '2026-10-25',
+        walletId: 'savings',
+      }),
+    )
+    render(<PaydayReviewSheet payday="2026-10-25" onClose={vi.fn()} />)
+    expect(await screen.findByText('SR 0 of SR 9,000')).toBeTruthy()
+    expect(screen.getByText('Ongoing')).toBeTruthy()
+  })
+
   it('edits an amount before setting it aside', async () => {
     const onClose = vi.fn()
     render(<PaydayReviewSheet payday="2026-10-25" onClose={onClose} />)
