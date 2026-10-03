@@ -1,6 +1,8 @@
 import { ChevronRight } from 'lucide-react'
+import { useRef } from 'react'
 import type { ReactNode } from 'react'
 import type { CurrencyCode } from '#/lib/currency'
+import { useElementWidth } from '#/features/planning/hooks/useElementWidth'
 import type { PlanningSection } from '#/features/planning/sections'
 import { money, signedMoney } from '#/features/planning/view/format'
 import type { PaycheckBar } from '#/features/planning/view/overview'
@@ -10,8 +12,12 @@ import {
   PlanCard,
 } from '#/features/planning/components/kit/PlanCard'
 
-/** Inline values show on segments wider than this share of the bar. */
-const LABEL_MIN_PCT = 11
+/** The bar's width before it is measured (a desktop card). */
+const FALLBACK_WIDTH = 900
+
+/** Whether a segment `px` wide fits its 11.5px extrabold value with some room either side. */
+const fitsLabel = (px: number, label: string): boolean =>
+  px >= label.length * 7.5 + 16
 
 type Props = {
   bar: PaycheckBar
@@ -27,6 +33,8 @@ type Props = {
  * line marks where the pay ends and a hatch covers the rest.
  */
 export function PaycheckCard({ bar, base, onSection, footer }: Props) {
+  const track = useRef<HTMLDivElement>(null)
+  const width = useElementWidth(track, FALLBACK_WIDTH)
   return (
     <PlanCard>
       <CardHeader
@@ -46,7 +54,10 @@ export function PaycheckCard({ bar, base, onSection, footer }: Props) {
               <span className="w-[2px] flex-1 bg-fp-danger-fill" />
             </div>
           ) : null}
-          <div className="relative flex h-[34px] gap-[2px] overflow-hidden rounded-[10px] bg-fp-surface-2">
+          <div
+            ref={track}
+            className="relative flex h-[34px] gap-[2px] overflow-hidden rounded-[10px] bg-fp-surface-2"
+          >
             {bar.segments.map((s) => (
               <button
                 key={s.key}
@@ -57,7 +68,9 @@ export function PaycheckCard({ bar, base, onSection, footer }: Props) {
                 className="fp-sensitive flex h-full min-w-[3px] items-center justify-center overflow-hidden text-[11.5px] font-extrabold whitespace-nowrap text-white transition-[filter] hover:brightness-110"
                 style={{ width: `${s.pct}%`, background: s.color }}
               >
-                {s.pct > LABEL_MIN_PCT ? money(s.amount, base) : null}
+                {fitsLabel((s.pct / 100) * width, money(s.amount, base))
+                  ? money(s.amount, base)
+                  : null}
               </button>
             ))}
             {bar.payAt !== null ? (

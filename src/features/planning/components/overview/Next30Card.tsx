@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
-import type { RefObject } from 'react'
+import { useRef } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { addDaysISO } from '#/features/planned/data/dates'
 import type { UpcomingRow } from '#/features/planning/data/upcoming'
 import { dayMonth } from '#/features/planning/view/format'
+import { useElementWidth } from '#/features/planning/hooks/useElementWidth'
 import { NEXT_DAYS, placeLabels } from '#/features/planning/view/overview'
 import type { DayEvent } from '#/features/planning/view/overview'
 import { cn } from '#/lib/utils'
@@ -97,7 +97,7 @@ function Timeline({
   onEvent: (e: DayEvent) => void
 }) {
   const axis = useRef<HTMLDivElement>(null)
-  const width = useWidth(axis)
+  const width = useElementWidth(axis, FALLBACK_WIDTH)
   const sides = placeLabels(
     events.map((e) => (pctOf(e.day) / 100) * width),
     LABEL_GAP_PX,
@@ -171,20 +171,6 @@ function Timeline({
       </div>
     </div>
   )
-}
-
-function useWidth(ref: RefObject<HTMLElement | null>): number {
-  const [width, setWidth] = useState(FALLBACK_WIDTH)
-  useEffect(() => {
-    const el = ref.current
-    if (!el || typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver(([entry]) => {
-      if (entry.contentRect.width > 0) setWidth(entry.contentRect.width)
-    })
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [ref])
-  return width
 }
 
 /** Mobile: a strip of dots, then the list. */
