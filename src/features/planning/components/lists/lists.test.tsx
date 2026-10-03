@@ -206,6 +206,13 @@ describe('Bills', () => {
     render(<BillsSection />)
     expect(await screen.findByText('No bills yet')).toBeTruthy()
   })
+
+  it('keeps the empty card above Done when every bill is finished', async () => {
+    await db.bills.bulkDelete(['rent', 'ins', 'gym'])
+    render(<BillsSection />)
+    expect(await screen.findByText('No bills yet')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Done/ })).toBeTruthy()
+  })
 })
 
 describe('Goals', () => {
@@ -269,6 +276,20 @@ describe('Goals', () => {
     } finally {
       window.matchMedia = desktopMedia
     }
+  })
+
+  it('offers the emergency fund above Reached when every goal is finished', async () => {
+    await db.goals.put(
+      goal({
+        id: 'laptop',
+        name: 'New laptop',
+        closedAt: '2026-06-01T00:00:00Z',
+      }),
+    )
+    render(<GoalsSection />)
+    expect(await screen.findByText('No goals yet')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Emergency fund/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Reached/ })).toBeTruthy()
   })
 
   it('offers the emergency fund when there are no goals', async () => {

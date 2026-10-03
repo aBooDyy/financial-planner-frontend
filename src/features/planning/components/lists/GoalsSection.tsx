@@ -70,7 +70,25 @@ export function GoalsSection() {
 
   const add = () => openSheet({ kind: 'goal', id: null })
   if (planning.loading) return null
-  if (inputs.goals.length === 0)
+  const doneCard = (
+    <DoneCard
+      title="Reached"
+      items={done.map((g) => ({
+        id: g.id,
+        name: g.name,
+        color: g.color,
+        note: [
+          `${money(statusOf(g)?.progress ?? 0, g.currency)} saved`,
+          g.closedAt ? monthYear(g.closedAt.slice(0, 10)) : null,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+        onReopen: () => void actions.reopen(g, 'goal'),
+        onOpen: () => openDetail(goalOwner(g.id)),
+      }))}
+    />
+  )
+  if (open.length === 0)
     return (
       <>
         <SectionHeading title="Goals" addLabel="Add goal" onAdd={add} />
@@ -101,6 +119,7 @@ export function GoalsSection() {
             ) : null
           }
         />
+        {doneCard}
       </>
     )
 
@@ -176,22 +195,7 @@ export function GoalsSection() {
           </TierCard>
         ),
       )}
-      <DoneCard
-        title="Reached"
-        items={done.map((g) => ({
-          id: g.id,
-          name: g.name,
-          color: g.color,
-          note: [
-            `${money(statusOf(g)?.progress ?? 0, g.currency)} saved`,
-            g.closedAt ? monthYear(g.closedAt.slice(0, 10)) : null,
-          ]
-            .filter(Boolean)
-            .join(' · '),
-          onReopen: () => void actions.reopen(g, 'goal'),
-          onOpen: () => openDetail(goalOwner(g.id)),
-        }))}
-      />
+      {doneCard}
     </>
   )
 }

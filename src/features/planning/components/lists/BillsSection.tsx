@@ -62,7 +62,24 @@ export function BillsSection() {
 
   const add = () => openSheet({ kind: 'bill', id: null })
   if (planning.loading) return null
-  if (inputs.bills.length === 0)
+  const doneCard = (
+    <DoneCard
+      title="Done"
+      items={done.map((b) => ({
+        id: b.id,
+        name: b.name,
+        color: b.color,
+        note:
+          b.closedAt !== null
+            ? `Ended ${dayMonth(b.closedAt.slice(0, 10))}`
+            : `Paid · ${money(b.amount, b.currency)}`,
+        onReopen:
+          b.closedAt !== null ? () => void actions.reopen(b, 'bill') : null,
+        onOpen: () => openDetail(billOwner(b.id)),
+      }))}
+    />
+  )
+  if (open.length === 0)
     return (
       <>
         <SectionHeading title="Bills" addLabel="Add bill" onAdd={add} />
@@ -73,6 +90,7 @@ export function BillsSection() {
           addLabel="Add bill"
           onAdd={add}
         />
+        {doneCard}
       </>
     )
 
@@ -164,21 +182,7 @@ export function BillsSection() {
           </TierCard>
         ),
       )}
-      <DoneCard
-        title="Done"
-        items={done.map((b) => ({
-          id: b.id,
-          name: b.name,
-          color: b.color,
-          note:
-            b.closedAt !== null
-              ? `Ended ${dayMonth(b.closedAt.slice(0, 10))}`
-              : `Paid · ${money(b.amount, b.currency)}`,
-          onReopen:
-            b.closedAt !== null ? () => void actions.reopen(b, 'bill') : null,
-          onOpen: () => openDetail(billOwner(b.id)),
-        }))}
-      />
+      {doneCard}
     </>
   )
 }
