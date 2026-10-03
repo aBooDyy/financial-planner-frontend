@@ -30,12 +30,12 @@ describe('formatDate', () => {
 
 describe('parseISODate', () => {
   it('round-trips a wire date into the chosen display format', () => {
-    const d = parseISODate('2026-07-01')!
-    expect(d.getFullYear()).toBe(2026)
-    expect(d.getMonth()).toBe(6) // July, 0-indexed
-    expect(d.getDate()).toBe(1)
+    const parsed = parseISODate('2026-07-01')!
+    expect(parsed.getFullYear()).toBe(2026)
+    expect(parsed.getMonth()).toBe(6) // July, 0-indexed
+    expect(parsed.getDate()).toBe(1)
     // The bug report: 2026-07-01 must read as day-first 01/07/2026, not 07/01/2026.
-    expect(formatDate(d, 'dmy')).toBe('01/07/2026')
+    expect(formatDate(parsed, 'dmy')).toBe('01/07/2026')
   })
 
   it('returns null for empty or malformed input', () => {
