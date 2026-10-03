@@ -3,8 +3,8 @@ import type { YearMonth } from '#/features/planning/data/yearAhead'
 import { bill, m } from '#/features/planned/testing/fixtures'
 import { monthHead, monthIndex, monthlyBillLanes } from './yearView'
 
-const month = (m: string): YearMonth => ({
-  month: m,
+const month = (key: string): YearMonth => ({
+  month: key,
   income: 0,
   monthlyBills: { total: 0, items: [] },
   bigBills: [],
