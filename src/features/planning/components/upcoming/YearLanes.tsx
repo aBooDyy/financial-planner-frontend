@@ -9,6 +9,7 @@ import {
 } from '#/components/ui/popover'
 import type { PayCalendar } from '#/features/planning/data/payPeriods'
 import type { YearAhead } from '#/features/planning/data/yearAhead'
+import type { RatesMap } from '#/lib/config/rates'
 import type { CurrencyCode } from '#/lib/currency'
 import {
   figure,
@@ -19,6 +20,7 @@ import {
 import {
   billLanes,
   goalLanes,
+  groupNotes,
   monthHead,
   monthLines,
   monthlyBillLanes,
@@ -31,6 +33,7 @@ type Props = {
   bills: ReadonlyArray<LocalBill>
   goals: ReadonlyArray<LocalGoal>
   base: CurrencyCode
+  rates: RatesMap
   calendar: PayCalendar
   onOpen: (kind: 'bill' | 'goal', id: string) => void
   onReview: () => void
@@ -58,6 +61,7 @@ export function YearLanes({
   bills,
   goals,
   base,
+  rates,
   calendar,
   onOpen,
   onReview,
@@ -72,6 +76,7 @@ export function YearLanes({
   }
   const bigLanes = billLanes(ahead, bills, calendar)
   const monthlyLanes = monthlyBillLanes(ahead, bills)
+  const notes = groupNotes(ahead, bills, goals, base, rates, calendar)
   const goalRows = goalLanes(ahead, goals, calendar)
   const maxSet = Math.max(1, ...months.map((m) => m.setAside.total))
   const range = `${monthYear(`${months[0].month}-01`)} – ${monthYear(`${months[n - 1].month}-01`)}`
@@ -92,12 +97,21 @@ export function YearLanes({
       </div>
     )
   }
-  const group = (title: string) => (
+  const group = (title: string, note: string | null = null) => (
     <div
-      className="sticky start-0 border-t border-fp-border px-3 pt-[14px] pb-[6px] text-[11px] font-extrabold tracking-[0.06em] text-fp-text-3 uppercase"
+      className="flex border-t border-fp-border pt-[14px] pb-[6px]"
       style={{ gridRow: next++, gridColumn: `1 / span ${n + 1}` }}
     >
-      {title}
+      <span className="sticky start-[14px] ms-[14px] flex items-baseline gap-[10px] whitespace-nowrap">
+        <span className="text-[11px] font-extrabold tracking-[0.07em] text-fp-text-3 uppercase">
+          {title}
+        </span>
+        {note ? (
+          <span className="fp-sensitive text-[11.5px] text-fp-text-3">
+            {note}
+          </span>
+        ) : null}
+      </span>
     </div>
   )
 
@@ -216,9 +230,7 @@ export function YearLanes({
           )}
 
           {/* Bills */}
-          {group(
-            `Bills · ${money(months[0].monthlyBills.total, base)} this month`,
-          )}
+          {group('Bills', notes.bills)}
           {row(
             <button
               type="button"
@@ -350,7 +362,7 @@ export function YearLanes({
           )}
 
           {/* Goals */}
-          {goalRows.length > 0 ? group('Goals') : null}
+          {goalRows.length > 0 ? group('Goals', notes.goals) : null}
           {goalRows.map((g) =>
             row(
               <button

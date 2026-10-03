@@ -5,6 +5,9 @@
 import type { LocalBill, LocalGoal } from '#/db/types'
 import type { PayCalendar } from '#/features/planning/data/payPeriods'
 import type { YearAhead, YearMonth } from '#/features/planning/data/yearAhead'
+import { frequencyMetaOf } from '#/features/goals/data/cadence'
+import type { RatesMap } from '#/lib/config/rates'
+import { convertMinor } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
 import { dayMonth, money, monthYear, perPeriod } from './format'
 import { repeatLabel } from './repeat'
@@ -31,6 +34,43 @@ export function monthHead(
   return {
     name,
     year: i === 0 || months[i].month.endsWith('-01') ? year : null,
+  }
+}
+
+/**
+ * The Bills and Goals group heads' notes: what the bills covered from each paycheck cost a
+ * month, and what goals set aside a paycheck. Null when there is nothing to say.
+ */
+export function groupNotes(
+  ahead: YearAhead,
+  bills: ReadonlyArray<LocalBill>,
+  goals: ReadonlyArray<LocalGoal>,
+  base: CurrencyCode,
+  rates: RatesMap,
+  calendar: PayCalendar,
+): { bills: string | null; goals: string | null } {
+  const monthlyIds = new Set(
+    ahead.months.flatMap((m) => m.monthlyBills.items.map((i) => i.billId)),
+  )
+  const monthly = bills
+    .filter((b) => monthlyIds.has(b.id) && b.frequency)
+    .reduce(
+      (sum, b) =>
+        sum +
+        (convertMinor(b.amount, b.currency, base, rates) *
+          frequencyMetaOf(b, 'monthly').perYear) /
+          12,
+      0,
+    )
+  const pace = ahead.goals.reduce((sum, y) => {
+    const goal = goals.find((g) => g.id === y.goalId)
+    return goal
+      ? sum + convertMinor(y.perPaycheck, goal.currency, base, rates)
+      : sum
+  }, 0)
+  return {
+    bills: monthly > 0 ? `${money(monthly, base)} a month` : null,
+    goals: pace > 0 ? `${money(pace, base)} ${perPeriod(calendar)}` : null,
   }
 }
 

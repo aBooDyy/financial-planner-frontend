@@ -9,7 +9,7 @@ import {
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { YearAhead, YearMonth } from '#/features/planning/data/yearAhead'
 import type { PayCalendar } from '#/features/planning/data/payPeriods'
-import { bill, goal, m } from '#/features/planned/testing/fixtures'
+import { bill, goal, m, RATES } from '#/features/planned/testing/fixtures'
 import { stubBrowser } from '#/features/planning/testing/dom'
 import { YearLanes } from './YearLanes'
 
@@ -69,6 +69,7 @@ function renderLanes() {
       bills={[rent]}
       goals={[car]}
       base="SAR"
+      rates={RATES}
       calendar={calendar}
       onOpen={vi.fn()}
       onReview={vi.fn()}
@@ -126,6 +127,7 @@ describe('year lanes', () => {
         bills={[rent]}
         goals={[car]}
         base="SAR"
+        rates={RATES}
         calendar={calendar}
         onOpen={onOpen}
         onReview={vi.fn()}
@@ -140,5 +142,15 @@ describe('year lanes', () => {
     expect(screen.getByText('Jan 1')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /^Rent/ }))
     expect(onOpen).toHaveBeenCalledWith('bill', 'rent')
+  })
+
+  it('notes what bills cost a month and what goals set aside', () => {
+    renderLanes()
+    expect(screen.getByText('Bills').parentElement?.textContent).toBe(
+      'BillsSR 3,000 a month',
+    )
+    expect(screen.getByText('Goals').parentElement?.textContent).toBe(
+      'GoalsSR 1,000 a month',
+    )
   })
 })

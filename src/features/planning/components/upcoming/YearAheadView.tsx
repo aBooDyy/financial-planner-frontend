@@ -23,6 +23,7 @@ export function YearAheadView({ planning }: { planning: PlanningView }) {
       bills={inputs.bills}
       goals={inputs.goals}
       base={inputs.base}
+      rates={inputs.rates}
       calendar={planning.calendar}
       onOpen={open}
       onReview={() => openSheet({ kind: 'review', payday: null })}
