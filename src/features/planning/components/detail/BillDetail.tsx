@@ -54,6 +54,7 @@ export function BillDetail({
             setAsides: inputs.setAsides,
             planned: inputs.planned,
             walletName,
+            categoryName: () => null,
             rates: inputs.rates,
           })
         : [],

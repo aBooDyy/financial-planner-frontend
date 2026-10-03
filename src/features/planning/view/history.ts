@@ -1,8 +1,9 @@
 /**
- * A bill's or goal's history for its detail panel: set-asides made (and freed), payments or
+ * A bill's or goal's history for its detail panel: set-asides made (and taken back), payments or
  * spending, and skipped occurrences — latest first. Pure.
  */
 import type { LocalPlanned, LocalSetAside, LocalTransaction } from '#/db/types'
+import { autoSettlementId } from '#/features/planned/data/autoConfirm'
 import { convertMinor } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
 import type { RatesMap } from '#/lib/config/rates'
@@ -28,6 +29,8 @@ export function historyOf(args: {
   setAsides: ReadonlyArray<LocalSetAside>
   planned: ReadonlyArray<LocalPlanned>
   walletName: (id: string | null) => string
+  /** A transaction's category as shown on its line ("Visa fees"); null leaves it out. */
+  categoryName: (id: string | null) => string | null
   rates: RatesMap
 }): HistoryLine[] {
   const { kind, id, currency, rates } = args
@@ -57,7 +60,7 @@ export function historyOf(args: {
       lines.push({
         key: `f:${a.id}`,
         date: a.releasedAt.slice(0, 10),
-        label: 'Freed',
+        label: 'Taken back',
         sub: where,
         amount,
         tone: 'none',
@@ -68,8 +71,18 @@ export function historyOf(args: {
     lines.push({
       key: `t:${t.id}`,
       date: t.date,
-      label: kind === 'bill' ? 'Paid' : 'Used',
-      sub: args.walletName(t.walletId),
+      label:
+        kind === 'goal'
+          ? 'Used'
+          : t.plannedId && t.id === autoSettlementId(t.plannedId)
+            ? 'Paid · auto-pay'
+            : 'Paid',
+      sub: [
+        kind === 'goal' ? args.categoryName(t.categoryId) : null,
+        args.walletName(t.walletId),
+      ]
+        .filter(Boolean)
+        .join(' · '),
       amount: `−${money(inOwner(t.amount, t.currency), currency)}`,
       tone: 'out',
     })

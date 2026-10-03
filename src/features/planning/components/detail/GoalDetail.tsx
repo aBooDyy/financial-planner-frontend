@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useCategoryCatalog } from '#/features/categories/hooks/useCategoryCatalog'
 import { goalOwner } from '#/features/planned/data/owners'
 import { useGoalPlan } from '#/features/planned/hooks/useGoalPlan'
 import { usePlannedData } from '#/features/planned/hooks/usePlannedData'
@@ -27,6 +28,7 @@ export function GoalDetail({
   const { inputs } = usePlannedData()
   const planning = usePlanning()
   const wallets = usePlanningWallets()
+  const catalog = useCategoryCatalog()
   const actions = useItemActions()
   const openSheet = usePlanningUi((s) => s.openSheet)
   const plan = useGoalPlan(goalId)
@@ -46,10 +48,14 @@ export function GoalDetail({
               id
                 ? (wallets.byId.get(id)?.name ?? 'A deleted wallet')
                 : 'No wallet',
+            categoryName: (id) =>
+              id && catalog.has(id)
+                ? (catalog.pathOf(id).at(-1) ?? null)
+                : null,
             rates: inputs.rates,
           })
         : [],
-    [goal, inputs, wallets],
+    [goal, inputs, wallets, catalog],
   )
 
   if (!goal || !status) return null

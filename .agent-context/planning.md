@@ -506,7 +506,9 @@ to Bills and open a bill in one go). Header (both): colour dot, name, "Semi-annu
   says the stored plan is off — *"Your plan says SR 500 a paycheck; today it works out to SR
   1,000."* + **Recalculate**, then *Plan updated · Undo* from the recalc-undo store),
   `NextOccurrences` (repeating bills), `HistoryList` (`view/history.ts`: Set aside / Moved in /
-  Freed / Paid / Used / Skipped, latest first, 15 shown).
+  Taken back (a freed set-aside, the docs' word) / Paid / Paid · auto-pay (the settlement's id is
+  `autoSettlementId`) / Used (sub "Visa fees · Main bank": leaf category · wallet) / Skipped,
+  latest first, 15 shown).
 
 ### Anytime-action sheets — `components/sheets/`
 
