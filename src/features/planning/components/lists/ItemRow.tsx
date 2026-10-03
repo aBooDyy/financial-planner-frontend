@@ -53,7 +53,7 @@ export function ItemRow({
     <li
       {...drag}
       className={cn(
-        'flex items-stretch gap-3 border-t border-fp-border px-4 py-3 transition-opacity data-[dragging]:opacity-40',
+        'flex items-stretch gap-3 border-t border-fp-border px-4 py-3 transition-[opacity,background-color] hover:bg-fp-surface-2 data-[dragging]:opacity-40',
         muted && 'opacity-70',
       )}
     >
