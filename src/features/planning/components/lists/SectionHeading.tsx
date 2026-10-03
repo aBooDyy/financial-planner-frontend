@@ -34,7 +34,7 @@ export function SectionHeading({
           ) : null}
         </h2>
         {sub ? (
-          <p className="mt-[2px] text-[13px] text-fp-text-2">
+          <p className="mt-[2px] text-[12.5px] text-fp-text-3">
             <span className="fp-sensitive">{sub}</span>
             {subLink ? <> · {subLink}</> : null}
           </p>

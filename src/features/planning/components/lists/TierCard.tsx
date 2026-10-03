@@ -13,7 +13,7 @@ export function TierCard({ title, note, children }: Props) {
   return (
     <PlanCard label={title} className="overflow-hidden">
       <div className="flex items-baseline gap-3 px-4 pt-3 pb-[10px]">
-        <h3 className="text-[15px] font-extrabold tracking-[-0.01em]">
+        <h3 className="text-[13.5px] font-extrabold">
           {title}
         </h3>
         {note ? (

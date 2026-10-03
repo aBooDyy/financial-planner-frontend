@@ -32,8 +32,8 @@ export function DoneCard({
         onClick={() => setOpen((o) => !o)}
         className="flex w-full items-center gap-2 px-4 py-3 text-start"
       >
-        <span className="text-[15px] font-extrabold">{title}</span>
-        <span className="text-[13px] font-bold text-fp-text-3 tabular-nums">
+        <span className="text-[13.5px] font-extrabold">{title}</span>
+        <span className="text-[12px] text-fp-text-3 tabular-nums">
           {items.length}
         </span>
         <ChevronDown
@@ -69,7 +69,7 @@ export function DoneCard({
                 <button
                   type="button"
                   onClick={item.onReopen}
-                  className="self-center rounded-[9px] border border-fp-border px-[10px] py-[6px] text-[12.5px] font-bold text-fp-accent-ink hover:border-fp-border-strong"
+                  className="self-center rounded-[9px] border border-fp-border-strong bg-fp-surface px-[11px] py-[6px] text-[12px] font-bold text-fp-text hover:bg-fp-surface-2"
                 >
                   Reopen
                 </button>
