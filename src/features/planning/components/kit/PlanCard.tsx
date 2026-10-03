@@ -25,7 +25,7 @@ export function PlanCard({
   )
 }
 
-/** A card's title row: the title, an optional note and something at the end. */
+/** A card's title row: the title, then a quiet note or a control at its end. */
 export function CardHeader({
   title,
   note,
@@ -48,7 +48,7 @@ export function CardHeader({
         {title}
       </h2>
       {note ? (
-        <span className="min-w-0 truncate text-[12px] text-fp-text-3">
+        <span className="ms-auto min-w-0 truncate text-[12px] text-fp-text-3">
           {note}
         </span>
       ) : null}
