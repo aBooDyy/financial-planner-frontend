@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type {
   LocalBalanceNode,
+  LocalBill,
   LocalBudget,
   LocalCategory,
   LocalGoal,
@@ -1209,7 +1210,20 @@ describe('confirmed planned items in Activity', () => {
       name: 'Umrah trip',
       sourceName: 'Main',
       amountStr: 'SR 1,500.00',
-      ownerId: 'umrah',
+      owner: { kind: 'goal', id: 'umrah' },
+    })
+  })
+
+  it('names a bill’s set-aside after the bill and points at it', () => {
+    const rent = { id: 'rent', name: 'Rent' } as LocalBill
+    const view = list({
+      bills: [rent],
+      setAsides: [allocation({ goalId: null, billId: 'rent' })],
+    })
+    expect(view.groups[0].rows[0]).toMatchObject({
+      kind: 'set_aside',
+      name: 'Rent',
+      owner: { kind: 'bill', id: 'rent' },
     })
   })
 

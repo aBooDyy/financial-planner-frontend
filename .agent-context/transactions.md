@@ -626,13 +626,15 @@ pass them).
 - **Tag pill.** `TxRow.tag` (`txTagOf`): a planned income reads "Income"; a spend with a
   `billId` reads "Bill"; a spend with a `goalId` reads "Goal". Drawn with the shared
   `components/TagPill` before the category in the meta line.
-- **Set-asides.** Every set-aside dated in the window becomes a `SetAsideRow` (`ownerId`, the
+- **Set-asides.** Every set-aside dated in the window becomes a `SetAsideRow` (`owner` — `{kind: 'bill' | 'goal', id}`, the
   bill's or goal's name, "Set aside · <wallet or outside label>", base-currency amount) —
   released ones too: the row records that money was set aside that day. A wallet's shows when
   its wallet is in scope; one held outside only unscoped. `SetAsideActivityRow` draws it
-  like a transfer (dashed neutral chip, grey amount, "not in totals"). They are **never** in a
+  like a transfer (dashed neutral chip, grey amount, "not in totals") behind its owner's pill —
+  **Bill** (neutral) or **Goal** (accent), as on transaction rows. They are **never** in a
   day total, Spent, the donut, the calendar or a budget — those read `txns` only — and a day
-  holding only set-asides totals `—`. Wallet-held ones feed only the hero's set-aside caption. Tapping one opens `/goals` (the route has no goal selector yet).
+  holding only set-asides totals `—`. Wallet-held ones feed only the hero's set-aside caption. Tapping one opens its
+  bill or goal on Planning (`/planning/bills|goals?open=<kind>:<id>`, the search hand-off).
 - **Nudge.** When `usePlanned().dueCount > 0` the Activity tab leads with `PlannedNudge`
   ("● N planned waiting for you to confirm · Review →"), which switches to the Planned tab; the
   tab's label carries the same count as an amber pill.

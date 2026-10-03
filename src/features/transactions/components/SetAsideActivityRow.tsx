@@ -1,8 +1,9 @@
 import { PiggyBank } from 'lucide-react'
 import type { SetAsideRow } from '#/features/transactions/data/selectors'
+import { TX_TAG_LABEL } from '#/features/transactions/data/selectors'
 import { TagPill } from '#/components/TagPill'
 
-/** A goal reservation in the activity list — held, not spent, so never in the day's totals. */
+/** A bill's or goal's reservation in the activity list — held, not spent, so never in the day's totals. */
 export function SetAsideActivityRow({
   row,
   onClick,
@@ -21,7 +22,10 @@ export function SetAsideActivityRow({
       <div className="flex min-w-0 flex-col gap-px">
         <span className="truncate text-[14px] font-semibold">{row.name}</span>
         <span className="flex min-w-0 items-center gap-[6px] text-[12px] text-fp-text-3">
-          <TagPill label="Goal" tone="accent" />
+          <TagPill
+            label={TX_TAG_LABEL[row.owner.kind]}
+            tone={row.owner.kind === 'bill' ? 'neutral' : 'accent'}
+          />
           <span className="flex-none">Set aside</span>
           <span className="h-[3px] w-[3px] flex-none rounded-full bg-fp-border-strong" />
           <span

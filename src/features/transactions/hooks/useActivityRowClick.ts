@@ -1,5 +1,9 @@
 import { useNavigate } from '@tanstack/react-router'
 import type { LocalTransaction } from '#/db/types'
+import {
+  PLANNING_OPEN_SECTION,
+  encodePlanningOpen,
+} from '#/features/planning/data/openParam'
 import { readTransferLegs } from '#/features/transactions/data/ledgerReads'
 import type { ActivityRow } from '#/features/transactions/data/selectors'
 import type { AdjustmentEditor } from '#/features/transactions/hooks/useAdjustmentEditor'
@@ -20,7 +24,8 @@ export function useActivityRowClick(
     if (row.kind === 'set_aside') {
       void navigate({
         to: '/planning/$section',
-        params: { section: 'goals' },
+        params: { section: PLANNING_OPEN_SECTION[row.owner.kind] },
+        search: { open: encodePlanningOpen(row.owner) },
       })
       return
     }

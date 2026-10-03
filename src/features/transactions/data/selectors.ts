@@ -554,12 +554,12 @@ export type TransferRow = {
   amountStr: string
 }
 
-/** A goal reservation — money held aside in a wallet (or outside one), not spent. */
+/** A bill's or goal's reservation — money held aside in a wallet (or outside one), not spent. */
 export type SetAsideRow = {
   kind: 'set_aside'
   id: string
   /** The bill or goal it is set aside for. */
-  ownerId: string
+  owner: { kind: 'bill' | 'goal'; id: string }
   /** The bill's or goal's name. */
   name: string
   /** "Main Checking", or where money held outside is. */
@@ -723,12 +723,14 @@ function setAsideRowOf(
   ownerNames: ReadonlyMap<string, string>,
 ): SetAsideRow {
   const wallet = a.walletId ? ctx.nodeById.get(a.walletId) : undefined
-  const ownerId = a.goalId ?? a.billId ?? ''
+  const owner = a.billId
+    ? { kind: 'bill' as const, id: a.billId }
+    : { kind: 'goal' as const, id: a.goalId ?? '' }
   return {
     kind: 'set_aside',
     id: a.id,
-    ownerId,
-    name: ownerNames.get(ownerId) ?? (a.billId ? 'Bill' : 'Goal'),
+    owner,
+    name: ownerNames.get(owner.id) ?? TX_TAG_LABEL[owner.kind],
     sourceName:
       a.source === 'outside'
         ? (a.externalLabel ?? 'Outside')
