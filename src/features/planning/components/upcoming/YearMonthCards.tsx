@@ -15,6 +15,7 @@ type Props = {
 
 /** Year ahead as month cards (mobile, D22): what each month brings in, owes and sets aside. */
 export function YearMonthCards({ ahead, bills, goals, base, onOpen }: Props) {
+  const maxSet = Math.max(1, ...ahead.months.map((m) => m.setAside.total))
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(250px,1fr))]">
       {ahead.months.map((m, i) => {
@@ -74,7 +75,7 @@ export function YearMonthCards({ ahead, bills, goals, base, onOpen }: Props) {
                   <span
                     key={`${o.kind}${o.ownerId}`}
                     style={{
-                      flexGrow: o.amount,
+                      flex: `0 0 ${(o.amount / maxSet) * 100}%`,
                       background: o.color || 'var(--fp-chart-set-aside)',
                     }}
                   />
