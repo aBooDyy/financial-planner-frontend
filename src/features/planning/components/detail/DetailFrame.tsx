@@ -50,7 +50,12 @@ export function DetailFrame({
         onOpenChange={(open) => {
           if (!open) onClose()
         }}
-        title={title}
+        title={
+          <span className="flex min-w-0 items-center gap-[10px]">
+            <Dot color={color} size={12} />
+            <span className="truncate">{title}</span>
+          </span>
+        }
         description={sub}
       >
         <div className="-mt-2 flex justify-end">
