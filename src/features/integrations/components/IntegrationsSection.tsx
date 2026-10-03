@@ -4,7 +4,7 @@ import { Plus } from 'lucide-react'
 import { OfflineNotice } from '#/components/OfflineNotice'
 import { Button } from '#/components/ui/button'
 import { walletGroupOptions } from '#/features/wallets/data/selectors'
-import { useWallets } from '#/features/wallets/hooks/useWallets'
+import { useWalletBasics } from '#/features/wallets/hooks/useWalletBasics'
 import { useCategoryCatalog } from '#/features/categories/hooks/useCategoryCatalog'
 import { useIntegrationKeys } from '#/features/integrations/hooks/useIntegrationKeys'
 import { useKeyFlow } from '#/features/integrations/hooks/useKeyFlow'
@@ -33,7 +33,7 @@ export function IntegrationsSection() {
       void navigate({ to: '/settings/integrations', search: {}, replace: true })
     }
   }
-  const { nodes, base } = useWallets()
+  const { nodes, base } = useWalletBasics()
   const catalog = useCategoryCatalog()
 
   const walletGroups = useMemo(() => walletGroupOptions(nodes), [nodes])

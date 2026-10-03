@@ -50,7 +50,7 @@ export async function readLedgerWindow(
 
 // Balances sum every row, so no window serves them: they come from the running totals the
 // database keeps alongside the ledger.
-async function readWalletTotals() {
+export async function readWalletTotals() {
   const nodes = await db.balanceNodes.toArray()
   const totals = await db.ledgerTotals.where('kind').equals('wallet').toArray()
   return { nodes: nodes.filter((n) => n.deleted === 0), totals }
@@ -64,25 +64,10 @@ export async function readWalletDeltas(
   return walletDeltasFromTotals(nodes, totals, rates)
 }
 
-/** What the Wallets page derives from the whole ledger. */
-export type LedgerSummary = {
-  deltas: Record<string, number>
-  /** Every currency a row is in, deleted rows included. */
-  currencies: CurrencyCode[]
-}
-
-export async function readLedgerSummary(
-  rates: RatesMap,
-): Promise<LedgerSummary> {
-  const { nodes, totals } = await readWalletTotals()
-  const currencies = await db.ledgerTotals
-    .where('kind')
-    .equals('currency')
-    .toArray()
-  return {
-    deltas: walletDeltasFromTotals(nodes, totals, rates),
-    currencies: currencies.map((t) => t.ref),
-  }
+/** Every currency a ledger row is in, deleted rows included. */
+export async function readLedgerCurrencies(): Promise<CurrencyCode[]> {
+  const rows = await db.ledgerTotals.where('kind').equals('currency').toArray()
+  return rows.map((t) => t.ref)
 }
 
 /** Every row dated on or after `from` (ISO), in primary-key order. */

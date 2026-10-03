@@ -134,7 +134,7 @@ through, `CurrencyPicker` offers it, `mergeRates` prices it.
 The backend no longer seeds per-user rate rows. `GET /exchange-rates` returns **overrides
 only** (empty for a fresh user); the published rates come from config. So every rates map is
 built once with `useMergedRates(rateRows)` — **config seed, then a custom currency's own
-rate, then the user's override** — in `useWallets`, `useGoals` and `useTransactions`
+rate, then the user's override** — in `usePlannedData` (which `useWallets` reads), `useGoals` and `useTransactions`
 (`mergeRates` is the same thing outside React). A currency in none of them (CUP, IRR, KPW,
 SSP, SYP, VES, ZWG ship no rate) simply has no rate, and `convertMinor` keeps returning `0`
 for that pair rather than inventing one.
@@ -161,7 +161,8 @@ a config default (the server creates the row), and the stored `version` once a r
     BASE", what the field edits) alongside the absolute stored rate, so switching base
     re-reads every row without rewriting one.
   - Held currencies sort to the top and wear a badge — `heldCurrencies(base, sources)` in
-    `features/wallets/data/selectors.ts`, via `useWallets().held`.
+    `features/wallets/data/selectors.ts`, via `useHeldCurrencies(base, rateRows)`
+    (`features/settings/hooks/`).
   - The list is **windowed** (`hooks/useVirtualRows`, shared with the import review grid):
     ~150 rows each carrying an input costs more than the screen is worth. Rows are therefore
     fixed-height (`RATE_ROW_HEIGHT`) — keep them that way.

@@ -425,8 +425,9 @@ without bound, and every builder only ever looks at a few dates. **What each con
   `YYYY-MM-DD`, where string order is date order.
 - **Balances read the running totals, not the ledger.** `readWalletDeltas(rates)` reads the
   `wallet` rows of `ledgerTotals` and converts each currency's sum into the wallet's currency
-  (`walletDeltasFromTotals`); `readLedgerSummary` adds the `currency` rows and the goal-linked
-  rows by the `goalId` index. It waits for the rates to load, and only the account filter's
+  (`walletDeltasFromTotals`); `readLedgerCurrencies` lists the `currency` rows. In React,
+  `hooks/useWalletDeltas(rates)` holds **one** live read of the wallet totals for every mounted
+  consumer (`db/sharedLiveQuery.ts`) and converts it once per rates map. It waits for the rates to load, and only the account filter's
   balances and the editors wait for it — the filter lists its accounts at once (`scopeSections`
   over empty deltas) with skeleton balances until then.
 
@@ -453,8 +454,8 @@ rows per merchant, currencies in use — reads a small derived table instead of 
   between pages makes the paged recount disagree with totals that are right, so a
   disagreement is only confirmed by `rebuildLedgerTotals`, which recounts in one transaction
   with the ledger and rewrites (and reports drift) only when the totals really differ.
-- **Readers**: `readWalletDeltas` / `readLedgerSummary` (Spending, Wallets, Settings › Archived,
-  search's account balances) and `hooks/useLedgerCounts(kind)` (Settings › Categories and
+- **Readers**: `readWalletDeltas` / `useWalletDeltas` (Spending, Wallets and Safe to spend,
+  Settings › Archived, search's account balances), `readLedgerCurrencies` (Settings › Currencies) and `hooks/useLedgerCounts(kind)` (Settings › Categories and
   › Merchants).
 
 - **Stepping periods never flashes.** `useLedgerWindow` wraps `useLiveQuery`, which

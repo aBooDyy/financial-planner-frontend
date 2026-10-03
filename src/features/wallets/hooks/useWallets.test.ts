@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import 'fake-indexeddb/auto'
-import { renderHook, waitFor } from '@testing-library/react'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { cleanup, renderHook, waitFor } from '@testing-library/react'
+import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { db } from '#/db/db'
 import type {
   LocalBalanceNode,
@@ -16,13 +16,16 @@ import {
   buildWalletsView,
   heldCurrencies,
 } from '#/features/wallets/data/selectors'
+import { useHeldCurrencies } from '#/features/settings/hooks/useHeldCurrencies'
+import { useWalletDeltas } from '#/features/transactions/hooks/useWalletDeltas'
 import { mergeRates } from '#/lib/config/rates'
 import { useWallets } from './useWallets'
 
 /**
- * The Wallets page no longer holds the ledger's rows: the query sums each wallet's deltas and
- * hands over only the goal-linked rows and the currencies. These pin that nothing it shows
- * changes, and that no balance is shown before everything it derives from has landed.
+ * The Wallets page never holds the ledger's rows: balances come from the running totals and
+ * the rest from the planner's shared read. These pin that nothing it shows changes from the
+ * every-row derivation, and that no balance is shown before everything it derives from has
+ * landed.
  */
 
 const meta = {
@@ -144,6 +147,9 @@ const TXNS = [
   tx({ id: 't8', type: 'adjustment_in', amount: 321, walletId: 'gone' }),
 ]
 
+// Unmounting closes the shared reads, so each test starts from nothing loaded.
+afterEach(cleanup)
+
 beforeAll(async () => {
   await db.balanceNodes.bulkPut(NODES)
   await db.transactions.bulkPut(TXNS)
@@ -177,10 +183,19 @@ describe('useWallets', () => {
     const expected = fromEveryRow()
     expect(result.current.deltas).toEqual(expected.deltas)
     expect(result.current.view).toEqual(expected.view)
-    expect(result.current.held).toEqual(expected.held)
-    // The set-aside earmarks the wallet, and the deleted EUR row still counts as held.
+    // The set-aside earmarks the wallet.
     expect(result.current.view.rows.some((r) => r.hasSetAside)).toBe(true)
-    expect(result.current.held).toContain('EUR')
+  })
+
+  it('shares one ledger read with every other consumer of the deltas', async () => {
+    const rates = mergeRates([])
+    const { result } = renderHook(() => ({
+      a: useWalletDeltas(rates),
+      b: useWalletDeltas(rates),
+    }))
+    await waitFor(() => expect(result.current.a).toBeDefined())
+    expect(result.current.b).toBe(result.current.a)
+    expect(result.current.a).toEqual(fromEveryRow().deltas)
   })
 
   it('never offers a figure before everything it derives from has landed', async () => {
@@ -195,5 +210,14 @@ describe('useWallets', () => {
     expect(seen[0].loading).toBe(true)
     for (const render of seen.filter((r) => !r.loading))
       expect(render.total).toBe(total)
+  })
+})
+
+describe('useHeldCurrencies', () => {
+  it('lists what the every-row read listed, deleted ledger rows included', async () => {
+    const { result } = renderHook(() => useHeldCurrencies('SAR', []))
+    const expected = fromEveryRow().held
+    await waitFor(() => expect(result.current).toEqual(expected))
+    expect(result.current).toContain('EUR')
   })
 })

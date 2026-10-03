@@ -22,7 +22,7 @@ import { usePaydayNoticeStore } from '#/features/planned/stores/paydayNotice'
 import { useRecalcUndoStore } from '#/features/planned/stores/recalcUndo'
 import { moveSetAsides } from '#/features/setAsides/data/batches'
 import { walletSetAsides } from '#/features/setAsides/data/totals'
-import { readLedgerSummary } from '#/features/transactions/data/ledgerReads'
+import { readWalletDeltas } from '#/features/transactions/data/ledgerReads'
 import { convertMinor } from '#/lib/currency'
 import { planningSettingsOf } from '#/features/wallets/data/mappers'
 import { autoConfirms, autoSetAsides, autoSettlementId } from './autoConfirm'
@@ -335,7 +335,7 @@ async function freeByWallet(
     db.setAsides.toArray(),
   ])
   const nodes = allNodes.filter((n) => n.deleted === 0 && n.kind === 'wallet')
-  const { deltas } = await readLedgerSummary(inputs.rates)
+  const deltas = await readWalletDeltas(inputs.rates)
   const held = walletSetAsides(
     setAsides.filter((a) => a.deleted === 0),
     inputs.goals,

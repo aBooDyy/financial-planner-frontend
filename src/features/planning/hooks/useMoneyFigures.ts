@@ -1,11 +1,10 @@
 import { useMemo } from 'react'
-import { useLiveQuery } from 'dexie-react-hooks'
 import { usePlannedData } from '#/features/planned/hooks/usePlannedData'
 import { balanceFigures } from '#/features/planning/data/balances'
 import type { BalanceFigures } from '#/features/planning/data/balances'
 import { safeToSpend } from '#/features/planning/data/safeToSpend'
 import type { SafeToSpend } from '#/features/planning/data/safeToSpend'
-import { readLedgerSummary } from '#/features/transactions/data/ledgerReads'
+import { useWalletDeltas } from '#/features/transactions/hooks/useWalletDeltas'
 
 export type MoneyFiguresView = {
   /** True until the ledger and every planning input have been read. */
@@ -22,14 +21,11 @@ export type MoneyFiguresView = {
 export function useMoneyFigures(): MoneyFiguresView {
   const data = usePlannedData()
   const { inputs, state, nodes, today } = data
-  const ledger = useLiveQuery(
-    () => readLedgerSummary(inputs.rates),
-    [inputs.rates],
-  )
+  const deltas = useWalletDeltas(inputs.rates)
   return useMemo(() => {
     const figures = balanceFigures({
       nodes,
-      walletDeltas: ledger?.deltas ?? {},
+      walletDeltas: deltas ?? {},
       setAsides: inputs.setAsides,
       goals: inputs.goals,
       bills: inputs.bills,
@@ -37,7 +33,7 @@ export function useMoneyFigures(): MoneyFiguresView {
       rates: inputs.rates,
     })
     return {
-      loading: data.loading || ledger === undefined,
+      loading: data.loading || deltas === undefined,
       figures,
       safe: safeToSpend({
         header: figures.header,
@@ -53,5 +49,5 @@ export function useMoneyFigures(): MoneyFiguresView {
         rates: inputs.rates,
       }),
     }
-  }, [data.loading, inputs, state, nodes, today, ledger])
+  }, [data.loading, inputs, state, nodes, today, deltas])
 }

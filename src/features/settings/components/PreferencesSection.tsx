@@ -3,7 +3,7 @@ import { WalletSelectSections } from '#/features/wallets/components/WalletSelect
 import { setBaseCurrency } from '#/features/wallets/data/mutations'
 import { sectionByGroup } from '#/features/wallets/data/walletSections'
 import { useWalletGroups } from '#/features/wallets/hooks/useWalletGroups'
-import { useWallets } from '#/features/wallets/hooks/useWallets'
+import { useWalletBasics } from '#/features/wallets/hooks/useWalletBasics'
 import type { CurrencyCode } from '#/lib/currency'
 import { DATE_FORMAT_OPTIONS } from '#/lib/date'
 import type { DateFormat } from '#/lib/date'
@@ -30,7 +30,7 @@ const SELECT = 'w-auto shrink-0'
 const DEFAULT_ACCOUNT_NONE = '__none__'
 
 export function PreferencesSection() {
-  const { base, nodes, rates } = useWallets()
+  const { base, nodes, rates } = useWalletBasics()
   const preference = useThemeStore((s) => s.preference)
   const setPreference = useThemeStore((s) => s.setPreference)
   const p = usePreferencesStore()

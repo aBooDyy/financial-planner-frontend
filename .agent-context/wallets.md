@@ -40,9 +40,11 @@ those without a coordinated backend + Dexie migration.
   KWD), so formatting (via `Intl`) and FX conversion happen only here. Any ISO code is valid,
   validated at the wire boundary — see [app-config.md](app-config.md). Totals are computed
   client-side, not fetched.
-- **Rates**: `useWallets` builds one map with `useStableRates(rateRows)` (`src/hooks/`) — the
-  config's seed rates with the user's override rows on top, memoized so it can key a live
-  query (`useMergedRates` returns a new object every render). The server stores overrides only; an unpriced
+- **Rates**: `useWallets` takes the planner's map (`usePlannedData().inputs.rates`, one object
+  per set of rates); Settings' `useWalletBasics` builds one with `useStableRates(rateRows)`
+  (`src/hooks/`). Both are the config's seed rates with the user's override rows on top, kept
+  stable so they can key a live query or a memo (`useMergedRates` returns a new object every
+  render). The server stores overrides only; an unpriced
   currency has no rate and `convertMinor` returns `0` for that pair.
 - `heldCurrencies(base, sources)` lists the currencies the user actually holds (wallets,
   goals, bills, transactions, set-asides, overrides); anything that renders a rate list uses it.
@@ -92,17 +94,23 @@ walletDeltas?, setAsideLines?)` builds the flattened tree (honoring collapse), g
 
 ### The ledger read and the loading state
 
-- **`useWallets` never holds the ledger's rows.** `readLedgerSummary(rates)`
-  (`features/transactions/data/ledgerReads.ts`) reads the whole table inside one live query and
-  hands back only what the view derives from it: each wallet's `walletDeltas` and the set of
-  row **currencies**
-  (deleted rows included, as `heldCurrencies` always counted them). A balance sums every row, so
-  the read itself stays whole; nothing it shows changed — `hooks/useWallets.test.ts` compares
-  deltas, the full view and `held` against the old every-row derivation. It waits for the rates
-  (so a mount costs one read, not two); a rate edit re-runs it.
-- **Two flags.** `loading` = the nodes are not known yet. `balancesLoading` = any input a figure
-  derives from is still missing: the nodes, the settings (`null`, not `undefined`, when there is
-  no row), the rates, goals, bills, set-asides or the ledger summary. The old flag
+- **`useWallets` reads nothing of its own.** Wallets, settings, rates, goals, bills and
+  set-asides come from the planner's shared snapshot (`usePlannedData`, see
+  [planned.md](planned.md)) — the one Safe to spend and Coming up already read — and balances
+  from `useWalletDeltas(rates)` (`features/transactions/hooks/`), the running totals read once
+  for every consumer, so `useMoneyFigures` and `useWallets` share it. The page therefore reads
+  no table twice, and the tree's figures and Safe to spend come from the same snapshot.
+  `hooks/useWallets.test.ts` compares deltas and the full view against the old every-row
+  derivation and pins the shared read.
+- **Settings needs no balances.** Its panes (Preferences, Email sync, Integrations, Currencies)
+  use `useWalletBasics()` — active wallets, base, rates, rate rows, three small live reads — and
+  Currencies adds `useHeldCurrencies(base, rateRows)` (`features/settings/hooks/`): wallets,
+  bills, goals, set-asides, the ledger's `currency` totals (deleted rows included) and rate rows.
+  Neither opens the planner's reads.
+- **Two flags.** `loading` = the nodes are not known yet (`usePlannedData().nodesLoading`).
+  `balancesLoading` = any input a figure derives from is still missing: every planner table
+  (the nodes, the settings — `null`, not `undefined`, when there is no row — the rates, goals,
+  bills, set-asides…) or the wallet totals. The old flag
   ignored all but nodes and rates, so balances first drew as bare opening balances and then
   jumped. While `balancesLoading`, the view is built with **no deltas and no set-asides**, so
   the tree is right but its figures are not — and must not be shown.
@@ -118,7 +126,8 @@ walletDeltas?, setAsideLines?)` builds the flattened tree (honoring collapse), g
 ## UI & wiring
 
 - Feature lives in `src/features/wallets/` (`api/`, `data/`, `hooks/`, `components/`,
-  `constants.ts`). `useWallets` is the reactive read (`useLiveQuery`); `useNodeEditor`
+  `constants.ts`). `useWallets` is the reactive read (over `usePlannedData` + `useWalletDeltas`), `useWalletBasics`
+  the light one for screens that only name wallets; `useNodeEditor`
   drives the add/edit sheet. Components are dumb; `WalletsPage` composes them.
 - Recreated shell: the **shared chrome** now lives in `src/components/chrome/` (`TopNav`,
   `MobileTabBar`, `AccountMenu`, `BrandMark`, `sections.ts`), section-aware via an `active`

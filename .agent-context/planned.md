@@ -148,7 +148,7 @@ varies), each pull, each plan-rewrite request, and day rollover.
    set-asides there and moves `nextDue`), a payday when its stream **logs automatically**
    (into the stream's wallet). In **Automatic** payday mode (settings `paydayMode`), a due
    goal/bill set-aside is set aside without a tap when its wallet is the main paycheck's
-   deposit wallet and that wallet's free money (balance from `readLedgerSummary` − its live
+   deposit wallet and that wallet's free money (balance from `readWalletDeltas` − its live
    set-asides, read again **after** this pass's auto-pay and auto-logged pay were confirmed, so
    that pay funds the payday's lines and those bills are already out) still covers it, lines
    taken in plan priority; any other line is flagged
@@ -280,8 +280,11 @@ hooks a page mounts — Spending's tab + transaction dialog
 + confirm dialog + QuickAdd — the tables are read once and the plan derived once. No provider
 is needed, so the hooks work unchanged in tests and in any tree. A consumer that mounts while
 others are open renders the current snapshot at once (no loading flash). `loading` stays true
-until every input table but the rates has been read (nodes and the settings row included), so
-a screen that reads defaults from them — the Planning editors and sheets — can wait for it.
+until every input table has been read (nodes, the settings row and the rates included), so a
+screen that reads defaults from them — the Planning editors and sheets — can wait for it;
+`nodesLoading` is the nodes alone, for a tree that can draw before its figures. `inputs.rates`
+is one object per set of rates (memoised on its JSON), so a table landing never hands
+consumers new rates — a read keyed on them would restart every time.
 
 **Linked transactions only (`data/linkedTransactions.ts`).** The planner's derivation needs only
 the transactions that link to something: a `goalId` (goal progress, contributions), a
@@ -336,6 +339,8 @@ its list, rail (`ForecastCard`, `HeadedCard`, `data/forecast.ts`, `data/headed.t
   `useYearAhead`, and `useBillPlan` / `useGoalPlan` in the detail panels' Plan box (recalc +
   undo from `useRecalcUndoStore`). See [planning.md](planning.md#the-planning-page--components).
 - **Spending**: `usePlanned()` for the nudge's count; the transaction dialog's match hooks.
+- **Wallets**: `useWallets` (the tree), `useMoneyFigures` (Safe to spend) and `useComingUp` —
+  every table the page needs comes through the one shared read.
 
 ## What planned rows never affect
 

@@ -4,7 +4,7 @@ import { Plus } from 'lucide-react'
 import { OfflineNotice } from '#/components/OfflineNotice'
 import { Button } from '#/components/ui/button'
 import { walletGroupOptions } from '#/features/wallets/data/selectors'
-import { useWallets } from '#/features/wallets/hooks/useWallets'
+import { useWalletBasics } from '#/features/wallets/hooks/useWalletBasics'
 import { useEmailConnections } from '#/features/email-sync/hooks/useEmailConnections'
 import { useInboxFlow } from '#/features/email-sync/hooks/useInboxFlow'
 import { SectionHeader } from '#/features/settings/components/SectionHeader'
@@ -22,7 +22,7 @@ export function EmailSyncSection() {
   const search = settingsRoute.useSearch()
   const navigate = useNavigate()
   const flow = useInboxFlow(search)
-  const { nodes, base } = useWallets()
+  const { nodes, base } = useWalletBasics()
   const walletGroups = useMemo(() => walletGroupOptions(nodes), [nodes])
 
   const closeEditor = () => {

@@ -294,7 +294,7 @@ their own: they derive from `usePlannedData()` (the planner's one shared read an
   `paycheck`, `verdict`, `decisions`, `upcoming`, `reviews` (waiting paydays) and
   `reviewCount`.
 - `useMoneyFigures()` → `{loading, figures, safe}`: `balanceFigures` over the ledger's running
-  totals (`readLedgerSummary` — never the whole ledger) and `safeToSpend` over the planner's
+  totals (`useWalletDeltas` — one read shared with `useWallets`, never the whole ledger) and `safeToSpend` over the planner's
   rows. Safe to spend counts planned rows, so it is only as current as the planner's last run.
 - `useYearAhead(months?)` → `buildYearAhead` + `loading`.
 

@@ -20,7 +20,10 @@ import { planningSettingsOf } from '#/features/wallets/data/mappers'
 import { useSessionStore } from '#/stores/session'
 
 export type PlannedData = {
+  /** True until every input below has been read. */
   loading: boolean
+  /** True until the wallets and groups have been read, which can be before the rest. */
+  nodesLoading: boolean
   userId: string
   /** ISO date the views are computed for. */
   today: string
@@ -124,7 +127,9 @@ export function usePlannedData(): PlannedData {
       tables.txns === undefined ||
       tables.setAsides === undefined ||
       tables.nodes === undefined ||
-      tables.settings === undefined,
+      tables.settings === undefined ||
+      tables.rateRows === undefined,
+    nodesLoading: tables.nodes === undefined,
     userId,
     today,
     todayDate,
