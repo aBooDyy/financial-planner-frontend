@@ -43,7 +43,7 @@ export function PaycheckCard({ bar, base, onSection, footer }: Props) {
               <span className="fp-sensitive text-[11px] font-extrabold whitespace-nowrap text-fp-danger">
                 Your pay · {money(bar.income ?? 0, base)}
               </span>
-              <span className="w-[2px] flex-1 bg-fp-danger" />
+              <span className="w-[2px] flex-1 bg-fp-danger-fill" />
             </div>
           ) : null}
           <div className="relative flex h-[34px] gap-[2px] overflow-hidden rounded-[10px] bg-fp-surface-2">
@@ -63,7 +63,7 @@ export function PaycheckCard({ bar, base, onSection, footer }: Props) {
             {bar.payAt !== null ? (
               <span
                 aria-hidden
-                className="pointer-events-none absolute inset-y-0 end-0 bg-[repeating-linear-gradient(135deg,color-mix(in_srgb,var(--fp-danger)_55%,transparent)_0_6px,color-mix(in_srgb,var(--fp-danger)_22%,transparent)_6px_12px)]"
+                className="pointer-events-none absolute inset-y-0 end-0 bg-[repeating-linear-gradient(135deg,color-mix(in_srgb,var(--fp-danger-fill)_55%,transparent)_0_5px,color-mix(in_srgb,var(--fp-danger-fill)_25%,transparent)_5px_10px)]"
                 style={{ insetInlineStart: `${bar.payAt}%` }}
               />
             ) : null}

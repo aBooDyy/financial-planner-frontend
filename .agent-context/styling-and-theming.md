@@ -139,6 +139,20 @@ Palette (from the Means design's `THEMES` const): warm-neutral surfaces, emerald
 Concrete light/dark hex values are recorded in the agent memory `means-design-tokens`.
 Added beyond the design: `fp-danger` (form errors) — light `#B42318`, dark `#F2998E`; `fp-warn`
 (a warning that is not yet an error, e.g. a key expiring soon) — light `#B54708`, dark `#F5B35C`.
+Both are **inks** (text, icons, strokes); don't paint them as solid fills or derive tints from
+them. Their fill/tint partners (Planning design's palette, used by its badges, bands, verdict and
+overflow hatch):
+
+| Token | Light | Dark | Use |
+| ----- | ----- | ---- | --- |
+| `fp-warn-fill` / `fp-on-warn-fill` | `#D9882B` / `#1B1A17` | `#E39A45` / `#141619` | solid amber (count badge, status dot) and the text on it |
+| `fp-warn-soft` / `fp-warn-line` | `rgba(217,136,43,.12)` / `.30` | `rgba(227,154,69,.14)` / `.30` | amber wash and its border |
+| `fp-danger-fill` / `fp-on-danger-fill` | `#D83B40` / `#FFFFFF` | `#F2555A` / `#141619` | solid red (count badge, "your pay" mark, hatch) and the text on it |
+| `fp-danger-soft` / `fp-danger-line` | `rgba(229,72,77,.10)` / `.28` | `rgba(242,85,90,.14)` / `.30` | red wash and its border |
+
+Text on a fill uses its `fp-on-*-fill` partner, never `text-white`: white on the design's amber is
+2.3–2.8:1 and on its dark red 3.4:1. Each pair is ≥ 4.5:1 (amber 6.2 / 7.8, red 4.6 / 5.4). The
+light red fill is the design's `#E5484D` deepened to `#D83B40` so white text passes.
 The transaction dialog's type tints: `fp-spend` / `fp-spend-soft` (light `#B4561A` on
 `rgba(232,131,58,.11)`, dark `#F4A66E`) and `fp-transfer` / `fp-transfer-soft` (light `#2457B8` on
 `rgba(59,130,246,.10)`, dark `#8DB4F8`); income uses the accent.

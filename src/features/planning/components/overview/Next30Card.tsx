@@ -43,11 +43,11 @@ export function Next30Card({ events, due, today, onSeeAll, onEvent }: Props) {
           <button
             type="button"
             onClick={onSeeAll}
-            className="flex items-center gap-2 rounded-[11px] border border-fp-warn/30 bg-fp-warn/10 px-3 py-[9px] text-start text-[13px]"
+            className="flex items-center gap-2 rounded-[11px] border border-fp-warn-line bg-fp-warn-soft px-3 py-[9px] text-start text-[13px]"
           >
             <span
               aria-hidden
-              className="size-[7px] flex-none rounded-full bg-fp-warn"
+              className="size-[7px] flex-none rounded-full bg-fp-warn-fill"
             />
             <span className="flex-none font-extrabold text-fp-warn">
               {due.length} to confirm

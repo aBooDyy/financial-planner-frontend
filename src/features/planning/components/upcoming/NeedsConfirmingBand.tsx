@@ -25,10 +25,10 @@ export function NeedsConfirmingBand({
   return (
     <section
       aria-label="Needs confirming"
-      className="overflow-hidden rounded-[16px] border border-fp-warn/30 bg-fp-warn/10"
+      className="overflow-hidden rounded-[16px] border border-fp-warn-line bg-fp-warn-soft"
     >
       <div className="flex items-center gap-2 px-4 pt-3 pb-2">
-        <span aria-hidden className="size-[7px] rounded-full bg-fp-warn" />
+        <span aria-hidden className="size-[7px] rounded-full bg-fp-warn-fill" />
         <span className="text-[12px] font-extrabold tracking-[0.05em] text-fp-warn uppercase">
           Needs confirming
         </span>
@@ -43,7 +43,7 @@ export function NeedsConfirmingBand({
         {rows.map((r) => (
           <li
             key={r.id}
-            className="flex flex-wrap items-center gap-3 border-t border-fp-warn/25 px-4 py-[10px]"
+            className="flex flex-wrap items-center gap-3 border-t border-fp-warn-line px-4 py-[10px]"
           >
             <button
               type="button"

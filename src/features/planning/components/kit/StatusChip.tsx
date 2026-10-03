@@ -5,8 +5,8 @@ export type ChipTone = 'ok' | 'warn' | 'danger' | 'blue' | 'goal' | 'neutral'
 
 const TONE: Record<ChipTone, string> = {
   ok: 'bg-fp-accent-soft text-fp-accent-ink',
-  warn: 'bg-fp-warn/12 text-fp-warn',
-  danger: 'bg-fp-danger/10 text-fp-danger',
+  warn: 'bg-fp-warn-soft text-fp-warn',
+  danger: 'bg-fp-danger-soft text-fp-danger',
   blue: 'bg-fp-transfer-soft text-fp-transfer',
   goal: 'bg-fp-goal-soft text-fp-goal',
   neutral: 'bg-fp-surface-2 text-fp-text-2',

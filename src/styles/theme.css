@@ -29,6 +29,14 @@
   --color-fp-accent-soft: var(--fp-accent-soft);
   --color-fp-danger: var(--fp-danger);
   --color-fp-warn: var(--fp-warn);
+  --color-fp-warn-fill: var(--fp-warn-fill);
+  --color-fp-on-warn-fill: var(--fp-on-warn-fill);
+  --color-fp-warn-soft: var(--fp-warn-soft);
+  --color-fp-warn-line: var(--fp-warn-line);
+  --color-fp-danger-fill: var(--fp-danger-fill);
+  --color-fp-on-danger-fill: var(--fp-on-danger-fill);
+  --color-fp-danger-soft: var(--fp-danger-soft);
+  --color-fp-danger-line: var(--fp-danger-line);
   --color-fp-spend: var(--fp-spend);
   --color-fp-spend-soft: var(--fp-spend-soft);
   --color-fp-transfer: var(--fp-transfer);
@@ -83,6 +91,15 @@
   --fp-accent-soft: rgba(31, 157, 107, 0.1);
   --fp-danger: #b42318;
   --fp-warn: #b54708;
+  /* Solid fills and tints beside those inks; each fill pairs with a text colour that reads on it. */
+  --fp-warn-fill: #d9882b;
+  --fp-on-warn-fill: #1b1a17;
+  --fp-warn-soft: rgba(217, 136, 43, 0.12);
+  --fp-warn-line: rgba(217, 136, 43, 0.3);
+  --fp-danger-fill: #d83b40;
+  --fp-on-danger-fill: #ffffff;
+  --fp-danger-soft: rgba(229, 72, 77, 0.1);
+  --fp-danger-line: rgba(229, 72, 77, 0.28);
   /* The transaction dialog's type tints; income wears the accent. */
   --fp-spend: #b4561a;
   --fp-spend-soft: rgba(232, 131, 58, 0.11);
@@ -137,6 +154,14 @@
   --fp-accent-soft: rgba(47, 189, 139, 0.14);
   --fp-danger: #f2998e;
   --fp-warn: #f5b35c;
+  --fp-warn-fill: #e39a45;
+  --fp-on-warn-fill: #141619;
+  --fp-warn-soft: rgba(227, 154, 69, 0.14);
+  --fp-warn-line: rgba(227, 154, 69, 0.3);
+  --fp-danger-fill: #f2555a;
+  --fp-on-danger-fill: #141619;
+  --fp-danger-soft: rgba(242, 85, 90, 0.14);
+  --fp-danger-line: rgba(242, 85, 90, 0.3);
   --fp-spend: #f4a66e;
   --fp-spend-soft: rgba(232, 131, 58, 0.14);
   --fp-transfer: #8db4f8;

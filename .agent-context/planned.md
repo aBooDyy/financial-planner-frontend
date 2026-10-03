@@ -317,8 +317,9 @@ its list, rail (`ForecastCard`, `HeadedCard`, `data/forecast.ts`, `data/headed.t
   (asks first through a light `ConfirmDialog`), Close the rest (partials) as two equal quiet
   buttons under a full-width primary. `PlannedActionError` codes map to copy via
   `messageForCode('planned.<code>')` (`plannedErrorMessage`).
-- Amber for things waiting (the nudge, Upcoming's band) is `fp-warn` at 10 % / 25-30 %
-  (`bg-fp-warn/10`, `border-fp-warn/25`) — there is no separate amber-soft token. The confirm
+- Amber for things waiting: Upcoming's band and Overview's "to confirm" pill use
+  `fp-warn-soft` / `fp-warn-line` with an `fp-warn-fill` dot (see styling-and-theming); the
+  Activity nudge still derives its tint from the ink (`bg-fp-warn/10`, `border-fp-warn/25`). The confirm
   dialog's partial line instead uses the dialog kit's `warn` (`fp-spend` on `fp-spend-soft`).
 
 ## Where the UI reads it

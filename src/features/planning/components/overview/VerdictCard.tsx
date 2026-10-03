@@ -5,7 +5,7 @@ import { cn } from '#/lib/utils'
 
 const TILE: Record<VerdictCopy['tone'], string> = {
   ok: 'bg-fp-accent-soft text-fp-accent-ink',
-  warn: 'bg-fp-warn/12 text-fp-warn',
+  warn: 'bg-fp-warn-soft text-fp-warn',
   danger: 'bg-fp-surface text-fp-danger',
   neutral: 'bg-fp-surface-2 text-fp-text-2',
 }
@@ -31,7 +31,7 @@ export function VerdictCard({
       className={cn(
         'flex flex-col gap-3 rounded-[18px] border px-4 py-4 md:flex-row md:items-center md:px-5 md:py-[18px]',
         danger
-          ? 'border-fp-danger/30 bg-fp-danger/10'
+          ? 'border-fp-danger-line bg-fp-danger-soft'
           : 'border-fp-border bg-fp-surface shadow-fp',
       )}
     >
