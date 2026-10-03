@@ -6,25 +6,27 @@ import type { LocalBill, LocalGoal } from '#/db/types'
 import type { PayCalendar } from '#/features/planning/data/payPeriods'
 import type { BillStatus, GoalStatus } from '#/features/planning/data/status'
 import type { CurrencyCode } from '#/lib/currency'
-import { dayMonth, money, monthYear, perPeriod } from './format'
+import { dueDay, money, monthYear, perPeriod } from './format'
 
 export function billPlanText(
   bill: LocalBill,
   s: BillStatus,
   walletName: string | null,
   calendar: PayCalendar,
+  today: string,
 ): string {
   if (s.state === 'done') return 'Ended. Nothing more is set aside for it.'
   if (!s.occurrence) return 'Paid. Nothing is left to set aside.'
   const c = bill.currency
+  const due = dueDay(s.occurrence, today)
   const where = walletName ? ` in ${walletName}` : ''
   if (s.state === 'not_set_aside')
-    return `Due ${dayMonth(s.occurrence)}, before your next payday — it comes out of what is free now.`
+    return `Due ${due}, before your next payday — it comes out of what is free now.`
   if (s.cycle === 'save_up')
     return s.perPaycheck > 0
-      ? `Set aside ${money(s.perPaycheck, c)} ${perPeriod(calendar)}${where} until ${dayMonth(s.occurrence)}.`
-      : `Saving up${where} for ${dayMonth(s.occurrence)}.`
-  return `Covered from each ${calendar.kind === 'paycheck' ? 'paycheck' : 'month'}${bill.autopay ? ', logged by auto-pay' : ''}. Next on ${dayMonth(s.occurrence)}.`
+      ? `Set aside ${money(s.perPaycheck, c)} ${perPeriod(calendar)}${where} until ${due}.`
+      : `Saving up${where} for ${due}.`
+  return `Covered from each ${calendar.kind === 'paycheck' ? 'paycheck' : 'month'}${bill.autopay ? ', logged by auto-pay' : ''}. Next on ${due}.`
 }
 
 export function goalPlanText(

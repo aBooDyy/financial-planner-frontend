@@ -8,7 +8,7 @@ import { daysBetween } from '#/features/planned/data/dates'
 import type { PayCalendar } from '#/features/planning/data/payPeriods'
 import type { BillStatus, GoalStatus } from '#/features/planning/data/status'
 import type { ChipTone } from '#/features/planning/components/kit/StatusChip'
-import { dayMonth, figure, money, monthYear, perPeriod } from './format'
+import { dayMonth, dueDay, figure, money, monthYear, perPeriod } from './format'
 import { repeatLabel } from './repeat'
 
 export type Chip = { tone: ChipTone; label: string }
@@ -68,6 +68,7 @@ export function billMeta(
   s: BillStatus,
   walletName: string | null,
   calendar: PayCalendar,
+  today: string,
 ): string {
   const c = bill.currency
   if (s.state === 'done') return `${repeatLabel(bill)} · ended`
@@ -76,7 +77,7 @@ export function billMeta(
   if (s.cycle === 'save_up')
     return [
       `${money(s.setAside, c)} of ${money(s.amount, c)}`,
-      `due ${dayMonth(s.occurrence)}`,
+      `due ${dueDay(s.occurrence, today)}`,
       s.perPaycheck > 0
         ? `${money(s.perPaycheck, c)} ${perPeriod(calendar)}`
         : null,
@@ -85,7 +86,7 @@ export function billMeta(
       .join(' · ')
   return [
     repeatLabel(bill),
-    `next ${dayMonth(s.occurrence)}`,
+    `next ${dueDay(s.occurrence, today)}`,
     walletName,
     bill.autopay ? 'auto-pay' : null,
   ]

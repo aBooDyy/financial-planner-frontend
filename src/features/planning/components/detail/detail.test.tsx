@@ -88,7 +88,7 @@ describe('BillDetail', () => {
     expect(within(panel).getByText('+SR 800')).toBeTruthy()
   })
 
-  it('names the wallet it saves up in', async () => {
+  it('names the wallet it saves up in, and the year of a due date a year off', async () => {
     await db.balanceNodes.put(
       wallet({ id: 'savings', name: 'Savings', amount: m(5000) }),
     )
@@ -107,7 +107,9 @@ describe('BillDetail', () => {
     const panel = await screen.findByRole('complementary', {
       name: 'Registration',
     })
-    expect(within(panel).getByText(/in Savings for Nov 15\.$/)).toBeTruthy()
+    expect(
+      within(panel).getByText(/in Savings for Nov 15, 2027.$/),
+    ).toBeTruthy()
   })
 
   it('opens Pay now from its main button', async () => {

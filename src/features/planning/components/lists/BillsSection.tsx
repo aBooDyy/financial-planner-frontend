@@ -154,7 +154,7 @@ export function BillsSection() {
                   key={b.id}
                   name={b.name}
                   color={b.color}
-                  meta={billMeta(b, s, walletName, calendar)}
+                  meta={billMeta(b, s, walletName, calendar, planning.today)}
                   amount={money(b.amount, b.currency)}
                   chip={billChip(s, b.currency, planning.today)}
                   progress={

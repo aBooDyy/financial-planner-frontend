@@ -8,7 +8,7 @@ import { useItemActions } from '#/features/planning/hooks/useItemActions'
 import { usePlanning } from '#/features/planning/hooks/usePlanning'
 import { usePlanningWallets } from '#/features/planning/hooks/usePlanningWallets'
 import { usePlanningUi } from '#/features/planning/stores/planningUi'
-import { dayMonth, money, perPeriod } from '#/features/planning/view/format'
+import { dueDay, money, perPeriod } from '#/features/planning/view/format'
 import { historyOf } from '#/features/planning/view/history'
 import { billChip } from '#/features/planning/view/itemCopy'
 import { billPlanText } from '#/features/planning/view/planText'
@@ -128,8 +128,8 @@ export function BillDetail({
         note={
           status.occurrence
             ? saveUp && status.perPaycheck > 0
-              ? `${money(status.perPaycheck, c)} ${perPeriod(planning.calendar)} · due ${dayMonth(status.occurrence)}`
-              : `Due ${dayMonth(status.occurrence)}${paidFrom ? ` · ${paidFrom}` : ''}`
+              ? `${money(status.perPaycheck, c)} ${perPeriod(planning.calendar)} · due ${dueDay(status.occurrence, planning.today)}`
+              : `Due ${dueDay(status.occurrence, planning.today)}${paidFrom ? ` · ${paidFrom}` : ''}`
             : 'Nothing left to pay'
         }
         chip={billChip(status, c, planning.today)}
@@ -142,6 +142,7 @@ export function BillDetail({
           status,
           walletName(bill.saveWalletId ?? bill.walletId),
           planning.calendar,
+          planning.today,
         )}
         plan={closed ? null : plan.plan}
         currency={c}
