@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '#/db/db'
 import { SETTINGS_KEY } from '#/db/types'
 import type { User } from '#/features/auth/api/types'
@@ -525,7 +525,13 @@ describe('Use it and I spent it', () => {
 })
 
 describe('closing and reopening', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('rewrites the plan from today when a bill is reopened', async () => {
+    // A reopened bill picks up from the real clock; pin it to the day the plan is run for.
+    vi.useFakeTimers({ toFake: ['Date'], now: SEP_24 })
     await db.balanceSettings.put({
       id: SETTINGS_KEY,
       baseCurrency: 'SAR',
