@@ -100,14 +100,30 @@ describe('ruleProblems', () => {
 })
 
 describe('connectedReturnUrl', () => {
+  const fresh = { id: 'c1', rules: [] }
+
   it('opens a new inbox on its first rule back in Settings', () => {
-    expect(connectedReturnUrl(SETTINGS_PATH, 'c1')).toBe(
+    expect(connectedReturnUrl(SETTINGS_PATH, fresh)).toBe(
       '/settings/email-sync?inbox=c1&fresh=1',
     )
   })
 
+  it('returns an inbox signed in again to the list, its rules intact', () => {
+    const rule = {
+      id: 'r1',
+      name: 'Card',
+      enabled: true,
+      senders: [],
+      walletId: null,
+      type: 'spend' as const,
+      autoConfirm: false,
+    }
+    const ruled = { id: 'c1', rules: [rule] }
+    expect(connectedReturnUrl(SETTINGS_PATH, ruled)).toBe(SETTINGS_PATH)
+  })
+
   it('leaves any other return path alone', () => {
-    expect(connectedReturnUrl('/setup', 'c1')).toBe('/setup')
+    expect(connectedReturnUrl('/setup', fresh)).toBe('/setup')
     expect(connectedReturnUrl(SETTINGS_PATH, null)).toBe(SETTINGS_PATH)
   })
 })

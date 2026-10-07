@@ -6,10 +6,14 @@ export const PROVIDER_LABEL: Record<EmailProvider, string> = {
   outlook: 'Outlook',
 }
 
-/** `reading` — some rule is on; `idle` — rules exist but all are paused; `empty` — none yet. */
-export type InboxHealth = 'reading' | 'idle' | 'empty'
+/**
+ * `signin` — the provider stopped honouring the inbox's grant; `reading` — some rule is on;
+ * `idle` — rules exist but all are paused; `empty` — none yet.
+ */
+export type InboxHealth = 'signin' | 'reading' | 'idle' | 'empty'
 
 export function inboxHealth(connection: LocalEmailConnection): InboxHealth {
+  if (connection.status === 'needs_reauth') return 'signin'
   if (connection.rules.length === 0) return 'empty'
   return connection.rules.some((r) => r.enabled) ? 'reading' : 'idle'
 }

@@ -15,12 +15,18 @@ const runEmailSync = vi.fn()
 vi.mock('#/features/email-sync/data/mutations', () => ({
   runEmailSync: (...args: unknown[]) => runEmailSync(...args),
 }))
+const beginInboxReconnect = vi.fn()
+
+vi.mock('#/features/email-sync/data/connect', () => ({
+  beginInboxReconnect: (...args: unknown[]) => beginInboxReconnect(...args),
+}))
 vi.mock('@tanstack/react-router', () => ({
   Link: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,
 }))
 
 afterEach(cleanup)
 beforeEach(() => {
+  beginInboxReconnect.mockReset().mockResolvedValue(undefined)
   runEmailSync.mockReset().mockResolvedValue({
     syncedConnections: 1,
     scannedMessages: 0,
@@ -143,6 +149,39 @@ describe('InboxRow', () => {
     ).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Add a rule' }))
     expect(onAddRule).toHaveBeenCalled()
+  })
+
+  it('asks to sign in again once the provider refused the inbox', async () => {
+    renderRow(inbox({ status: 'needs_reauth' }))
+    expect(screen.getByText(/Means lost access to this inbox/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Sync now' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }))
+    await waitFor(() =>
+      expect(beginInboxReconnect).toHaveBeenCalledWith(
+        { id: 'c1', provider: 'google' },
+        '/',
+      ),
+    )
+  })
+
+  it('says why a reconnect could not start and lets it be tried again', async () => {
+    beginInboxReconnect.mockRejectedValueOnce({
+      code: 'email_sync.provider.not_configured',
+    })
+    renderRow(inbox({ status: 'needs_reauth' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }))
+    expect(
+      await screen.findByText(
+        'That inbox needs reconnecting before it can be scanned.',
+      ),
+    ).toBeTruthy()
+    expect(
+      screen
+        .getByRole('button', { name: 'Reconnect' })
+        .hasAttribute('disabled'),
+    ).toBe(false)
   })
 
   it('cannot sync offline', () => {

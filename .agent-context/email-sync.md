@@ -62,11 +62,21 @@ which dialog is open and why the editor was opened (`EditorIntent`: `fresh` / `f
   or the error with _Try again_ (re-runs the same request, backfill included). `useScanToast`
   fades a result with nothing to act on after 5s and keeps a failure or a review until closed; a
   dismissal holds only for the state it was made on. On a phone the button hides and the menu has it.
+- **Reconnecting.** An inbox whose grant the provider refused comes back from the server as
+  `status: 'needs_reauth'` (pulled after every scan). `inboxHealth` then says `signin` — warn dot,
+  "Means lost access to this inbox…", **Reconnect** in place of Sync now and at the top of the ⋯
+  menu, Sync items disabled. `useInboxReconnect` → `beginInboxReconnect` asks for the
+  authorize URL **with the connection id** (the server pins the account and keeps the inbox,
+  rules and all) and returns to the page it was pressed on. The same prompt
+  (`ReconnectInboxNotice`) shows on the Import hub's inbox card and above the review queue
+  (`ReviewScanPrompt`, read live from Dexie via `useInboxesToReconnect`).
 - **Connecting** (`ConnectInboxDialog`) picks the provider and leaves via `beginInboxConnect`.
   The callback URL is fixed (the provider apps whitelist it), so the return path travels
   through sessionStorage; `takeConnectReturnPath()` reads it once (same-origin only). Back in
-  Settings, `connectedReturnUrl` adds `?inbox=<id>&fresh=1`, so the new inbox's editor opens
-  straight onto its first rule. First-run setup returns to `/setup` unchanged
+  Settings, `connectedReturnUrl` adds `?inbox=<id>&fresh=1` when the inbox has no rules yet, so
+  a new inbox's editor opens straight onto its first rule (one signed in again returns to the
+  list). The callback goes straight back on a cancelled consent and shows the error with _Go
+  back_ when the server refused it (e.g. `email_sync.oauth.account_mismatch`). First-run setup returns to `/setup` unchanged
   ([onboarding.md](onboarding.md)). `PENDING_SETUP` is no longer written by the backend and
   nothing here resumes on it.
 

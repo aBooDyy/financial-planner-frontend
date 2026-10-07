@@ -16,15 +16,18 @@ import { describeInbox, inboxHealth } from '#/features/email-sync/data/describe'
 import type { InboxHealth } from '#/features/email-sync/data/describe'
 import { windowLabel, windowOptions } from '#/features/email-sync/data/windows'
 import type { ScanOptions } from '#/features/email-sync/api/types'
+import { useInboxReconnect } from '#/features/email-sync/hooks/useInboxReconnect'
 import { useManualScan } from '#/features/email-sync/hooks/useManualScan'
 import { useScanToast } from '#/features/email-sync/hooks/useScanToast'
 import { useConfigLimits } from '#/lib/config/appConfig'
 import { useDirectionStore } from '#/stores/direction'
 import { CustomWindowDialog } from './CustomWindowDialog'
+import { ReconnectButton } from './ReconnectButton'
 import { ScanToast } from './ScanToast'
 import { SyncNowButton } from './SyncNowButton'
 
 const DOT: Record<InboxHealth, string> = {
+  signin: 'bg-fp-warn',
   reading: 'bg-fp-accent',
   idle: 'border-[1.5px] border-fp-text-3 bg-transparent',
   empty: 'bg-fp-warn',
@@ -54,6 +57,8 @@ export function InboxRow({
   const maxLookbackDays = useConfigLimits().emailSyncMaxLookbackDays
   const { state, summary, scan } = useManualScan()
   const health = inboxHealth(connection)
+  const signIn = useInboxReconnect(connection)
+  const unreadable = health === 'signin'
   const toast = useScanToast(state, summary)
   const running = state.status === 'scanning' || state.status === 'busy'
   const [request, setRequest] = useState<ScanOptions>({})
@@ -91,7 +96,14 @@ export function InboxRow({
             {describeInbox(connection, locale).join(' · ')}
           </div>
         </div>
-        {health === 'empty' ? (
+        {unreadable ? (
+          <ReconnectButton
+            busy={signIn.busy}
+            onReconnect={signIn.reconnect}
+            disabled={!online}
+            className="hidden sm:inline-flex"
+          />
+        ) : health === 'empty' ? (
           <Button
             type="button"
             variant="outline"
@@ -133,11 +145,24 @@ export function InboxRow({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="min-w-[190px]">
-            <DropdownMenuItem disabled={!online || running} onSelect={sync}>
+            {unreadable ? (
+              <DropdownMenuItem
+                disabled={!online || signIn.busy}
+                onSelect={signIn.reconnect}
+              >
+                Reconnect
+              </DropdownMenuItem>
+            ) : null}
+            <DropdownMenuItem
+              disabled={!online || running || unreadable}
+              onSelect={sync}
+            >
               Sync now
             </DropdownMenuItem>
             <DropdownMenuSub>
-              <DropdownMenuSubTrigger disabled={!online || running}>
+              <DropdownMenuSubTrigger
+                disabled={!online || running || unreadable}
+              >
                 Sync older emails
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
@@ -166,7 +191,15 @@ export function InboxRow({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      {health === 'empty' ? (
+      {unreadable ? (
+        <p role="status" className="ps-[21px] text-[12.5px] text-fp-warn">
+          Means lost access to this inbox, so nothing new is read from it.
+          Reconnect to sign in again — its rules are kept.
+          {signIn.error ? (
+            <span className="mt-0.5 block text-fp-danger">{signIn.error}</span>
+          ) : null}
+        </p>
+      ) : health === 'empty' ? (
         <p className="ps-[21px] text-[12.5px] text-fp-warn">
           Nothing is read from this inbox until it has a rule.
         </p>

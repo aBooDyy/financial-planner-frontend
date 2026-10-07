@@ -1,3 +1,4 @@
+import type { LocalEmailConnection } from '#/db/types'
 import { useEmailConnections } from '#/features/email-sync/hooks/useEmailConnections'
 import { usePendingImports } from '#/features/inbound-imports/hooks/usePendingImports'
 import { lastSyncedLabel } from '#/features/email-sync/data/describe'
@@ -12,6 +13,8 @@ export type InboxConnectionSummary = {
 export type InboxSummary = {
   loading: boolean
   connections: InboxConnectionSummary[]
+  /** Inboxes the provider stopped honouring; they read nothing until signed in again. */
+  toReconnect: LocalEmailConnection[]
   pendingCount: number
 }
 
@@ -24,6 +27,7 @@ export function useInboxSummary(): InboxSummary {
   return {
     loading,
     pendingCount: count,
+    toReconnect: connections.filter((c) => c.status === 'needs_reauth'),
     connections: connections
       .filter((c) => c.status === 'connected')
       .map((c) => ({

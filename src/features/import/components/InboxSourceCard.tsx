@@ -1,13 +1,15 @@
 import { Link } from '@tanstack/react-router'
 import { ArrowRight, Mail } from 'lucide-react'
 import { Button } from '#/components/ui/button'
+import { ReconnectInboxNotice } from '#/features/email-sync/components/ReconnectInboxNotice'
 import { ScanNowControl } from '#/features/email-sync/components/ScanNowControl'
 import { useInboxSummary } from '#/features/import/hooks/useInboxSummary'
 import { ImportSourceCard } from './ImportSourceCard'
 
 export function InboxSourceCard() {
-  const { loading, connections, pendingCount } = useInboxSummary()
+  const { loading, connections, toReconnect, pendingCount } = useInboxSummary()
   const connected = connections.length > 0
+  const hasInbox = connected || toReconnect.length > 0
   const many = connections.length > 1
 
   return (
@@ -15,7 +17,7 @@ export function InboxSourceCard() {
       icon={Mail}
       title="From your inbox"
       footer={
-        connected ? (
+        hasInbox ? (
           <>
             {pendingCount > 0 ? (
               <Button asChild className="px-[15px] py-[10px] text-[13.5px]">
@@ -45,7 +47,11 @@ export function InboxSourceCard() {
     >
       {loading ? <span>Checking your connected inboxes…</span> : null}
 
-      {!loading && !connected ? (
+      {toReconnect.map((c) => (
+        <ReconnectInboxNotice key={c.id} connection={c} />
+      ))}
+
+      {!loading && !hasInbox ? (
         <span>
           Connect the inbox where your bank and card alerts land. Means reads
           them read-only and logs each transaction for you.

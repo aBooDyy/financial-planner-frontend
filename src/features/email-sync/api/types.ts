@@ -24,7 +24,10 @@ export type {
  */
 export type EmailProviderWire = 'GOOGLE' | 'OUTLOOK'
 export type ScanFrequencyWire = 'FIFTEEN_MIN' | 'HOURLY' | 'DAILY'
-export type ConnectionStatusWire = 'PENDING_SETUP' | 'CONNECTED'
+export type ConnectionStatusWire =
+  | 'PENDING_SETUP'
+  | 'CONNECTED'
+  | 'NEEDS_REAUTH'
 export type DecimalStyleWire = 'AUTO' | 'DOT' | 'COMMA'
 export type CurrencyModeWire = 'FROM_EMAIL' | 'FIXED'
 export type ReadingStatusWire =
@@ -59,6 +62,7 @@ const FREQ_FROM_WIRE: Record<ScanFrequencyWire, ScanFrequency> = {
 const STATUS_FROM_WIRE: Record<ConnectionStatusWire, ConnectionStatus> = {
   PENDING_SETUP: 'pending_setup',
   CONNECTED: 'connected',
+  NEEDS_REAUTH: 'needs_reauth',
 }
 export const toWireProvider = (p: EmailProvider): EmailProviderWire =>
   PROVIDER_TO_WIRE[p]

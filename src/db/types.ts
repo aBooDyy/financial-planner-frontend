@@ -436,7 +436,8 @@ export type LocalMerchantAlias = {
 
 export type EmailProvider = 'google' | 'outlook'
 export type ScanFrequency = '15m' | 'hourly' | 'daily'
-export type ConnectionStatus = 'pending_setup' | 'connected'
+/** `needs_reauth`: the provider refused the inbox's grant; it reads nothing until signed in again. */
+export type ConnectionStatus = 'pending_setup' | 'connected' | 'needs_reauth'
 
 /** One of an inbox's email rules, as the settings list shows it. */
 export type EmailRuleSummary = {

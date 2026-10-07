@@ -54,9 +54,14 @@ const messageQuery = ({ limit, sender }: MessageQuery): string => {
  * rules are fetched when an inbox's editor opens and never cached.
  */
 export const emailSyncApi = {
-  authorizeUrl: (provider: EmailProvider): Promise<AuthorizeUrlWire> =>
+  /** With `connectionId`, the URL signs that inbox in again instead of adding one. */
+  authorizeUrl: (
+    provider: EmailProvider,
+    connectionId?: string,
+  ): Promise<AuthorizeUrlWire> =>
     http.post<AuthorizeUrlWire>(
       `${CONN}/oauth/${toWireProvider(provider)}/authorize-url`,
+      connectionId ? { connection_id: connectionId } : undefined,
     ),
 
   completeOAuth: (code: string, state: string): Promise<EmailConnection> =>

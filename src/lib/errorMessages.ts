@@ -134,6 +134,10 @@ const MESSAGES: Record<string, string> = {
   'email_sync.connection.not_found': 'That inbox is no longer connected.',
   'email_sync.provider.fetch_failed':
     'Couldn’t reach your inbox provider. Try again.',
+  'email_sync.provider.reauth_required':
+    'Means lost access to this inbox. Reconnect it to keep syncing.',
+  'email_sync.oauth.account_mismatch':
+    'That’s a different account. Sign in with the address of the inbox you’re reconnecting.',
   'email_sync.provider.not_configured':
     'That inbox needs reconnecting before it can be scanned.',
   'email_sync.sync.window_invalid':
