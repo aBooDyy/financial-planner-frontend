@@ -43,10 +43,19 @@ const PUBLIC_AUTH_PATHS = new Set([
   REFRESH_PATH,
   '/auth/google/authorize-url',
   '/auth/google/callback',
+  '/auth/passkeys/authentication/options',
+  '/auth/passkeys/authentication/verify',
 ])
 
 const isPublicAuthPath = (path: string): boolean =>
   PUBLIC_AUTH_PATHS.has(path.split('?')[0])
+
+/**
+ * A `401` that judges a password the user typed (re-authenticating on a protected path), not
+ * the cookie. Refreshing and retrying would only spend a second attempt against the limiter.
+ */
+const isWrongPassword = (error: ApiError): boolean =>
+  error.code === 'auth.credentials.invalid'
 
 async function send<T>(
   method: string,
@@ -147,6 +156,7 @@ async function request<T>(
     const expired =
       error instanceof ApiError &&
       error.isUnauthenticated &&
+      !isWrongPassword(error) &&
       !isPublicAuthPath(path)
     if (!expired) throw error
 

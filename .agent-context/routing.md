@@ -59,7 +59,7 @@ back button moves between them. `routes/settings/route.tsx` is the layout — th
 plus `SettingsLayout` (TopNav, rail, `Outlet`, MobileTabBar) — and each pane is a thin file
 rendering its feature component directly:
 
-`account` · `preferences` · `currencies` · `categories` · `merchants` · `import` ·
+`account` · `security` · `preferences` · `currencies` · `categories` · `merchants` · `import` ·
 `email-sync` · `integrations` · `notifications` · `archived` · `data`.
 
 - `routes/settings/index.tsx` **redirects** `/settings` → `/settings/account` in

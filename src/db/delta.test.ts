@@ -91,6 +91,7 @@ const signIn = (id: string) =>
     id,
     email: `${id}@example.com`,
     onboardedAt: '2026-01-01T00:00:00Z',
+    hasPassword: true,
     name: id,
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',

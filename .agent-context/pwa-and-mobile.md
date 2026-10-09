@@ -167,6 +167,7 @@ connection and load on reconnect.
 | Log in / sign up / Continue with Google | Notice on the auth screen; submit and Google disabled |
 | Sign out (account menu, Settings › Data) | The menu item and the Data button are disabled with the hint. `SignOutConfirm` also refuses, in case the connection drops while it's open. Why: `useLogout` wipes Dexie in its `finally`, which would lose the unsynced outbox, and the server couldn't clear the HTTP-only cookie anyway |
 | Profile save (Settings › Account) | Save disabled, notice in the footer |
+| Passkeys: sign in with a passkey, the post-sign-in offer, Settings › Sign-in & security (add, rename, remove) | Login button disabled and email-field autofill not started; the offer waits for a connection; section notice, Add disabled with a reason tooltip, row actions disabled ([passkeys.md](passkeys.md)) |
 | Merge merchants | Merge disabled, `DialogActions` hint |
 | Onboarding finish (`/setup` step 5) and inbox connect/undo | CTA disabled with a footer notice; provider buttons and Undo disabled |
 | Email sync: connect, Sync now, older emails, rules, disconnect | Section notice, every control disabled (`model.online`); `ScanNowControl` gates itself |

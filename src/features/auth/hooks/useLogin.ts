@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigate } from '@tanstack/react-router'
+import { markJustSignedIn } from '#/features/passkeys/data/setupFlags'
 import { useSessionStore } from '#/stores/session'
 import { authApi } from '../api/authApi'
 import { loginSchema } from '../schemas'
@@ -23,6 +24,7 @@ export function useLogin() {
     try {
       const user = await authApi.login({ email, password })
       setUser(user)
+      markJustSignedIn(user.id)
       await navigate({ to: '/' })
     } catch (error) {
       setFormError(applyApiError(error, form.setError, ['email', 'password']))

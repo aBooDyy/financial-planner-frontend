@@ -4,6 +4,7 @@ import {
   Bell,
   Coins,
   Download,
+  KeyRound,
   LayoutGrid,
   Mail,
   Shield,
@@ -18,6 +19,11 @@ type Section = { to: string; label: string; icon: LucideIcon }
 
 export const SECTIONS: Section[] = [
   { to: '/settings/account', label: 'Account', icon: User },
+  {
+    to: '/settings/security',
+    label: 'Sign-in & security',
+    icon: KeyRound,
+  },
   {
     to: '/settings/preferences',
     label: 'Preferences',

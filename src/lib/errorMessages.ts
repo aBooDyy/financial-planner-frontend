@@ -15,6 +15,17 @@ const MESSAGES: Record<string, string> = {
   'auth.password.weak': 'Use at least 8 characters.',
   'auth.name.required': 'Enter your full name.',
   'auth.unauthenticated': 'Your session has expired. Please log in again.',
+  'auth.reauth.required': 'Confirm it’s you before adding a passkey.',
+  'auth.passkey.invalid':
+    'That passkey isn’t recognised. Sign in with your password.',
+  'auth.passkey.state_invalid': 'That took too long. Try again.',
+  'auth.passkey.verification_failed':
+    'Your device’s passkey couldn’t be checked. Try again.',
+  'auth.passkey.already_registered':
+    'This passkey is already set up for your account.',
+  'auth.passkey.limit_reached':
+    'You have the most passkeys you can have. Remove one you no longer use.',
+  'auth.passkey.not_found': 'That passkey is no longer set up.',
   'common.network': 'Can’t reach the server. Check your connection.',
   'common.conflict': 'This was changed elsewhere — reload and try again.',
   'onboarding.category_unknown': 'Pick categories from the starter set.',

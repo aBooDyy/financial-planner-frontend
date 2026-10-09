@@ -44,7 +44,21 @@ const EMAIL_RULE_CODES = [
   'email_sync.rule.samples_invalid',
 ]
 
+const PASSKEY_CODES = [
+  'auth.reauth.required',
+  'auth.passkey.invalid',
+  'auth.passkey.state_invalid',
+  'auth.passkey.verification_failed',
+  'auth.passkey.already_registered',
+  'auth.passkey.limit_reached',
+  'auth.passkey.not_found',
+]
+
 describe('error messages', () => {
+  it.each(PASSKEY_CODES)('has a message for %s', (code) => {
+    expect(messageForCode(code)).not.toBe(FALLBACK)
+  })
+
   it.each(EMAIL_RULE_CODES)('has a message for %s', (code) => {
     expect(messageForCode(code)).not.toBe(FALLBACK)
   })

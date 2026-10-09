@@ -5,6 +5,7 @@ import { useSync } from '#/db/useSync'
 import { useSessionBootstrap } from '#/features/auth/hooks/useSessionBootstrap'
 import { useEmailSyncBootstrap } from '#/features/email-sync/hooks/useEmailSyncBootstrap'
 import { PayloadViewContext } from '#/features/inbound-imports/components/payloadView'
+import { PasskeySetupPromptHost } from '#/features/passkeys/components/PasskeySetupPromptHost'
 import { usePlannedRunner } from '#/features/planned'
 import { AppToastHost } from '#/features/planning/components/shell/AppToastHost'
 import { LeftoverPromptHost } from '#/features/transactions/components/LeftoverPromptHost'
@@ -48,6 +49,7 @@ function RootLayout() {
           <Outlet />
         </PayloadViewContext.Provider>
         <LeftoverPromptHost />
+        <PasskeySetupPromptHost />
         <AppToastHost />
         <UpdatePrompt />
         <Devtools />

@@ -134,6 +134,39 @@ describe('silent refresh', () => {
     expect(endSession).not.toHaveBeenCalled()
   })
 
+  it('never refreshes for the anonymous passkey sign-in', async () => {
+    reply = () => ({
+      status: 401,
+      body: {
+        success: false,
+        error: { code: 'auth.passkey.invalid', message: 'Unknown passkey.' },
+      },
+    })
+
+    await expect(
+      http.post('/auth/passkeys/authentication/verify', { state: 's' }),
+    ).rejects.toMatchObject({ code: 'auth.passkey.invalid' })
+    expect(countOf('/auth/passkeys/authentication/verify')).toBe(1)
+    expect(countOf('/auth/refresh')).toBe(0)
+    expect(endSession).not.toHaveBeenCalled()
+  })
+
+  it('does not refresh when a signed-in call refuses a typed password', async () => {
+    reply = () => ({
+      status: 401,
+      body: {
+        success: false,
+        error: { code: 'auth.credentials.invalid', message: 'Wrong.' },
+      },
+    })
+
+    await expect(
+      http.post('/auth/passkeys/registration/options', { password: 'x' }),
+    ).rejects.toMatchObject({ code: 'auth.credentials.invalid' })
+    expect(countOf('/auth/passkeys/registration/options')).toBe(1)
+    expect(countOf('/auth/refresh')).toBe(0)
+  })
+
   it('leaves an offline client signed in, with its local data', async () => {
     reply = () => 'network'
 

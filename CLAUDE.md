@@ -26,6 +26,7 @@ pattern changes. Index: [`.agent-context/README.md`](.agent-context/README.md).
 - [planning.md](.agent-context/planning.md) — Planning: the engine (pay periods, two-tier funding, money actions, pure view models) and the Planning page (shell, editors, Overview, Upcoming, review, lists, detail, sheets).
 - [planned.md](.agent-context/planned.md) — Planned transactions: generator + reconciler, the app-level planner, deterministic ids, confirm/skip/recalc, the confirm dialog and the hooks Planning reads.
 - [onboarding.md](.agent-context/onboarding.md) — the `/setup` first-run wizard, `SessionGate`, starter packs, the sessionStorage draft.
+- [passkeys.md](.agent-context/passkeys.md) — Passkeys: sign-in button + autofill, adding one with re-auth, the post-sign-in offer, Settings › Sign-in & security.
 - [settings.md](.agent-context/settings.md) — the Settings page and its routed panes, local preferences.
 - [reports.md](.agent-context/reports.md) — Reports: the period presets + comparison in the URL, the windowed read, the pure report builders.
 - [search.md](.agent-context/search.md) — Search: the top-bar sheet, Everywhere vs. current-tab scope, the on-device index (incl. bills and goals) + filters, the `?open=` hand-off to Spending's editors and Planning.

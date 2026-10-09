@@ -5,11 +5,14 @@ import { PasswordField } from '#/components/PasswordField'
 import { TextField } from '#/components/TextField'
 import { useOnline } from '#/hooks/useOnline'
 import { useLogin } from '../hooks/useLogin'
+import { usePasskeyAutofill } from '../hooks/usePasskeyAutofill'
 import { FormError } from './FormError'
 
 export function LoginForm() {
   const { form, submit, formError } = useLogin()
   const online = useOnline()
+  const passkeyError = usePasskeyAutofill(online)
+  const shownError = formError ?? passkeyError
   const {
     register,
     control,
@@ -18,14 +21,14 @@ export function LoginForm() {
 
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-[15px]">
-      {formError ? <FormError message={formError} /> : null}
+      {shownError ? <FormError message={shownError} /> : null}
 
       <TextField
         label="Email address"
         id="login-email"
         type="email"
         inputMode="email"
-        autoComplete="email"
+        autoComplete="username webauthn"
         placeholder="you@example.com"
         error={errors.email?.message}
         {...register('email')}

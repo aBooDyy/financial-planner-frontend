@@ -1,11 +1,15 @@
+import { useState } from 'react'
 import { ScanFace } from 'lucide-react'
 import { Button } from '#/components/Button'
 import { useOnline } from '#/hooks/useOnline'
+import {
+  passkeysSupported,
+  platformLabel,
+  signInLabel,
+} from '#/features/passkeys/passkeySupport'
 import { useGoogleAuth } from '../hooks/useGoogleAuth'
+import { usePasskeySignIn } from '../hooks/usePasskeySignIn'
 import { FormError } from './FormError'
-
-// Passkey / Face ID sign-in is presentational for now — no WebAuthn backend yet.
-const notYetAvailable = () => {}
 
 function GoogleIcon() {
   return (
@@ -34,7 +38,11 @@ type Props = { showPasskey?: boolean }
 
 export function SocialAuthButtons({ showPasskey = false }: Props) {
   const google = useGoogleAuth()
+  const passkey = usePasskeySignIn()
   const online = useOnline()
+  const [passkeyLabel] = useState(() =>
+    passkeysSupported() ? signInLabel(platformLabel()) : null,
+  )
 
   return (
     <div className="flex flex-col gap-2.5">
@@ -47,20 +55,21 @@ export function SocialAuthButtons({ showPasskey = false }: Props) {
         {google.pending ? 'Connecting…' : 'Continue with Google'}
       </Button>
       {google.error ? <FormError message={google.error} /> : null}
-      {showPasskey ? (
+      {showPasskey && passkeyLabel ? (
         <Button
           variant="secondary"
-          className="lg:hidden"
-          onClick={notYetAvailable}
+          onClick={() => void passkey.start()}
+          disabled={passkey.pending || !online}
         >
           <ScanFace
             size={19}
             strokeWidth={1.8}
             className="text-fp-accent-ink"
           />
-          Sign in with Face ID
+          {passkey.pending ? 'Signing in…' : passkeyLabel}
         </Button>
       ) : null}
+      {passkey.error ? <FormError message={passkey.error} /> : null}
     </div>
   )
 }

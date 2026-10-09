@@ -498,8 +498,12 @@ many times the server has _rejected_ it) and `nextAttemptAt` (no automatic retry
   refresh. Verified in a browser: **12 parallel `401`s → exactly 1 refresh → 12 retries, all
   `200`, session alive**, and a test pins the same numbers.
 - **`PUBLIC_AUTH_PATHS` is the list of paths a `401` is the _answer_ for** — `/auth/register`,
-  `/auth/login`, `/auth/logout`, `/auth/refresh`, and the two Google OAuth paths. There a `401`
-  means bad credentials or a spent refresh cookie, and refreshing would recurse or mask it.
+  `/auth/login`, `/auth/logout`, `/auth/refresh`, the two Google OAuth paths and the two
+  public passkey `authentication/*` paths. There a `401`
+  means bad credentials or a spent refresh cookie, and refreshing would recurse or mask it. On a
+  protected path, a `401 auth.credentials.invalid` (a typed password refused while re-authenticating
+  to add a passkey) is likewise the answer, never refreshed and retried — a retry would resend the
+  password ([passkeys.md](passkeys.md)).
   **`/auth/me` is deliberately _not_ on that list**: reopening the app after 15 idle minutes
   bootstraps through `GET /auth/me`, and it should renew the session rather than bounce the user
   to login.

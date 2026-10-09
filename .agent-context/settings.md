@@ -7,7 +7,8 @@ shared shell (`TopNav` / `MobileTabBar`, whose `active` prop is now optional so 
 highlights) and lists its panes in `SettingsRail` (desktop left rail / mobile chips): Account,
 Preferences, Currencies & rates, Categories, Merchants, Import ([import.md](import.md)), Email
 sync ([email-sync.md](email-sync.md)), Integrations ([integrations.md](integrations.md)),
-Notifications, Archived, Data & privacy. Each pane is its own route — see
+Notifications, Archived, Data & privacy, with Sign-in & security ([passkeys.md](passkeys.md)) right
+after Account. Each pane is its own route — see
 [routing.md](routing.md#settings-settings).
 
 ## Where each control's state lives

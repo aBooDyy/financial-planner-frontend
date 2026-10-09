@@ -23,6 +23,7 @@ import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as PlanningIndexRouteImport } from './routes/planning/index'
 import { Route as GoalsIndexRouteImport } from './routes/goals/index'
 import { Route as TransactionsViewRouteImport } from './routes/transactions/$view'
+import { Route as SettingsSecurityRouteImport } from './routes/settings/security'
 import { Route as SettingsPreferencesRouteImport } from './routes/settings/preferences'
 import { Route as SettingsNotificationsRouteImport } from './routes/settings/notifications'
 import { Route as SettingsMerchantsRouteImport } from './routes/settings/merchants'
@@ -110,6 +111,11 @@ const TransactionsViewRoute = TransactionsViewRouteImport.update({
   id: '/$view',
   path: '/$view',
   getParentRoute: () => TransactionsRouteRoute,
+} as any)
+const SettingsSecurityRoute = SettingsSecurityRouteImport.update({
+  id: '/security',
+  path: '/security',
+  getParentRoute: () => SettingsRouteRoute,
 } as any)
 const SettingsPreferencesRoute = SettingsPreferencesRouteImport.update({
   id: '/preferences',
@@ -223,6 +229,7 @@ export interface FileRoutesByFullPath {
   '/settings/merchants': typeof SettingsMerchantsRoute
   '/settings/notifications': typeof SettingsNotificationsRoute
   '/settings/preferences': typeof SettingsPreferencesRoute
+  '/settings/security': typeof SettingsSecurityRoute
   '/transactions/$view': typeof TransactionsViewRoute
   '/goals/': typeof GoalsIndexRoute
   '/planning/': typeof PlanningIndexRoute
@@ -252,6 +259,7 @@ export interface FileRoutesByTo {
   '/settings/merchants': typeof SettingsMerchantsRoute
   '/settings/notifications': typeof SettingsNotificationsRoute
   '/settings/preferences': typeof SettingsPreferencesRoute
+  '/settings/security': typeof SettingsSecurityRoute
   '/transactions/$view': typeof TransactionsViewRoute
   '/goals': typeof GoalsIndexRoute
   '/planning': typeof PlanningIndexRoute
@@ -286,6 +294,7 @@ export interface FileRoutesById {
   '/settings/merchants': typeof SettingsMerchantsRoute
   '/settings/notifications': typeof SettingsNotificationsRoute
   '/settings/preferences': typeof SettingsPreferencesRoute
+  '/settings/security': typeof SettingsSecurityRoute
   '/transactions/$view': typeof TransactionsViewRoute
   '/goals/': typeof GoalsIndexRoute
   '/planning/': typeof PlanningIndexRoute
@@ -321,6 +330,7 @@ export interface FileRouteTypes {
     | '/settings/merchants'
     | '/settings/notifications'
     | '/settings/preferences'
+    | '/settings/security'
     | '/transactions/$view'
     | '/goals/'
     | '/planning/'
@@ -350,6 +360,7 @@ export interface FileRouteTypes {
     | '/settings/merchants'
     | '/settings/notifications'
     | '/settings/preferences'
+    | '/settings/security'
     | '/transactions/$view'
     | '/goals'
     | '/planning'
@@ -383,6 +394,7 @@ export interface FileRouteTypes {
     | '/settings/merchants'
     | '/settings/notifications'
     | '/settings/preferences'
+    | '/settings/security'
     | '/transactions/$view'
     | '/goals/'
     | '/planning/'
@@ -507,6 +519,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/transactions/$view'
       preLoaderRoute: typeof TransactionsViewRouteImport
       parentRoute: typeof TransactionsRouteRoute
+    }
+    '/settings/security': {
+      id: '/settings/security'
+      path: '/security'
+      fullPath: '/settings/security'
+      preLoaderRoute: typeof SettingsSecurityRouteImport
+      parentRoute: typeof SettingsRouteRoute
     }
     '/settings/preferences': {
       id: '/settings/preferences'
@@ -670,6 +689,7 @@ interface SettingsRouteRouteChildren {
   SettingsMerchantsRoute: typeof SettingsMerchantsRoute
   SettingsNotificationsRoute: typeof SettingsNotificationsRoute
   SettingsPreferencesRoute: typeof SettingsPreferencesRoute
+  SettingsSecurityRoute: typeof SettingsSecurityRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
 }
 
@@ -685,6 +705,7 @@ const SettingsRouteRouteChildren: SettingsRouteRouteChildren = {
   SettingsMerchantsRoute: SettingsMerchantsRoute,
   SettingsNotificationsRoute: SettingsNotificationsRoute,
   SettingsPreferencesRoute: SettingsPreferencesRoute,
+  SettingsSecurityRoute: SettingsSecurityRoute,
   SettingsIndexRoute: SettingsIndexRoute,
 }
 

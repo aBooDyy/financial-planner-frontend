@@ -4,6 +4,8 @@ export type User = {
   name: string
   /** Null until the user finishes first-run setup (`/setup`). */
   onboardedAt: string | null
+  /** False for an account opened with Google that never set a password. */
+  hasPassword: boolean
   createdAt: string
   updatedAt: string
   version: string
@@ -18,6 +20,7 @@ export type UserWire = {
   email: string
   name: string
   onboarded_at: string | null
+  has_password: boolean
   created_at: string
   updated_at: string
   version: string
@@ -31,6 +34,7 @@ export const toUser = (wire: UserWire): User => ({
   email: wire.email,
   name: wire.name,
   onboardedAt: wire.onboarded_at,
+  hasPassword: wire.has_password,
   createdAt: wire.created_at,
   updatedAt: wire.updated_at,
   version: wire.version,

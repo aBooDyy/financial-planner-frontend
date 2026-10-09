@@ -48,6 +48,9 @@ root product [`.agent-context/`](../../.agent-context/). Keep
 - [onboarding.md](onboarding.md) — the `/setup` first-run wizard: `SessionGate`, the
   sessionStorage draft, starter packs over the category catalog, the one commit call, the
   inbox connect round trip.
+- [passkeys.md](passkeys.md) — Passkeys: the login button and email-field autofill, adding one
+  (re-auth by password or Google + the resume round trip), the one-time post-sign-in offer, and
+  Settings › Sign-in & security.
 - [settings.md](settings.md) — the Settings page (avatar-menu route): profile editing, synced
   copy-on-write categories, editable FX rates, and the local preferences store.
 - [merchants.md](merchants.md) — Merchants: the shared `normalizeKey` port, the scored local
