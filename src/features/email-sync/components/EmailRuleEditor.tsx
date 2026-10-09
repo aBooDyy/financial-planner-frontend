@@ -2,8 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, CloudOff } from 'lucide-react'
 import { NoteBox } from '#/components/dialog/NoteBox'
 import type { WalletGroupOption } from '#/features/wallets/data/selectors'
-import { labelLineMarks, labelModeOf } from '#/features/email-sync/data/labels'
-import { pickForLine } from '#/features/email-sync/data/mapping'
+import {
+  labelLineMarks,
+  labelModeOf,
+} from '#/features/text-templates/data/labels'
+import { pickForLine } from '#/features/text-templates/data/mapping'
 import { describeTemplate } from '#/features/email-sync/data/ruleDraft'
 import {
   groupsForSenders,
@@ -15,19 +18,19 @@ import type { EmailRuleEditorModel } from '#/features/email-sync/hooks/useEmailR
 import type { InboxSamples } from '#/features/email-sync/hooks/useInboxSamples'
 import { useConfigLimits } from '#/lib/config/appConfig'
 import type { CurrencyCode } from '#/lib/currency'
-import { EditorSection } from './EditorSection'
-import { FieldLabels } from './FieldLabels'
-import { FieldTargetChips } from './FieldTargetChips'
+import { EditorSection } from '#/features/text-templates/components/EditorSection'
+import { FieldLabels } from '#/features/text-templates/components/FieldLabels'
+import { FieldTargetChips } from '#/features/text-templates/components/FieldTargetChips'
 import { GroupPreview } from './GroupPreview'
 import { MatchSummary } from './MatchSummary'
-import { NumberChoice } from './NumberChoice'
-import { ReadingOptions } from './ReadingOptions'
-import { ReadingSummary } from './ReadingSummary'
+import { NumberChoice } from '#/features/text-templates/components/NumberChoice'
+import { ReadingOptions } from '#/features/text-templates/components/ReadingOptions'
+import { ReadingSummary } from '#/features/text-templates/components/ReadingSummary'
 import { RuleFilterForm } from './RuleFilterForm'
 import { RuleRoutingForm } from './RuleRoutingForm'
-import { SampleLines } from './SampleLines'
+import { SampleLines } from '#/features/text-templates/components/SampleLines'
 import { SamplePicker } from './SamplePicker'
-import { TapHint } from './TapHint'
+import { TapHint } from '#/features/text-templates/components/TapHint'
 
 type Props = {
   model: EmailRuleEditorModel
@@ -166,6 +169,10 @@ export function EmailRuleEditor({
               />
               <SampleLines
                 sample={sample}
+                heading={{
+                  title: sample.senderName ?? sample.senderEmail,
+                  subtitle: sample.subject || '(no subject)',
+                }}
                 picks={mapping.picks}
                 options={mapping.options}
                 target={target}

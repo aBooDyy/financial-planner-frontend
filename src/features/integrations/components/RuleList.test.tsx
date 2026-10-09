@@ -14,6 +14,7 @@ const rule = (name: string, over: Partial<RuleDraft> = {}): RuleDraft => ({
   name,
   match: null,
   fields: {},
+  text: null,
   ...over,
 })
 

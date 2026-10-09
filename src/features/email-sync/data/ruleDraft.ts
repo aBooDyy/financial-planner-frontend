@@ -3,13 +3,13 @@ import type {
   EmailRuleDraft,
   ExtractionTemplate,
   RuleFilter,
-  TemplateLabel,
 } from '#/features/email-sync/api/types'
 import type { TxType } from '#/features/transactions/api/types'
-import { describeLabel } from './labels'
+
+export { describeTemplate } from '#/features/text-templates/data/describe'
+export { cleanTerms, TERM_MAX } from '#/features/text-templates/data/terms'
 
 export const RULE_NAME_MAX = 120
-export const TERM_MAX = 100
 
 /** A rule as the editor holds it: the template stays null until one has been learned. */
 export type RuleDraft = {
@@ -95,20 +95,6 @@ const shape = (rules: RuleDraft[]): string =>
 export const sameRules = (a: RuleDraft[], b: RuleDraft[]): boolean =>
   a === b || shape(a) === shape(b)
 
-/** Terms typed into a list: trimmed, capped, empties and repeats dropped. */
-export function cleanTerms(terms: string[]): string[] {
-  const seen = new Set<string>()
-  const out: string[] = []
-  for (const raw of terms) {
-    const term = raw.trim().slice(0, TERM_MAX)
-    const folded = term.toLowerCase()
-    if (!term || seen.has(folded)) continue
-    seen.add(folded)
-    out.push(term)
-  }
-  return out
-}
-
 const quoted = (terms: string[]) => terms.map((t) => `“${t}”`).join(' or ')
 
 /** The filter in words, as a rule row's second line reads. */
@@ -123,29 +109,6 @@ export function describeFilter(filter: RuleFilter): string {
   if (filter.bodyAny.length) parts.push(`body has ${quoted(filter.bodyAny)}`)
   if (filter.excludeAny.length) parts.push(`not ${quoted(filter.excludeAny)}`)
   return parts.join(' · ')
-}
-
-const sameLabel = (a: TemplateLabel | null, b: TemplateLabel | null) =>
-  a?.text === b?.text && a?.offset === b?.offset
-
-/**
- * What the template reads and where, in words:
- * "Reads amount below “amount”, currency, merchant after “at”". The currency is only placed
- * when it is found somewhere other than the amount.
- */
-export function describeTemplate(template: ExtractionTemplate | null): string {
-  if (!template) return 'Nothing to read yet'
-  const { amount, currency, merchant } = template
-  const parts = [`amount ${describeLabel(amount.label)}`]
-  parts.push(
-    currency.mode === 'fixed'
-      ? `always ${currency.code}`
-      : sameLabel(currency.label, amount.label)
-        ? 'currency'
-        : `currency ${describeLabel(currency.label)}`,
-  )
-  if (merchant) parts.push(`merchant ${describeLabel(merchant.label)}`)
-  return `Reads ${parts.join(', ')}`
 }
 
 export type DraftProblems = Partial<

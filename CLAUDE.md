@@ -33,7 +33,8 @@ pattern changes. Index: [`.agent-context/README.md`](.agent-context/README.md).
 - [categories.md](.agent-context/categories.md) — Categories: the two-level synced tree, `buildCatalog` and the `CategoryCatalog` every surface reads, the Settings editor, the subtree delete.
 - [email-sync.md](.agent-context/email-sync.md) — Email sync: the connect/map wizard, on-demand scans, feeding the review queue.
 - [inbound-imports.md](.agent-context/inbound-imports.md) — the shared review queue (`features/inbound-imports/`): review against the stored body, the delta pull, source-agnostic slots.
-- [integrations.md](.agent-context/integrations.md) — Integrations: webhook keys, the shown-once secret, the key editor, the rule editor + payload tester.
+- [integrations.md](.agent-context/integrations.md) — Integrations: webhook keys, the shown-once secret, the key editor, the rule editor (JSON and text rules) + payload tester.
+- [text-templates.md](.agent-context/text-templates.md) — the shared tap-to-learn kit for email rules and integration text rules.
 - [import.md](.agent-context/import.md) — Import: the on-device CSV pipeline, saved templates, batches & undo, the review grid's virtualisation contract.
 - [merchants.md](.agent-context/merchants.md) — Merchants: the shared `normalizeKey` port, the scored matcher, adopt-and-remap.
 - [app-config.md](.agent-context/app-config.md) — `GET /config`: open ISO-4217 currencies, the bundled snapshot + cache order, live rates + auto-update opt-out, user-defined currencies, rate precedence, server limits.

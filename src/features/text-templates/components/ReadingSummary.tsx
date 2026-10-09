@@ -1,11 +1,14 @@
-import type { ExtractField, Extraction } from '#/features/email-sync/api/types'
-import { FIELD_LABEL } from '#/features/email-sync/data/fields'
+import type {
+  ExtractField,
+  Extraction,
+} from '#/features/text-templates/api/types'
+import { FIELD_LABEL } from '#/features/text-templates/data/fields'
 import {
   fieldText,
   fieldTone,
   moneyText,
-} from '#/features/email-sync/data/readings'
-import type { ReadingTone } from '#/features/email-sync/data/readings'
+} from '#/features/text-templates/data/readings'
+import type { ReadingTone } from '#/features/text-templates/data/readings'
 import { cn } from '#/lib/utils'
 
 const TONE: Record<ReadingTone, string> = {
@@ -18,10 +21,12 @@ const FIELDS: ExtractField[] = ['amount', 'currency', 'merchant']
 
 type Props = {
   reading: Extraction | null
-  /** What an email without a merchant line is filed as. */
+  /** What a sample without a merchant line is filed as. */
   defaultMerchant?: string | null
   pending: boolean
   error: string | null
+  /** What a sample is called on screen — an email, a message. */
+  noun?: string
 }
 
 /** What the rule reads from the sample itself, field by field — the proof it learned right. */
@@ -30,6 +35,7 @@ export function ReadingSummary({
   defaultMerchant = null,
   pending,
   error,
+  noun = 'email',
 }: Props) {
   if (error) {
     return (
@@ -58,7 +64,7 @@ export function ReadingSummary({
       )}
     >
       <div className="text-[12px] font-bold text-fp-text-2">
-        This email reads as
+        This {noun} reads as
       </div>
       <div className="mt-0.5 mb-1.5 text-[26px] font-extrabold tracking-[-0.02em] tabular-nums">
         {money ? (

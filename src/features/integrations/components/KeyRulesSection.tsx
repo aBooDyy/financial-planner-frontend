@@ -158,8 +158,8 @@ function SampleSummary({ model }: { model: RuleEditorModel }) {
   const fired = result.matchedIndex
   const text =
     fired !== null
-      ? `Your sample payload is handled by rule ${fired + 1}. ${OUTCOME_TEXT[result.would]}`
-      : `No rule matches your sample payload. ${OUTCOME_TEXT[result.would]}`
+      ? `Your sample is handled by rule ${fired + 1}. ${OUTCOME_TEXT[result.would]}`
+      : `No rule matches your sample. ${OUTCOME_TEXT[result.would]}`
   return (
     <NoteBox
       tone={fired !== null ? 'accent' : 'neutral'}

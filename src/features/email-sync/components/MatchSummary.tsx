@@ -4,7 +4,7 @@ import type {
   InboxMessage,
   SampleVerdict,
 } from '#/features/email-sync/api/types'
-import { extractionLine } from '#/features/email-sync/data/readings'
+import { extractionLine } from '#/features/text-templates/data/readings'
 import { focusMatches } from '#/features/email-sync/data/verdicts'
 import { cn } from '#/lib/utils'
 

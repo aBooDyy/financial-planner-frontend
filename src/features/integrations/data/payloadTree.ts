@@ -1,13 +1,18 @@
+import { textLines } from '#/features/text-templates/data/textLines'
 import { tokenise } from '#/lib/wordTokens'
 import type { Token } from '#/lib/wordTokens'
 
 type SampleProblem = 'empty' | 'invalid' | 'not_object' | 'too_large'
 
 export type SampleReading =
-  | { ok: true; value: Record<string, unknown> }
+  | { ok: true; kind: 'json'; value: Record<string, unknown> }
+  | { ok: true; kind: 'text'; lines: string[] }
   | { ok: false; problem: SampleProblem; detail?: string }
 
-/** The sample as ingest would read it: bounded, JSON, an object at the root. */
+/**
+ * The sample as ingest would read it, bounded: a JSON object, or — when it does not parse as
+ * JSON and does not open like an object — a text message. Any other JSON root is refused.
+ */
 export function readSample(text: string, maxBytes: number): SampleReading {
   if (!text.trim()) return { ok: false, problem: 'empty' }
   if (new TextEncoder().encode(text).length > maxBytes) {
@@ -17,6 +22,8 @@ export function readSample(text: string, maxBytes: number): SampleReading {
   try {
     value = JSON.parse(text)
   } catch (error) {
+    if (!text.trimStart().startsWith('{'))
+      return { ok: true, kind: 'text', lines: textLines(text) }
     return {
       ok: false,
       problem: 'invalid',
@@ -26,7 +33,7 @@ export function readSample(text: string, maxBytes: number): SampleReading {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return { ok: false, problem: 'not_object' }
   }
-  return { ok: true, value: value as Record<string, unknown> }
+  return { ok: true, kind: 'json', value: value as Record<string, unknown> }
 }
 
 // --- Paths ---------------------------------------------------------------------------

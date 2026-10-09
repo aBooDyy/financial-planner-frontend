@@ -18,7 +18,10 @@ import type {
   RuleFilter,
   SampleVerdict,
 } from '#/features/email-sync/api/types'
-import { learnRequestOf, signatureOf } from '#/features/email-sync/data/mapping'
+import {
+  learnRequestOf,
+  signatureOf,
+} from '#/features/text-templates/data/mapping'
 import { saveRules } from '#/features/email-sync/data/mutations'
 import { draftProblems, sameRules } from '#/features/email-sync/data/ruleDraft'
 import type {
@@ -45,8 +48,8 @@ import { inboundImportsApi } from '#/features/inbound-imports/api/inboundImports
 import { ApiError } from '#/lib/apiError'
 import { useConfigLimits } from '#/lib/config/appConfig'
 import type { CurrencyCode } from '#/lib/currency'
-import { useDebouncedCall } from './useDebouncedCall'
-import type { DebouncedCall } from './useDebouncedCall'
+import { useDebouncedCall } from '#/hooks/useDebouncedCall'
+import type { DebouncedCall } from '#/hooks/useDebouncedCall'
 
 export type RuleTestRequest = {
   samples: EmailSample[]

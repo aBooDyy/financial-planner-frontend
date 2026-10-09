@@ -30,7 +30,10 @@ type Props = {
 const kb = (bytes: number) => Math.round(bytes / 1024)
 
 function problemText(reading: SampleReading, maxBytes: number): string | null {
-  if (reading.ok) return null
+  if (reading.ok)
+    return reading.kind === 'text'
+      ? 'That’s a text message — a JSON rule reads JSON payloads.'
+      : null
   switch (reading.problem) {
     case 'empty':
       return null

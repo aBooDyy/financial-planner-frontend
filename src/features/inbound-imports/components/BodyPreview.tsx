@@ -1,11 +1,16 @@
 import { useMemo } from 'react'
 import type { ReactNode } from 'react'
-import type { BodyFormat } from '#/features/inbound-imports/api/types'
+import type {
+  BodyFormat,
+  InboundSource,
+} from '#/features/inbound-imports/api/types'
 import { bodyNoun } from '#/features/inbound-imports/data/sources'
 import { usePayloadView } from './payloadView'
 
 type Props = {
   format: BodyFormat
+  /** Who staged it, which decides what a text body is called. */
+  source?: InboundSource
   lines: string[]
   truncated: boolean
   loading: boolean
@@ -102,12 +107,13 @@ function JsonBody({
 /** The body an import was parsed from, as it was stored when it was staged. */
 export function BodyPreview({
   format,
+  source,
   lines,
   truncated,
   loading,
   error,
 }: Props) {
-  const noun = bodyNoun(format)
+  const noun = bodyNoun(format, source)
   if (loading || error || lines.length === 0)
     return (
       <Shell>

@@ -221,6 +221,50 @@ two panes, sample (sticky) then fields; phone: stacked, sample on top because a 
 field below it, in a full-height sheet (`ResponsiveDialog sheetClassName`). Path and pattern
 inputs are `dir="ltr"` monospace; labels and help follow the page.
 
+## Text rules
+
+A key also receives **plain text** — a bank SMS forwarded as-is — read by **text rules**, the
+email rule model under a key (backend:
+[integrations.md](../../financial-planner-backend/.agent-context/integrations.md#text-messages-and-text-rules)).
+One set mixes both kinds; a payload is read only by rules of its kind.
+
+- **The sample.** `readSample` mirrors ingest: a JSON object (`kind: 'json'`, `value`), a body
+  that does not parse and does not open with `{` (`kind: 'text'`, `lines` from
+  `textLines`), else a problem. Everything that took a JSON object — the dry run, _Use last
+  received_, _Build a rule from this_ (`readsAsPayload`; a cut text excerpt falls through to
+  the import's full body), the Fix-the-rule deep link — takes text too.
+- **The model.** `IntegrationRule.text: TextRule | null` — `{filter: {textAny, excludeAny},
+  template | null, walletId, type, categoryId, defaultMerchant}`; a JSON rule has `text: null`,
+  a text rule an empty `match`/`fields`. Wire `kind: 'JSON' | 'TEXT'` (`toRuleWire` refuses a
+  text rule with no template — `hasTemplate`). `newRule(count, kind)`; `sendable` cleans the
+  terms and the default merchant.
+- **The reducer.** `add` without a kind makes a text rule when the sample is a message
+  (`textSampleOf`), a JSON rule otherwise; `kind` switches a **new** rule. An open text rule
+  holds a `tapping` ([text-templates.md](text-templates.md)) on the sample's lines, reset by
+  every `sample` change; `{type: 'tap', action}` forwards to `tappingReducer`; `learned`
+  lands only on the taps it answers (signature); `editText` (a type change clears the
+  category) and `textFilter`. `templateCurrent`: until something is tapped a rule keeps its
+  template; after, only one learned from those taps. `workingSet` leaves out a new text rule
+  with nothing learned yet.
+- **The hook.** `useRuleEditor` adds the debounced learn (`useDebouncedCall` →
+  `integrationRulesApi.learn` → `POST …/rules/learn`, the sample sent as its lines joined by
+  `\n`), `learned` / `learnError` for the taps on screen, and `openProblem` — why Done is
+  disabled ("Tap the amount and currency on the sample.", "Reading your sample…"), shown as
+  the footer hint.
+- **The editor.** `RuleEditor` keeps the name, a _This rule reads_ switch (new rules only) and
+  `TraceBanner` (worded for a filter with `textRule`), then hands a text rule to
+  `TextRuleEditor`: `TextSampleStep` (paste / _Use last received_ / _Edit_, then
+  `FieldTargetChips`, `TapHint`, `FieldLabels`, `SampleLines`), `TextReadingStep`
+  (`NumberChoice`, `ReadingOptions` and `ReadingSummary` with `noun="message"`),
+  _Which messages_ (`TextFilterForm`, `TEXT_TERMS_MAX` 10 — the server's own — and whether
+  the sample gets through) and _File into_ (`TextRoutingForm`: account and category fall back
+  to the key's defaults; auto-confirm stays the key's).
+- **Elsewhere.** `RuleListItem` describes a text rule by `describeTextFilter` and
+  `describeTemplate`; `ruleProblems` puts `rules[i].filter…`, `.template…`, `.wallet_id`,
+  `.category_id`, `.default_merchant` beside their controls; `statusLine` says `NOT_FOUND`
+  ("Couldn’t find it in the message"); the queue calls a webhook's text body a **message**
+  (`bodyNoun(format, source)`).
+
 ## Endpoint and limits
 
 The endpoint card shows `config.integrations.webhookUrl` (the deployment's `WEBHOOK_BASE_URL`)
@@ -280,6 +324,11 @@ is tagged with its key id, so switching keys never shows the previous key's rows
 describe, draft, errors, expiry, order), `hooks/useIntegrationKeys.test.ts` (cache-then-network,
 offline from Dexie, failed refresh, 409 as a field error, token never cached, revoke/delete),
 `components/TokenRevealDialog.test.tsx`, `CreateKeyDialog.test.tsx`, `KeyRow.test.tsx`;
+text rules: `data/textRules.test.ts` (wire mapping both ways, no template no send, cleaning,
+filter wording, text samples, the kind of a new rule and the switch, learned-only-for-its-taps,
+a saved template kept until a tap, taps dropped with the sample, routing coherence, the working
+set, refused parts beside their controls), `useRuleEditor.test.ts` (learn from taps, Done
+gated), `deliveries.test.ts` (building from a message, never from a cut one);
 rules: `data/ruleData.test.ts` (tokens and pattern suggestion — incl. the four Tasker words —,
 date guessing, path quoting, sample reading, visible ids, reference candidates, the reducer's
 hop / optional-never-steals / condition binding / Done-vs-Cancel / working set / reorder,

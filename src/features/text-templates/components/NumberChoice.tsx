@@ -1,4 +1,4 @@
-import type { FieldPick } from '#/features/email-sync/api/types'
+import type { FieldPick } from '#/features/text-templates/api/types'
 import { numberTokens } from '#/lib/lineTokens'
 import { cn } from '#/lib/utils'
 

@@ -4,6 +4,7 @@ import { cn } from '#/lib/utils'
 import {
   describeFields,
   describeMatch,
+  describeTextFilter,
 } from '#/features/integrations/data/ruleDraft'
 import type { RuleDraft } from '#/features/integrations/data/ruleDraft'
 import type { RuleVerdict } from '#/features/integrations/data/verdicts'
@@ -38,7 +39,7 @@ const VERDICT: Partial<
 const ICON_BUTTON =
   'flex size-[30px] shrink-0 items-center justify-center rounded-[9px] border-[1.5px] border-fp-border text-fp-text-3 transition hover:border-fp-border-strong hover:text-fp-text disabled:opacity-40'
 
-/** One rule, summarised from itself: its condition in words and the fields it reads. */
+/** One rule, summarised from itself: what it takes in words and what it reads. */
 export function RuleListItem({
   rule,
   index,
@@ -107,7 +108,9 @@ export function RuleListItem({
           ) : null}
         </div>
         <span className="mt-[3px] text-[12.5px] text-fp-text-2">
-          {match ? (
+          {rule.text ? (
+            describeTextFilter(rule.text.filter)
+          ) : match ? (
             <>
               When{' '}
               <bdi dir="ltr" className="font-mono text-[12px]">

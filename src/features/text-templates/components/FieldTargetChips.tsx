@@ -4,8 +4,11 @@ import type {
   ExtractField,
   FieldPicks,
   LearnOptions,
-} from '#/features/email-sync/api/types'
-import { FIELD_LABEL, tappableFields } from '#/features/email-sync/data/fields'
+} from '#/features/text-templates/api/types'
+import {
+  FIELD_LABEL,
+  tappableFields,
+} from '#/features/text-templates/data/fields'
 import { cn } from '#/lib/utils'
 
 type Props = {
@@ -17,7 +20,7 @@ type Props = {
 
 const LABEL = 'Pick a tag, then tap its line'
 
-/** What the next tap on the email fills; the dot says whether it is tagged yet. */
+/** What the next tap on the sample fills; the dot says whether it is tagged yet. */
 export function FieldTargetChips({ target, picks, options, onTarget }: Props) {
   return (
     <div className="min-w-0">

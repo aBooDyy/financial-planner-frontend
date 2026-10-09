@@ -1,3 +1,13 @@
+import {
+  toLearned,
+  toLearnOptionsWire,
+  toPicksWire,
+} from '#/features/text-templates/api/types'
+import type {
+  Learned,
+  LearnedWire,
+  LearnRequest,
+} from '#/features/text-templates/api/types'
 import { http } from '#/lib/http'
 import type {
   DryRun,
@@ -45,4 +55,14 @@ export const integrationRulesApi = {
     if (focusIndex !== undefined) body.focus_index = focusIndex
     return http.post<DryRunWire>(`${keyPath(keyId)}/test`, body).then(toDryRun)
   },
+
+  /** A text rule's template from taps on a sample message. Writes nothing. */
+  learn: (keyId: string, request: LearnRequest): Promise<Learned> =>
+    http
+      .post<LearnedWire>(`${keyPath(keyId)}/rules/learn`, {
+        sample: request.sample.bodyLines.join('\n'),
+        picks: toPicksWire(request.picks),
+        options: toLearnOptionsWire(request.options),
+      })
+      .then(toLearned),
 }

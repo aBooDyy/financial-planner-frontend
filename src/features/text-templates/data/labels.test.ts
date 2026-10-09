@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { LearnOptions } from '#/features/email-sync/api/types'
+import type { LearnOptions } from '#/features/text-templates/api/types'
 import {
   describeLabel,
   foundLabel,

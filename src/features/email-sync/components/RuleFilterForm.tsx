@@ -1,7 +1,7 @@
 import { FormRow } from '#/components/FormRow'
 import type { RuleFilter } from '#/features/email-sync/api/types'
 import { useConfigLimits } from '#/lib/config/appConfig'
-import { TermsInput } from './TermsInput'
+import { TermsInput } from '#/features/text-templates/components/TermsInput'
 
 type Props = {
   filter: RuleFilter

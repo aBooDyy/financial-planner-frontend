@@ -12,6 +12,7 @@ import type {
   Locator,
   LocatorField,
   MatchCondition,
+  TextFilter,
 } from '#/features/integrations/api/ruleTypes'
 import {
   importPayload,
@@ -24,21 +25,35 @@ import type {
 } from '#/features/integrations/data/payloadTree'
 import { prettyJson } from '#/features/integrations/data/prettyJson'
 import { sameRules, sendable } from '#/features/integrations/data/ruleDraft'
-import type { Binding, RuleDraft } from '#/features/integrations/data/ruleDraft'
+import type {
+  Binding,
+  RuleDraft,
+  RuleKind,
+} from '#/features/integrations/data/ruleDraft'
 import {
   initialRuleEditorState,
   ruleEditorReducer,
+  templateCurrent,
   workingSet,
 } from '#/features/integrations/data/ruleEditorState'
 import type {
   OpenRule,
   Target,
+  TextRulePatch,
 } from '#/features/integrations/data/ruleEditorState'
 import {
   NO_PROBLEMS,
   ruleProblems,
 } from '#/features/integrations/data/ruleErrors'
 import type { RuleProblems } from '#/features/integrations/data/ruleErrors'
+import type { Learned, LearnRequest } from '#/features/text-templates/api/types'
+import {
+  learnRequestOf,
+  signatureOf,
+} from '#/features/text-templates/data/mapping'
+import type { TappingAction } from '#/features/text-templates/data/tapping'
+import { useDebouncedCall } from '#/hooks/useDebouncedCall'
+import type { DebouncedCall } from '#/hooks/useDebouncedCall'
 import { ApiError } from '#/lib/apiError'
 import { useConfigLimits } from '#/lib/config/appConfig'
 import { useDryRun } from './useDryRun'
@@ -63,6 +78,14 @@ export type RuleEditorModel = {
   dirty: boolean
   /** The open rule has edits that Done has not folded into the set yet. */
   openDirty: boolean
+  /** Why Done cannot fold the open rule into the set yet, if it cannot. */
+  openProblem: string | null
+  /** The open text rule's template being learned from its taps. */
+  learning: DebouncedCall<Learned>
+  /** The learn answer for exactly the taps on screen, or null while there is none. */
+  learned: Learned | null
+  /** Why the taps on screen could not be learned, if they could not. */
+  learnError: string | null
   saving: boolean
   rulesMax: number
   canAddRule: boolean
@@ -74,6 +97,11 @@ export type RuleEditorModel = {
   remove: (index: number) => void
   move: (from: number, to: number) => void
   rename: (name: string) => void
+  /** A new rule only: read JSON payloads or text messages. */
+  setKind: (kind: RuleKind) => void
+  editText: (patch: TextRulePatch) => void
+  editTextFilter: (patch: Partial<TextFilter>) => void
+  tap: (action: TappingAction) => void
   setMatch: (match: MatchCondition | null) => void
   setLocator: (field: LocatorField, locator: Locator | null) => void
   setTarget: (target: Target | null) => void
@@ -167,9 +195,36 @@ export function useRuleEditor({
     [state.sample, limits.integrationPayloadMaxBytes],
   )
   const tree = useMemo(
-    () => (reading.ok ? buildTree(reading.value) : null),
+    () =>
+      reading.ok && reading.kind === 'json' ? buildTree(reading.value) : null,
     [reading],
   )
+
+  const mapping = state.open?.tapping?.mapping ?? null
+  const learnRequest = useMemo(
+    () => (mapping ? learnRequestOf(mapping) : null),
+    [mapping],
+  )
+  const learnCall = useCallback(
+    (request: LearnRequest) => integrationRulesApi.learn(keyId, request),
+    [keyId],
+  )
+  const learning = useDebouncedCall(learnRequest, learnCall, online)
+  const learnSignature = useMemo(
+    () => signatureOf(learnRequest),
+    [learnRequest],
+  )
+  const answersTaps =
+    learnSignature !== null && learning.answered === learnSignature
+
+  useEffect(() => {
+    if (learning.result && learning.answered)
+      dispatch({
+        type: 'learned',
+        signature: learning.answered,
+        result: learning.result,
+      })
+  }, [learning.result, learning.answered])
 
   const working = useMemo(
     () => workingSet({ rules: state.rules, open: state.open }),
@@ -188,6 +243,9 @@ export function useRuleEditor({
   const dirty = state.status === 'ready' && !sameRules(state.rules, state.saved)
   const openDirty =
     state.open !== null && !sameRules([state.open.draft], [state.open.base])
+  const openProblem = state.open
+    ? textRuleProblem(state.open, learning.pending)
+    : null
   const ruleCount = state.rules.length + (state.open?.isNew ? 1 : 0)
 
   const save = useCallback(async (): Promise<boolean> => {
@@ -258,6 +316,10 @@ export function useRuleEditor({
     conflict: current?.conflict ?? false,
     dirty,
     openDirty,
+    openProblem,
+    learning,
+    learned: answersTaps ? learning.result : null,
+    learnError: answersTaps ? learning.error : null,
     saving,
     rulesMax: limits.integrationRulesMax,
     canAddRule,
@@ -272,6 +334,10 @@ export function useRuleEditor({
     remove: (index) => dispatch({ type: 'remove', index }),
     move: (from, to) => dispatch({ type: 'move', from, to }),
     rename: (name) => dispatch({ type: 'rename', name }),
+    setKind: (kind) => dispatch({ type: 'kind', kind }),
+    editText: (patch) => dispatch({ type: 'editText', patch }),
+    editTextFilter: (patch) => dispatch({ type: 'textFilter', patch }),
+    tap: (action) => dispatch({ type: 'tap', action }),
     setMatch: (match) => dispatch({ type: 'setMatch', match }),
     setLocator: (field, locator) =>
       dispatch({ type: 'setLocator', field, locator }),
@@ -286,4 +352,13 @@ export function useRuleEditor({
     startFromPayload,
     save,
   }
+}
+
+/** What a text rule still needs before Done: something learned from its sample. */
+function textRuleProblem(open: OpenRule, learning: boolean): string | null {
+  if (templateCurrent(open)) return null
+  if (learning) return 'Reading your sample…'
+  return open.tapping?.mapping.sample
+    ? 'Tap the amount and currency on the sample.'
+    : 'Paste a sample message, then tap the amount and currency.'
 }

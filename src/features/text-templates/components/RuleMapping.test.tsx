@@ -1,16 +1,13 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { EmailSample } from '#/features/email-sync/api/types'
+import type { TextSample } from '#/features/text-templates/api/types'
 import { NumberChoice } from './NumberChoice'
 import { SampleLines } from './SampleLines'
 
 afterEach(cleanup)
 
-const SAMPLE: EmailSample = {
-  senderEmail: 'alerts@bank.com',
-  senderName: 'Bank',
-  subject: 'Purchase',
+const SAMPLE: TextSample = {
   bodyLines: ['Dear customer', '', 'Amount: SAR 38.50', 'At: Jarir'],
 }
 

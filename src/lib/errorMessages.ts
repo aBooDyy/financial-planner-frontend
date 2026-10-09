@@ -204,6 +204,15 @@ const MESSAGES: Record<string, string> = {
   'integrations.rule.field_unknown': 'Means doesn’t know that field.',
   'integrations.rule.limit_reached':
     'This key has the most rules it can hold. Remove one first.',
+  'integrations.rule.term_invalid':
+    'Use up to 10 words or phrases of up to 100 characters.',
+  'integrations.rule.template_invalid':
+    'Means couldn’t read that. Tap the amount on the sample again.',
+  'integrations.rule.currency_invalid': 'Choose a currency Means knows.',
+  'integrations.rule.wallet_invalid': 'Choose one of your accounts.',
+  'integrations.rule.category_invalid':
+    'Choose one of your categories of this type.',
+  'integrations.rule.pick_invalid': 'Tap a line of the sample message.',
   'integrations.auth.missing': 'This endpoint needs an integration key.',
   'integrations.auth.invalid': 'That integration key isn’t valid.',
   'integrations.auth.expired': 'That integration key has expired.',

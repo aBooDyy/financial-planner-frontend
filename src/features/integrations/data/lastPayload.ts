@@ -13,22 +13,27 @@ export async function importPayload(importId: string): Promise<string | null> {
   return detail.bodyLines.length > 0 ? detail.bodyLines.join('\n') : null
 }
 
-const readsAsObject = (text: string): boolean =>
-  readSample(text, Number.POSITIVE_INFINITY).ok
+/** A JSON object can only parse whole; a text message may have been cut, so it must not be. */
+const readsAsPayload = (text: string, cut = false): boolean => {
+  const reading = readSample(text, Number.POSITIVE_INFINITY)
+  return reading.ok && (reading.kind === 'json' || !cut)
+}
 
 /**
  * The whole payload a delivery carried, as a rule can be built from it: its excerpt when that
- * is the whole object, else the body of the import it staged (kept in full). Null when neither
- * is a JSON object — a refused body, or a request whose secret did not verify.
+ * is the whole of it, else the body of the import it staged (kept in full). Null when neither
+ * reads as a JSON object or a text message — a refused body, or a request whose secret did
+ * not verify.
  */
 export async function deliveryPayload(
   delivery: Delivery,
 ): Promise<string | null> {
   const excerpt = delivery.payloadExcerpt
-  if (excerpt && readsAsObject(excerpt)) return excerpt
+  if (excerpt && readsAsPayload(excerpt, delivery.payloadTruncated))
+    return excerpt
   if (delivery.importId && (excerpt === null || delivery.payloadTruncated)) {
     const body = await importPayload(delivery.importId)
-    return body && readsAsObject(body) ? body : null
+    return body && readsAsPayload(body) ? body : null
   }
   return null
 }

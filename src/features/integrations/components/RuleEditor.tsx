@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useRef } from 'react'
+import { PillSwitch } from '#/components/dialog/PillSwitch'
+import { FieldLabel } from '#/components/FieldLabel'
 import { Input } from '#/components/ui/input'
 import type { CategoryCatalog } from '#/features/categories/data/catalog'
 import type { IntegrationKey } from '#/features/integrations/api/types'
 import { referenceCandidates } from '#/features/integrations/data/payloadTree'
 import { isBound } from '#/features/integrations/data/ruleDraft'
+import type { RuleKind } from '#/features/integrations/data/ruleDraft'
 import { FIELD_META } from '#/features/integrations/data/ruleFields'
 import { treeMarks } from '#/features/integrations/data/treeMarks'
 import { useFieldStatusContext } from '#/features/integrations/hooks/useFieldStatusContext'
@@ -14,7 +17,13 @@ import { FormRow } from '#/components/FormRow'
 import { MatchConditionRow } from './MatchConditionRow'
 import { ReferenceWarning } from './ReferenceWarning'
 import { SamplePayloadPane } from './SamplePayloadPane'
+import { TextRuleEditor } from './TextRuleEditor'
 import { TraceBanner } from './TraceBanner'
+
+const KINDS: { value: RuleKind; label: string }[] = [
+  { value: 'json', label: 'JSON payloads' },
+  { value: 'text', label: 'Text messages' },
+]
 
 type Props = {
   model: RuleEditorModel
@@ -27,8 +36,9 @@ type Props = {
 }
 
 /**
- * One rule: the condition that selects it, the sample it is built from, and its fields. The
- * sample sits above the fields on a phone, because a tap fills the field below it.
+ * One rule. A JSON rule: the condition that selects it, the sample it is built from, and its
+ * fields — the sample above the fields on a phone, because a tap fills the field below it. A
+ * text rule: the four steps of `TextRuleEditor`. A new rule can still change which it is.
  */
 export function RuleEditor({
   model,
@@ -100,58 +110,87 @@ export function RuleEditor({
         />
       </FormRow>
 
-      <MatchConditionRow
-        match={draft.match}
-        picking={target === 'match'}
-        problem={problem?.match ?? null}
-        onChange={model.setMatch}
-        onPick={(on) => model.setTarget(on ? 'match' : null)}
-      />
+      {open.isNew ? (
+        <div className="min-w-0">
+          <FieldLabel>This rule reads</FieldLabel>
+          <PillSwitch
+            label="This rule reads"
+            value={draft.text ? 'text' : 'json'}
+            options={KINDS}
+            onChange={model.setKind}
+          />
+        </div>
+      ) : null}
+
+      {draft.text ? null : (
+        <MatchConditionRow
+          match={draft.match}
+          picking={target === 'match'}
+          problem={problem?.match ?? null}
+          onChange={model.setMatch}
+          onPick={(on) => model.setTarget(on ? 'match' : null)}
+        />
+      )}
 
       <TraceBanner
         dryRun={model.dryRun}
         index={open.index}
         ruleNames={ruleNames}
         hasSample={model.reading.ok}
+        textRule={draft.text !== null}
       />
 
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
-        <div className="flex flex-col gap-3 md:sticky md:top-0 md:self-start">
-          <SamplePayloadPane
-            sample={model.sample}
-            reading={model.reading}
-            tree={model.tree}
-            maxBytes={maxBytes}
-            online={online}
-            lastPayload={model.lastPayload}
-            onSample={model.setSample}
-            onLoadLast={() => void model.loadLastPayload()}
-            onBind={model.bind}
-            marks={marks}
-            highlighted={highlighted}
-            targetLabel={targetLabel}
-          />
-          {!isBound(draft.fields.external_id) ? (
-            <ReferenceWarning
-              onFix={model.fixReference}
-              noCandidates={
-                model.highlightReference &&
-                model.tree !== null &&
-                candidates.length === 0
-              }
-            />
-          ) : null}
-        </div>
-        <FieldList
-          fields={draft.fields}
-          target={target}
-          statusContext={statusContext}
+      {draft.text && open.tapping ? (
+        <TextRuleEditor
+          model={model}
+          open={open}
+          text={draft.text}
+          tapping={open.tapping}
           problem={problem}
-          choices={choices}
-          onChange={model.setLocator}
-          onTarget={model.setTarget}
+          online={online}
+          walletGroups={choices.walletGroups}
+          baseCurrency={choices.baseCurrency}
+          maxBytes={maxBytes}
         />
-      </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
+          <div className="flex flex-col gap-3 md:sticky md:top-0 md:self-start">
+            <SamplePayloadPane
+              sample={model.sample}
+              reading={model.reading}
+              tree={model.tree}
+              maxBytes={maxBytes}
+              online={online}
+              lastPayload={model.lastPayload}
+              onSample={model.setSample}
+              onLoadLast={() => void model.loadLastPayload()}
+              onBind={model.bind}
+              marks={marks}
+              highlighted={highlighted}
+              targetLabel={targetLabel}
+            />
+            {!isBound(draft.fields.external_id) ? (
+              <ReferenceWarning
+                onFix={model.fixReference}
+                noCandidates={
+                  model.highlightReference &&
+                  model.tree !== null &&
+                  candidates.length === 0
+                }
+              />
+            ) : null}
+          </div>
+          <FieldList
+            fields={draft.fields}
+            target={target}
+            statusContext={statusContext}
+            problem={problem}
+            choices={choices}
+            onChange={model.setLocator}
+            onTarget={model.setTarget}
+          />
+        </div>
+      )}
       {problem?.other ? (
         <p role="alert" className="text-[12px] font-semibold text-fp-danger">
           {problem.other}

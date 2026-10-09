@@ -117,12 +117,27 @@ describe('building a rule from a delivery', () => {
     expect(getImport).toHaveBeenCalledWith('imp1')
   })
 
-  it('has nothing to build from when no JSON object was kept', async () => {
+  it('has nothing to build from when no payload was kept', async () => {
     const refused = aRejection('integrations.payload.invalid')
     const withText = { ...refused, payloadExcerpt: '{not json' }
     expect(canBuildFrom(refused)).toBe(false)
     expect(canBuildFrom(withText)).toBe(false)
     expect(await deliveryPayload(withText)).toBeNull()
+  })
+
+  it('builds from a text message, but never from a cut one', async () => {
+    const sms = aDelivery({ payloadExcerpt: 'Purchase of SAR 38.50 at JARIR' })
+    expect(canBuildFrom(sms)).toBe(true)
+    expect(await deliveryPayload(sms)).toBe('Purchase of SAR 38.50 at JARIR')
+
+    getImport.mockResolvedValue({
+      bodyLines: ['Purchase of SAR 38.50', 'at X'],
+    })
+    const cut = aDelivery({
+      payloadExcerpt: 'Purchase of',
+      payloadTruncated: true,
+    })
+    expect(await deliveryPayload(cut)).toBe('Purchase of SAR 38.50\nat X')
   })
 })
 

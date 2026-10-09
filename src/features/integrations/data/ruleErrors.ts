@@ -6,8 +6,29 @@ export type RuleProblem = {
   name?: string
   match?: string
   fields: Partial<Record<LocatorField, string>>
+  /** A text rule's parts. */
+  filter?: string
+  template?: string
+  walletId?: string
+  categoryId?: string
+  defaultMerchant?: string
   /** Something wrong with the rule that no single control owns. */
   other?: string
+}
+
+type TextPart =
+  | 'filter'
+  | 'template'
+  | 'walletId'
+  | 'categoryId'
+  | 'defaultMerchant'
+
+const TEXT_PART: Record<string, TextPart | undefined> = {
+  filter: 'filter',
+  template: 'template',
+  wallet_id: 'walletId',
+  category_id: 'categoryId',
+  default_merchant: 'defaultMerchant',
 }
 
 export type RuleProblems = {
@@ -21,8 +42,8 @@ export const NO_PROBLEMS: RuleProblems = { byRule: new Map(), general: null }
 const RULE_FIELD = /^rules\[(\d+)\](?:\.(\w+)(?:\.(\w+))?)?/
 
 /**
- * A 422 on a rule set names each failing part as `rules[2].fields.amount.regex`; each message
- * goes beside the control it is about. Anything else — the ceiling, a conflict, the network —
+ * A 422 on a rule set names each failing part as `rules[2].fields.amount.regex` (a text rule's
+ * as `rules[2].filter.text_any`); each message goes beside the control it is about. Anything else — the ceiling, a conflict, the network —
  * is one line for the whole set.
  */
 export function ruleProblems(error: unknown): RuleProblems {
@@ -35,7 +56,10 @@ export function ruleProblems(error: unknown): RuleProblems {
     const problem = byRule.get(index) ?? { fields: {} }
     const message = messageForCode(detail.code)
     const [, , part, field] = parsed
-    if (part === 'fields' && field) {
+    const textPart = part ? TEXT_PART[part] : undefined
+    if (textPart) {
+      problem[textPart] ??= message
+    } else if (part === 'fields' && field) {
       problem.fields[field as LocatorField] ??= message
     } else if (part === 'name') {
       problem.name ??= message

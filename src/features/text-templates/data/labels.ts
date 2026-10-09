@@ -1,5 +1,4 @@
 import type {
-  EmailSample,
   ExtractField,
   FieldPick,
   FieldPicks,
@@ -7,7 +6,8 @@ import type {
   LearnedLabel,
   LearnedLabels,
   TemplateLabel,
-} from '#/features/email-sync/api/types'
+  TextSample,
+} from '#/features/text-templates/api/types'
 import { tappableFields } from './fields'
 
 /** How far from its value a label may sit — the server refuses a label line further away. */
@@ -97,7 +97,7 @@ export function labelCandidates(
 export type LabelMode = { field: ExtractField; candidates: Set<number> }
 
 export function labelModeOf(
-  sample: EmailSample | null,
+  sample: TextSample | null,
   picks: FieldPicks,
   field: ExtractField | null,
 ): LabelMode | null {

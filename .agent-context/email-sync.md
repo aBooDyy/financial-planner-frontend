@@ -12,6 +12,14 @@ editor that swaps in with a back chevron and Done/Cancel. Plan and contract:
 `working.local/email-rules/PLAN.md`; backend counterpart:
 [email-sync.md](../../financial-planner-backend/.agent-context/email-sync.md).
 
+The tap-to-learn pieces — template types, the mapping and its tapping sub-reducer, labels,
+readings, `SampleLines`, `FieldTargetChips`, `FieldLabels`/`LabelChip`, `TapHint`,
+`NumberChoice`, `ReadingOptions`, `ReadingSummary`, `TermsInput`, `EditorSection` — live in
+the shared `features/text-templates/` ([text-templates.md](text-templates.md)), because an
+integration key's text rules use them too. `api/types.ts` re-exports the template types, and
+`data/ruleDraft.ts` `describeTemplate` / `cleanTerms`, so the slice keeps importing them from
+its own modules.
+
 ## Surfaces
 
 | Where                         | What                                                                                                                           |

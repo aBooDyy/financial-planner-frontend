@@ -97,7 +97,7 @@ export const DELIVERY_TONE_TEXT: Record<DeliveryTone, string> = {
   idle: 'text-fp-text-3',
 }
 
-/** Whether "build a rule from this" can find a JSON object to build from. */
+/** Whether "build a rule from this" can find a JSON object or a text message to build from. */
 export const canBuildFrom = (delivery: Delivery): boolean =>
   delivery.importId !== null ||
   (delivery.payloadExcerpt !== null &&

@@ -41,3 +41,6 @@ export const HOP_FIELDS: LocatorField[] = ['amount', 'currency', 'date']
 
 export const isHopField = (field: LocatorField): boolean =>
   HOP_FIELDS.includes(field)
+
+/** How many words a text rule's filter list may hold — the server's own limit. */
+export const TEXT_TERMS_MAX = 10

@@ -108,7 +108,24 @@ describe('payload tree', () => {
     expect(readSample('{"a": "xxxxxxxx"}', 10)).toMatchObject({
       problem: 'too_large',
     })
-    expect(readSample('{"a": 1}', 100)).toEqual({ ok: true, value: { a: 1 } })
+    expect(readSample('{"a": 1}', 100)).toEqual({
+      ok: true,
+      kind: 'json',
+      value: { a: 1 },
+    })
+  })
+
+  it('reads anything else as a text message, line by line like the server', () => {
+    expect(readSample('[Bank] Paid SAR 10', 100)).toEqual({
+      ok: true,
+      kind: 'text',
+      lines: ['[Bank] Paid SAR 10'],
+    })
+    expect(readSample('Paid\r\nSAR 10\rat X\n', 100)).toEqual({
+      ok: true,
+      kind: 'text',
+      lines: ['Paid', 'SAR 10', 'at X', ''],
+    })
   })
 
   it('lists open nodes and the words of an open string, never the root', () => {
@@ -233,8 +250,8 @@ describe('rule editor state', () => {
   it('tries the open rule’s unsaved edits in place, with its position as the focus', () => {
     const state = run(
       loaded([
-        { id: 'a', name: 'A', match: null, fields: {} },
-        { id: 'b', name: 'B', match: null, fields: {} },
+        { id: 'a', name: 'A', match: null, fields: {}, text: null },
+        { id: 'b', name: 'B', match: null, fields: {}, text: null },
       ]),
       { type: 'open', index: 1 },
       { type: 'rename', name: 'B edited' },
@@ -248,9 +265,9 @@ describe('rule editor state', () => {
   it('reorders the set, which is what decides the firing rule', () => {
     const state = run(
       loaded([
-        { id: 'a', name: 'A', match: null, fields: {} },
-        { id: 'b', name: 'B', match: null, fields: {} },
-        { id: 'c', name: 'C', match: null, fields: {} },
+        { id: 'a', name: 'A', match: null, fields: {}, text: null },
+        { id: 'b', name: 'B', match: null, fields: {}, text: null },
+        { id: 'c', name: 'C', match: null, fields: {}, text: null },
       ]),
       { type: 'move', from: 2, to: 0 },
     )
@@ -265,6 +282,7 @@ describe('what is sent', () => {
     name: '  ',
     match: { path: ' ', op: 'EQUALS', value: '', ignoreCase: true },
     fields,
+    text: null,
   })
 
   it('leaves out fields that point nowhere and an empty condition', () => {
@@ -277,6 +295,7 @@ describe('what is sent', () => {
       name: 'Untitled rule',
       match: null,
       fields: { amount: { path: '$.a' } },
+      text: null,
     })
   })
 

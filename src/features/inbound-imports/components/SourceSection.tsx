@@ -75,6 +75,7 @@ export function SourceSection({ transactionId, origin }: Props) {
             <AddedBy label={loaded.import.sourceLabel} keyId={origin.keyId} />
           ) : null}
           <BodyPreview
+            source={origin.kind === 'webhook' ? 'webhook' : 'inbox'}
             format={
               loaded?.import.bodyFormat ??
               (origin.kind === 'webhook' ? 'json' : 'text')

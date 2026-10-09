@@ -118,10 +118,14 @@ export function KeyEditorDialog({
 
   const footer = ruleView ? (
     <DialogActions
-      hint={`${open.isNew ? 'Done adds it to the list.' : 'Done keeps your edits.'} Save the key to store them.`}
+      hint={
+        rules.openProblem ??
+        `${open.isNew ? 'Done adds it to the list.' : 'Done keeps your edits.'} Save the key to store them.`
+      }
       onCancel={ruleGuard.requestClose}
       submitLabel="Done"
       onSubmit={() => rules.closeRule(true)}
+      disabled={rules.openProblem !== null}
     />
   ) : (
     <div className="flex w-full flex-col gap-2">

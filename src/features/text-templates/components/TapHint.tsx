@@ -1,7 +1,7 @@
 import { Crosshair, Tag } from 'lucide-react'
 import { NoteBox } from '#/components/dialog/NoteBox'
-import type { ExtractField } from '#/features/email-sync/api/types'
-import { LABEL_OFFSET_MAX } from '#/features/email-sync/data/labels'
+import type { ExtractField } from '#/features/text-templates/api/types'
+import { LABEL_OFFSET_MAX } from '#/features/text-templates/data/labels'
 
 type Props = {
   target: ExtractField | null

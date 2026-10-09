@@ -1,7 +1,10 @@
 import { AlertTriangle, Check } from 'lucide-react'
 import { NoteBox } from '#/components/dialog/NoteBox'
 import type { EmailSample, Extraction } from '#/features/email-sync/api/types'
-import { extractionLine, groupScore } from '#/features/email-sync/data/readings'
+import {
+  extractionLine,
+  groupScore,
+} from '#/features/text-templates/data/readings'
 import { cn } from '#/lib/utils'
 
 type Props = {

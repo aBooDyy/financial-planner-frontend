@@ -5,17 +5,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '#/db/db'
 import { aKey } from '#/features/integrations/__fixtures__/keys'
 import type { DryRun, RuleSet } from '#/features/integrations/api/ruleTypes'
+import type { Learned } from '#/features/text-templates/api/types'
 import { ApiError } from '#/lib/apiError'
 import { DRY_RUN_DEBOUNCE_MS } from './useDryRun'
 import { useRuleEditor } from './useRuleEditor'
 
-const api = { list: vi.fn(), replace: vi.fn(), dryRun: vi.fn() }
+const api = {
+  list: vi.fn(),
+  replace: vi.fn(),
+  dryRun: vi.fn(),
+  learn: vi.fn(),
+}
 
 vi.mock('#/features/integrations/api/integrationRulesApi', () => ({
   integrationRulesApi: {
     list: (...a: unknown[]) => api.list(...a),
     replace: (...a: unknown[]) => api.replace(...a),
     dryRun: (...a: unknown[]) => api.dryRun(...a),
+    learn: (...a: unknown[]) => api.learn(...a),
   },
 }))
 
@@ -101,7 +108,9 @@ describe('useRuleEditor', () => {
     const [keyId, payload, rules, focus] = api.dryRun.mock.calls[0]
     expect(keyId).toBe('k1')
     expect(payload).toBe(SAMPLE)
-    expect(rules).toEqual([{ name: 'Bank', match: null, fields: {} }])
+    expect(rules).toEqual([
+      { name: 'Bank', kind: 'JSON', match: null, fields: {} },
+    ])
     expect(focus).toBe(0)
     expect(api.replace).not.toHaveBeenCalled()
   })
@@ -110,7 +119,10 @@ describe('useRuleEditor', () => {
     await db.integrationKeys.put(aKey({ id: 'k1', ruleCount: 0 }))
     api.list.mockResolvedValue(set())
     api.replace.mockResolvedValue(
-      set([{ id: 'r1', name: 'Bank', match: null, fields: {} }], 'v2'),
+      set(
+        [{ id: 'r1', name: 'Bank', match: null, fields: {}, text: null }],
+        'v2',
+      ),
     )
     const { result } = render()
     await waitFor(() => expect(result.current.status).toBe('ready'))
@@ -126,7 +138,7 @@ describe('useRuleEditor', () => {
     })
     expect(saved).toBe(true)
     expect(api.replace).toHaveBeenCalledWith('k1', 'v1', [
-      { id: null, name: 'Bank', match: null, fields: {} },
+      { id: null, name: 'Bank', match: null, fields: {}, text: null },
     ])
     expect(result.current.dirty).toBe(false)
     expect((await db.integrationKeys.get('k1'))?.ruleCount).toBe(1)
@@ -134,7 +146,7 @@ describe('useRuleEditor', () => {
 
   it('reports a refused save beside the rule it is about', async () => {
     api.list.mockResolvedValue(
-      set([{ id: 'r1', name: 'A', match: null, fields: {} }]),
+      set([{ id: 'r1', name: 'A', match: null, fields: {}, text: null }]),
     )
     api.replace.mockRejectedValue(
       new ApiError({
@@ -234,7 +246,9 @@ describe('useRuleEditor', () => {
 
   it('opens the first rule on a staged import’s payload — “Fix the rule”', async () => {
     api.list.mockResolvedValue(
-      set([{ id: 'r1', name: 'Bank SMS', match: null, fields: {} }]),
+      set([
+        { id: 'r1', name: 'Bank SMS', match: null, fields: {}, text: null },
+      ]),
     )
     importDetail.mockResolvedValue({ bodyLines: ['{"text":"SAR 9.00"}'] })
     const { result } = renderHook(() =>
@@ -249,8 +263,8 @@ describe('useRuleEditor', () => {
   it('opens the rule a delivery was handled by, on that delivery’s payload', async () => {
     api.list.mockResolvedValue(
       set([
-        { id: 'r1', name: 'Purchase', match: null, fields: {} },
-        { id: 'r2', name: 'Refund', match: null, fields: {} },
+        { id: 'r1', name: 'Purchase', match: null, fields: {}, text: null },
+        { id: 'r2', name: 'Refund', match: null, fields: {}, text: null },
       ]),
     )
     const { result } = render()
@@ -265,8 +279,8 @@ describe('useRuleEditor', () => {
   it('opens the handling rule by id even after the set was reordered meanwhile', async () => {
     api.list.mockResolvedValue(
       set([
-        { id: 'r1', name: 'Purchase', match: null, fields: {} },
-        { id: 'r2', name: 'Refund', match: null, fields: {} },
+        { id: 'r1', name: 'Purchase', match: null, fields: {}, text: null },
+        { id: 'r2', name: 'Refund', match: null, fields: {}, text: null },
       ]),
     )
     const { result } = render()
@@ -282,7 +296,9 @@ describe('useRuleEditor', () => {
 
   it('starts a new rule from a delivery no rule handled', async () => {
     api.list.mockResolvedValue(
-      set([{ id: 'r1', name: 'Purchase', match: null, fields: {} }]),
+      set([
+        { id: 'r1', name: 'Purchase', match: null, fields: {}, text: null },
+      ]),
     )
     const { result } = render()
     await waitFor(() => expect(result.current.status).toBe('ready'))
@@ -291,5 +307,61 @@ describe('useRuleEditor', () => {
 
     expect(result.current.open).toMatchObject({ index: 1, isNew: true })
     expect(result.current.reading.ok).toBe(true)
+  })
+
+  it('learns a text rule from its taps, and only then lets it be done', async () => {
+    const learned: Learned = {
+      template: {
+        kind: 'anchored_lines',
+        amount: { label: null, numberIndex: null, decimal: 'auto' },
+        currency: { mode: 'from_email', label: null, code: 'SAR' },
+        merchant: null,
+      },
+      reading: {
+        amount: 3850,
+        currency: 'SAR',
+        merchant: null,
+        complete: true,
+        fields: {
+          amount: { status: 'ok', raw: '38.50', line: 0 },
+          currency: { status: 'ok', raw: 'SAR', line: 0 },
+          merchant: { status: 'not_set', raw: null, line: null },
+        },
+      },
+      labels: { amount: null, currency: null, merchant: null },
+    }
+    api.list.mockResolvedValue(set())
+    api.learn.mockResolvedValue(learned)
+    const { result } = render()
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+
+    act(() => {
+      result.current.setSample('Purchase of SAR 38.50 at CARREFOUR')
+      result.current.add()
+    })
+    expect(result.current.open?.draft.text).not.toBeNull()
+    expect(result.current.openProblem).toMatch(/Tap the amount/)
+
+    act(() =>
+      result.current.tap({
+        type: 'pick',
+        pick: { line: 0, start: 16, end: 21 },
+      }),
+    )
+    act(() =>
+      result.current.tap({
+        type: 'pick',
+        pick: { line: 0, start: 12, end: 15 },
+      }),
+    )
+    await waitFor(() => expect(result.current.openProblem).toBeNull())
+    expect(api.learn).toHaveBeenCalledTimes(1)
+    const [keyId, request] = api.learn.mock.calls[0]
+    expect(keyId).toBe('k1')
+    expect(request.sample.bodyLines).toEqual([
+      'Purchase of SAR 38.50 at CARREFOUR',
+    ])
+    expect(result.current.learned?.reading.amount).toBe(3850)
+    expect(result.current.open?.draft.text?.template).toEqual(learned.template)
   })
 })

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { LearnedLabel } from '#/features/email-sync/api/types'
+import type { LearnedLabel } from '#/features/text-templates/api/types'
 import { FieldLabelRow } from './FieldLabelRow'
 import { LabelChip } from './LabelChip'
 

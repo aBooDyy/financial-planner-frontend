@@ -2,7 +2,7 @@ import type {
   ExtractField,
   FieldPicks,
   LearnOptions,
-} from '#/features/email-sync/api/types'
+} from '#/features/text-templates/api/types'
 import { currencyPickNeeded } from './mapping'
 
 export const FIELD_LABEL: Record<ExtractField, string> = {

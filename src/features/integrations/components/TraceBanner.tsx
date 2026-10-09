@@ -17,13 +17,21 @@ type Props = {
   index: number
   ruleNames: string[]
   hasSample: boolean
+  /** A text rule is taken by its words, not a condition, and reads its steps, not fields. */
+  textRule?: boolean
 }
 
 /**
  * Whether this rule is the one that handles the sample, and if not, why: its own condition, or
  * an earlier rule that matches first. Order is the semantics, so this says which rule to move.
  */
-export function TraceBanner({ dryRun, index, ruleNames, hasSample }: Props) {
+export function TraceBanner({
+  dryRun,
+  index,
+  ruleNames,
+  hasSample,
+  textRule = false,
+}: Props) {
   if (!hasSample) return null
   const { result, error, pending } = dryRun
 
@@ -37,6 +45,8 @@ export function TraceBanner({ dryRun, index, ruleNames, hasSample }: Props) {
   } else if (result.matchedIndex === index) {
     tone = 'ok'
     body = `This rule handles the sample. ${OUTCOME_TEXT[result.would]}`
+  } else if (!result.focus.matched && textRule) {
+    body = `This rule doesn’t take the sample${result.focus.detail ? ` — ${result.focus.detail}` : ''}. Step 2 shows what it would read if it did.`
   } else if (!result.focus.matched) {
     body = (
       <>

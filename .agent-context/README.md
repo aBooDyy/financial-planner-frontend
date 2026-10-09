@@ -64,8 +64,12 @@ root product [`.agent-context/`](../../.agent-context/). Keep
 - [integrations.md](integrations.md) — Integrations: webhook keys (server-minted, online-only,
   Dexie read cache), the shown-once secret, key health/expiry, the settings editor, and the
   rule editor: the reducer, tap-to-bind with generated patterns, the payload tree's keyboard
-  contract, the debounced dry run, reorder; the delivery log (refusals, per-field report, build
-  a rule from a delivery) and the throttled-key notice.
+  contract, the debounced dry run, reorder; text rules for plain-text bodies (a bank SMS); the
+  delivery log (refusals, per-field report, build a rule from a delivery) and the throttled-key
+  notice.
+- [text-templates.md](text-templates.md) — the shared tap-to-learn kit (`features/text-templates/`)
+  email rules and integration text rules both use: template types, the tapping sub-reducer,
+  `textLines`, `SampleLines` and the reading components.
 - [import.md](import.md) — Import: the on-device CSV pipeline (worker → mapping → review →
   commit), transfers and balance adjustments found in a file (pairing, lone sides, coupling),
   saved templates, batches and undo, the review grid's virtualisation contract, and what the

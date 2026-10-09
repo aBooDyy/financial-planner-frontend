@@ -171,7 +171,7 @@ export function ReviewEmail({
   onUse,
   defaultOpen,
 }: Props) {
-  const noun = bodyNoun(item.bodyFormat)
+  const noun = bodyNoun(item.bodyFormat, item.source)
   const lines = useMemo(
     () =>
       detail

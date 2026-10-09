@@ -2,7 +2,7 @@ import type {
   ExtractField,
   Extraction,
   FieldReading,
-} from '#/features/email-sync/api/types'
+} from '#/features/text-templates/api/types'
 import { formatMoney } from '#/lib/currency'
 
 export type ReadingTone = 'ok' | 'warn' | 'idle'
@@ -48,7 +48,7 @@ export const moneyText = (extraction: Extraction): string | null =>
     ? formatMoney(extraction.amount, extraction.currency)
     : null
 
-/** A one-line summary for a list of emails: "SAR 38.50 · Jarir" or the first problem. */
+/** A one-line summary for a list of samples: "SAR 38.50 · Jarir" or the first problem. */
 export function extractionLine(extraction: Extraction): string {
   const money = moneyText(extraction)
   if (!money) {
@@ -60,7 +60,7 @@ export function extractionLine(extraction: Extraction): string {
   return extraction.merchant ? `${money} · ${extraction.merchant}` : money
 }
 
-/** "Read 11 of 12 similar emails" — how well the template holds across its group. */
+/** "Read 11 of 12 similar samples" — how well the template holds across its group. */
 export function groupScore(similar: Extraction[]): {
   read: number
   total: number

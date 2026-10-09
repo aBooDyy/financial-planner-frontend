@@ -3,7 +3,11 @@ import type {
   Locator,
   LocatorField,
   MatchCondition,
+  TextFilter,
+  TextRule,
 } from '#/features/integrations/api/ruleTypes'
+import { describeTemplate } from '#/features/text-templates/data/describe'
+import { cleanTerms } from '#/features/text-templates/data/terms'
 import { FIELD_META, FIELD_ORDER, HOP_FIELDS } from './ruleFields'
 import { guessDateFormat, suggestPattern } from './tokens'
 import type { Token } from '#/lib/wordTokens'
@@ -19,12 +23,28 @@ export const toDraft = (rule: IntegrationRule): RuleDraft => ({
   key: rule.id ?? nextKey(),
 })
 
-export const newRule = (count: number): RuleDraft => ({
+/** What a rule reads: a JSON payload through paths, or a text message through a template. */
+export type RuleKind = 'json' | 'text'
+
+export const kindOf = (rule: IntegrationRule): RuleKind =>
+  rule.text ? 'text' : 'json'
+
+export const newTextRule = (): TextRule => ({
+  filter: { textAny: [], excludeAny: [] },
+  template: null,
+  walletId: null,
+  type: 'spend',
+  categoryId: null,
+  defaultMerchant: '',
+})
+
+export const newRule = (count: number, kind: RuleKind = 'json'): RuleDraft => ({
   id: null,
   key: nextKey(),
   name: `Rule ${count + 1}`,
   match: null,
   fields: {},
+  text: kind === 'text' ? newTextRule() : null,
 })
 
 export const isBound = (locator: Locator | undefined): boolean =>
@@ -67,6 +87,24 @@ function captureGroups(pattern: string): number {
  * out rather than sent half-made, and an empty condition means "always".
  */
 export function sendable(rule: RuleDraft): IntegrationRule {
+  const name = rule.name.trim() || 'Untitled rule'
+  if (rule.text) {
+    const { filter, defaultMerchant } = rule.text
+    return {
+      id: rule.id,
+      name,
+      match: null,
+      fields: {},
+      text: {
+        ...rule.text,
+        filter: {
+          textAny: cleanTerms(filter.textAny),
+          excludeAny: cleanTerms(filter.excludeAny),
+        },
+        defaultMerchant: defaultMerchant.trim(),
+      },
+    }
+  }
   const fields: IntegrationRule['fields'] = {}
   for (const field of FIELD_ORDER) {
     const locator = rule.fields[field]
@@ -76,12 +114,7 @@ export function sendable(rule: RuleDraft): IntegrationRule {
   const match = rule.match?.path.trim()
     ? { ...rule.match, path: rule.match.path.trim() }
     : null
-  return {
-    id: rule.id,
-    name: rule.name.trim() || 'Untitled rule',
-    match,
-    fields,
-  }
+  return { id: rule.id, name, match, fields, text: null }
 }
 
 export const sameRules = (a: RuleDraft[], b: RuleDraft[]): boolean =>
@@ -194,7 +227,21 @@ export function describeMatch(
   }
 }
 
+const quoted = (terms: string[]) => terms.map((t) => `“${t}”`).join(' or ')
+
+/** A text rule's filter in words, as its row reads. */
+export function describeTextFilter(filter: TextFilter): string {
+  const parts = [
+    filter.textAny.length
+      ? `Text messages with ${quoted(filter.textAny)}`
+      : 'Any text message',
+  ]
+  if (filter.excludeAny.length) parts.push(`not ${quoted(filter.excludeAny)}`)
+  return parts.join(' · ')
+}
+
 export function describeFields(rule: IntegrationRule): string {
+  if (rule.text) return describeTemplate(rule.text.template)
   const labels = FIELD_ORDER.filter((f) => isBound(rule.fields[f])).map((f) =>
     FIELD_META[f].label.toLowerCase(),
   )

@@ -3,8 +3,8 @@ import type {
   FieldPicks,
   LearnOptions,
   LearnedLabels,
-} from '#/features/email-sync/api/types'
-import { tappableFields } from '#/features/email-sync/data/fields'
+} from '#/features/text-templates/api/types'
+import { tappableFields } from '#/features/text-templates/data/fields'
 import { FieldLabelRow } from './FieldLabelRow'
 
 type Props = {

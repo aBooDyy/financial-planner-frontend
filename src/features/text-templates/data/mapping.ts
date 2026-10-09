@@ -1,19 +1,19 @@
 import { numberTokens } from '#/lib/lineTokens'
 import type {
-  EmailSample,
   ExtractField,
   ExtractionTemplate,
   FieldPick,
   FieldPicks,
   LearnOptions,
   LearnRequest,
-} from '#/features/email-sync/api/types'
+  TextSample,
+} from '#/features/text-templates/api/types'
 
 /** The user's taps on one sample, and the reading options — what a template is learned from. */
-export type Mapping = {
-  sample: EmailSample | null
+export type Mapping<TSample extends TextSample = TextSample> = {
+  sample: TSample | null
   /** The sample's group, read with the learned template to prove it. */
-  similar: EmailSample[]
+  similar: TSample[]
   picks: FieldPicks
   options: LearnOptions
 }
@@ -35,7 +35,9 @@ export const optionsFrom = (
       : { mode: 'from_email', code: null },
 })
 
-export const blankMapping = (template: ExtractionTemplate | null): Mapping => ({
+export const blankMapping = <TSample extends TextSample = TextSample>(
+  template: ExtractionTemplate | null,
+): Mapping<TSample> => ({
   sample: null,
   similar: [],
   picks: NO_PICKS,
@@ -68,11 +70,11 @@ export const firstTarget = (mapping: Mapping): ExtractField | null =>
       ? 'currency'
       : null
 
-export const withPick = (
-  mapping: Mapping,
+export const withPick = <TMapping extends Mapping<TextSample>>(
+  mapping: TMapping,
   field: ExtractField,
   pick: FieldPick | null,
-): Mapping => ({ ...mapping, picks: { ...mapping.picks, [field]: pick } })
+): TMapping => ({ ...mapping, picks: { ...mapping.picks, [field]: pick } })
 
 /** A refined pick on the same line keeps the label the user chose for it; a new line does not. */
 export const keepLabelLine = (
@@ -84,11 +86,11 @@ export const keepLabelLine = (
     : next
 
 /** Sets (or, with undefined, clears) the line the user says labels `field`. */
-export function withLabelLine(
-  mapping: Mapping,
+export function withLabelLine<TMapping extends Mapping<TextSample>>(
+  mapping: TMapping,
   field: ExtractField,
   line: number | undefined,
-): Mapping {
+): TMapping {
   const pick = mapping.picks[field]
   if (!pick) return mapping
   const { labelLine: _previous, ...value } = pick
@@ -100,7 +102,9 @@ export function withLabelLine(
 }
 
 /** The learn call these picks make, or null while one is still missing. */
-export function learnRequestOf(mapping: Mapping): LearnRequest | null {
+export function learnRequestOf<TSample extends TextSample>(
+  mapping: Mapping<TSample>,
+): LearnRequest<TSample> | null {
   const { sample, picks, options } = mapping
   if (!sample || !picks.amount) return null
   if (currencyPickNeeded(options) && !picks.currency) return null
@@ -118,8 +122,9 @@ export function learnRequestOf(mapping: Mapping): LearnRequest | null {
 }
 
 /** Identifies one learn request, so an answer is only ever applied to what it answers. */
-export const signatureOf = (request: LearnRequest | null): string | null =>
-  request ? JSON.stringify(request) : null
+export const signatureOf = (
+  request: LearnRequest<TextSample> | null,
+): string | null => (request ? JSON.stringify(request) : null)
 
 /**
  * A tap on a line, as a pick for `field`. An amount line holding exactly one number pins it

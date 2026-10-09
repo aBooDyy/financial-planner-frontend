@@ -1,9 +1,9 @@
 import type {
   ExtractField,
   LearnedLabel,
-} from '#/features/email-sync/api/types'
-import { FIELD_LABEL } from '#/features/email-sync/data/fields'
-import { LABEL_UNVERIFIED } from '#/features/email-sync/data/labels'
+} from '#/features/text-templates/api/types'
+import { FIELD_LABEL } from '#/features/text-templates/data/fields'
+import { LABEL_UNVERIFIED } from '#/features/text-templates/data/labels'
 import { LabelChip } from './LabelChip'
 
 type Props = {

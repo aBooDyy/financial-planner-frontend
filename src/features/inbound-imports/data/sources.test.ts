@@ -25,5 +25,7 @@ describe('ledgerSourceOf', () => {
   it('names a body by its format', () => {
     expect(bodyNoun('text')).toBe('email')
     expect(bodyNoun('json')).toBe('payload')
+    expect(bodyNoun('text', 'webhook')).toBe('message')
+    expect(bodyNoun('json', 'webhook')).toBe('payload')
   })
 })

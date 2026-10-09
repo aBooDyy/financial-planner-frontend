@@ -6,7 +6,7 @@ import type {
   CurrencyMode,
   DecimalStyle,
   LearnOptions,
-} from '#/features/email-sync/api/types'
+} from '#/features/text-templates/api/types'
 import { readNumber } from '#/lib/lineTokens'
 import type { CurrencyCode } from '#/lib/currency'
 import { useDirectionStore } from '#/stores/direction'
@@ -17,8 +17,10 @@ const DECIMALS: { value: DecimalStyle; label: string }[] = [
   { value: 'comma', label: '1.234,56' },
 ]
 
-const CURRENCY_MODES: { value: CurrencyMode; label: string }[] = [
-  { value: 'from_email', label: 'From the email' },
+const currencyModes = (
+  noun: string,
+): { value: CurrencyMode; label: string }[] => [
+  { value: 'from_email', label: `From the ${noun}` },
   { value: 'fixed', label: 'Always the same' },
 ]
 
@@ -31,11 +33,13 @@ type Props = {
   baseCurrency: CurrencyCode
   onDecimal: (style: DecimalStyle) => void
   onCurrency: (mode: CurrencyMode, code: CurrencyCode | null) => void
+  /** What a sample is called on screen — an email, a message. */
+  noun?: string
 }
 
 /**
  * How the rule reads what it finds: which mark is the decimal point, and whether the currency
- * comes from the email or is always the same. Saying so beats guessing — `1.234` is a thousand
+ * comes from the sample or is always the same. Saying so beats guessing — `1.234` is a thousand
  * in one bank's alerts and one-and-a-bit in another's.
  */
 export function ReadingOptions({
@@ -45,6 +49,7 @@ export function ReadingOptions({
   baseCurrency,
   onDecimal,
   onCurrency,
+  noun = 'email',
 }: Props) {
   const locale = useDirectionStore((s) => s.locale)
   const read =
@@ -90,7 +95,7 @@ export function ReadingOptions({
         <PillSwitch
           label="Currency"
           value={options.currency.mode}
-          options={CURRENCY_MODES}
+          options={currencyModes(noun)}
           onChange={(mode) =>
             onCurrency(
               mode,
@@ -105,7 +110,7 @@ export function ReadingOptions({
             value={options.currency.code ?? baseCurrency}
             onChange={(code) => onCurrency('fixed', code)}
             base={baseCurrency}
-            label="Currency every email from this rule is in"
+            label={`Currency every ${noun} from this rule is in`}
             className="mt-2 w-full"
           />
         ) : (

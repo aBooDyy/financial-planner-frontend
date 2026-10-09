@@ -1,9 +1,17 @@
-import type { BodyFormat } from '#/features/inbound-imports/api/types'
+import type {
+  BodyFormat,
+  InboundSource,
+} from '#/features/inbound-imports/api/types'
 
-const NOUN: Record<BodyFormat, string> = { text: 'email', json: 'payload' }
-
-/** What a stored body is called in copy: an inbox row's email, a webhook row's payload. */
-export const bodyNoun = (format: BodyFormat): string => NOUN[format]
+/**
+ * What a stored body is called in copy: an inbox row's email, a webhook row's payload — or
+ * its message, when what the webhook received was text.
+ */
+export const bodyNoun = (
+  format: BodyFormat,
+  source: InboundSource = 'inbox',
+): string =>
+  format === 'json' ? 'payload' : source === 'webhook' ? 'message' : 'email'
 
 /** Where a ledger entry came from, read off its `source` marker. */
 export type LedgerSource =

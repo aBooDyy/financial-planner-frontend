@@ -2,8 +2,8 @@ import { AlertTriangle, Tag } from 'lucide-react'
 import type {
   ExtractField,
   LearnedLabel,
-} from '#/features/email-sync/api/types'
-import { foundLabel, keywordsText } from '#/features/email-sync/data/labels'
+} from '#/features/text-templates/api/types'
+import { foundLabel, keywordsText } from '#/features/text-templates/data/labels'
 import { cn } from '#/lib/utils'
 
 type Props = {

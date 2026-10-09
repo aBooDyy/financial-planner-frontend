@@ -1,8 +1,16 @@
+import { fromWireTxType, toWireTxType } from '#/features/transactions/api/types'
+import type { TxType, TxTypeWire } from '#/features/transactions/api/types'
+import { toTemplate, toTemplateWire } from '#/features/text-templates/api/types'
+import type {
+  ExtractionTemplate,
+  TemplateWire,
+} from '#/features/text-templates/api/types'
+
 /**
  * The rule schema is server-owned: the backend validates it on every write and evaluates it
- * on every delivery. These types mirror its wire shape, which is already the shape the editor
- * builds field by field, so the only translation here is the match condition's
- * `ignore_case` and the rule set's envelope.
+ * on every delivery. A JSON rule's types mirror its wire shape, which is already the shape the
+ * editor builds field by field; a text rule is translated like an email rule, since it reads
+ * the same kind of template.
  */
 
 export type LocatorField =
@@ -46,12 +54,32 @@ export type MatchCondition = {
   ignoreCase: boolean
 }
 
+/** Which text messages a text rule takes: one of `textAny` (any, when empty), none of `excludeAny`. */
+export type TextFilter = { textAny: string[]; excludeAny: string[] }
+
+/** How a text rule reads a message, and where what it reads goes. */
+export type TextRule = {
+  filter: TextFilter
+  /** Null until one is learned from taps on a sample. */
+  template: ExtractionTemplate | null
+  walletId: string | null
+  type: TxType
+  categoryId: string | null
+  /** Filed as the merchant when a message names none. */
+  defaultMerchant: string
+}
+
+/**
+ * A JSON rule reads a payload through `match` and `fields`; a text rule (`text` set) reads a
+ * text message through its learned template, and leaves those two empty.
+ */
 export type IntegrationRule = {
   /** Null until the server has saved it. */
   id: string | null
   name: string
   match: MatchCondition | null
   fields: Partial<Record<LocatorField, Locator>>
+  text: TextRule | null
 }
 
 export type RuleSet = { version: string; rules: IntegrationRule[] }
@@ -63,6 +91,7 @@ type FieldStatus =
   | 'REGEX_TIMEOUT'
   | 'COERCION_FAILED'
   | 'UNRESOLVED'
+  | 'NOT_FOUND'
 
 export type FieldReport = {
   value: string | number | null
@@ -133,19 +162,44 @@ type MatchWire = {
   ignore_case?: boolean
 }
 
-export type RuleWire = {
-  id?: string
-  name: string
-  match: MatchWire | null
-  fields: Partial<Record<LocatorField, Locator>>
+type TextFilterWire = { text_any: string[]; exclude_any: string[] }
+
+type TextRoutingWire = {
+  wallet_id: string | null
+  type: TxTypeWire
+  category_id: string | null
+  default_merchant: string | null
 }
+
+export type RuleWire =
+  | {
+      id?: string
+      name: string
+      kind: 'JSON'
+      match: MatchWire | null
+      fields: Partial<Record<LocatorField, Locator>>
+    }
+  | ({
+      id?: string
+      name: string
+      kind: 'TEXT'
+      filter: TextFilterWire
+      template: TemplateWire
+    } & TextRoutingWire)
 
 type RuleResponseWire = {
   id: string
   position: number
   name: string
+  kind?: 'JSON' | 'TEXT'
   match: MatchWire | null
   fields: Partial<Record<LocatorField, Locator>>
+  filter?: TextFilterWire | null
+  template?: TemplateWire | null
+  wallet_id?: string | null
+  type?: TxTypeWire | null
+  category_id?: string | null
+  default_merchant?: string | null
 }
 
 export type RuleSetWire = { version: string; rules: RuleResponseWire[] }
@@ -209,6 +263,22 @@ const toMatchWire = (m: MatchCondition): MatchWire =>
     ? { path: m.path, op: m.op }
     : { path: m.path, op: m.op, value: m.value, ignore_case: m.ignoreCase }
 
+const toTextRule = (r: RuleResponseWire): TextRule => ({
+  filter: {
+    textAny: r.filter?.text_any ?? [],
+    excludeAny: r.filter?.exclude_any ?? [],
+  },
+  template: r.template ? toTemplate(r.template) : null,
+  walletId: r.wallet_id ?? null,
+  type: fromWireTxType(r.type ?? 'SPEND'),
+  categoryId: r.category_id ?? null,
+  defaultMerchant: r.default_merchant ?? '',
+})
+
+/** Whether a rule can be sent: a text rule needs the template learned from its taps. */
+export const hasTemplate = (r: IntegrationRule): boolean =>
+  r.text === null || r.text.template !== null
+
 export const toRuleSet = (w: RuleSetWire): RuleSet => ({
   version: w.version,
   rules: [...w.rules]
@@ -218,15 +288,38 @@ export const toRuleSet = (w: RuleSetWire): RuleSet => ({
       name: r.name,
       match: toMatch(r.match),
       fields: r.fields,
+      text: r.kind === 'TEXT' ? toTextRule(r) : null,
     })),
 })
 
-export const toRuleWire = (r: IntegrationRule): RuleWire => ({
-  ...(r.id ? { id: r.id } : {}),
-  name: r.name,
-  match: r.match ? toMatchWire(r.match) : null,
-  fields: r.fields,
-})
+/** A text rule can only be sent once it has a template — see `hasTemplate`. */
+export const toRuleWire = (r: IntegrationRule): RuleWire => {
+  const id = r.id ? { id: r.id } : {}
+  const { text } = r
+  if (!text)
+    return {
+      ...id,
+      name: r.name,
+      kind: 'JSON',
+      match: r.match ? toMatchWire(r.match) : null,
+      fields: r.fields,
+    }
+  if (!text.template) throw new Error('A text rule is sent only once learned')
+  return {
+    ...id,
+    name: r.name,
+    kind: 'TEXT',
+    filter: {
+      text_any: text.filter.textAny,
+      exclude_any: text.filter.excludeAny,
+    },
+    template: toTemplateWire(text.template),
+    wallet_id: text.walletId,
+    type: toWireTxType(text.type),
+    category_id: text.categoryId,
+    default_merchant: text.defaultMerchant.trim() || null,
+  }
+}
 
 export const toExtraction = (w: ExtractionWire): Extraction => {
   const { external_id, ...values } = w.values

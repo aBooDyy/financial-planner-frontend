@@ -149,6 +149,11 @@ function reportLine(
       }
     case 'UNRESOLVED':
       return unresolvedLine(field, report, ctx)
+    case 'NOT_FOUND':
+      return {
+        tone: 'error',
+        lead: 'Couldn’t find it in the message — tap it again on a sample.',
+      }
   }
 }
 

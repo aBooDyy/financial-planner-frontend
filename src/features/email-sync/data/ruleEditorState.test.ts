@@ -5,7 +5,11 @@ import type {
   ExtractionTemplate,
   LearnResult,
 } from '#/features/email-sync/api/types'
-import { learnRequestOf, pickForLine, signatureOf } from './mapping'
+import {
+  learnRequestOf,
+  pickForLine,
+  signatureOf,
+} from '#/features/text-templates/data/mapping'
 import { describeFilter, describeTemplate, sendable } from './ruleDraft'
 import {
   initialRuleEditorState,

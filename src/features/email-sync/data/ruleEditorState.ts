@@ -1,39 +1,32 @@
 import type {
-  CurrencyMode,
-  DecimalStyle,
   EmailRuleDraft,
   EmailRuleSet,
   EmailSample,
-  ExtractField,
-  FieldPick,
   LearnResult,
   RuleFilter,
 } from '#/features/email-sync/api/types'
-import type { CurrencyCode } from '#/lib/currency'
-import { labelCandidates } from './labels'
 import {
-  blankMapping,
-  firstTarget,
-  keepLabelLine,
   learnRequestOf,
-  nextTarget,
   signatureOf,
-  withLabelLine,
-  withPick,
-} from './mapping'
-import type { Mapping } from './mapping'
+} from '#/features/text-templates/data/mapping'
+import {
+  isTappingAction,
+  tappingFor,
+  tappingReducer,
+  withSample,
+} from '#/features/text-templates/data/tapping'
+import type {
+  Tapping,
+  TappingAction,
+} from '#/features/text-templates/data/tapping'
 import { cleanTerms, newRule, sameRules, sendable, toDraft } from './ruleDraft'
 import type { RuleDraft } from './ruleDraft'
 
-export type OpenRule = {
+export type OpenRule = Tapping<EmailSample> & {
   /** Where the rule sits (or will sit, for a new one) in the set. */
   index: number
   draft: RuleDraft
   isNew: boolean
-  mapping: Mapping
-  target: ExtractField | null
-  /** The field whose label the next tap on the sample names, instead of a value. */
-  labelFor: ExtractField | null
   /** The learn request the draft's template answers; null when it came with the rule. */
   learnedFor: string | null
   /**
@@ -78,15 +71,7 @@ export type RuleEditorAction =
   | { type: 'edit'; patch: RuleSettingsPatch }
   | { type: 'editFilter'; patch: Partial<RuleFilter> }
   | { type: 'useSample'; sample: EmailSample; similar: EmailSample[] }
-  | { type: 'target'; target: ExtractField | null }
-  | { type: 'pick'; pick: FieldPick }
-  | { type: 'setPick'; field: ExtractField; pick: FieldPick }
-  | { type: 'clearPick'; field: ExtractField }
-  | { type: 'labelMode'; field: ExtractField | null }
-  | { type: 'pickLabel'; line: number }
-  | { type: 'clearLabel'; field: ExtractField }
-  | { type: 'decimal'; style: DecimalStyle }
-  | { type: 'currency'; mode: CurrencyMode; code: CurrencyCode | null }
+  | TappingAction
   | { type: 'learned'; signature: string; result: LearnResult }
   | { type: 'startFrom'; ruleId: string | null; rulesMax: number }
 
@@ -98,30 +83,20 @@ export const initialRuleEditorState = (): RuleEditorState => ({
   open: null,
 })
 
-const opened = (index: number, draft: RuleDraft, isNew: boolean): OpenRule => {
-  const mapping = blankMapping(draft.template)
-  return {
-    index,
-    draft,
-    isNew,
-    mapping,
-    target: firstTarget(mapping),
-    labelFor: null,
-    learnedFor: null,
-    autoFilter: isNew,
-  }
-}
+const opened = (index: number, draft: RuleDraft, isNew: boolean): OpenRule => ({
+  ...tappingFor<EmailSample>(draft.template),
+  index,
+  draft,
+  isNew,
+  learnedFor: null,
+  autoFilter: isNew,
+})
 
 const withOpen = (
   state: RuleEditorState,
   change: (open: OpenRule) => OpenRule,
 ): RuleEditorState =>
   state.open ? { ...state, open: change(state.open) } : state
-
-const withMapping = (open: OpenRule, mapping: Mapping): OpenRule => ({
-  ...open,
-  mapping,
-})
 
 /** Filter terms as the user left them: trimmed, deduped, senders lower-cased. */
 const mergeFilter = (
@@ -141,6 +116,8 @@ export function ruleEditorReducer(
   state: RuleEditorState,
   action: RuleEditorAction,
 ): RuleEditorState {
+  if (isTappingAction(action))
+    return withOpen(state, (open) => tappingReducer(open, action))
   switch (action.type) {
     case 'loaded': {
       const rules = action.set.rules.map(toDraft)
@@ -215,12 +192,6 @@ export function ruleEditorReducer(
       }))
     case 'useSample':
       return withOpen(state, (open) => {
-        const mapping: Mapping = {
-          ...open.mapping,
-          sample: action.sample,
-          similar: action.similar,
-          picks: { amount: null, currency: null, merchant: null },
-        }
         const sender = action.sample.senderEmail.toLowerCase()
         const draft = open.autoFilter
           ? {
@@ -232,96 +203,7 @@ export function ruleEditorReducer(
                 action.sample.senderEmail,
             }
           : open.draft
-        return {
-          ...open,
-          draft,
-          mapping,
-          target: firstTarget(mapping),
-          labelFor: null,
-        }
-      })
-    case 'target':
-      return withOpen(state, (open) => ({
-        ...open,
-        target: action.target,
-        labelFor: null,
-      }))
-    case 'pick':
-      return withOpen(state, (open) => {
-        if (!open.target || !open.mapping.sample) return open
-        const mapping = withPick(open.mapping, open.target, action.pick)
-        return {
-          ...withMapping(open, mapping),
-          target: nextTarget(mapping, open.target),
-        }
-      })
-    case 'setPick':
-      return withOpen(state, (open) =>
-        withMapping(
-          open,
-          withPick(
-            open.mapping,
-            action.field,
-            keepLabelLine(open.mapping.picks[action.field], action.pick),
-          ),
-        ),
-      )
-    case 'clearPick':
-      return withOpen(state, (open) => ({
-        ...withMapping(open, withPick(open.mapping, action.field, null)),
-        target: action.field,
-        labelFor: open.labelFor === action.field ? null : open.labelFor,
-      }))
-    case 'labelMode':
-      return withOpen(state, (open) =>
-        action.field === null || open.mapping.picks[action.field]
-          ? { ...open, labelFor: action.field }
-          : open,
-      )
-    case 'pickLabel':
-      return withOpen(state, (open) => {
-        const field = open.labelFor
-        const pick = field ? open.mapping.picks[field] : null
-        const lines = open.mapping.sample?.bodyLines
-        if (!field || !pick || !lines) return open
-        if (!labelCandidates(lines, pick, field).has(action.line)) return open
-        return {
-          ...withMapping(open, withLabelLine(open.mapping, field, action.line)),
-          labelFor: null,
-        }
-      })
-    case 'clearLabel':
-      return withOpen(state, (open) => ({
-        ...withMapping(
-          open,
-          withLabelLine(open.mapping, action.field, undefined),
-        ),
-        labelFor: open.labelFor === action.field ? null : open.labelFor,
-      }))
-    case 'decimal':
-      return withOpen(state, (open) =>
-        withMapping(open, {
-          ...open.mapping,
-          options: { ...open.mapping.options, decimal: action.style },
-        }),
-      )
-    case 'currency':
-      return withOpen(state, (open) => {
-        const mapping: Mapping = {
-          ...open.mapping,
-          options: {
-            ...open.mapping.options,
-            currency: { mode: action.mode, code: action.code },
-          },
-        }
-        const fixed = action.mode === 'fixed'
-        const target =
-          fixed && open.target === 'currency'
-            ? firstTarget(mapping)
-            : open.target
-        const labelFor =
-          fixed && open.labelFor === 'currency' ? null : open.labelFor
-        return { ...withMapping(open, mapping), target, labelFor }
+        return withSample({ ...open, draft }, action.sample, action.similar)
       })
     case 'learned':
       return withOpen(state, (open) => {

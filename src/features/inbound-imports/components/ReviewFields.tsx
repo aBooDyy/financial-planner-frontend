@@ -47,7 +47,7 @@ export function ReviewFields({ card, wallets, catalog }: Props) {
   const id = `import-${item.id}`
   const dateFormat = usePreferencesStore((s) => s.dateFormat)
   const groups = useWalletGroups()
-  const tapHint = `Enter it, or tap it in the ${bodyNoun(item.bodyFormat)} below.`
+  const tapHint = `Enter it, or tap it in the ${bodyNoun(item.bodyFormat, item.source)} below.`
   const wallet = wallets.find((w) => w.id === draft.walletId)
   const accountLabel = draft.type === 'income' ? 'Paid into' : 'Paid from'
 

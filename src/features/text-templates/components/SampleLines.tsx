@@ -1,19 +1,23 @@
 import type { ReactNode } from 'react'
 import type {
-  EmailSample,
   ExtractField,
   FieldPick,
   FieldPicks,
   LearnOptions,
-} from '#/features/email-sync/api/types'
-import { FIELD_LABEL, lineMarks } from '#/features/email-sync/data/fields'
-import type { LabelMode } from '#/features/email-sync/data/labels'
-import { currencyPickNeeded } from '#/features/email-sync/data/mapping'
+  TextSample,
+} from '#/features/text-templates/api/types'
+import { FIELD_LABEL, lineMarks } from '#/features/text-templates/data/fields'
+import type { LabelMode } from '#/features/text-templates/data/labels'
+import { currencyPickNeeded } from '#/features/text-templates/data/mapping'
 import { currencyTokens } from '#/lib/lineTokens'
 import { cn } from '#/lib/utils'
 
 type Props = {
-  sample: EmailSample
+  sample: TextSample
+  /** Who sent the sample and what it was about, when it has those — an email does. */
+  heading?: { title: string; subtitle: string } | null
+  /** What a sample is called on screen — an email, a message. */
+  noun?: string
   picks: FieldPicks
   options: LearnOptions
   target: ExtractField | null
@@ -98,6 +102,8 @@ function LineText({ text, spans }: { text: string; spans: Span[] }) {
  */
 export function SampleLines({
   sample,
+  heading = null,
+  noun = 'email',
   picks,
   options,
   target,
@@ -117,16 +123,18 @@ export function SampleLines({
 
   return (
     <div className="overflow-hidden rounded-[14px] border-[1.5px] border-fp-border">
-      <div className="bg-fp-surface-2 px-3 py-[10px] text-[12.5px]">
-        <div className="truncate font-bold">
-          <bdi>{sample.senderName ?? sample.senderEmail}</bdi>
+      {heading ? (
+        <div className="bg-fp-surface-2 px-3 py-[10px] text-[12.5px]">
+          <div className="truncate font-bold">
+            <bdi>{heading.title}</bdi>
+          </div>
+          <div className="truncate text-fp-text-2">
+            <bdi>{heading.subtitle}</bdi>
+          </div>
         </div>
-        <div className="truncate text-fp-text-2">
-          <bdi>{sample.subject || '(no subject)'}</bdi>
-        </div>
-      </div>
+      ) : null}
       <ol
-        aria-label="The sample email, line by line"
+        aria-label={`The sample ${noun}, line by line`}
         className="flex max-h-[52vh] flex-col gap-0.5 overflow-auto p-2"
       >
         {sample.bodyLines.map((line, index) => {
