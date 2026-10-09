@@ -16,10 +16,13 @@ import {
   it,
   vi,
 } from 'vitest'
+import { TooltipProvider } from '#/components/ui/tooltip'
 import { db } from '#/db/db'
+import type { LocalBill } from '#/db/types'
 import { catId } from '#/features/categories/__fixtures__/categories'
 import { bill, goal, m, tx } from '#/features/planned/testing/fixtures'
 import { seedPlanningDb, stubBrowser } from '#/features/planning/testing/dom'
+import { plannedScenario } from '#/features/planning/testing/state'
 import { usePlanningUi } from '#/features/planning/stores/planningUi'
 import { usePlanningToast } from '#/features/planning/stores/toast'
 import { OverviewSection } from './OverviewSection'
@@ -29,6 +32,20 @@ vi.mock('@tanstack/react-router', () => ({ useNavigate: () => navigate }))
 vi.mock('#/db/sync', () => ({ schedulePush: () => undefined }))
 
 beforeAll(stubBrowser)
+
+/** The bills, and the planned rows the planner would have written for them. */
+async function seedBills(bills: LocalBill[]) {
+  await db.bills.bulkPut(bills)
+  const { inputs } = plannedScenario({
+    bills,
+    income: await db.incomeStreams.toArray(),
+    today: '2026-10-02',
+  })
+  await db.plannedTransactions.bulkPut(inputs.planned)
+}
+
+const renderOverview = () =>
+  render(<OverviewSection />, { wrapper: TooltipProvider })
 
 beforeEach(async () => {
   vi.useFakeTimers({ toFake: ['Date'] })
@@ -45,7 +62,7 @@ afterEach(() => {
 
 describe('Overview', () => {
   it('starts an empty plan from the chooser, with nothing else on screen', async () => {
-    render(<OverviewSection />)
+    renderOverview()
     expect(await screen.findByText('Start your plan')).toBeTruthy()
     expect(screen.queryByText('Each paycheck')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Plan something' }))
@@ -55,7 +72,7 @@ describe('Overview', () => {
   it('asks for income when there is none', async () => {
     await db.incomeStreams.clear()
     await db.bills.put(bill({ id: 'rent', nextDue: '2026-11-01' }))
-    render(<OverviewSection />)
+    renderOverview()
     expect(
       await screen.findByText('Add your income to see if you’re covered'),
     ).toBeTruthy()
@@ -72,7 +89,7 @@ describe('Overview', () => {
         walletId: 'main',
       }),
     )
-    render(<OverviewSection />)
+    renderOverview()
     expect(await screen.findByText('You’re covered')).toBeTruthy()
     expect(
       screen.getByText(
@@ -108,7 +125,7 @@ describe('Overview', () => {
       }),
       tx({ categoryId: catId('dining'), amount: m(310), date: '2026-09-30' }),
     ])
-    render(<OverviewSection />)
+    renderOverview()
     const line = await screen.findByRole('button', {
       name: /Last month: Needs 48% · Wants 31% · Savings 21%/,
     })
@@ -129,7 +146,7 @@ describe('Overview', () => {
         mustHave: true,
       }),
     )
-    render(<OverviewSection />)
+    renderOverview()
     expect(
       await screen.findByText(/^Short by SR [\d,]+ a paycheck$/),
     ).toBeTruthy()
@@ -142,5 +159,65 @@ describe('Overview', () => {
     expect(usePlanningToast.getState().toast?.message).toBe(
       'New car moved to Sep 2027',
     )
+  })
+
+  it('opens a timeline bill in a dialog that pays it now', async () => {
+    await seedBills([
+      bill({
+        id: 'phone',
+        name: 'Phone',
+        amount: m(90),
+        nextDue: '2026-10-18',
+      }),
+    ])
+    renderOverview()
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: 'Phone · Sun, Oct 18 · −SR 90',
+      }),
+    )
+    expect(await screen.findByText('Sun, Oct 18 · in 16 days')).toBeTruthy()
+    expect(screen.getByText('Monthly')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Pay now' }))
+    expect(usePlanningUi.getState().sheet).toEqual({
+      kind: 'payNow',
+      billId: 'phone',
+      occurrence: '2026-10-18',
+    })
+  })
+
+  it('lists a busy day from its dot, then shows the one picked', async () => {
+    await seedBills([
+      bill({
+        id: 'phone',
+        name: 'Phone',
+        amount: m(90),
+        nextDue: '2026-10-18',
+      }),
+      bill({
+        id: 'power',
+        name: 'Power',
+        amount: m(400),
+        nextDue: '2026-10-18',
+      }),
+    ])
+    renderOverview()
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: /^Sun, Oct 18 · (Phone, Power|Power, Phone)$/,
+      }),
+    )
+    expect(await screen.findByText('2 things · in 16 days')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /Power.*SR 400/ }))
+    expect(await screen.findByText('Sun, Oct 18 · in 16 days')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'View bill' }))
+    expect(navigate).toHaveBeenCalledWith({
+      to: '/planning/$section',
+      params: { section: 'bills' },
+    })
+    expect(usePlanningUi.getState().detail).toEqual({
+      kind: 'bill',
+      id: 'power',
+    })
   })
 })

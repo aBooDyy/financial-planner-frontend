@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { updateGoal } from '#/features/goals/data/mutations'
 import { billOwner } from '#/features/planned/data/owners'
@@ -14,8 +15,9 @@ import {
   paycheckBar,
   verdictCopy,
 } from '#/features/planning/view/overview'
-import type { VerdictAction } from '#/features/planning/view/overview'
+import type { DayEvent, VerdictAction } from '#/features/planning/view/overview'
 import { DecisionsCard } from './DecisionsCard'
+import { EventDialog } from './EventDialog'
 import { LastMonthLine } from './LastMonthLine'
 import type { DecisionRow } from './DecisionsCard'
 import { Next30Card } from './Next30Card'
@@ -29,6 +31,7 @@ export function OverviewSection() {
   const navigate = useNavigate()
   const openSheet = usePlanningUi((s) => s.openSheet)
   const openDetail = usePlanningUi((s) => s.openDetail)
+  const [opened, setOpened] = useState<ReadonlyArray<DayEvent> | null>(null)
   const show = (section: PlanningSection) =>
     void navigate({ to: '/planning/$section', params: { section } })
   if (planning.loading)
@@ -121,13 +124,30 @@ export function OverviewSection() {
         due={planning.upcoming.due}
         today={planning.today}
         onSeeAll={() => show('upcoming')}
-        onEvent={(e) => {
-          if (e.billId) {
-            show('bills')
-            openDetail(billOwner(e.billId))
-          } else show('income')
-        }}
+        onEvent={setOpened}
       />
+      {opened ? (
+        <EventDialog
+          events={opened}
+          onClose={() => setOpened(null)}
+          onPayNow={(e) => {
+            setOpened(null)
+            if (e.billId)
+              openSheet({
+                kind: 'payNow',
+                billId: e.billId,
+                occurrence: e.occurrence,
+              })
+          }}
+          onView={(e) => {
+            setOpened(null)
+            if (e.billId) {
+              show('bills')
+              openDetail(billOwner(e.billId))
+            } else show('income')
+          }}
+        />
+      ) : null}
       <DecisionsCard rows={decisions} />
     </>
   )

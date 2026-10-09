@@ -402,11 +402,18 @@ Copy and shapes in `view/overview.ts`; the cards only draw them.
   Wants 31% · Savings 21% ›* from `useLastMonthNeedsWants` (the reports slice; calendar month,
   all accounts), opening `/reports?range=last_month`; nothing while last month has no split.
 - `Next30Card` (`next30Events`): bill payments and paydays in the next 30 days from Upcoming's
-  periods; a warn pill "N to confirm" with the names; desktop a 152px axis (dots in the bill's
-  colour, paydays ringed in accent, labels alternating above/below on stems — `placeLabels` on
-  the measured axis width: a label within 104px of the last on its side tries the other side,
-  then hides (dot stays) — ticks Today / +7 / … logical-positioned); mobile a dot
-  strip and a list. A bill's dot opens its detail, a payday the Income section.
+  periods; a warn pill "N to confirm" with the names; desktop a 136px axis — one dot per day
+  (`groupByDay`; several events split the dot as a conic gradient, a payday rings it in accent),
+  painted after the labels so it sits over their stems; each event's label (name + amount, no
+  date — the axis ticks and the tooltip carry it) above/below on a stem — `placeLabels` on the
+  measured axis width: a label within 104px of the last on its side tries the other side, then
+  hides (dot stays) — ticks Today / +7 / … logical-positioned; mobile a dot strip and a list.
+  Hover (`EventTip`): the day, then each event's amount, repeat/income, wallet, auto-pay and
+  cover; a dot's tip goes to the side its labels leave free. Click opens `EventDialog` (local
+  state in `OverviewSection`, not a planning sheet): a label or list row → that event; a dot →
+  its day's events, listed first when there are several (back returns to the list). Bills get
+  **Pay now** (the `payNow` sheet for that occurrence) and **View bill** (Bills + its detail);
+  a payday **View income**.
 - `DecisionsCard` (`decisionNote`): goals get **Push out** (to `pushOutTo`, +6 months, with a
   toast) and **Adjust**; bills **Adjust**.
 

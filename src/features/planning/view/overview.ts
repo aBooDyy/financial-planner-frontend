@@ -10,7 +10,10 @@ import type {
   Verdict,
 } from '#/features/planning/data/paycheck'
 import type { PayCalendar } from '#/features/planning/data/payPeriods'
-import type { UpcomingView } from '#/features/planning/data/upcoming'
+import type {
+  UpcomingRow,
+  UpcomingView,
+} from '#/features/planning/data/upcoming'
 import type { PlanningSection } from '#/features/planning/sections'
 import type { CurrencyCode } from '#/lib/currency'
 import {
@@ -21,6 +24,7 @@ import {
   perPeriod,
   plural,
 } from './format'
+import { repeatLabel } from './repeat'
 
 export type VerdictCopy = {
   tone: 'ok' | 'warn' | 'danger' | 'neutral'
@@ -213,6 +217,8 @@ export function paycheckBar(
   }
 }
 
+export type EventCover = { label: string; tone: 'ok' | 'warn' | 'muted' }
+
 export type DayEvent = {
   key: string
   date: string
@@ -223,9 +229,32 @@ export type DayEvent = {
   color: string
   kind: 'bill' | 'payday'
   billId: string | null
+  incomeId: string | null
+  occurrence: string
+  /** A bill's repeat ("Monthly"), or the income a payday comes from. */
+  sub: string
+  walletName: string | null
+  autopay: boolean
+  /** How much of a bill payment is set aside; null on a payday. */
+  cover: EventCover | null
 }
 
 export const NEXT_DAYS = 30
+
+function coverOf(r: UpcomingRow): EventCover | null {
+  if (!r.coverage) return null
+  switch (r.coverage.state) {
+    case 'covered':
+      return { label: 'Set aside ✓', tone: 'ok' }
+    case 'partial':
+      return {
+        label: `${money(r.coverage.setAside, r.currency)} of ${money(r.remainder, r.currency)} set aside`,
+        tone: 'warn',
+      }
+    case 'not_set_aside':
+      return { label: 'Nothing set aside yet', tone: 'muted' }
+  }
+}
 
 /** Bill payments and paydays in the next 30 days, for Overview's strip. */
 export function next30Events(
@@ -234,12 +263,13 @@ export function next30Events(
   today: string,
 ): DayEvent[] {
   const end = addDaysISO(today, NEXT_DAYS)
-  const color = new Map(bills.map((b) => [b.id, b.color]))
+  const billOf = new Map(bills.map((b) => [b.id, b]))
   return upcoming.periods
     .flatMap((p) => [...p.payments, ...p.income])
     .filter((r) => r.item.date >= today && r.item.date <= end)
     .map((r) => {
       const payday = r.item.role === 'income'
+      const bill = r.item.billId ? billOf.get(r.item.billId) : undefined
       return {
         key: r.id,
         date: r.item.date,
@@ -248,13 +278,40 @@ export function next30Events(
         amount: `${payday ? '+' : '−'}${money(r.remainder, r.currency)}`,
         color: payday
           ? 'var(--fp-accent)'
-          : ((r.item.billId && color.get(r.item.billId)) ?? 'var(--fp-text-3)'),
+          : (bill?.color ?? 'var(--fp-text-3)'),
         kind: payday ? ('payday' as const) : ('bill' as const),
         billId: r.item.billId,
+        incomeId: r.item.incomeStreamId,
+        occurrence: r.item.occurrence,
+        sub: payday ? r.name : bill ? repeatLabel(bill) : 'Bill',
+        walletName: r.walletName,
+        autopay: bill?.autopay ?? false,
+        cover: coverOf(r),
       }
     })
     .sort((a, b) => a.date.localeCompare(b.date) || a.key.localeCompare(b.key))
 }
+
+export type DayGroup = {
+  date: string
+  day: number
+  events: DayEvent[]
+}
+
+/** The events (date-sorted) gathered by day, one timeline dot each. */
+export function groupByDay(events: ReadonlyArray<DayEvent>): DayGroup[] {
+  const groups: DayGroup[] = []
+  for (const e of events) {
+    const last = groups.at(-1)
+    if (last?.date === e.date) last.events.push(e)
+    else groups.push({ date: e.date, day: e.day, events: [e] })
+  }
+  return groups
+}
+
+/** "Today", "Tomorrow", "in 9 days". */
+export const daysAhead = (day: number): string =>
+  day === 0 ? 'Today' : day === 1 ? 'Tomorrow' : `in ${day} days`
 
 export type LabelSide = 'above' | 'below'
 

@@ -3,15 +3,24 @@ import { ChevronRight } from 'lucide-react'
 import { Skeleton } from '#/components/ui/skeleton'
 import { addDaysISO } from '#/features/planned/data/dates'
 import type { UpcomingRow } from '#/features/planning/data/upcoming'
-import { dayMonth } from '#/features/planning/view/format'
+import { dayMonth, weekdayDayMonth } from '#/features/planning/view/format'
 import { useElementWidth } from '#/features/planning/hooks/useElementWidth'
-import { NEXT_DAYS, placeLabels } from '#/features/planning/view/overview'
-import type { DayEvent } from '#/features/planning/view/overview'
+import {
+  NEXT_DAYS,
+  groupByDay,
+  placeLabels,
+} from '#/features/planning/view/overview'
+import type {
+  DayEvent,
+  DayGroup,
+  LabelSide,
+} from '#/features/planning/view/overview'
 import { cn } from '#/lib/utils'
 import {
   CardHeader,
   PlanCard,
 } from '#/features/planning/components/kit/PlanCard'
+import { EventTip } from './EventTip'
 
 /** The least room (px) between two labels on the same side of the axis. */
 const LABEL_GAP_PX = 104
@@ -27,7 +36,8 @@ type Props = {
   due: ReadonlyArray<UpcomingRow>
   today: string
   onSeeAll: () => void
-  onEvent: (event: DayEvent) => void
+  /** The events of one label or one day's dot. */
+  onEvent: (events: ReadonlyArray<DayEvent>) => void
 }
 
 /** Next 30 days (04 §5): bills and paydays on a 30-day axis, and what waits to be confirmed. */
@@ -95,7 +105,7 @@ export function Next30Card({ events, due, today, onSeeAll, onEvent }: Props) {
 const pctOf = (day: number) =>
   (Math.min(NEXT_DAYS, Math.max(0, day)) / NEXT_DAYS) * 100
 
-/** Desktop: dots on an axis, labels alternating above and below on stems. */
+/** Desktop: a dot per day on an axis, each event's label above or below it on a stem. */
 function Timeline({
   events,
   today,
@@ -104,7 +114,7 @@ function Timeline({
 }: {
   events: ReadonlyArray<DayEvent>
   today: string
-  onEvent: (e: DayEvent) => void
+  onEvent: (events: ReadonlyArray<DayEvent>) => void
   /** Placeholder dots and labels stand where the events will be. */
   loading?: boolean
 }) {
@@ -114,59 +124,32 @@ function Timeline({
     events.map((e) => (pctOf(e.day) / 100) * width),
     LABEL_GAP_PX,
   )
-  const placed = events.map((e, i) => ({ e, at: pctOf(e.day), ...sides[i] }))
   return (
-    <div ref={axis} className="relative mx-11 hidden h-[152px] md:block">
+    <div ref={axis} className="relative mx-11 hidden h-[136px] md:block">
       <div className="absolute inset-x-0 top-[61px] h-[2px] rounded-full bg-fp-border-strong" />
       {loading ? <TimelineSkeleton /> : null}
-      {placed.map(({ e, side, at, labelled }) => (
-        <button
-          key={e.key}
-          type="button"
-          onClick={() => onEvent(e)}
-          aria-label={`${e.name} · ${dayMonth(e.date)} · ${e.amount}`}
-          className="group absolute top-[56px] -translate-x-1/2 rtl:translate-x-1/2"
-          style={{ insetInlineStart: `${at}%` }}
-        >
-          <span
-            className={cn(
-              'block size-3 rounded-full ring-2 ring-fp-surface',
-              e.kind === 'payday' &&
-                'outline-2 outline-offset-1 outline-fp-accent',
-            )}
-            style={{ background: e.color }}
+      {events.map((e, i) =>
+        sides[i].labelled ? (
+          <EventLabel
+            key={e.key}
+            event={e}
+            side={sides[i].side}
+            at={pctOf(e.day)}
+            onClick={() => onEvent([e])}
           />
-          {labelled ? (
-            <span
-              className={cn(
-                'absolute start-1/2 flex w-max -translate-x-1/2 flex-col items-center text-center rtl:translate-x-1/2',
-                side === 'above' ? 'bottom-[18px]' : 'top-[18px]',
-              )}
-            >
-              <span
-                aria-hidden
-                className={cn(
-                  'absolute h-[10px] w-px bg-fp-border-strong',
-                  side === 'above' ? '-bottom-[10px]' : '-top-[10px]',
-                )}
-              />
-              <span className="text-[10.5px] text-fp-text-3">
-                {dayMonth(e.date)}
-              </span>
-              <span className="max-w-[110px] truncate text-[12px] font-bold group-hover:underline">
-                {e.name}
-              </span>
-              <span
-                className={cn(
-                  'fp-sensitive text-[11.5px]',
-                  e.kind === 'payday' ? 'text-fp-accent-ink' : 'text-fp-text-2',
-                )}
-              >
-                {e.amount}
-              </span>
-            </span>
-          ) : null}
-        </button>
+        ) : null,
+      )}
+      {groupByDay(events).map((g) => (
+        <DayDot
+          key={g.date}
+          group={g}
+          tipSide={freeSide(
+            events.flatMap((e, i) =>
+              e.date === g.date && sides[i].labelled ? [sides[i].side] : [],
+            ),
+          )}
+          onClick={() => onEvent(g.events)}
+        />
       ))}
       <div className="absolute inset-x-0 bottom-0 h-4">
         {TICKS.map((day) => (
@@ -186,6 +169,104 @@ function Timeline({
   )
 }
 
+/** Where a dot's tooltip goes so it covers none of its day's labels. */
+function freeSide(
+  labelled: ReadonlyArray<LabelSide>,
+): 'top' | 'bottom' | 'right' {
+  if (!labelled.includes('above')) return 'top'
+  if (!labelled.includes('below')) return 'bottom'
+  return 'right'
+}
+
+/** One event's name and amount, on a stem reaching to the axis. */
+function EventLabel({
+  event: e,
+  side,
+  at,
+  onClick,
+}: {
+  event: DayEvent
+  side: LabelSide
+  at: number
+  onClick: () => void
+}) {
+  return (
+    <EventTip events={[e]} side={side === 'above' ? 'top' : 'bottom'}>
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={`${e.name} · ${weekdayDayMonth(e.date)} · ${e.amount}`}
+        className={cn(
+          'group absolute flex w-max -translate-x-1/2 flex-col items-center rounded-[8px] px-[6px] py-[2px] text-center transition-colors hover:bg-fp-surface-2 rtl:translate-x-1/2',
+          side === 'above' ? 'bottom-[92px]' : 'top-[80px]',
+        )}
+        style={{ insetInlineStart: `${at}%` }}
+      >
+        <span
+          aria-hidden
+          className={cn(
+            'absolute start-1/2 h-[18px] w-px bg-fp-border-strong',
+            side === 'above' ? '-bottom-[18px]' : '-top-[18px]',
+          )}
+        />
+        <span className="max-w-[110px] truncate text-[12px] font-bold">
+          {e.name}
+        </span>
+        <span
+          className={cn(
+            'fp-sensitive text-[11.5px] tabular-nums',
+            e.kind === 'payday' ? 'text-fp-accent-ink' : 'text-fp-text-2',
+          )}
+        >
+          {e.amount}
+        </span>
+      </button>
+    </EventTip>
+  )
+}
+
+/** A day's dot on the axis, split between its events' colours when it has several. */
+function DayDot({
+  group,
+  tipSide,
+  onClick,
+}: {
+  group: DayGroup
+  tipSide: 'top' | 'bottom' | 'right'
+  onClick: () => void
+}) {
+  const { events } = group
+  const fill =
+    events.length === 1
+      ? events[0].color
+      : `conic-gradient(${events
+          .map(
+            (e, i) =>
+              `${e.color} ${(i / events.length) * 100}% ${((i + 1) / events.length) * 100}%`,
+          )
+          .join(', ')})`
+  return (
+    <EventTip events={events} side={tipSide}>
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={`${weekdayDayMonth(group.date)} · ${events.map((e) => e.name).join(', ')}`}
+        className="group absolute top-[50px] z-[1] flex size-6 -translate-x-1/2 items-center justify-center rounded-full rtl:translate-x-1/2"
+        style={{ insetInlineStart: `${pctOf(group.day)}%` }}
+      >
+        <span
+          className={cn(
+            'block size-3 rounded-full ring-2 ring-fp-surface transition-transform group-hover:scale-125',
+            events.some((e) => e.kind === 'payday') &&
+              'outline-2 outline-offset-1 outline-fp-accent',
+          )}
+          style={{ background: fill }}
+        />
+      </button>
+    </EventTip>
+  )
+}
+
 /** The axis's events while the plan loads: dots, with labels alternating above and below. */
 function TimelineSkeleton() {
   return (
@@ -200,10 +281,9 @@ function TimelineSkeleton() {
           <span
             className={cn(
               'absolute start-1/2 flex -translate-x-1/2 flex-col items-center gap-[5px] rtl:translate-x-1/2',
-              i % 2 === 0 ? 'bottom-[22px]' : 'top-[22px]',
+              i % 2 === 0 ? 'bottom-[24px]' : 'top-[24px]',
             )}
           >
-            <Skeleton className="h-2.5 w-10" />
             <Skeleton className="h-3 w-16" />
             <Skeleton className="h-2.5 w-12" />
           </span>
@@ -241,7 +321,7 @@ function MobileList({
   onEvent,
 }: {
   events: ReadonlyArray<DayEvent>
-  onEvent: (e: DayEvent) => void
+  onEvent: (events: ReadonlyArray<DayEvent>) => void
 }) {
   return (
     <div className="flex flex-col gap-2 md:hidden">
@@ -264,7 +344,7 @@ function MobileList({
           <li key={e.key}>
             <button
               type="button"
-              onClick={() => onEvent(e)}
+              onClick={() => onEvent([e])}
               className="flex w-full items-center gap-[10px] py-[7px] text-start text-[13px]"
             >
               <span className="w-[44px] flex-none text-[12px] font-bold text-fp-text-3">

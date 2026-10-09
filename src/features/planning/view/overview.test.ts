@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { placeLabels } from './overview'
+import { groupByDay, placeLabels } from './overview'
+import type { DayEvent } from './overview'
 
 describe('placeLabels', () => {
   it('alternates sides while labels have room', () => {
@@ -19,5 +20,22 @@ describe('placeLabels', () => {
 
   it('hides a label when both sides are crowded', () => {
     expect(placeLabels([0, 50, 100], 104)[2].labelled).toBe(false)
+  })
+})
+
+describe('groupByDay', () => {
+  const at = (key: string, date: string, day: number) =>
+    ({ key, date, day }) as DayEvent
+
+  it('gathers same-day events under one dot, in order', () => {
+    const groups = groupByDay([
+      at('a', '2026-10-18', 9),
+      at('b', '2026-10-18', 9),
+      at('c', '2026-10-25', 16),
+    ])
+    expect(groups.map((g) => [g.date, g.events.map((e) => e.key)])).toEqual([
+      ['2026-10-18', ['a', 'b']],
+      ['2026-10-25', ['c']],
+    ])
   })
 })

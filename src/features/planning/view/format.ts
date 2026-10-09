@@ -19,6 +19,14 @@ export const signedMoney = (minor: number, currency: CurrencyCode): string =>
 export const dayMonth = (iso: string): string =>
   dateOf(iso).toLocaleString('en-US', { month: 'short', day: 'numeric' })
 
+/** "Sat, Oct 18". */
+export const weekdayDayMonth = (iso: string): string =>
+  dateOf(iso).toLocaleString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  })
+
 /** "Mar 15", or "Mar 15, 2028" once it is about a year or more away. */
 export const dueDay = (iso: string, today: string): string =>
   daysBetween(today, iso) < 330 ? dayMonth(iso) : fullDate(iso)
