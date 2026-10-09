@@ -67,6 +67,7 @@ export function BillDetail({
   const closed = bill.closedAt !== null
   const saveUp = status.cycle === 'save_up'
   const paidFrom = bill.walletId ? walletName(bill.walletId) : null
+  const saveWalletId = bill.saveWalletId ?? bill.walletId
 
   const buttons: DetailAction[] = closed
     ? [
@@ -140,7 +141,7 @@ export function BillDetail({
         text={billPlanText(
           bill,
           status,
-          walletName(bill.saveWalletId ?? bill.walletId),
+          saveWalletId ? walletName(saveWalletId) : null,
           planning.calendar,
           planning.today,
         )}

@@ -21,7 +21,7 @@ export function billPlanText(
   if (!s.occurrence) return 'Paid. Nothing is left to set aside.'
   const c = bill.currency
   const due = dueDay(s.occurrence, today)
-  const where = walletName ? ` in ${walletName}` : ''
+  const where = ` in ${walletName ?? 'any wallet'}`
   if (s.state === 'not_set_aside')
     return `Due ${due}, before your next payday — it comes out of what is free now.`
   if (s.cycle === 'save_up')
