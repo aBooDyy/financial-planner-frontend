@@ -17,8 +17,10 @@ import {
   learnRequestOf,
   signatureOf,
 } from '#/features/text-templates/data/mapping'
+import { messageFields } from './messageFields'
 import { describeTextFilter, sendable } from './ruleDraft'
 import {
+  guessTextPath,
   initialRuleEditorState,
   ruleEditorReducer,
   templateCurrent,
@@ -29,6 +31,10 @@ import type { RuleEditorAction, RuleEditorState } from './ruleEditorState'
 import { ruleProblems } from './ruleErrors'
 
 const SMS = 'Purchase of SAR 38.50\nat CARREFOUR\nCard **1123'
+const WRAPPED = JSON.stringify({
+  sender: 'MyBank',
+  data: { message: SMS, sent: '2026-10-10' },
+})
 
 const TEMPLATE: ExtractionTemplate = {
   kind: 'anchored_lines',
@@ -43,6 +49,7 @@ const TEXT_RULE: IntegrationRule = {
   match: null,
   fields: {},
   text: {
+    textPath: null,
     filter: { textAny: ['purchase'], excludeAny: ['otp'] },
     template: TEMPLATE,
     walletId: 'w1',
@@ -125,6 +132,7 @@ describe('text rules on the wire', () => {
       id: 't1',
       name: 'Bank SMS',
       kind: 'TEXT',
+      text_path: null,
       filter: { text_any: ['purchase'], exclude_any: ['otp'] },
       template: {
         kind: 'anchored_lines',
@@ -173,6 +181,121 @@ describe('text rules on the wire', () => {
         excludeAny: ['otp'],
       }),
     ).toBe('Text messages with “purchase” or “شراء” · not “otp”')
+    expect(
+      describeTextFilter({ textAny: ['purchase'], excludeAny: [] }, '$.body'),
+    ).toBe('Messages in $.body with “purchase”')
+    expect(describeTextFilter({ textAny: [], excludeAny: [] }, '$.body')).toBe(
+      'Any message in $.body',
+    )
+  })
+
+  it('carries where a JSON payload holds the message', () => {
+    const [rule] = toRuleSet({
+      version: 'v1',
+      rules: [
+        {
+          id: 't1',
+          position: 0,
+          name: 'Wrapped SMS',
+          kind: 'TEXT',
+          match: null,
+          fields: {},
+          text_path: '$.data.message',
+          filter: { text_any: [], exclude_any: [] },
+          template: null,
+        },
+      ],
+    }).rules
+    expect(rule.text?.textPath).toBe('$.data.message')
+    expect(
+      toRuleWire({ ...rule, text: { ...rule.text!, template: TEMPLATE } }),
+    ).toMatchObject({ text_path: '$.data.message' })
+  })
+})
+
+describe('a message inside a JSON payload', () => {
+  it('lists the payload’s strings, the likeliest message first', () => {
+    expect(messageFields(JSON.parse(WRAPPED))).toEqual([
+      { path: '$.data.message', text: SMS },
+      { path: '$.data.sent', text: '2026-10-10' },
+      { path: '$.sender', text: 'MyBank' },
+    ])
+    expect(guessTextPath(WRAPPED)).toBe('$.data.message')
+    expect(guessTextPath(SMS)).toBeNull()
+  })
+
+  it('taps the text at the rule’s path, and only in JSON', () => {
+    expect(textSampleOf(WRAPPED, '$.data.message')?.bodyLines).toEqual([
+      'Purchase of SAR 38.50',
+      'at CARREFOUR',
+      'Card **1123',
+    ])
+    expect(textSampleOf(WRAPPED, '$.missing')).toBeNull()
+    expect(textSampleOf(WRAPPED, '$.data')).toBeNull()
+    expect(textSampleOf(SMS, '$.data.message')).toBeNull()
+  })
+
+  it('points a new text rule at the likeliest field of a JSON sample', () => {
+    const state = run(
+      loaded([], WRAPPED),
+      { type: 'add' },
+      { type: 'kind', kind: 'text' },
+    )
+    expect(state.open?.draft.text?.textPath).toBe('$.data.message')
+    expect(state.open?.tapping?.mapping.sample?.bodyLines).toHaveLength(3)
+  })
+
+  it('re-reads the taps when the field changes', () => {
+    const state = run(
+      loaded([], WRAPPED),
+      { type: 'add', kind: 'text' },
+      tap({ type: 'pick', pick: { line: 0, start: 16, end: 21 } }),
+      { type: 'textPath', path: '$.sender' },
+    )
+    expect(state.open?.draft.text?.textPath).toBe('$.sender')
+    expect(state.open?.tapping?.mapping.picks.amount).toBeNull()
+    expect(state.open?.tapping?.mapping.sample?.bodyLines).toEqual(['MyBank'])
+  })
+
+  it('follows a new rule’s sample to its message, but not a saved rule’s', () => {
+    const fresh = run(
+      loaded([], SMS),
+      { type: 'add' },
+      {
+        type: 'sample',
+        text: WRAPPED,
+      },
+    )
+    expect(fresh.open?.draft.text?.textPath).toBe('$.data.message')
+    const back = run(fresh, { type: 'sample', text: SMS })
+    expect(back.open?.draft.text?.textPath).toBeNull()
+
+    const saved = run(
+      loaded([
+        { ...TEXT_RULE, text: { ...TEXT_RULE.text!, textPath: '$.body' } },
+      ]),
+      { type: 'open', index: 0 },
+      { type: 'sample', text: WRAPPED },
+    )
+    expect(saved.open?.draft.text?.textPath).toBe('$.body')
+    expect(saved.open?.tapping?.mapping.sample).toBeNull()
+  })
+
+  it('puts a refused path beside its control', () => {
+    const problems = ruleProblems(
+      new ApiError({
+        status: 422,
+        code: 'integrations.rule.path_invalid',
+        message: 'x',
+        details: [
+          {
+            field: 'rules[0].text_path',
+            code: 'integrations.rule.path_invalid',
+          },
+        ],
+      }),
+    )
+    expect(problems.byRule.get(0)?.textPath).toBeTruthy()
   })
 })
 

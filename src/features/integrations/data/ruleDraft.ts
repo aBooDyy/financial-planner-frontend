@@ -29,7 +29,8 @@ export type RuleKind = 'json' | 'text'
 export const kindOf = (rule: IntegrationRule): RuleKind =>
   rule.text ? 'text' : 'json'
 
-export const newTextRule = (): TextRule => ({
+export const newTextRule = (textPath: string | null = null): TextRule => ({
+  textPath,
   filter: { textAny: [], excludeAny: [] },
   template: null,
   walletId: null,
@@ -230,11 +231,17 @@ export function describeMatch(
 const quoted = (terms: string[]) => terms.map((t) => `“${t}”`).join(' or ')
 
 /** A text rule's filter in words, as its row reads. */
-export function describeTextFilter(filter: TextFilter): string {
+export function describeTextFilter(
+  filter: TextFilter,
+  textPath: string | null = null,
+): string {
+  const messages = textPath ? `Messages in ${textPath}` : 'Text messages'
   const parts = [
     filter.textAny.length
-      ? `Text messages with ${quoted(filter.textAny)}`
-      : 'Any text message',
+      ? `${messages} with ${quoted(filter.textAny)}`
+      : textPath
+        ? `Any message in ${textPath}`
+        : 'Any text message',
   ]
   if (filter.excludeAny.length) parts.push(`not ${quoted(filter.excludeAny)}`)
   return parts.join(' · ')

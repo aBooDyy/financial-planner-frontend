@@ -7,6 +7,7 @@ export type RuleProblem = {
   match?: string
   fields: Partial<Record<LocatorField, string>>
   /** A text rule's parts. */
+  textPath?: string
   filter?: string
   template?: string
   walletId?: string
@@ -17,6 +18,7 @@ export type RuleProblem = {
 }
 
 type TextPart =
+  | 'textPath'
   | 'filter'
   | 'template'
   | 'walletId'
@@ -24,6 +26,7 @@ type TextPart =
   | 'defaultMerchant'
 
 const TEXT_PART: Record<string, TextPart | undefined> = {
+  text_path: 'textPath',
   filter: 'filter',
   template: 'template',
   wallet_id: 'walletId',

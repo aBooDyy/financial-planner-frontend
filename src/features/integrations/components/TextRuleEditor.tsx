@@ -48,6 +48,8 @@ export function TextRuleEditor({
         <TextSampleStep
           model={model}
           tapping={tapping}
+          textPath={text.textPath}
+          pathError={problem?.textPath}
           online={online}
           maxBytes={maxBytes}
         />

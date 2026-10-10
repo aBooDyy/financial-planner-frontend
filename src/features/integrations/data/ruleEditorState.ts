@@ -8,11 +8,7 @@ import type {
   TextFilter,
   TextRule,
 } from '#/features/integrations/api/ruleTypes'
-import type {
-  ExtractionTemplate,
-  Learned,
-  TextSample,
-} from '#/features/text-templates/api/types'
+import type { Learned, TextSample } from '#/features/text-templates/api/types'
 import {
   learnRequestOf,
   signatureOf,
@@ -27,6 +23,8 @@ import type {
   TappingAction,
 } from '#/features/text-templates/data/tapping'
 import { cleanTerms } from '#/features/text-templates/data/terms'
+import { textLines } from '#/features/text-templates/data/textLines'
+import { messageAt, messageFields } from './messageFields'
 import { readSample } from './payloadTree'
 import {
   bindLocator,
@@ -92,6 +90,7 @@ export type RuleEditorAction =
   | { type: 'fixReference' }
   | { type: 'editText'; patch: TextRulePatch }
   | { type: 'textFilter'; patch: Partial<TextFilter> }
+  | { type: 'textPath'; path: string | null }
   | { type: 'tap'; action: TappingAction }
   | { type: 'learned'; signature: string; result: Learned }
   | { type: 'sample'; text: string }
@@ -108,21 +107,42 @@ export const initialRuleEditorState = (sample = ''): RuleEditorState => ({
   sample,
 })
 
-/** The sample as a text rule taps it, or null when it is empty or a JSON payload. */
-export function textSampleOf(sample: string): TextSample | null {
+/**
+ * The message a text rule taps in the sample: the whole of a text sample when the rule has no
+ * path, the text at its path in a JSON one — else null.
+ */
+export function textSampleOf(
+  sample: string,
+  textPath: string | null = null,
+): TextSample | null {
   const reading = readSample(sample, Number.POSITIVE_INFINITY)
-  return reading.ok && reading.kind === 'text'
-    ? { bodyLines: reading.lines }
+  if (!reading.ok) return null
+  if (textPath === null)
+    return reading.kind === 'text' ? { bodyLines: reading.lines } : null
+  if (reading.kind !== 'json') return null
+  const text = messageAt(reading.value, textPath)
+  return text === null ? null : { bodyLines: textLines(text) }
+}
+
+/** Where a new text rule looks for its message: the likeliest string of a JSON sample. */
+export function guessTextPath(sample: string): string | null {
+  const reading = readSample(sample, Number.POSITIVE_INFINITY)
+  return reading.ok && reading.kind === 'json'
+    ? (messageFields(reading.value)[0]?.path ?? null)
     : null
 }
 
-function tappingOn(
-  template: ExtractionTemplate | null,
-  sample: string,
-): Tapping {
-  const tapping = tappingFor<TextSample>(template)
-  const text = textSampleOf(sample)
-  return text ? withSample(tapping, text, []) : tapping
+function tappingOn(text: TextRule, sample: string): Tapping {
+  const tapping = tappingFor<TextSample>(text.template)
+  const message = textSampleOf(sample, text.textPath)
+  return message ? withSample(tapping, message, []) : tapping
+}
+
+const newDraft = (count: number, kind: RuleKind, sample: string): RuleDraft => {
+  const draft = newRule(count, kind)
+  return draft.text
+    ? { ...draft, text: newTextRule(guessTextPath(sample)) }
+    : draft
 }
 
 const opened = (
@@ -135,7 +155,7 @@ const opened = (
   draft,
   base: draft,
   isNew,
-  tapping: draft.text ? tappingOn(draft.text.template, sample) : null,
+  tapping: draft.text ? tappingOn(draft.text, sample) : null,
   learnedFor: null,
 })
 
@@ -183,7 +203,7 @@ export function ruleEditorReducer(
       return { ...state, status: 'failed' }
     case 'add': {
       const kind = action.kind ?? (textSampleOf(state.sample) ? 'text' : 'json')
-      const draft = newRule(state.rules.length, kind)
+      const draft = newDraft(state.rules.length, kind, state.sample)
       return {
         ...state,
         open: opened(state.rules.length, draft, true, state.sample),
@@ -239,7 +259,10 @@ export function ruleEditorReducer(
         ...open.draft,
         match: null,
         fields: {},
-        text: action.kind === 'text' ? newTextRule() : null,
+        text:
+          action.kind === 'text'
+            ? newTextRule(guessTextPath(state.sample))
+            : null,
       }
       return {
         ...state,
@@ -307,6 +330,20 @@ export function ruleEditorReducer(
           },
         }
       })
+    case 'textPath': {
+      const { open } = state
+      if (!open?.draft.text) return state
+      const text = { ...open.draft.text, textPath: action.path }
+      return {
+        ...state,
+        open: {
+          ...open,
+          draft: { ...open.draft, text },
+          tapping: tappingOn(text, state.sample),
+          learnedFor: null,
+        },
+      }
+    }
     case 'tap': {
       const { open } = state
       if (!open?.tapping) return state
@@ -338,11 +375,17 @@ export function ruleEditorReducer(
       const { open } = state
       const next = { ...state, sample: action.text }
       if (!open?.draft.text) return next
+      // A new rule follows its sample to the message; a saved one keeps where it reads.
+      const text =
+        open.isNew && !textSampleOf(action.text, open.draft.text.textPath)
+          ? { ...open.draft.text, textPath: guessTextPath(action.text) }
+          : open.draft.text
       return {
         ...next,
         open: {
           ...open,
-          tapping: tappingOn(open.draft.text.template, action.text),
+          draft: { ...open.draft, text },
+          tapping: tappingOn(text, action.text),
           learnedFor: null,
         },
       }

@@ -109,7 +109,7 @@ export function RuleListItem({
         </div>
         <span className="mt-[3px] text-[12.5px] text-fp-text-2">
           {rule.text ? (
-            describeTextFilter(rule.text.filter)
+            describeTextFilter(rule.text.filter, rule.text.textPath)
           ) : match ? (
             <>
               When{' '}

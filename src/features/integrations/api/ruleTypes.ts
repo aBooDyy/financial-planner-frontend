@@ -57,8 +57,10 @@ export type MatchCondition = {
 /** Which text messages a text rule takes: one of `textAny` (any, when empty), none of `excludeAny`. */
 export type TextFilter = { textAny: string[]; excludeAny: string[] }
 
-/** How a text rule reads a message, and where what it reads goes. */
+/** Where a text rule's message is, how it reads it, and where what it reads goes. */
 export type TextRule = {
+  /** The string in a JSON payload that holds the message; null for a plain-text body. */
+  textPath: string | null
   filter: TextFilter
   /** Null until one is learned from taps on a sample. */
   template: ExtractionTemplate | null
@@ -183,6 +185,7 @@ export type RuleWire =
       id?: string
       name: string
       kind: 'TEXT'
+      text_path: string | null
       filter: TextFilterWire
       template: TemplateWire
     } & TextRoutingWire)
@@ -194,6 +197,7 @@ type RuleResponseWire = {
   kind?: 'JSON' | 'TEXT'
   match: MatchWire | null
   fields: Partial<Record<LocatorField, Locator>>
+  text_path?: string | null
   filter?: TextFilterWire | null
   template?: TemplateWire | null
   wallet_id?: string | null
@@ -264,6 +268,7 @@ const toMatchWire = (m: MatchCondition): MatchWire =>
     : { path: m.path, op: m.op, value: m.value, ignore_case: m.ignoreCase }
 
 const toTextRule = (r: RuleResponseWire): TextRule => ({
+  textPath: r.text_path ?? null,
   filter: {
     textAny: r.filter?.text_any ?? [],
     excludeAny: r.filter?.exclude_any ?? [],
@@ -309,6 +314,7 @@ export const toRuleWire = (r: IntegrationRule): RuleWire => {
     ...id,
     name: r.name,
     kind: 'TEXT',
+    text_path: text.textPath,
     filter: {
       text_any: text.filter.textAny,
       exclude_any: text.filter.excludeAny,

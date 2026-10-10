@@ -101,6 +101,8 @@ export type RuleEditorModel = {
   setKind: (kind: RuleKind) => void
   editText: (patch: TextRulePatch) => void
   editTextFilter: (patch: Partial<TextFilter>) => void
+  /** Where in a JSON payload the open text rule finds its message; null for a text body. */
+  setTextPath: (path: string | null) => void
   tap: (action: TappingAction) => void
   setMatch: (match: MatchCondition | null) => void
   setLocator: (field: LocatorField, locator: Locator | null) => void
@@ -244,7 +246,7 @@ export function useRuleEditor({
   const openDirty =
     state.open !== null && !sameRules([state.open.draft], [state.open.base])
   const openProblem = state.open
-    ? textRuleProblem(state.open, learning.pending)
+    ? textRuleProblem(state.open, learning.pending, reading)
     : null
   const ruleCount = state.rules.length + (state.open?.isNew ? 1 : 0)
 
@@ -337,6 +339,7 @@ export function useRuleEditor({
     setKind: (kind) => dispatch({ type: 'kind', kind }),
     editText: (patch) => dispatch({ type: 'editText', patch }),
     editTextFilter: (patch) => dispatch({ type: 'textFilter', patch }),
+    setTextPath: (path) => dispatch({ type: 'textPath', path }),
     tap: (action) => dispatch({ type: 'tap', action }),
     setMatch: (match) => dispatch({ type: 'setMatch', match }),
     setLocator: (field, locator) =>
@@ -355,10 +358,16 @@ export function useRuleEditor({
 }
 
 /** What a text rule still needs before Done: something learned from its sample. */
-function textRuleProblem(open: OpenRule, learning: boolean): string | null {
+function textRuleProblem(
+  open: OpenRule,
+  learning: boolean,
+  reading: SampleReading,
+): string | null {
   if (templateCurrent(open)) return null
   if (learning) return 'Reading your sample…'
-  return open.tapping?.mapping.sample
-    ? 'Tap the amount and currency on the sample.'
+  if (open.tapping?.mapping.sample)
+    return 'Tap the amount and currency on the sample.'
+  return reading.ok && reading.kind === 'json'
+    ? 'Pick the field that holds the message, then tap the amount and currency.'
     : 'Paste a sample message, then tap the amount and currency.'
 }

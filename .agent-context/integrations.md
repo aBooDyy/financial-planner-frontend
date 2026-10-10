@@ -233,7 +233,15 @@ One set mixes both kinds; a payload is read only by rules of its kind.
   `textLines`), else a problem. Everything that took a JSON object — the dry run, _Use last
   received_, _Build a rule from this_ (`readsAsPayload`; a cut text excerpt falls through to
   the import's full body), the Fix-the-rule deep link — takes text too.
-- **The model.** `IntegrationRule.text: TextRule | null` — `{filter: {textAny, excludeAny},
+- **The message.** A text rule reads the whole body of a text delivery, or — `textPath` set —
+  one string field of a JSON one (a sender that wraps the SMS in `{"message": …}`).
+  `textSampleOf(sample, textPath)` gives the lines a rule taps: the text sample when the path
+  is null, the string at the path of a JSON sample (`messageAt`, then `textLines`) otherwise.
+  `messageFields` lists a JSON sample's non-blank strings, one holding a digit first, then the
+  longest; `guessTextPath` takes the first. `MessageFieldSelect` (_Read the message from_: _The
+  whole body_ or a field, with a preview) shows in step 1 whenever the sample is JSON or the
+  rule has a path. Paths are matched as `childPath` writes them.
+- **The model.** `IntegrationRule.text: TextRule | null` — `{textPath, filter: {textAny, excludeAny},
   template | null, walletId, type, categoryId, defaultMerchant}`; a JSON rule has `text: null`,
   a text rule an empty `match`/`fields`. Wire `kind: 'JSON' | 'TEXT'` (`toRuleWire` refuses a
   text rule with no template — `hasTemplate`). `newRule(count, kind)`; `sendable` cleans the
@@ -241,7 +249,10 @@ One set mixes both kinds; a payload is read only by rules of its kind.
 - **The reducer.** `add` without a kind makes a text rule when the sample is a message
   (`textSampleOf`), a JSON rule otherwise; `kind` switches a **new** rule. An open text rule
   holds a `tapping` ([text-templates.md](text-templates.md)) on the sample's lines, reset by
-  every `sample` change; `{type: 'tap', action}` forwards to `tappingReducer`; `learned`
+  every `sample` change and every `textPath` change; switching a new rule to text, or adding
+  one explicitly as text, points it at `guessTextPath(sample)`; a `sample` change re-guesses the
+  path of a **new** rule whose path no longer finds a message (a saved rule keeps its path);
+  `{type: 'tap', action}` forwards to `tappingReducer`; `learned`
   lands only on the taps it answers (signature); `editText` (a type change clears the
   category) and `textFilter`. `templateCurrent`: until something is tapped a rule keeps its
   template; after, only one learned from those taps. `workingSet` leaves out a new text rule
@@ -261,7 +272,7 @@ One set mixes both kinds; a payload is read only by rules of its kind.
   to the key's defaults; auto-confirm stays the key's).
 - **Elsewhere.** `RuleListItem` describes a text rule by `describeTextFilter` and
   `describeTemplate`; `ruleProblems` puts `rules[i].filter…`, `.template…`, `.wallet_id`,
-  `.category_id`, `.default_merchant` beside their controls; `statusLine` says `NOT_FOUND`
+  `.category_id`, `.default_merchant`, `.text_path` beside their controls; `statusLine` says `NOT_FOUND`
   ("Couldn’t find it in the message"); the queue calls a webhook's text body a **message**
   (`bodyNoun(format, source)`).
 

@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { History } from 'lucide-react'
 import { Button } from '#/components/ui/button'
 import { Textarea } from '#/components/ui/textarea'
+import { messageFields } from '#/features/integrations/data/messageFields'
 import type { SampleReading } from '#/features/integrations/data/payloadTree'
 import type { RuleEditorModel } from '#/features/integrations/hooks/useRuleEditor'
 import { EditorSection } from '#/features/text-templates/components/EditorSection'
@@ -15,28 +16,41 @@ import {
 } from '#/features/text-templates/data/labels'
 import { pickForLine } from '#/features/text-templates/data/mapping'
 import type { Tapping } from '#/features/text-templates/data/tapping'
+import { MessageFieldSelect } from './MessageFieldSelect'
 import { SMALL_BUTTON } from './buttonStyles'
 
 type Props = {
   model: RuleEditorModel
   tapping: Tapping
+  textPath: string | null
+  pathError?: string
   online: boolean
   maxBytes: number
 }
 
 const kb = (bytes: number) => Math.round(bytes / 1024)
 
-function problemText(reading: SampleReading, maxBytes: number): string | null {
-  if (reading.ok)
-    return reading.kind === 'json'
-      ? 'That’s a JSON payload — a text rule reads text messages.'
-      : null
+function problemText(
+  reading: SampleReading,
+  textPath: string | null,
+  found: boolean,
+  maxBytes: number,
+): string | null {
+  if (reading.ok) {
+    if (reading.kind === 'text')
+      return textPath === null
+        ? null
+        : `That’s a plain text message — this rule reads the message in ${textPath}.`
+    if (textPath === null) return null
+    return found ? null : `This sample has no text in ${textPath}.`
+  }
   switch (reading.problem) {
     case 'too_large':
       return `That’s larger than the ${kb(maxBytes)} KB a webhook can send.`
     case 'invalid':
+      return 'That opens like JSON but doesn’t parse.'
     case 'not_object':
-      return 'That reads as JSON, not a text message.'
+      return 'A JSON sample has to be an object: {…}.'
     case 'empty':
       return null
   }
@@ -44,17 +58,32 @@ function problemText(reading: SampleReading, maxBytes: number): string | null {
 
 /**
  * Step 1 of a text rule: the message it is built from — pasted, or the last one the key
- * received — and the taps on its lines that say where the amount, currency and merchant are.
+ * received, the whole body or one field of a JSON payload — and the taps on its lines that
+ * say where the amount, currency and merchant are.
  */
-export function TextSampleStep({ model, tapping, online, maxBytes }: Props) {
+export function TextSampleStep({
+  model,
+  tapping,
+  textPath,
+  pathError,
+  online,
+  maxBytes,
+}: Props) {
   const sample = tapping.mapping.sample
+  const { reading } = model
+  const isJson = reading.ok && reading.kind === 'json'
+  const fields = useMemo(
+    () =>
+      reading.ok && reading.kind === 'json' ? messageFields(reading.value) : [],
+    [reading],
+  )
   const [editing, setEditing] = useState(sample === null)
   const { mapping, target, labelFor } = tapping
   const labels = model.learned?.labels ?? null
   const merchantReading = model.learned?.reading.fields.merchant
   const merchantGuess =
     merchantReading?.status === 'heuristic' ? merchantReading.line : null
-  const problem = problemText(model.reading, maxBytes)
+  const problem = problemText(reading, textPath, sample !== null, maxBytes)
   const showLines = sample !== null && !editing
 
   const tap = (line: number) => {
@@ -100,6 +129,14 @@ export function TextSampleStep({ model, tapping, online, maxBytes }: Props) {
         </div>
       }
     >
+      {isJson || textPath !== null ? (
+        <MessageFieldSelect
+          fields={fields}
+          textPath={textPath}
+          onChange={model.setTextPath}
+          error={pathError}
+        />
+      ) : null}
       {showLines ? (
         <>
           <FieldTargetChips
@@ -142,7 +179,7 @@ export function TextSampleStep({ model, tapping, online, maxBytes }: Props) {
             value={model.sample}
             spellCheck={false}
             placeholder={
-              'Paste a message your bank sent, e.g.\nPurchase of SAR 38.50 at CARREFOUR'
+              'Paste a message your bank sent, e.g.\nPurchase of SAR 38.50 at CARREFOUR\n\nor the JSON it arrives in, e.g.\n{"message": "Purchase of SAR 38.50 …"}'
             }
             aria-invalid={problem ? true : undefined}
             aria-describedby="text-sample-problem"
@@ -155,7 +192,9 @@ export function TextSampleStep({ model, tapping, online, maxBytes }: Props) {
               className={`text-[12px] font-medium ${problem ? 'font-semibold text-fp-danger' : 'text-fp-text-3'}`}
             >
               {problem ??
-                'Paste it, then tap the lines with the amount and currency.'}
+                (isJson && textPath === null
+                  ? 'Pick the field that holds the message, then tap its lines.'
+                  : 'Paste it, then tap the lines with the amount and currency.')}
             </p>
             {sample ? (
               <Button
