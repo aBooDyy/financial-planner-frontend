@@ -3,8 +3,8 @@ import { useEffect, useRef, useState } from 'react'
 /** How long an ignore can still be taken back before it reaches the server. */
 export const UNDO_MS = 5000
 
-/** Imports set aside by Ignore / Not a transaction, not yet sent. */
-export type HeldBatch = { ids: string[]; skipSimilar: boolean }
+/** Imports set aside by Ignore, not yet sent. */
+export type HeldBatch = { ids: string[] }
 
 /**
  * Ignoring with a way back. The server has no undismiss, so a batch is held here for a few

@@ -26,7 +26,7 @@ its own modules.
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | Settings → Email sync         | `EmailSyncSection` → `InboxList` → `InboxRow`; `NoInboxCard`; `ConnectInboxDialog`; `InboxEditorDialog`; `DisconnectInboxDialog` |
 | Import hub inbox card         | `ScanNowControl` + the inbox summary (`features/import/hooks/useInboxSummary`)                                                 |
-| Spending → Review             | `ReviewScanPrompt` — compact Sync now, passed into the queue's `PendingReviewModal` as its `toolbar`                           |
+| Spending → Review             | `ReviewSyncButton` (icon-only sync beside the queue's paging, its tooltip saying what it found) as the modal's `action`; `ReviewReconnectNotices` as its `notice` |
 | Review queue, an unread row   | the queue's own `FixRuleLink` → `/settings/email-sync?inbox=&sample=&rule=`                                                     |
 
 ## The model
@@ -77,7 +77,8 @@ which dialog is open and why the editor was opened (`EditorIntent`: `fresh` / `f
   authorize URL **with the connection id** (the server pins the account and keeps the inbox,
   rules and all) and returns to the page it was pressed on. The same prompt
   (`ReconnectInboxNotice`) shows on the Import hub's inbox card and above the review queue
-  (`ReviewScanPrompt`, read live from Dexie via `useInboxesToReconnect`).
+  (`ReviewReconnectNotices`, read live from Dexie via `useInboxesToReconnect`; renders nothing
+  while every inbox is fine).
 - **Connecting** (`ConnectInboxDialog`) picks the provider and leaves via `beginInboxConnect`.
   The callback URL is fixed (the provider apps whitelist it), so the return path travels
   through sessionStorage; `takeConnectReturnPath()` reads it once (same-origin only). Back in

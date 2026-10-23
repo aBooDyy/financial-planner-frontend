@@ -3,6 +3,9 @@ import { inboundImportsApi } from '#/features/inbound-imports/api/inboundImports
 import type { InboundImport } from '#/features/inbound-imports/api/types'
 import type { TxType } from '#/features/transactions/api/types'
 import { toWireTxType } from '#/features/transactions/api/types'
+import { saveTransactionEdit } from '#/features/transactions/data/billPayments'
+import type { LeftoverPrompt } from '#/features/transactions/data/billPayments'
+import type { CountsLink } from '#/features/transactions/data/countsLink'
 import { transactionToLocal } from './mappers'
 
 /**
@@ -25,7 +28,7 @@ export async function confirmImport(
     categoryId: string
     type: TxType
   } & ConfirmOverrides,
-): Promise<void> {
+): Promise<string> {
   const { walletId, categoryId, type, ...overrides } = input
   const { transaction } = await inboundImportsApi.confirmImport(item.id, {
     wallet_id: walletId,
@@ -38,12 +41,36 @@ export async function confirmImport(
     // Reflect the promoted entry in the local ledger immediately (clean, already-synced).
     await db.transactions.put(transactionToLocal(transaction))
   })
+  return transaction.id
 }
 
-export async function dismissImport(
-  item: InboundImport,
-  skipSimilar = false,
-): Promise<void> {
-  await inboundImportsApi.dismissImport(item.id, skipSimilar)
+const linksNothing = (link: CountsLink) =>
+  !link.plannedId && !link.goalId && !link.billId
+
+/**
+ * Points a just-confirmed entry at the bill, goal or payday it counts toward. It goes through
+ * the dialog's edit path, so a bill payment releases its set-asides and moves `nextDue` on.
+ */
+export async function linkConfirmed(
+  transactionId: string,
+  link: CountsLink,
+): Promise<LeftoverPrompt | null> {
+  const tx = await db.transactions.get(transactionId)
+  if (!tx?.categoryId || linksNothing(link)) return null
+  if (tx.type !== 'spend' && tx.type !== 'income') return null
+  return saveTransactionEdit(transactionId, {
+    type: tx.type,
+    amount: tx.amount,
+    currency: tx.currency,
+    categoryId: tx.categoryId,
+    walletId: tx.walletId,
+    date: tx.date,
+    note: tx.note,
+    ...link,
+  })
+}
+
+export async function dismissImport(item: InboundImport): Promise<void> {
+  await inboundImportsApi.dismissImport(item.id)
   await db.inboundImports.delete(item.id)
 }

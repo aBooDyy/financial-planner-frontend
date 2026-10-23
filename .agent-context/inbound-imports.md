@@ -18,7 +18,9 @@ that. So sources depend on the queue, never the reverse:
   `SourceSection` + `ledgerSourceOf`, `SkippedShapes`, and the `PayloadViewContext` slot — and sources call
   those. They never read or write `db.inboundImports` themselves.
 - The queue never imports a source. Source-specific UI inside it arrives through a slot:
-  `PendingReviewModal`'s `toolbar` is where the page passes email sync's `ReviewScanPrompt`,
+  `PendingReviewModal`'s `action` (a compact control beside the card stack's prev/next, also
+  under the empty state) is where the page passes email sync's `ReviewSyncButton`, its
+  `notice` (above the stack) `ReviewReconnectNotices`,
   and **`PayloadViewContext`** (`components/payloadView.ts`) is how `BodyPreview` draws a
   JSON body read-only under a ledger entry — the root layout (`routes/__root.tsx`) provides
   integrations' `ReviewPayloadTree` (the rule editor's `PayloadTree`, read-only). Without a
@@ -29,7 +31,7 @@ that. So sources depend on the queue, never the reverse:
 
 | Where                         | What                                                                                                                                                                                            |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Spending → Review             | `PendingReviewButton` (beside Add in the Activity transactions card, only while rows are pending) opens `PendingReviewModal` → one `ReviewCard` at a time on a swipeable `CardStack`, `toolbar` from the source |
+| Spending → Review             | `PendingReviewButton` (beside Add in the Activity transactions card, only while rows are pending) opens `PendingReviewModal` → one `ReviewCard` at a time on a swipeable `CardStack`, `action` / `notice` from the source |
 | Import hub inbox card         | `usePendingImports().count` via `useInboxSummary`                                                                                                                                               |
 | Spending → edit a transaction | `SourceSection` (this slice) — the email or payload the entry came from                                                                                                                         |
 
@@ -55,7 +57,7 @@ either at once (`categories/data/refile.ts`). Confirm refuses an unknown or fore
 
 Nothing that was parsed is final. `PendingReviewModal` shows **one import at a time on a card
 stack** (`CardStack`: "1 of 3", prev/next that wrap, two faint cards behind while more wait),
-with the source's `toolbar` above and a pinned footer for the whole queue: what still needs
+with the source's `action` beside the paging and a pinned footer for the whole queue: what still needs
 details, **Ignore all** and **Confirm all · n** (only the ready ones; the rest stay).
 
 **The stack animates with `motion` (`motion/react`, framer-motion's successor).** The top card
@@ -81,24 +83,44 @@ keeps them and Confirm all posts exactly what each card would. The card API it h
 (`ReviewCard` type) has the resolved draft, `draftState` (`amountMissing`, `currencyMissing`,
 `needsDetails`, `ready` = amount + currency + account + category), the picked field, the
 row's error, the import's `merchant` (`MerchantCategories` or null), and `setField` /
-`setType` / `pickCategory` (a category plus its own type) / `use` / `confirm` / `ignore` /
-`notTransaction`.
+`setType` / `pickCategory` (a category plus its own type) / `setCounts` / `setSpendTarget` /
+`use` / `confirm` / `ignore`.
 The header counts drafts that still need details, so filling one in updates "1 needs details".
 
-**The card** (`ReviewCard`): the header (`PendingImportHeader`: initial, who — the merchant
-title-cased by `displayName`, else the source — source · day, the amount or _Needs details_),
-Spend/Income, then `ReviewFields` — the amount as the shared `AmountWell` (the add dialog's
-tinted lead, toned by type, asking `AMOUNT_QUESTION`) with the account beneath as a "Paid from /
-Paid into" pill (the review's own wallet `Select` wearing `TxAccountPill`'s `ACCOUNT_PILL` trigger;
-the modal has no scope sections to feed `TxAccountPill` itself). "Enter it, or tap it in the
-email below." shows while the amount (under the well) or currency (under its field) is missing. Then merchant,
-**category full-width (the shared `CategoryPicker`: a category or a subcategory in one pick)
-with the merchant hint under it** (`MerchantHint`: "✦ Careem — you filed it under" + one
-`Chip` per category, the selected one active; tapping one picks it, switching Spend/Income with
-it), currency · date, note — **empty by default**: an email's subject is never the note (the backend no longer
-falls back to it either); a webhook row's `subject` is the note its rule read, so it prefills. Then the
-body — **folded to its sender/subject row** (a `Collapsible`; it starts open only when the card
-`needsDetails`, since that is when tapping the body is the fix) — then Ignore · Not a transaction · Confirm & add (disabled until `ready`).
+**The card** (`ReviewCard`) is kept short — what matters first, the rest folded. Up front: the
+header (`PendingImportHeader`: initial, who — the merchant title-cased by `displayName`, else the
+source — source · day, the amount or _Needs details_), then `ReviewFields` — the amount as the
+shared `AmountWell` (the add dialog's tinted lead, toned by type, asking `AMOUNT_QUESTION`) with
+the account beneath as a "Paid from / Paid into" pill (the review's own wallet `Select` wearing
+`TxAccountPill`'s `ACCOUNT_PILL` trigger; the modal has no scope sections to feed `TxAccountPill`
+itself), **category full-width (the shared `CategoryPicker`) with the merchant hint under it**
+(`MerchantHint`: "✦ Careem — you filed it under" + one `Chip` per category, the selected one
+active; tapping one picks it, switching Spend/Income with it), and the note — **empty by
+default**: an email's subject is never the note (the backend no longer falls back to it either);
+a webhook row's `subject` is the note its rule read, so it prefills. Under them, when the entry
+settles a planned item, the dialog's `PlannedLinkBanner` ("Matches upcoming Rent (Oct 1)" with
+its Link switch). Then **More details** (`ReviewMoreDetails`, a `Collapsible` whose folded row
+summarises "Spend · Careem · Oct 21"; it starts open only when the card `needsDetails`):
+`ReviewDetailFields` (Spend/Income, merchant, currency · date), `ReviewCountsToward` and the body
+— itself folded to its sender/subject row, open from the start in the same case, since then
+tapping the body is the fix. Last, Ignore · Confirm & add (disabled until `ready`). "Enter it,
+or tap it in the email below." shows while the amount (under the well) or currency (under its
+field) is missing.
+
+**Counts toward — linking an import to a bill.** The card runs the transaction dialog's own
+`useCountsToward` with its choice **held in the draft** (`draft.counts`, a `CountsChoice`, plus
+`goalId` / `billId` for a spend's pick — through the hook's optional `control` argument), so
+paging keeps it. Untouched, an import whose amount and date match an open bill payment or payday
+(`DIALOG_MATCH`: ±7 days, within 10%) shows the link banner, **linked by default**; the switch
+turns it off. `ReviewCountsToward` is the dialog's `CountsTowardRow` opening `CountsTowardOptions`
+in a popover (the card has no panes), with the saving-goal / no-payday hints. The queue resolves
+each draft's link with the same pure `resolveCountsLink` (`transactions/data/countsLink.ts`) over
+one `usePlannedData`, so Confirm all links cards never opened exactly as the card would. Confirm
+promotes the import on the server first (`confirmImport` returns the transaction id), then
+`linkConfirmed` writes the link through the dialog's `saveTransactionEdit` — a bill payment
+releases its set-asides and moves `nextDue` on like Pay now — and a leftover prompt goes to
+`stores/leftoverPrompt`. The link is a local edit that syncs as a PATCH; the confirm contract is
+unchanged.
 
 - **The body is not cached.** The card fetches `GET /inbound-imports/{id}` when it shows
   (`useImportDetail`); bodies are far larger than the row. Offline the hook doesn't ask. It
@@ -125,13 +147,12 @@ body — **folded to its sender/subject row** (a `Collapsible`; it starts open o
   `FixRuleLink` → `/settings/integrations?key=&sample=` for a webhook row that still has its
   key, `/settings/email-sync?inbox=&sample=[&rule=]` for an inbox row with a body. The queue
   knows only each source's settings **route**, never its code.
-- **Ignore vs Not a transaction.** Both are held for an Undo (`useHeldBatch`, `UNDO_MS` = 5 s,
-  the dark `UndoToast` over the dialog) and only then sent — at once when another batch is held
-  or the review closes; a sent batch stays hidden until the server answers. **Ignore** is a
-  plain dismiss. **Not a transaction** dismisses with `skip_similar`, so the source stops
-  staging messages shaped like it ("Not a transaction — ones like it will be skipped", when the
-  row is `skippable`). Ignore all holds the whole queue the same way. A failed dismiss brings the
-  row back with the reason.
+- **Ignore** is held for an Undo (`useHeldBatch`, `UNDO_MS` = 5 s, the dark `UndoToast` over
+  the dialog) and only then sent — at once when another batch is held or the review closes; a
+  sent batch stays hidden until the server answers. Ignore all holds the whole queue the same
+  way. A failed dismiss brings the row back with the reason. There is no "Not a transaction"
+  button any more (dropped as noise); skips made with it before still apply and are forgotten
+  from `SkippedShapes`, and the API client still takes `skip_similar`.
 - **Confirm is final** (no Undo): "Added to your ledger" / "n added to your ledger" as a
   plain toast. The merchant is only sent when it was **edited** — resending it would re-count
   the sighting. Errors surface through `messageForApiError` (the UI keys off `code`).
@@ -209,7 +230,9 @@ merchant only when edited), `data/sources.test.ts` (`ledgerSourceOf`), `data/syn
 (delta, eviction, single flight, a pull overtaken by sign-out), `api/inboundImportsApi.test.ts`
 (ids encoded into paths), `components/BodyPreview.test.tsx` (read-only text lines, the tree via
 the slot, truncated fallback), `components/PendingReviewModal.test.tsx` (one card at a time and
-the queue's counts, the read values tagged in the email with Fix the rule, a tapped number and a
-tapped name, Ignore held for Undo and sent after the wait, Not a transaction with
-`skip_similar`, held batches sent on close, Confirm all posting only the ready ones),
+the queue's counts, the short card with the rest under More details, the read values tagged in
+the email with Fix the rule, a tapped number and a tapped name, Ignore held for Undo and sent
+after the wait, held batches sent on close, a bill matched by amount and date linked on
+confirm — or not once switched off — and one picked under Counts toward, Confirm all posting
+only the ready ones), `data/mutations.test.ts` also `linkConfirmed`,
 `components/SourceSection.test.tsx` (email, webhook, deleted key).

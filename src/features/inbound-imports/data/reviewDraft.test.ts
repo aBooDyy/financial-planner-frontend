@@ -22,6 +22,9 @@ const DRAFT: ReviewDraft = {
   walletId: 'w1',
   merchant: 'STARBUCKS RIYADH',
   note: '',
+  goalId: null,
+  billId: null,
+  counts: { pick: null, unlinkedId: null },
 }
 
 const ITEM = { suggestedMerchant: 'STARBUCKS RIYADH' } as LocalInboundImport

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import 'fake-indexeddb/auto'
 import type { ReactNode } from 'react'
 import {
   act,
@@ -17,8 +18,10 @@ import {
   it,
   vi,
 } from 'vitest'
+import { db } from '#/db/db'
 import type { LocalBalanceNode, LocalInboundImport } from '#/db/types'
 import { catId } from '#/features/categories/__fixtures__/categories'
+import { bill, m, planned } from '#/features/planned/testing/fixtures'
 import type { ImportDetail } from '#/features/inbound-imports/api/types'
 import { UNDO_MS } from '#/features/inbound-imports/hooks/useHeldBatch'
 import { PendingReviewModal } from './PendingReviewModal'
@@ -27,11 +30,14 @@ vi.setConfig({ testTimeout: 20000 })
 
 const confirmImport = vi.fn()
 const dismissImport = vi.fn()
+const linkConfirmed = vi.fn()
 const getImport = vi.fn()
 
+vi.mock('#/db/sync', () => ({ schedulePush: () => undefined }))
 vi.mock('#/features/inbound-imports/data/mutations', () => ({
   confirmImport: (...args: unknown[]) => confirmImport(...args),
   dismissImport: (...args: unknown[]) => dismissImport(...args),
+  linkConfirmed: (...args: unknown[]) => linkConfirmed(...args),
 }))
 vi.mock('#/features/inbound-imports/api/inboundImportsApi', () => ({
   inboundImportsApi: {
@@ -62,6 +68,12 @@ vi.mock('@tanstack/react-router', () => ({
 
 beforeAll(() => {
   Element.prototype.scrollIntoView = () => undefined
+  Element.prototype.hasPointerCapture = () => false
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
   window.matchMedia = (query: string) =>
     ({
       matches: true,
@@ -123,9 +135,26 @@ const NEEDS = row({
   subject: 'Card purchase',
 })
 
-beforeEach(() => {
-  confirmImport.mockReset().mockResolvedValue(undefined)
+beforeEach(async () => {
+  await Promise.all(db.tables.map((t) => t.clear()))
+  await db.bills.put(
+    bill({ id: 'rent', name: 'Rent', amount: m(3500), nextDue: '2026-10-01' }),
+  )
+  await db.plannedTransactions.put(
+    planned({
+      id: 'rent-oct',
+      origin: 'bill',
+      role: 'payment',
+      goalId: null,
+      billId: 'rent',
+      name: 'Rent',
+      amount: m(3500),
+      occurrence: '2026-10-01',
+    }),
+  )
+  confirmImport.mockReset().mockResolvedValue('tx1')
   dismissImport.mockReset().mockResolvedValue(undefined)
+  linkConfirmed.mockReset().mockResolvedValue(null)
   getImport.mockReset().mockImplementation(
     (id: string): Promise<ImportDetail> =>
       Promise.resolve({
@@ -145,6 +174,7 @@ const renderQueue = (imports: LocalInboundImport[]) =>
     <PendingReviewModal
       imports={imports}
       wallets={WALLETS}
+      goals={[]}
       onClose={vi.fn()}
     />,
   )
@@ -177,6 +207,7 @@ describe('PendingReviewModal', () => {
   it('highlights what was read in the email, with a link to fix the rule', async () => {
     renderQueue([READY])
 
+    fireEvent.click(screen.getByRole('button', { name: /More details/ }))
     const email = screen.getByRole('button', { name: /Card purchase/ })
     expect(email.getAttribute('aria-expanded')).toBe('false')
     fireEvent.click(email)
@@ -240,23 +271,81 @@ describe('PendingReviewModal', () => {
       await vi.advanceTimersByTimeAsync(UNDO_MS)
     })
     expect(dismissImport).toHaveBeenCalledTimes(1)
-    expect(dismissImport).toHaveBeenCalledWith(READY, false)
+    expect(dismissImport).toHaveBeenCalledWith(READY)
   })
 
-  it('asks the source to skip ones like it for Not a transaction', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true })
+  it('keeps the card to amount, category and note, the rest folded', () => {
     renderQueue([READY])
 
-    fireEvent.click(screen.getByRole('button', { name: 'Not a transaction' }))
+    expect(screen.getByLabelText('How much did you spend?')).toBeTruthy()
+    expect(screen.getByLabelText(/Note/, { selector: 'input' })).toBeTruthy()
     expect(
-      screen.getByText('Not a transaction — ones like it will be skipped'),
-    ).toBeTruthy()
-    expect(screen.getByText('All caught up')).toBeTruthy()
+      screen.queryByLabelText(/Merchant/, { selector: 'input' }),
+    ).toBeNull()
+    expect(
+      screen.queryByRole('button', { name: 'Not a transaction' }),
+    ).toBeNull()
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(UNDO_MS)
-    })
-    expect(dismissImport).toHaveBeenCalledWith(READY, true)
+    fireEvent.click(screen.getByRole('button', { name: /More details/ }))
+    expect(
+      screen.getByLabelText(/Merchant/, { selector: 'input' }),
+    ).toBeTruthy()
+  })
+
+  it('links an import to the bill its amount and date match', async () => {
+    const rent = row({ amount: m(3500), occurredOn: '2026-10-01' })
+    renderQueue([rent])
+
+    expect(
+      await screen.findByText('Matches upcoming Rent (Oct 1)'),
+    ).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm & add' }))
+
+    await waitFor(() =>
+      expect(linkConfirmed).toHaveBeenCalledWith('tx1', {
+        plannedId: 'rent-oct',
+        goalId: null,
+        billId: 'rent',
+      }),
+    )
+  })
+
+  it('confirms unlinked once the bill match is switched off', async () => {
+    renderQueue([row({ amount: m(3500), occurredOn: '2026-10-01' })])
+
+    fireEvent.click(
+      await screen.findByRole('switch', { name: 'Link to the upcoming item' }),
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm & add' }))
+
+    await waitFor(() =>
+      expect(linkConfirmed).toHaveBeenCalledWith('tx1', {
+        plannedId: null,
+        goalId: null,
+        billId: null,
+      }),
+    )
+  })
+
+  it('counts toward a bill picked under More details', async () => {
+    renderQueue([READY])
+
+    fireEvent.click(screen.getByRole('button', { name: /More details/ }))
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Counts toward: Nothing/ }),
+    )
+    fireEvent.click(await screen.findByRole('option', { name: /Rent/ }))
+    expect(
+      await screen.findByRole('button', { name: /Counts toward: Rent/ }),
+    ).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm & add' }))
+
+    await waitFor(() =>
+      expect(linkConfirmed).toHaveBeenCalledWith(
+        'tx1',
+        expect.objectContaining({ billId: 'rent' }),
+      ),
+    )
   })
 
   it('sends what is held at once when the review closes', () => {
@@ -265,7 +354,7 @@ describe('PendingReviewModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Ignore' }))
     unmount()
 
-    expect(dismissImport).toHaveBeenCalledWith(READY, false)
+    expect(dismissImport).toHaveBeenCalledWith(READY)
   })
 
   it('confirms every ready import and leaves the rest', async () => {

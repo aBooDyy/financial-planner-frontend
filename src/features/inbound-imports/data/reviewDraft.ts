@@ -1,6 +1,8 @@
 import type { LocalBalanceNode, LocalInboundImport } from '#/db/types'
 import type { CategoryCatalog } from '#/features/categories/data/catalog'
 import { DELETED_CATEGORY_ID } from '#/features/categories/data/catalog'
+import { UNTOUCHED } from '#/features/transactions/data/countsLink'
+import type { CountsChoice } from '#/features/transactions/data/countsLink'
 import type { TxType } from '#/features/transactions/api/types'
 import { startOfToday, ymd } from '#/features/transactions/data/planning'
 import type { CurrencyCode } from '#/lib/currency'
@@ -16,6 +18,10 @@ export type ReviewDraft = {
   walletId: string
   merchant: string
   note: string
+  /** The bill or goal a spend was pointed at in "Counts toward". */
+  goalId: string | null
+  billId: string | null
+  counts: CountsChoice
 }
 
 /** What confirm sends for one import; every value is the user's last word. */
@@ -85,6 +91,9 @@ export function initialDraft(
     walletId: wallet?.id ?? '',
     merchant: item.suggestedMerchant ?? '',
     note: initialNote(item),
+    goalId: null,
+    billId: null,
+    counts: UNTOUCHED,
   }
 }
 

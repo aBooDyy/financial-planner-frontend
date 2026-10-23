@@ -4,7 +4,11 @@ import { UndoToast } from '#/components/dialog/UndoToast'
 import { OfflineNotice } from '#/components/OfflineNotice'
 import { Button } from '#/components/ui/button'
 import { ResponsiveDialog } from '#/components/ui/responsive-dialog'
-import type { LocalBalanceNode, LocalInboundImport } from '#/db/types'
+import type {
+  LocalBalanceNode,
+  LocalGoal,
+  LocalInboundImport,
+} from '#/db/types'
 import { useCategoryCatalog } from '#/features/categories/hooks/useCategoryCatalog'
 import { useRefreshQueue } from '#/features/inbound-imports/hooks/useRefreshQueue'
 import { useReviewQueue } from '#/features/inbound-imports/hooks/useReviewQueue'
@@ -15,9 +19,12 @@ import { ReviewCard } from './ReviewCard'
 type Props = {
   imports: LocalInboundImport[]
   wallets: LocalBalanceNode[]
+  goals: ReadonlyArray<LocalGoal>
   onClose: () => void
-  /** A source's own controls (e.g. an inbox scan), shown above the queue. */
-  toolbar?: ReactNode
+  /** A source's compact control (e.g. an inbox sync), beside the queue's paging. */
+  action?: ReactNode
+  /** A source's notices (e.g. an inbox to sign in to again), above the queue. */
+  notice?: ReactNode
 }
 
 const plural = (n: number, one: string, many = `${one}s`) =>
@@ -26,8 +33,10 @@ const plural = (n: number, one: string, many = `${one}s`) =>
 export function PendingReviewModal({
   imports,
   wallets,
+  goals,
   onClose,
-  toolbar,
+  action,
+  notice,
 }: Props) {
   useRefreshQueue()
   const catalog = useCategoryCatalog()
@@ -92,11 +101,7 @@ export function PendingReviewModal({
         ) : undefined
       }
     >
-      {toolbar ? (
-        <div className="flex flex-wrap items-center justify-between gap-x-[10px] gap-y-2 border-y border-fp-border bg-fp-surface-2 px-5 py-[10px]">
-          {toolbar}
-        </div>
-      ) : null}
+      {notice}
 
       {online ? null : (
         <OfflineNotice className="px-5 pt-1 pb-2">
@@ -113,11 +118,13 @@ export function PendingReviewModal({
             count={count}
             onPrev={queue.prev}
             onNext={queue.next}
+            actions={action}
           >
             <ReviewCard
               key={card.item.id}
               card={card}
               wallets={wallets}
+              goals={goals}
               catalog={catalog}
               busy={locked}
             />
@@ -129,6 +136,7 @@ export function PendingReviewModal({
           <div className="text-[13px] text-fp-text-2">
             New imports show up here after the next sync.
           </div>
+          {action}
         </div>
       )}
 

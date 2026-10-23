@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { MobileTabBar } from '#/components/chrome/MobileTabBar'
 import { TopNav } from '#/components/chrome/TopNav'
-import { ReviewScanPrompt } from '#/features/email-sync/components/ReviewScanPrompt'
+import { ReviewReconnectNotices } from '#/features/email-sync/components/ReviewReconnectNotices'
+import { ReviewSyncButton } from '#/features/email-sync/components/ReviewSyncButton'
 import { PendingReviewButton } from '#/features/inbound-imports/components/PendingReviewButton'
 import { PendingReviewModal } from '#/features/inbound-imports/components/PendingReviewModal'
 import { usePendingImports } from '#/features/inbound-imports/hooks/usePendingImports'
@@ -294,8 +295,12 @@ export function TransactionsPage() {
         <PendingReviewModal
           imports={pendingImports}
           wallets={wallets}
+          goals={goals}
           onClose={closeReview}
-          toolbar={<ReviewScanPrompt />}
+          action={<ReviewSyncButton />}
+          notice={
+            <ReviewReconnectNotices className="flex flex-col gap-2 px-5 pb-1" />
+          }
         />
       ) : null}
     </div>

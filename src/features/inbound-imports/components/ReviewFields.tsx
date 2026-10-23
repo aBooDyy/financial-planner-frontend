@@ -1,9 +1,6 @@
-import { CurrencyPicker } from '#/components/CurrencyPicker'
 import { AmountWell } from '#/components/dialog/AmountWell'
 import type { AmountTone } from '#/components/dialog/AmountWell'
-import { DateField } from '#/components/DateField'
 import { FieldLabel } from '#/components/FieldLabel'
-import { FieldMessage } from '#/components/FormRow'
 import { IconChip } from '#/components/icons/IconChip'
 import { Input } from '#/components/ui/input'
 import {
@@ -24,8 +21,6 @@ import { WalletSelectSections } from '#/features/wallets/components/WalletSelect
 import { sectionByGroup } from '#/features/wallets/data/walletSections'
 import { useWalletGroups } from '#/features/wallets/hooks/useWalletGroups'
 import { WALLET_ICON, iconIdOr } from '#/lib/icons/fallbacks'
-import { cn } from '#/lib/utils'
-import { usePreferencesStore } from '#/stores/preferences'
 import { MerchantHint } from './MerchantHint'
 
 const NONE = '__none__'
@@ -41,11 +36,10 @@ type Props = {
   catalog: CategoryCatalog
 }
 
-/** Every value the entry will post with — prefilled from the read, blank where it found none. */
+/** What matters most on an entry — amount and account, category, note — prefilled from the read. */
 export function ReviewFields({ card, wallets, catalog }: Props) {
   const { item, draft, setField } = card
   const id = `import-${item.id}`
-  const dateFormat = usePreferencesStore((s) => s.dateFormat)
   const groups = useWalletGroups()
   const tapHint = `Enter it, or tap it in the ${bodyNoun(item.bodyFormat, item.source)} below.`
   const wallet = wallets.find((w) => w.id === draft.walletId)
@@ -122,18 +116,6 @@ export function ReviewFields({ card, wallets, catalog }: Props) {
         ) : null}
       </div>
 
-      <div className="min-w-0">
-        <FieldLabel htmlFor={`${id}-merchant`} optional>
-          Merchant
-        </FieldLabel>
-        <Input
-          id={`${id}-merchant`}
-          value={draft.merchant}
-          onChange={(e) => setField('merchant', e.target.value)}
-          placeholder="Who was paid"
-        />
-      </div>
-
       <div className="flex min-w-0 flex-col gap-2">
         <div className="min-w-0">
           <FieldLabel htmlFor={`${id}-category`}>Category</FieldLabel>
@@ -152,29 +134,6 @@ export function ReviewFields({ card, wallets, catalog }: Props) {
             onPick={card.pickCategory}
           />
         ) : null}
-      </div>
-
-      <div className="grid grid-cols-2 items-start gap-3">
-        <div className="min-w-0">
-          <FieldLabel>Currency</FieldLabel>
-          <CurrencyPicker
-            value={draft.currency}
-            onChange={(code) => setField('currency', code)}
-            className={cn(
-              card.currencyMissing && 'border-fp-danger bg-fp-danger/[0.07]',
-            )}
-          />
-          {card.currencyMissing ? <FieldMessage error={tapHint} /> : null}
-        </div>
-        <div className="min-w-0">
-          <FieldLabel>Date</FieldLabel>
-          <DateField
-            value={draft.date}
-            onChange={(iso) => setField('date', iso)}
-            dateFormat={dateFormat}
-            ariaLabel="Date"
-          />
-        </div>
       </div>
 
       <div className="min-w-0">

@@ -12,6 +12,7 @@ import type {
 import {
   confirmImport,
   dismissImport,
+  linkConfirmed,
 } from '#/features/inbound-imports/data/mutations'
 import { readPick } from '#/features/inbound-imports/data/pickValues'
 import {
@@ -25,7 +26,15 @@ import type {
   DraftState,
   ReviewDraft,
 } from '#/features/inbound-imports/data/reviewDraft'
+import { remainderOf, usePlannedData } from '#/features/planned'
 import type { TxType } from '#/features/transactions/api/types'
+import { resolveCountsLink } from '#/features/transactions/data/countsLink'
+import type {
+  CountsChoice,
+  CountsWorld,
+} from '#/features/transactions/data/countsLink'
+import type { SpendTarget } from '#/features/transactions/hooks/useTxEditor'
+import { useLeftoverPromptStore } from '#/features/transactions/stores/leftoverPrompt'
 import { messageForApiError } from '#/lib/errorMessages'
 import { useHeldBatch } from './useHeldBatch'
 import type { HeldBatch } from './useHeldBatch'
@@ -46,8 +55,8 @@ const valuesOf = (draft: ReviewDraft): ReadValues => ({
 
 /**
  * The review queue, one import at a time. Every import's edits live here rather than in its
- * card, so paging keeps them and Confirm all posts what each card would. Ignoring is held for
- * an Undo; confirming is final.
+ * card, so paging keeps them and Confirm all posts what each card would — including the bill
+ * or payday a card links to. Ignoring is held for an Undo; confirming is final.
  */
 export function useReviewQueue(
   imports: LocalInboundImport[],
@@ -78,12 +87,12 @@ export function useReviewQueue(
       message ? { ...rest, [id]: message } : rest,
     )
 
-  const sendBatch = async ({ ids, skipSimilar }: HeldBatch) => {
+  const sendBatch = async ({ ids }: HeldBatch) => {
     for (const id of ids) {
       const item = latest.current.find((i) => i.id === id)
       if (!item) continue
       try {
-        await dismissImport(item, skipSimilar && item.skippable)
+        await dismissImport(item)
       } catch (err) {
         setError(id, messageForApiError(err))
       }
@@ -91,6 +100,14 @@ export function useReviewQueue(
   }
   const batch = useHeldBatch(sendBatch)
   const merchantCategories = useMerchantCategories(imports, catalog)
+  const showLeftover = useLeftoverPromptStore((s) => s.show)
+  const planned = usePlannedData()
+  const world: CountsWorld = {
+    planned: planned.inputs.planned,
+    remainderOf: (p) =>
+      remainderOf(p, planned.state.index, planned.inputs.rates),
+    rates: planned.inputs.rates,
+  }
 
   const showNotice = (message: string) => {
     if (noticeTimer.current) clearTimeout(noticeTimer.current)
@@ -118,6 +135,22 @@ export function useReviewQueue(
     )
   }
 
+  const countsOf = (draft: ReviewDraft) =>
+    resolveCountsLink(
+      {
+        type: draft.type,
+        isNew: true,
+        goalId: draft.goalId,
+        billId: draft.billId,
+        plannedId: null,
+        amount: draft.amount,
+        currency: draft.currency,
+        date: draft.date,
+      },
+      draft.counts,
+      world,
+    )
+
   const visible = imports.filter((i) => !batch.hidden.has(i.id))
   const count = visible.length
   const at = count ? ((index % count) + count) % count : 0
@@ -135,27 +168,30 @@ export function useReviewQueue(
     setError(id, null)
   }
 
-  const hold = (ids: string[], skipSimilar: boolean, message: string) => {
-    batch.hold({ ids, skipSimilar })
+  const hold = (ids: string[], message: string) => {
+    batch.hold({ ids })
     if (noticeTimer.current) clearTimeout(noticeTimer.current)
     setNotice(null)
     setHeldMessage(message)
   }
 
   const post = async (item: LocalInboundImport): Promise<boolean> => {
-    const answer = confirmInput(item, draftOf(item))
+    const draft = draftOf(item)
+    const answer = confirmInput(item, draft)
     if ('problem' in answer) {
       setError(item.id, answer.problem)
       return false
     }
+    let transactionId: string
     try {
-      await confirmImport(item, answer.input)
+      transactionId = await confirmImport(item, answer.input)
       setEdits(({ [item.id]: _done, ...rest }) => rest)
-      return true
     } catch (err) {
       setError(item.id, messageForApiError(err))
       return false
     }
+    showLeftover(await linkConfirmed(transactionId, countsOf(draft).link))
+    return true
   }
 
   const card = current ? cardFor(current) : null
@@ -178,6 +214,13 @@ export function useReviewQueue(
         value: ReviewDraft[TKey],
       ) => edit(item.id, { [key]: value }),
       setType: (type: TxType) => edit(item.id, { type }),
+      setCounts: (counts: CountsChoice) => edit(item.id, { counts }),
+      /** A spend's pick in "Counts toward" is filed as its bill or goal. */
+      setSpendTarget: (spendTarget: SpendTarget) =>
+        edit(item.id, {
+          goalId: spendTarget?.kind === 'goal' ? spendTarget.id : null,
+          billId: spendTarget?.kind === 'bill' ? spendTarget.id : null,
+        }),
       /** A suggested category brings its own type with it. */
       pickCategory: (categoryId: string) =>
         edit(item.id, { categoryId, type: catalog.get(categoryId).type }),
@@ -200,15 +243,7 @@ export function useReviewQueue(
         if (await post(item)) showNotice('Added to your ledger')
         setBusy(false)
       },
-      ignore: () => hold([item.id], false, 'Import ignored'),
-      notTransaction: () =>
-        hold(
-          [item.id],
-          true,
-          item.skippable
-            ? 'Not a transaction — ones like it will be skipped'
-            : 'Marked as not a transaction',
-        ),
+      ignore: () => hold([item.id], 'Import ignored'),
     }
   }
 
@@ -232,7 +267,6 @@ export function useReviewQueue(
     ignoreAll: () =>
       hold(
         visible.map((i) => i.id),
-        false,
         `${plural(count, 'import')} ignored`,
       ),
     confirmAll: async () => {

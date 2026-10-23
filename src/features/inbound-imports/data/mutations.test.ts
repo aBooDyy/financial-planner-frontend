@@ -7,7 +7,9 @@ import type {
   InboundImportWire,
 } from '#/features/inbound-imports/api/types'
 import { http } from '#/lib/http'
-import { confirmImport } from './mutations'
+import { confirmImport, linkConfirmed } from './mutations'
+
+vi.mock('#/db/sync', () => ({ schedulePush: () => undefined }))
 
 afterEach(() => vi.restoreAllMocks())
 
@@ -75,4 +77,24 @@ it('confirms with the leaf category id and files the promoted entry locally', as
   })
   const row = await db.transactions.get('t1')
   expect(row?.categoryId).toBe('cat-dining-cafes')
+})
+
+it('links a confirmed entry to what it counts toward, and leaves it alone with no link', async () => {
+  vi.spyOn(http, 'post').mockResolvedValue(confirmed)
+  const id = await confirmImport({ id: 'i1' } as InboundImport, {
+    walletId: 'w1',
+    categoryId: 'cat-dining-cafes',
+    type: 'spend',
+  })
+  expect(id).toBe('t1')
+
+  const none = { plannedId: null, goalId: null, billId: null }
+  expect(await linkConfirmed(id, none)).toBeNull()
+  expect((await db.transactions.get('t1'))?.dirty).toBe(0)
+
+  await linkConfirmed(id, { ...none, goalId: 'g1' })
+  const row = await db.transactions.get('t1')
+  expect(row?.goalId).toBe('g1')
+  expect(row?.dirty).toBe(1)
+  expect(await db.outbox.count()).toBe(1)
 })

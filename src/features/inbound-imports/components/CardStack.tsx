@@ -13,6 +13,8 @@ type Props = {
   count: number
   onPrev: () => void
   onNext: () => void
+  /** Extra controls beside prev/next (e.g. a source's sync). */
+  actions?: ReactNode
   children: ReactNode
 }
 
@@ -29,6 +31,7 @@ export function CardStack({
   count,
   onPrev,
   onNext,
+  actions,
   children,
 }: Props) {
   const single = count < 2
@@ -67,6 +70,7 @@ export function CardStack({
           >
             {position + 1} of {count}
           </span>
+          {actions}
           <button
             type="button"
             aria-label="Previous import"
