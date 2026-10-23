@@ -301,7 +301,11 @@ tx/budget editor state machine. Components are dumb (`components/`): page compos
   "More…" for the rest; typing searches **names only** across all of them (`commandFilter`; a
   sub-line's figures would match everything). Income lists **income streams** instead
   (`rankIncomeOptions`); a stream is only a way to find its planned payday (a transaction has no
-  stream column). Hidden for transfers. `hooks/useCountsToward` resolves what to save:
+  stream column). Hidden for transfers. `hooks/useCountsToward` resolves what to save, through
+  the pure `data/countsLink.ts#resolveCountsLink` (entry + `CountsChoice` + planned rows → item,
+  auto, linked, `link`); its choice lives in the hook unless the caller passes `control` — the
+  review queue does, and resolves Confirm all with the same function
+  ([inbound-imports.md](inbound-imports.md)):
   - **Auto-match.** A _new_, untouched entry links itself to the open planned item its amount
     and date match — `findAmountMatch` with `DIALOG_MATCH` (±7 days, amount within **10%** of
     the open remainder, same settle rules as QuickAdd). The banner reads "Matches planned Rent

@@ -1,30 +1,20 @@
 import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '#/db/db'
-import type { LocalGoal, LocalPlanned } from '#/db/types'
-import {
-  remainderOf,
-  shortDate,
-  usePlannedData,
-  usePlannedMatch,
-} from '#/features/planned'
+import type { LocalGoal } from '#/db/types'
+import { remainderOf, shortDate, usePlannedData } from '#/features/planned'
 import type { PlannedRole } from '#/features/planned'
+import {
+  UNTOUCHED,
+  resolveCountsLink,
+} from '#/features/transactions/data/countsLink'
+import type { CountsChoice } from '#/features/transactions/data/countsLink'
 import {
   rankIncomeOptions,
   rankSpendOptions,
 } from '#/features/transactions/data/countsToward'
 import type { RankedOptions } from '#/features/transactions/data/countsToward'
-import {
-  DIALOG_MATCH,
-  billIdForMatch,
-  findAmountMatch,
-  goalIdForMatch,
-} from '#/features/transactions/data/quickAddMatch'
-import {
-  formatMoney,
-  formatMoneyRounded,
-  parseAmountToMinor,
-} from '#/lib/currency'
+import { formatMoney, formatMoneyRounded } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
 import type { EditorTxType } from './useTxEditor'
 
@@ -62,95 +52,65 @@ export type CountsToward = ReturnType<typeof useCountsToward>
  * A spend only ever settles a planned *payment*: a set-aside labels money in place, so money
  * put aside for a goal goes through the goal's "Add contribution", not a spend.
  */
-export function useCountsToward(args: {
-  type: EditorTxType
-  isNew: boolean
-  goalId: string | null
-  billId: string | null
-  /** The link the entry already has (editing a settled row), or null. */
-  plannedId: string | null
-  amount: string
-  currency: CurrencyCode
-  date: string
-  goals: ReadonlyArray<LocalGoal>
-}) {
+export function useCountsToward(
+  args: {
+    type: EditorTxType
+    isNew: boolean
+    goalId: string | null
+    billId: string | null
+    /** The link the entry already has (editing a settled row), or null. */
+    plannedId: string | null
+    amount: string
+    currency: CurrencyCode
+    date: string
+    goals: ReadonlyArray<LocalGoal>
+  },
+  /** Held by the caller when the choice must outlive this component (the review queue). */
+  control?: { choice: CountsChoice; onChoice: (next: CountsChoice) => void },
+) {
   const data = usePlannedData()
   const streams = useLiveQuery(() => db.incomeStreams.toArray())
   const { planned, rates } = data.inputs
   const { index } = data.state
   const isIncome = args.type === 'income'
-  const isTransfer = args.type === 'transfer'
-  const linkedRow = args.plannedId
-    ? (planned.find((p) => p.id === args.plannedId) ?? null)
-    : null
+  const [ownChoice, setOwnChoice] = useState<CountsChoice>(UNTOUCHED)
+  const choice = control?.choice ?? ownChoice
+  const setChoice = control?.onChoice ?? setOwnChoice
 
-  // A pick holds for the type it was made under; switching type starts untouched again.
-  const [pick, setPick] = useState<{
-    type: EditorTxType
-    id: string | null
-  } | null>(null)
-  const picked = pick?.type === args.type ? pick : null
-  const streamId = picked ? picked.id : (linkedRow?.incomeStreamId ?? null)
-
-  const canAuto =
-    args.isNew &&
-    !isTransfer &&
-    picked === null &&
-    args.plannedId === null &&
-    (isIncome || (args.goalId === null && args.billId === null))
-  const minor = parseAmountToMinor(args.amount, args.currency)
-  const autoItem = useMemo(
+  const { type, isNew, goalId, billId: argBillId, plannedId, amount } = args
+  const { currency, date } = args
+  const resolved = useMemo(
     () =>
-      canAuto
-        ? findAmountMatch({
-            type: isIncome ? 'income' : 'spend',
-            amount: minor,
-            currency: args.currency,
-            date: args.date,
-            planned,
-            remainderOf: (p) => remainderOf(p, index, rates),
-            rates,
-            withinDays: DIALOG_MATCH.days,
-            tolerance: DIALOG_MATCH.tolerance,
-          })
-        : null,
-    [canAuto, isIncome, minor, args.currency, args.date, planned, index, rates],
+      resolveCountsLink(
+        {
+          type,
+          isNew,
+          goalId,
+          billId: argBillId,
+          plannedId,
+          amount,
+          currency,
+          date,
+        },
+        choice,
+        { planned, remainderOf: (p) => remainderOf(p, index, rates), rates },
+      ),
+    [
+      type,
+      isNew,
+      goalId,
+      argBillId,
+      plannedId,
+      amount,
+      currency,
+      date,
+      choice,
+      planned,
+      index,
+      rates,
+    ],
   )
-
-  const ref =
-    args.plannedId || isTransfer || autoItem
-      ? null
-      : isIncome
-        ? streamId
-          ? { incomeStreamId: streamId }
-          : null
-        : args.billId
-          ? { billId: args.billId }
-          : args.goalId
-            ? { goalId: args.goalId }
-            : null
-  const match = usePlannedMatch(ref, isIncome ? 'income' : 'payment', args.date)
-
-  const item: LocalPlanned | null = linkedRow ?? autoItem ?? match?.item ?? null
-  const auto = item !== null && item === autoItem
-  const [unlinkedId, setUnlinkedId] = useState<string | null>(null)
-  const linked = item !== null && unlinkedId !== item.id
-  const autoGoalId = auto && linked ? goalIdForMatch(item, 'spend') : null
-  const autoBillId = auto && linked ? billIdForMatch(item, 'spend') : null
-  // Switching a found payment off saves regular spending; with none found, a picked bill
-  // still pays its first open occurrence.
-  const billId = isIncome
-    ? null
-    : item
-      ? linked
-        ? billIdForMatch(item, 'spend')
-        : null
-      : args.billId
-  const selectedId = isIncome
-    ? auto && linked
-      ? item.incomeStreamId
-      : streamId
-    : (autoBillId ?? autoGoalId ?? args.billId ?? args.goalId)
+  const { item, auto, linked, selectedId, streamId } = resolved
 
   const options: RankedOptions = useMemo(
     () =>
@@ -194,7 +154,7 @@ export function useCountsToward(args: {
       ? null
       : chosen
         ? chosen
-        : auto && linked
+        : item && auto && linked
           ? {
               name: item.name,
               sub: `Upcoming · ${formatMoneyRounded(item.amount, item.currency)} due ${shortDate(item.date)}`,
@@ -234,17 +194,11 @@ export function useCountsToward(args: {
     face,
     banner,
     infoHint,
-    setLinked: (on: boolean) => setUnlinkedId(on || !item ? null : item.id),
+    setLinked: (on: boolean) =>
+      setChoice({ ...choice, unlinkedId: on || !item ? null : item.id }),
     /** Records a pick from the list; the caller files a spend's pick as its bill or goal. */
-    pick: (id: string | null) => {
-      setPick({ type: args.type, id })
-      setUnlinkedId(null)
-    },
-    /** What the entry saves: the planned item it settles and, for a spend, its goal or bill. */
-    link: {
-      plannedId: linked ? item.id : null,
-      goalId: isIncome || billId ? null : (autoGoalId ?? args.goalId),
-      billId,
-    },
+    pick: (id: string | null) =>
+      setChoice({ pick: { type: args.type, id }, unlinkedId: null }),
+    link: resolved.link,
   }
 }
