@@ -36,12 +36,16 @@ the server makes it), so there is no offline write and no outbox entity. Dexie `
 
 ## Status and expiry
 
-- Local `status` is only the stored `'active' | 'revoked'`. The wire may say `EXPIRED`
-  (presentation, derived from `expires_at`); it maps to `'active'` and is never sent back.
-  `keyHealth(key, now)` re-derives `active | expiring (≤ 14 days) | expired | revoked` at render,
-  so a cached row does not stay "active" after it lapses.
-- Row dot: `fp-accent` active, `fp-warn` expiring, `fp-danger` expired, hollow `fp-text-3`
-  revoked — always beside a text label. The second line (`describeKey`) is the key's identity
+- Local `status` is only the stored `'active' | 'revoked'`. The wire may say `EXPIRED` or
+  `PAUSED` (presentation, derived from `expires_at` / `paused_until`); both map to `'active'`
+  and are never sent back. `pausedUntil` is cached with the key (a row cached before it existed
+  has none — `isPaused` treats that as unpaused). `keyHealth(key, now)` re-derives
+  `active | expiring (≤ 14 days) | paused | expired | revoked` at render (revoked, then expired,
+  then paused), so a cached row does not stay "active" or "paused" after it lapses.
+- Row dot: `fp-accent` active, `fp-warn` expiring, solid `fp-text-3` paused, `fp-danger`
+  expired, hollow `fp-text-3` revoked — always beside a text label. A paused key's label is
+  "Paused until <time>" (`formatResume`: just the time when it is today, else date, time).
+  The second line (`describeKey`) is the key's identity
   in words: status · default account · expiry · last use. Expiring keys count in **days**
   (`Intl.RelativeTimeFormat` unit `day`), not `formatRelativeTime`'s "next week".
 - **Throttled.** `throttledUntil` (wire `throttled_until`, cached with the key) is when a key
@@ -50,6 +54,14 @@ the server makes it), so there is no offline write and no outbox entity. Dexie `
   a third, `fp-warn` line with a Lucide `Gauge` ("Over its limit of 60 a minute — requests are
   refused, accepted again in 34 seconds."), spoken in seconds (a window is one minute). Not on
   a revoked key.
+- **Pause.** The row menu offers **Pause…** on a working key and **Resume** on a paused one
+  (neither on a revoked or expired key). `PauseKeyDialog` (shared `ConfirmDialog`, neutral tint)
+  picks 1 hour / 1 day / 1 week / until a day (`data/pause.ts`); the resume time is computed
+  when Pause is pressed, and "until a day" means the **start** of that local day
+  (`startOfDayIso`), so it must be after today. Resume goes through `ConfirmKeyActionDialog`
+  (`resume`, accent). Both call `PUT …/pause` (`integrationKeysApi.pause`, `pauseKey` /
+  `resumeKey`) and cache the returned key; the flow is `useKeyFlow` with
+  `confirm(pauseUntil)`.
 - Expiry picks: Never / 30 / 90 / 365 days / a date. A key expires at the **end** of the chosen
   local day (`endOfDayIso`). Re-sending an unchanged past expiry is accepted by the backend, so
   the editor passes the stored string through untouched unless the user changes it.
@@ -312,7 +324,8 @@ is tagged with its key id, so switching keys never shows the previous key's rows
   staged-with-missing-fields / unmatched / ignored `warn`, refused `error`, duplicate `idle` —
   always beside the text, never colour alone.
 - **Opened** (`DeliveryDetails`): the fix for a refusal (`deliveryText.REFUSED` — wrong secret →
-  re-paste or rotate; revoked → rotate; expired → a later expiry; over the limit → "the rest of
+  re-paste or rotate; revoked → rotate; expired → a later expiry; paused → resume (tone
+  `warn`, not `error` — the owner chose it); over the limit → "the rest of
   that minute's requests were refused too and aren't listed", because only the first refusal of
   a window is logged; too large; not a JSON object; failed on our side); for a delivery no rule
   handled, each rule's `didn't match (<detail>)`; the **per-field report**

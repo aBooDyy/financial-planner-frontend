@@ -8,6 +8,8 @@ type Props = {
   onEdit: (key: LocalIntegrationKey) => void
   onRotate: (key: LocalIntegrationKey) => void
   onRevoke: (key: LocalIntegrationKey) => void
+  onPause: (key: LocalIntegrationKey) => void
+  onResume: (key: LocalIntegrationKey) => void
   onDelete: (key: LocalIntegrationKey) => void
 }
 
@@ -18,6 +20,8 @@ export function KeyList({
   onEdit,
   onRotate,
   onRevoke,
+  onPause,
+  onResume,
   onDelete,
 }: Props) {
   return (
@@ -38,6 +42,8 @@ export function KeyList({
           onEdit={() => onEdit(k)}
           onRotate={() => onRotate(k)}
           onRevoke={() => onRevoke(k)}
+          onPause={() => onPause(k)}
+          onResume={() => onResume(k)}
           onDelete={() => onDelete(k)}
         />
       ))}

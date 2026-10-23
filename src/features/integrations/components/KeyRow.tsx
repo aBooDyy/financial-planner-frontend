@@ -21,6 +21,7 @@ import { usePreferencesStore } from '#/stores/preferences'
 const DOT: Record<KeyHealth, string> = {
   active: 'bg-fp-accent',
   expiring: 'bg-fp-warn',
+  paused: 'bg-fp-text-3',
   expired: 'bg-fp-danger',
   revoked: 'border-[1.5px] border-fp-text-3 bg-transparent',
 }
@@ -36,6 +37,8 @@ type Props = {
   onEdit: () => void
   onRotate: () => void
   onRevoke: () => void
+  onPause: () => void
+  onResume: () => void
   onDelete: () => void
 }
 
@@ -46,6 +49,8 @@ export function KeyRow({
   onEdit,
   onRotate,
   onRevoke,
+  onPause,
+  onResume,
   onDelete,
 }: Props) {
   const locale = useDirectionStore((s) => s.locale)
@@ -121,6 +126,15 @@ export function KeyRow({
           <DropdownMenuItem disabled={!online} onSelect={onRotate}>
             Rotate secret
           </DropdownMenuItem>
+          {health === 'paused' ? (
+            <DropdownMenuItem disabled={!online} onSelect={onResume}>
+              Resume
+            </DropdownMenuItem>
+          ) : health === 'active' || health === 'expiring' ? (
+            <DropdownMenuItem disabled={!online} onSelect={onPause}>
+              Pause…
+            </DropdownMenuItem>
+          ) : null}
           {apiKey.status === 'active' ? (
             <DropdownMenuItem disabled={!online} onSelect={onRevoke}>
               Revoke

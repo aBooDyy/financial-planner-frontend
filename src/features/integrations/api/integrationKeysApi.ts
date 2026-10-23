@@ -11,6 +11,7 @@ import {
   toCreateKeyWire,
   toCreatedKey,
   toIntegrationKey,
+  toPauseKeyWire,
   toUpdateKeyWire,
 } from './types'
 
@@ -37,6 +38,19 @@ export const integrationKeysApi = {
       .patch<IntegrationKeyWire>(
         keyPath(id),
         toUpdateKeyWire(version, settings),
+      )
+      .then(toIntegrationKey),
+
+  /** `until: null` resumes the key now. */
+  pause: (
+    id: string,
+    version: string,
+    until: string | null,
+  ): Promise<IntegrationKey> =>
+    http
+      .put<IntegrationKeyWire>(
+        `${keyPath(id)}/pause`,
+        toPauseKeyWire(version, until),
       )
       .then(toIntegrationKey),
 

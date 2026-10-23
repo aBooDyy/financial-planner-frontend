@@ -477,6 +477,8 @@ export type LocalIntegrationKey = {
   tokenPrefix: string
   status: IntegrationKeyStatus
   expiresAt: string | null
+  /** When a paused key accepts deliveries again; null while it is not paused. */
+  pausedUntil: string | null
   rotatedAt: string | null
   lastUsedAt: string | null
   requestsCount: number

@@ -17,6 +17,7 @@ import { EndpointCard } from './EndpointCard'
 import { KeyEditorDialog } from './KeyEditorDialog'
 import { KeyList } from './KeyList'
 import { NoKeysCard } from './NoKeysCard'
+import { PauseKeyDialog } from './PauseKeyDialog'
 import { TokenRevealDialog } from './TokenRevealDialog'
 
 /** Read through the route API rather than the route module, which imports this component. */
@@ -106,6 +107,8 @@ export function IntegrationsSection() {
           onEdit={flow.edit}
           onRotate={(k) => flow.ask('rotate', k)}
           onRevoke={(k) => flow.ask('revoke', k)}
+          onPause={(k) => flow.ask('pause', k)}
+          onResume={(k) => flow.ask('resume', k)}
           onDelete={(k) => flow.ask('delete', k)}
         />
       )}
@@ -149,8 +152,24 @@ export function IntegrationsSection() {
         />
       ) : null}
 
+      {flow.pending?.action === 'pause' ? (
+        <PauseKeyDialog
+          key={flow.pending.key.id}
+          open
+          keyName={flow.pending.key.name}
+          busy={flow.busy}
+          error={flow.pendingError}
+          onConfirm={(until) => void flow.confirm(until)}
+          onClose={flow.cancelPending}
+        />
+      ) : null}
+
       <ConfirmKeyActionDialog
-        action={flow.pending?.action ?? null}
+        action={
+          flow.pending && flow.pending.action !== 'pause'
+            ? flow.pending.action
+            : null
+        }
         keyName={flow.pending?.key.name ?? ''}
         busy={flow.busy}
         error={flow.pendingError}

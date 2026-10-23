@@ -23,6 +23,11 @@ const REFUSED: Record<string, (limits: Limits) => DeliverySummary> = {
     headline: 'Refused — key revoked',
     help: 'This key no longer accepts transactions. Rotate it to use it again.',
   }),
+  'integrations.auth.paused': () => ({
+    tone: 'warn',
+    headline: 'Refused — key paused',
+    help: 'This key was paused, so this wasn’t added. Resume the key to accept transactions again.',
+  }),
   'integrations.auth.expired': () => ({
     tone: 'error',
     headline: 'Refused — key expired',

@@ -23,6 +23,8 @@ const renderRow = (
         onEdit={vi.fn()}
         onRotate={vi.fn()}
         onRevoke={vi.fn()}
+        onPause={vi.fn()}
+        onResume={vi.fn()}
         onDelete={vi.fn()}
       />
     </ul>,
@@ -72,6 +74,31 @@ describe('KeyRow', () => {
     openMenu('Tasker — SMS alerts')
     expect(screen.getByRole('menuitem', { name: 'Revoke' })).toBeDefined()
     expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeDefined()
+  })
+
+  it('offers Pause on an active key and Resume on a paused one', () => {
+    renderRow(aKey())
+    openMenu('Tasker — SMS alerts')
+    expect(screen.getByRole('menuitem', { name: 'Pause…' })).toBeDefined()
+    expect(screen.queryByRole('menuitem', { name: 'Resume' })).toBeNull()
+    cleanup()
+
+    renderRow(aKey({ pausedUntil: inDays(1) }))
+    expect(screen.getByText(/^Paused until /)).toBeDefined()
+    openMenu('Tasker — SMS alerts')
+    expect(screen.getByRole('menuitem', { name: 'Resume' })).toBeDefined()
+    expect(screen.queryByRole('menuitem', { name: 'Pause…' })).toBeNull()
+  })
+
+  it('offers no pause on a revoked or expired key', () => {
+    renderRow(aKey({ status: 'revoked' }))
+    openMenu('Tasker — SMS alerts')
+    expect(screen.queryByRole('menuitem', { name: 'Pause…' })).toBeNull()
+    cleanup()
+
+    renderRow(aKey({ expiresAt: inDays(-1) }))
+    openMenu('Tasker — SMS alerts')
+    expect(screen.queryByRole('menuitem', { name: 'Pause…' })).toBeNull()
   })
 
   it('says a throttled key is refusing requests, and when that ends', () => {

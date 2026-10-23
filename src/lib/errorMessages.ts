@@ -197,6 +197,8 @@ const MESSAGES: Record<string, string> = {
     'You’ve reached the most keys you can have. Delete one you no longer use.',
   'integrations.key.revoked':
     'That key is revoked. Rotate it or create a new one.',
+  'integrations.key.pause_invalid':
+    'Choose a time in the future to pause until.',
   'integrations.rule.invalid': 'That rule couldn’t be saved.',
   'integrations.rule.path_invalid':
     'That path isn’t valid. Use a form like $.data.amount.',
@@ -217,6 +219,7 @@ const MESSAGES: Record<string, string> = {
   'integrations.auth.invalid': 'That integration key isn’t valid.',
   'integrations.auth.expired': 'That integration key has expired.',
   'integrations.auth.revoked': 'That integration key was revoked.',
+  'integrations.auth.paused': 'That integration key is paused.',
   'integrations.payload.invalid': 'The request body isn’t valid JSON.',
   'integrations.payload.too_large': 'The request body is too large.',
   'integrations.rate.limited':

@@ -15,6 +15,8 @@ import { byListOrder } from '#/features/integrations/data/mappers'
 import {
   createKey,
   deleteKey,
+  pauseKey,
+  resumeKey,
   revokeKey,
   rotateKey,
   updateKey,
@@ -42,6 +44,8 @@ const ACTIONS = {
       updateKey(key, settings),
   ),
   revoke: attempt(revokeKey),
+  pause: attempt(pauseKey),
+  resume: attempt(resumeKey),
   rotate: attempt(rotateKey),
   remove: attempt(deleteKey),
 }

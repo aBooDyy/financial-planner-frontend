@@ -28,6 +28,19 @@ export async function revokeKey(key: IntegrationKey): Promise<IntegrationKey> {
   return updateKey(key, { ...settingsOf(key), status: 'revoked' })
 }
 
+export async function pauseKey(
+  key: IntegrationKey,
+  until: string | null,
+): Promise<IntegrationKey> {
+  const updated = await integrationKeysApi.pause(key.id, key.version, until)
+  await cacheKey(updated)
+  return updated
+}
+
+export async function resumeKey(key: IntegrationKey): Promise<IntegrationKey> {
+  return pauseKey(key, null)
+}
+
 export async function rotateKey(key: IntegrationKey): Promise<CreatedKey> {
   const rotated = await integrationKeysApi.rotate(key.id)
   await cacheKey(rotated.key)

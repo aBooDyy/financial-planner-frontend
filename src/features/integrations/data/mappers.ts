@@ -10,6 +10,7 @@ export const keyToLocal = (k: IntegrationKey): LocalIntegrationKey => ({
 const RANK: Record<KeyHealth, number> = {
   active: 0,
   expiring: 0,
+  paused: 0,
   expired: 1,
   revoked: 2,
 }

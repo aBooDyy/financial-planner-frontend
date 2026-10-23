@@ -38,6 +38,17 @@ describe('integration key wire mappers', () => {
     expect(toUpdateKeyWire(key.version, settingsOf(key)).status).toBe('ACTIVE')
   })
 
+  it('never stores PAUSED — it is re-derived from paused_until', () => {
+    const key = toIntegrationKey(
+      aKeyWire({ status: 'PAUSED', paused_until: '2099-01-01T00:00:00Z' }),
+    )
+    expect(key.status).toBe('active')
+    expect(key.pausedUntil).toBe('2099-01-01T00:00:00Z')
+    expect(toUpdateKeyWire(key.version, settingsOf(key))).not.toHaveProperty(
+      'paused_until',
+    )
+  })
+
   it('keeps the token only on the created shape', () => {
     const created = toCreatedKey({
       key: aKeyWire(),

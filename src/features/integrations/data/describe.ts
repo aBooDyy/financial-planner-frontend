@@ -2,6 +2,7 @@ import type { LocalIntegrationKey } from '#/db/types'
 import { formatDate, formatRelativeTime } from '#/lib/date'
 import type { DateFormat } from '#/lib/date'
 import { HEALTH_LABEL, keyHealth } from './health'
+import { formatResume } from './pause'
 
 type Context = {
   walletName: string | null
@@ -27,7 +28,11 @@ export function describeKey(
     return [`Expired ${expiresOn} — this key no longer accepts transactions`]
   }
 
-  const parts = [HEALTH_LABEL[health]]
+  const parts = [
+    health === 'paused' && key.pausedUntil
+      ? `Paused until ${formatResume(key.pausedUntil, locale, dateFormat, now)}`
+      : HEALTH_LABEL[health],
+  ]
   if (health === 'revoked') {
     parts.push(requests(key.requestsCount))
     return parts

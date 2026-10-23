@@ -6,7 +6,7 @@ import { failureMessage } from '#/features/integrations/data/errors'
 import type { KeyActions } from './useIntegrationKeys'
 
 type Reveal = { token: string; keyId: string; kind: 'created' | 'rotated' }
-type Pending = { action: KeyAction; key: LocalIntegrationKey }
+type Pending = { action: KeyAction | 'pause'; key: LocalIntegrationKey }
 
 /**
  * Which of the Integrations dialogs is open, and the hand-offs between them: create → reveal
@@ -43,12 +43,13 @@ export function useKeyFlow(actions: KeyActions, initialEditingId?: string) {
     setReveal(null)
   }
 
-  const ask = (action: KeyAction, key: LocalIntegrationKey) => {
+  const ask = (action: Pending['action'], key: LocalIntegrationKey) => {
     setPendingError(null)
     setPending({ action, key })
   }
 
-  const confirm = async () => {
+  /** `pauseUntil` is the pause dialog's answer; every other action needs nothing more. */
+  const confirm = async (pauseUntil?: string) => {
     if (!pending || busy) return
     setBusy(true)
     const { action, key } = pending
@@ -72,7 +73,11 @@ export function useKeyFlow(actions: KeyActions, initialEditingId?: string) {
     const outcome =
       action === 'revoke'
         ? await actions.revoke(key)
-        : await actions.remove(key.id)
+        : action === 'pause' && pauseUntil
+          ? await actions.pause(key, pauseUntil)
+          : action === 'resume'
+            ? await actions.resume(key)
+            : await actions.remove(key.id)
     settle(outcome.ok ? null : failureMessage(outcome.failure))
   }
 

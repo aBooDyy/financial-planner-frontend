@@ -12,16 +12,23 @@ export type { IntegrationKeyStatus } from '#/db/types'
  * direct API calls — never through the outbox.
  */
 type IntegrationKeyStatusWire = 'ACTIVE' | 'REVOKED'
-/** What a read may say. `EXPIRED` is derived from `expires_at` and is never sent back. */
-type IntegrationKeyStatusReadWire = IntegrationKeyStatusWire | 'EXPIRED'
+/**
+ * What a read may say. `PAUSED` and `EXPIRED` are derived from `paused_until` and
+ * `expires_at` and are never sent back.
+ */
+type IntegrationKeyStatusReadWire =
+  | IntegrationKeyStatusWire
+  | 'PAUSED'
+  | 'EXPIRED'
 
-// An expired key's stored status is still ACTIVE, and expiry is re-derived locally from
-// `expiresAt` — a cached row would otherwise stay "active" long after it lapsed.
+// A paused or expired key's stored status is still ACTIVE, and both are re-derived locally
+// from the timestamps — a cached row would otherwise keep a state long after it lapsed.
 const STATUS_FROM_WIRE: Record<
   IntegrationKeyStatusReadWire,
   IntegrationKeyStatus
 > = {
   ACTIVE: 'active',
+  PAUSED: 'active',
   EXPIRED: 'active',
   REVOKED: 'revoked',
 }
@@ -45,6 +52,7 @@ export type IntegrationKey = {
   tokenPrefix: string
   status: IntegrationKeyStatus
   expiresAt: string | null
+  pausedUntil: string | null
   rotatedAt: string | null
   lastUsedAt: string | null
   requestsCount: number
@@ -93,6 +101,7 @@ export type IntegrationKeyWire = {
   token_prefix: string
   status: IntegrationKeyStatusReadWire
   expires_at: string | null
+  paused_until: string | null
   rotated_at: string | null
   last_used_at: string | null
   requests_count: number
@@ -132,6 +141,8 @@ type UpdateKeyWire = {
   rate_limit_per_minute: number
 }
 
+type PauseKeyWire = { version: string; until: string | null }
+
 // --- Mappers -------------------------------------------------------------------------
 
 export const toIntegrationKey = (w: IntegrationKeyWire): IntegrationKey => ({
@@ -140,6 +151,7 @@ export const toIntegrationKey = (w: IntegrationKeyWire): IntegrationKey => ({
   tokenPrefix: w.token_prefix,
   status: fromWireKeyStatus(w.status),
   expiresAt: w.expires_at,
+  pausedUntil: w.paused_until,
   rotatedAt: w.rotated_at,
   lastUsedAt: w.last_used_at,
   requestsCount: w.requests_count,
@@ -184,6 +196,11 @@ export const toUpdateKeyWire = (
   stage_unmatched: s.stageUnmatched,
   rate_limit_per_minute: s.rateLimitPerMinute,
 })
+
+export const toPauseKeyWire = (
+  version: string,
+  until: string | null,
+): PauseKeyWire => ({ version, until })
 
 /** A key's current settings, as the editor starts from them. */
 export const settingsOf = (k: IntegrationKey): KeySettings => ({

@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react'
-import { Ban, KeyRound, Trash2 } from 'lucide-react'
+import { Ban, KeyRound, Play, Trash2 } from 'lucide-react'
 import { ConfirmDialog } from '#/components/dialog/ConfirmDialog'
 import type { DialogTone } from '#/components/ui/responsive-dialog'
 
-export type KeyAction = 'rotate' | 'revoke' | 'delete'
+export type KeyAction = 'rotate' | 'revoke' | 'resume' | 'delete'
 
 type ActionCopy = {
   title: (name: string) => string
@@ -30,6 +30,14 @@ const COPY: Record<KeyAction, ActionCopy> = {
     busy: 'Revoking…',
     tone: 'danger',
     icon: <Ban />,
+  },
+  resume: {
+    title: (name) => `Resume “${name}” now?`,
+    body: 'It starts accepting transactions again right away. Anything sent while it was paused stays out.',
+    confirm: 'Resume',
+    busy: 'Resuming…',
+    tone: 'accent',
+    icon: <Play />,
   },
   delete: {
     title: (name) => `Delete “${name}”?`,
@@ -71,7 +79,9 @@ export function ConfirmKeyActionDialog({
       tone={copy.tone}
       icon={copy.icon}
       confirmLabel={busy ? copy.busy : copy.confirm}
-      confirmVariant={action === 'rotate' ? 'default' : 'destructive'}
+      confirmVariant={
+        action === 'rotate' || action === 'resume' ? 'default' : 'destructive'
+      }
       onConfirm={onConfirm}
       busy={busy}
       error={error}

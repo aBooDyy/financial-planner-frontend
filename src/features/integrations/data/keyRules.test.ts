@@ -8,6 +8,7 @@ import { ApiError } from '#/lib/apiError'
 import { endOfDayIso, expiryDay, presetExpiry } from './expiry'
 import { keyHealth } from './health'
 import { byListOrder } from './mappers'
+import { formatResume, presetPause, startOfDayIso } from './pause'
 
 const NOW = new Date('2026-09-23T12:00:00Z')
 const inDays = (days: number) =>
@@ -20,6 +21,26 @@ describe('keyHealth', () => {
     expect(keyHealth(aKey({ expiresAt: inDays(12) }), NOW)).toBe('expiring')
     expect(keyHealth(aKey({ expiresAt: inDays(40) }), NOW)).toBe('active')
     expect(keyHealth(aKey(), NOW)).toBe('active')
+  })
+
+  it('reads a key paused until later as paused, and as itself once that passes', () => {
+    expect(keyHealth(aKey({ pausedUntil: inDays(1) }), NOW)).toBe('paused')
+    expect(keyHealth(aKey({ pausedUntil: inDays(-1) }), NOW)).toBe('active')
+  })
+
+  it('reads a row cached before pauses existed as unpaused', () => {
+    const { pausedUntil: _, ...cached } = aKey()
+    expect(keyHealth(cached as ReturnType<typeof aKey>, NOW)).toBe('active')
+  })
+
+  it('reports revocation and expiry over a pause', () => {
+    const paused = { pausedUntil: inDays(1) }
+    expect(keyHealth(aKey({ ...paused, status: 'revoked' }), NOW)).toBe(
+      'revoked',
+    )
+    expect(keyHealth(aKey({ ...paused, expiresAt: inDays(-1) }), NOW)).toBe(
+      'expired',
+    )
   })
 
   it('treats a revoked key as revoked even once it has expired', () => {
@@ -43,6 +64,14 @@ describe('describeKey', () => {
       'expires in 12 days',
       'last used 2 days ago',
     ])
+  })
+
+  it('says until when a paused key is paused', () => {
+    const [line] = describeKey(aKey({ pausedUntil: '2026-09-30T09:00:00Z' }), {
+      ...ctx,
+      walletName: null,
+    })
+    expect(line).toMatch(/^Paused until 30\/09\/2026, /)
   })
 
   it('says a revoked key’s history, not its settings', () => {
@@ -155,6 +184,25 @@ describe('expiry', () => {
     expect(expiryDay(presetExpiry('30d', new Date(2026, 8, 23)))).toBe(
       '2026-10-23',
     )
+  })
+})
+
+describe('pause', () => {
+  it('counts presets from now', () => {
+    expect(presetPause('1h', NOW)).toBe('2026-09-23T13:00:00.000Z')
+    expect(presetPause('7d', NOW)).toBe('2026-09-30T12:00:00.000Z')
+  })
+
+  it('resumes at the start of the chosen local day', () => {
+    const d = new Date(startOfDayIso('2026-10-05'))
+    expect([d.getFullYear(), d.getMonth(), d.getDate(), d.getHours()]).toEqual([
+      2026, 9, 5, 0,
+    ])
+  })
+
+  it('shows only the time for a pause that ends today', () => {
+    const later = new Date(NOW.getTime() + 3600 * 1000).toISOString()
+    expect(formatResume(later, 'en', 'dmy', NOW)).not.toContain('/')
   })
 })
 
