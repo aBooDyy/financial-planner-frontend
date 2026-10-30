@@ -1,23 +1,32 @@
 /**
- * "Pay now" on a bill: pay any open occurrence — the next one, or a later one ahead of time —
- * in full or in part. The payment settles that occurrence's planned row (made on the spot when
- * the occurrence is beyond what the planner has generated), releases what it had set aside in
- * the paying wallet, and moves `nextDue` on once the occurrence is settled. What a settled
- * occurrence still holds comes back as a leftover report for the prompt.
+ * "Pay now" on a bill: pay any occurrence not paid yet — the next one, a later one ahead of time,
+ * or an earlier one (skipped, or before `nextDue` with no payment on record) — in full or in
+ * part. The payment settles that occurrence's planned row (made on the spot when the planner has
+ * not generated one), releases what it had set aside in the paying wallet, and moves `nextDue`
+ * on once the occurrence is settled. What a settled occurrence still holds comes back as a
+ * leftover report for the prompt.
  */
 import { db } from '#/db/db'
 import type { LocalBill, LocalPlanned, LocalSetAside } from '#/db/types'
 import { plannedIdFor } from '#/features/planned/data/ids'
 import {
+  closeRest,
   confirmPlanned,
+  editPlannedAmount,
+  reopenToPay,
   replanSettledOccurrence,
+  settleVaryingRow,
+  skipPlanned,
   syncBillNextDue,
 } from '#/features/planned/data/mutations'
+import { billOwner } from '#/features/planned/data/owners'
+import { requestPlanRecalc } from '#/features/planned/data/recalcRequests'
 import { currentRates, insertPlanned } from '#/features/planned/data/rows'
 import { leftoverFor } from '#/features/planning/data/leftover'
 import type { LeftoverReport } from '#/features/planning/data/leftover'
 import {
   billOccurrences,
+  earlierOccurrences,
   firstOpenOccurrence,
   paymentRowsOf,
 } from '#/features/planning/data/occurrences'
@@ -172,12 +181,18 @@ async function afterPayment(
   return withPayingWallet(report, bill, setAsides, payingWalletId, rates)
 }
 
-/** A date the bill falls due on, from `nextDue` on (before it everything is settled). */
+/** How far back an earlier occurrence may be picked — a monthly bill's ten years. */
+const EARLIEST_CYCLES = 120
+
+/** A date the bill falls due on: from `nextDue` on, before it, or a row it already has. */
 const onSchedule = (
   bill: LocalBill,
   payments: ReadonlyMap<string, LocalPlanned>,
   occurrence: string,
-): boolean => billOccurrences(bill, payments, occurrence).includes(occurrence)
+): boolean =>
+  payments.has(occurrence) ||
+  billOccurrences(bill, payments, occurrence).includes(occurrence) ||
+  earlierOccurrences(bill, payments, EARLIEST_CYCLES).includes(occurrence)
 
 export async function payBill(
   billId: string,
@@ -189,24 +204,58 @@ export async function payBill(
   if (!onSchedule(bill, payments, occurrence))
     throw new MoneyActionError('bad_occurrence')
   const existing = payments.get(occurrence)
-  if (existing && existing.status !== 'open')
-    throw new MoneyActionError('closed')
+  if (existing?.status === 'done') throw new MoneyActionError('closed')
   const walletId = input.walletId ?? bill.walletId
   if (!walletId) throw new MoneyActionError('no_wallet')
 
   const row = await paymentRow(bill, occurrence, existing)
+  await reopenToPay(row.id)
   const result = await confirmPlanned(row.id, {
     amount: input.amount,
     walletId,
     date: input.date,
     note: input.note,
   })
+  // `nextDue` has moved on past it: this is a record of the past, and nothing more is owed.
+  if (result.status === 'open' && occurrence < bill.nextDue)
+    await closeRest(row.id)
   return {
     transactionId: result.settlementId,
     occurrence,
-    status: result.status,
+    status: occurrence < bill.nextDue ? 'done' : result.status,
     leftover: await afterPayment(bill, occurrence, walletId),
   }
+}
+
+/** Not paying this occurrence: on any of its dates, whether or not a row exists yet. */
+export async function skipOccurrence(
+  billId: string,
+  occurrence: string,
+): Promise<void> {
+  const bill = await liveBill(billId)
+  const payments = await paymentsOf(bill)
+  if (!onSchedule(bill, payments, occurrence))
+    throw new MoneyActionError('bad_occurrence')
+  const row = await paymentRow(bill, occurrence, payments.get(occurrence))
+  await skipPlanned(row.id)
+}
+
+/**
+ * This occurrence costs `amount` instead of what the bill says ("this month's electricity came
+ * to SR 430"). The plan is rewritten quietly so the paydays before it cover the new figure.
+ */
+export async function setOccurrenceAmount(
+  billId: string,
+  occurrence: string,
+  amount: number,
+): Promise<void> {
+  const bill = await liveBill(billId)
+  const payments = await paymentsOf(bill)
+  if (!onSchedule(bill, payments, occurrence))
+    throw new MoneyActionError('bad_occurrence')
+  const row = await paymentRow(bill, occurrence, payments.get(occurrence))
+  await editPlannedAmount(row.id, amount)
+  requestPlanRecalc(billOwner(bill.id), { quiet: true })
 }
 
 /** The planned payment row a bill payment written elsewhere settles. */
@@ -261,6 +310,7 @@ export async function settleBillPayment(
     payment,
     await currentRates(),
   )
+  await settleVaryingRow((await paymentsOf(bill)).get(occurrence)?.id)
   await syncBillNextDue(bill.id)
   return afterPayment(bill, occurrence, payment.walletId)
 }

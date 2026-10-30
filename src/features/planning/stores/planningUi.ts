@@ -18,6 +18,9 @@ export type PlanningSheet =
   | { kind: 'income'; id: string | null }
   | { kind: 'addMoney'; owner: PlanOwner }
   | { kind: 'payNow'; billId: string; occurrence?: string }
+  | { kind: 'cycleAmount'; billId: string; occurrence: string }
+  | { kind: 'setAside'; id: string }
+  | { kind: 'payment'; transactionId: string }
   | {
       kind: 'leftover'
       report: LeftoverReport

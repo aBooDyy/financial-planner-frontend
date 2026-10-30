@@ -44,6 +44,7 @@ export type Bill = {
   autopay: boolean
   /** False = "Nice to have". */
   mustPay: boolean
+  amountVaries: boolean
   color: string
   position: number
   /** Set by Mark as done / End this bill; cleared by Reopen. */
@@ -77,6 +78,7 @@ export type BillWire = {
   note: string | null
   autopay: boolean
   must_pay: boolean
+  amount_varies?: boolean
   color: string
   position: number
   closed_at: string | null
@@ -107,6 +109,7 @@ export type CreateBillWire = PlanWire & {
   note: string | null
   autopay: boolean
   must_pay: boolean
+  amount_varies: boolean
   color: string
   position: number
 }
@@ -144,6 +147,7 @@ export const toBill = (w: BillWire): Bill => ({
   note: w.note ?? null,
   autopay: w.autopay,
   mustPay: w.must_pay,
+  amountVaries: w.amount_varies ?? false,
   color: w.color,
   position: w.position,
   closedAt: w.closed_at ?? null,

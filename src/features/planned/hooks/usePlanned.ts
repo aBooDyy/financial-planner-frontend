@@ -36,6 +36,9 @@ export function usePlanned(): UsePlanned {
         rates: data.inputs.rates,
         base: data.inputs.base,
         today: data.today,
+        varyingBillIds: new Set(
+          data.inputs.bills.filter((b) => b.amountVaries).map((b) => b.id),
+        ),
       }),
     [data.inputs, data.state, data.nodes, data.today],
   )

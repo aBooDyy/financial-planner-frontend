@@ -6,6 +6,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react'
 import {
   afterEach,
@@ -24,6 +25,7 @@ import {
   goal,
   m,
   setAside,
+  tx,
   wallet,
 } from '#/features/planned/testing/fixtures'
 import { seedPlanningDb, stubBrowser } from '#/features/planning/testing/dom'
@@ -32,6 +34,7 @@ import { AddMoneySheet } from './AddMoneySheet'
 import { LeftoverSheet } from './LeftoverSheet'
 import { MarkDoneSheet } from './MarkDoneSheet'
 import { PayNowSheet } from './PayNowSheet'
+import { SetAsideSheet } from './SetAsideSheet'
 import { UseItSheet } from './UseItSheet'
 
 vi.mock('#/db/sync', () => ({ schedulePush: () => undefined }))
@@ -378,5 +381,127 @@ describe('Use it', () => {
     expect(
       screen.getByRole('button', { name: 'Record SR 250 spent' }),
     ).toBeTruthy()
+  })
+})
+
+describe('SetAsideSheet', () => {
+  const held = (over = {}) =>
+    setAside({
+      id: 'sa',
+      goalId: 'g1',
+      walletId: 'main',
+      amount: m(200),
+      date: '2026-09-01',
+      ...over,
+    })
+
+  beforeEach(async () => {
+    await db.goals.put(goal({ id: 'g1', name: 'Car', amount: m(300) }))
+  })
+
+  it('saves a change to a live one', async () => {
+    await db.setAsides.put(held())
+    render(<SetAsideSheet id="sa" onClose={vi.fn()} />)
+    const amount = await screen.findByRole('textbox', { name: /How much/ })
+    fireEvent.change(amount, { target: { value: '250' } })
+    fireEvent.click(screen.getByRole('button', { name: /^Save/ }))
+    await waitFor(async () =>
+      expect((await db.setAsides.get('sa'))?.amount).toBe(m(250)),
+    )
+  })
+
+  it('takes a live one back, keeping the record', async () => {
+    await db.setAsides.put(held())
+    render(<SetAsideSheet id="sa" onClose={vi.fn()} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Take back' }))
+    await waitFor(async () =>
+      expect((await db.setAsides.get('sa'))?.releasedAt).not.toBeNull(),
+    )
+  })
+
+  it('deletes one after asking', async () => {
+    await db.setAsides.put(held())
+    render(<SetAsideSheet id="sa" onClose={vi.fn()} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }))
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Delete this set-aside?',
+    })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }))
+    await waitFor(async () =>
+      expect(await db.setAsides.get('sa')).toBeUndefined(),
+    )
+  })
+
+  it('only tells about one a payment used', async () => {
+    await db.transactions.put(
+      tx({ id: 'pay', goalId: 'g1', date: '2026-09-20' }),
+    )
+    await db.setAsides.put(
+      held({ releasedAt: '2026-09-20', releasedById: 'pay' }),
+    )
+    render(<SetAsideSheet id="sa" onClose={vi.fn()} />)
+    expect(
+      await screen.findByText(/Used by the Sep 20, 2026 payment/),
+    ).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull()
+    expect(
+      screen.getByRole('button', { name: 'Open the payment' }),
+    ).toBeTruthy()
+  })
+
+  it('sets one aside again after it was taken back', async () => {
+    await db.setAsides.put(held({ releasedAt: '2026-09-20' }))
+    render(<SetAsideSheet id="sa" onClose={vi.fn()} />)
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Set aside again' }),
+    )
+    await waitFor(async () =>
+      expect((await db.setAsides.get('sa'))?.releasedAt).toBeNull(),
+    )
+  })
+})
+
+describe('PayNowSheet — any date', () => {
+  beforeEach(async () => {
+    await db.bills.put(
+      bill({
+        id: 'elec',
+        name: 'Electricity',
+        amount: m(400),
+        amountVaries: true,
+        nextDue: '2026-08-15',
+        walletId: 'main',
+      }),
+    )
+  })
+
+  it('pays the date it was opened on, in what it really came to', async () => {
+    render(
+      <PayNowSheet
+        billId="elec"
+        occurrence="2026-09-15"
+        onClose={vi.fn()}
+        onLeftover={vi.fn()}
+      />,
+    )
+    const amount = await screen.findByRole('textbox', {
+      name: /How much was it/,
+    })
+    fireEvent.change(amount, { target: { value: '437' } })
+    fireEvent.click(screen.getByRole('button', { name: /^Record/ }))
+    await waitFor(async () => {
+      const [paid] = await db.transactions.toArray()
+      expect(paid).toMatchObject({ amount: m(437), billId: 'elec' })
+    })
+    await waitFor(async () => {
+      const rows = await db.plannedTransactions
+        .where('billId')
+        .equals('elec')
+        .toArray()
+      expect(rows.find((p) => p.occurrence === '2026-09-15')?.status).toBe(
+        'done',
+      )
+    })
+    expect((await db.bills.get('elec'))?.nextDue).toBe('2026-08-15')
   })
 })

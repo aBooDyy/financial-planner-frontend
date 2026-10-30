@@ -44,6 +44,7 @@ import type { RatesMap } from '#/lib/config/rates'
 import {
   billOccurrences,
   isSettledOccurrence,
+  occurrenceAmount,
   occurrenceBefore,
   paymentRowsOf,
 } from './occurrences'
@@ -266,7 +267,10 @@ function billTracks(
     if (isSettledOccurrence(rows, due)) continue
     const row = rows.get(due)
     const paid = row ? settledOf(row, input.index, input.rates) : 0
-    const need = Math.max(0, bill.amount - paid - (held.get(due) ?? 0))
+    const need = Math.max(
+      0,
+      occurrenceAmount(bill, row) - paid - (held.get(due) ?? 0),
+    )
     out.push({
       key: `bill:${bill.id}:${due}`,
       kind: 'bill',

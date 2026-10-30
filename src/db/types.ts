@@ -234,6 +234,8 @@ export type LocalBill = {
   autopay: boolean
   /** False = "Nice to have". */
   mustPay: boolean
+  /** `amount` is an estimate: each occurrence costs whatever is paid for it. */
+  amountVaries: boolean
   color: string
   position: number
   /** Marked as done / ended. Only the close / reopen actions move it. */

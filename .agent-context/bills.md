@@ -18,8 +18,19 @@ editors and lists.
 - `walletId` = "Paid from" (null: decide when paying), `saveWalletId` = "Save in" (null: the
   paid-from wallet), `categoryId` a required **spend** category, `merchantId`, `note`,
   `autopay` ("Log it automatically on the due date"), `mustPay` (default **true**; false =
-  "Nice to have"), `color`, `position`, `closedAt` (moved only by the close / reopen actions),
+  "Nice to have"), `amountVaries` (`amount` is an estimate — see below), `color`, `position`, `closedAt` (moved only by the close / reopen actions),
   the stored plan header and `setAsideDay`.
+
+## A bill whose amount varies
+
+`amountVaries` (electricity, water) keeps `amount` as the estimate the plan works with and shows
+it as "≈SR 400". A payment of **any** amount settles the occurrence: `settleVaryingRow`
+(`planned/data/mutations.ts`) gives the row the paid amount, pins it and marks it done, and when
+nothing pays it any more puts it back on the estimate, open and unpinned. Every payment path runs
+it: `confirmPlanned`, `settleBillPayment`, `stepNextDueBack`. Its rows never confirm in one tap
+(`varyingBillIds`), so the real amount is asked for; auto-pay logs the estimate, to be corrected
+on the transaction. A wire without the field reads false; **deploy the backend first**, because
+older servers ignore `amount_varies` and a full pull would turn it off.
 
 ## Sync — `data/sync.ts`
 

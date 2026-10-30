@@ -6,6 +6,7 @@
 import { db } from '#/db/db'
 import type { LocalSetAside } from '#/db/types'
 import { setBillNextDue } from '#/features/bills/data/mutations'
+import { settleVaryingRow } from '#/features/planned/data/mutations'
 import { unreleaseSetAside } from '#/features/setAsides/data/mutations'
 
 /** Whether the row's bill or goal can still hold money: open, not deleted. */
@@ -63,6 +64,7 @@ export async function stepNextDueBack(
 ): Promise<void> {
   for (const plannedId of plannedIds) {
     if (!plannedId) continue
+    await settleVaryingRow(plannedId)
     const row = await db.plannedTransactions.get(plannedId)
     if (!row || row.deleted !== 0 || row.status !== 'open') continue
     if (row.role !== 'payment' || !row.billId) continue

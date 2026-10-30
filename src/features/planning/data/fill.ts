@@ -9,7 +9,11 @@ import type { SettlementIndex } from '#/features/planned/data/settle'
 import { isLiveSetAside } from '#/features/setAsides/data/totals'
 import { convertMinor } from '#/lib/currency'
 import type { RatesMap } from '#/lib/config/rates'
-import { billOccurrences, isSettledOccurrence } from './occurrences'
+import {
+  billOccurrences,
+  isSettledOccurrence,
+  occurrenceAmount,
+} from './occurrences'
 
 /** What an open occurrence still needs, in the bill's currency. */
 export type OccurrenceNeed = { occurrence: string; need: number }
@@ -45,7 +49,10 @@ export function occurrenceNeeds(
       const paid = row ? settledOf(row, index, rates) : 0
       return {
         occurrence,
-        need: Math.max(0, bill.amount - paid - (held.get(occurrence) ?? 0)),
+        need: Math.max(
+          0,
+          occurrenceAmount(bill, row) - paid - (held.get(occurrence) ?? 0),
+        ),
       }
     })
 }

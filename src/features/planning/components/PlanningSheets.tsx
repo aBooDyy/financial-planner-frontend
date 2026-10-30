@@ -10,10 +10,13 @@ import { IncomeEditor } from './editors/IncomeEditor'
 import { ConfirmPlannedDialog } from '#/features/planned/components/ConfirmPlannedDialog'
 import { PaydayReviewSheet } from './review/PaydayReviewSheet'
 import { AddMoneySheet } from './sheets/AddMoneySheet'
+import { CycleAmountSheet } from './sheets/CycleAmountSheet'
 import { DeleteItemConfirm } from './sheets/DeleteItemConfirm'
 import { LeftoverSheet } from './sheets/LeftoverSheet'
 import { MarkDoneSheet } from './sheets/MarkDoneSheet'
+import { PaymentEditorSheet } from './sheets/PaymentEditorSheet'
 import { PayNowSheet } from './sheets/PayNowSheet'
+import { SetAsideSheet } from './sheets/SetAsideSheet'
 import { UseItSheet } from './sheets/UseItSheet'
 
 /** The one sheet the Planning page has open, by kind. */
@@ -99,6 +102,23 @@ export function PlanningSheets() {
               date: isoOf(new Date()),
             })
           }
+        />
+      )
+    case 'cycleAmount':
+      return (
+        <CycleAmountSheet
+          billId={sheet.billId}
+          occurrence={sheet.occurrence}
+          onClose={closeSheet}
+        />
+      )
+    case 'setAside':
+      return <SetAsideSheet id={sheet.id} onClose={closeSheet} />
+    case 'payment':
+      return (
+        <PaymentEditorSheet
+          transactionId={sheet.transactionId}
+          onClose={closeSheet}
         />
       )
     case 'leftover':

@@ -1,9 +1,10 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useCategoryCatalog } from '#/features/categories/hooks/useCategoryCatalog'
 import { goalOwner } from '#/features/planned/data/owners'
 import { useGoalPlan } from '#/features/planned/hooks/useGoalPlan'
 import { usePlannedData } from '#/features/planned/hooks/usePlannedData'
 import type { GoalStatus } from '#/features/planning/data/status'
+import { useComingSetAsides } from '#/features/planning/hooks/useComingSetAsides'
 import { useItemActions } from '#/features/planning/hooks/useItemActions'
 import { usePlanning } from '#/features/planning/hooks/usePlanning'
 import { usePlanningWallets } from '#/features/planning/hooks/usePlanningWallets'
@@ -13,11 +14,25 @@ import { historyOf } from '#/features/planning/view/history'
 import { goalChip } from '#/features/planning/view/itemCopy'
 import { goalPlanText } from '#/features/planning/view/planText'
 import { DetailFrame } from './DetailFrame'
-import { DetailActions, DetailHero, HeldIn, HistoryList } from './DetailParts'
+import {
+  ComingSetAsides,
+  DetailActions,
+  DetailHero,
+  DetailTabs,
+  HeldIn,
+  HistoryList,
+} from './DetailParts'
 import type { DetailAction } from './DetailParts'
 import { PlanBox } from './PlanBox'
 
-/** A goal's detail (04 §6): progress, where its money is held, its plan and its activity. */
+type Tab = 'history' | 'plan'
+
+const TABS: ReadonlyArray<{ value: Tab; label: string }> = [
+  { value: 'history', label: 'History' },
+  { value: 'plan', label: 'Plan' },
+]
+
+/** A goal's detail (04 §6): progress, then its history or its plan and what is coming. */
 export function GoalDetail({
   goalId,
   onClose,
@@ -32,6 +47,9 @@ export function GoalDetail({
   const actions = useItemActions()
   const openSheet = usePlanningUi((s) => s.openSheet)
   const plan = useGoalPlan(goalId)
+  const [tab, setTab] = useState<Tab>('history')
+  const owner = useMemo(() => goalOwner(goalId), [goalId])
+  const coming = useComingSetAsides(owner)
   const goal = inputs.goals.find((g) => g.id === goalId)
   const status = planning.goals[goalId] as GoalStatus | undefined
   const history = useMemo(
@@ -131,18 +149,25 @@ export function GoalDetail({
         chip={goalChip(status, c)}
       />
       <DetailActions actions={buttons} />
-      <HeldIn lines={status.heldIn} currency={c} wallets={wallets} />
-      <PlanBox
-        text={goalPlanText(goal, status, planning.calendar)}
-        plan={closed || paused ? null : plan.view}
-        currency={c}
-        calendar={planning.calendar}
-        today={planning.today}
-        lastRecalc={plan.lastRecalc}
-        onRecalc={plan.recalc}
-        onDismiss={plan.dismissRecalc}
-      />
-      <HistoryList lines={history} />
+      <DetailTabs options={TABS} value={tab} onChange={setTab} />
+      {tab === 'history' ? (
+        <HistoryList lines={history} today={planning.today} />
+      ) : (
+        <>
+          <HeldIn lines={status.heldIn} currency={c} wallets={wallets} />
+          <PlanBox
+            text={goalPlanText(goal, status, planning.calendar)}
+            plan={closed || paused ? null : plan.view}
+            currency={c}
+            calendar={planning.calendar}
+            today={planning.today}
+            lastRecalc={plan.lastRecalc}
+            onRecalc={plan.recalc}
+            onDismiss={plan.dismissRecalc}
+          />
+          <ComingSetAsides rows={coming} currency={c} today={planning.today} />
+        </>
+      )}
     </DetailFrame>
   )
 }

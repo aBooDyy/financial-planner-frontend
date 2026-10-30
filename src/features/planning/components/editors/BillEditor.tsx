@@ -83,7 +83,7 @@ function BillEditorForm({ id, onClose, onDelete }: Props) {
           />
         </FormRow>
         <AmountWell
-          question="How much?"
+          question={form.amountVaries ? 'About how much?' : 'How much?'}
           currency={e.currency}
           amount={form.amount}
           onAmount={(v) => set('amount', v)}
@@ -97,6 +97,16 @@ function BillEditorForm({ id, onClose, onDelete }: Props) {
             noneLabel="Decide when paying"
           />
         </AmountWell>
+        <ToggleCard
+          title="The amount changes each time"
+          description={
+            form.autopay && form.amountVaries
+              ? 'Like electricity. Auto-pay logs this estimate; correct the payment when the real bill comes.'
+              : 'Like electricity. We plan with this estimate, and you enter the real amount when you pay.'
+          }
+          checked={form.amountVaries}
+          onCheckedChange={(v) => set('amountVaries', v)}
+        />
         <RepeatField
           label="Repeats"
           picks={PICKS}

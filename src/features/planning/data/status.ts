@@ -14,6 +14,7 @@ import { isGoalReached, roundedSchedule, tracksOf } from './funding'
 import type { FundingPlan, OwnerKind, TrackPlan } from './funding'
 import {
   isSettledOccurrence,
+  occurrenceAmount,
   occurrenceBefore,
   openOccurrences,
   paymentRowsOf,
@@ -217,6 +218,10 @@ export function billStatusOf(
   const track = tracks.find((t) => t.occurrence === occurrence)
   const held = occurrence ? heldFor(occurrence) : []
   const setAside = held.reduce((sum, a) => sum + a.amount, 0)
+  const amount = occurrenceAmount(
+    bill,
+    occurrence ? payments.get(occurrence) : undefined,
+  )
   const pace = atNextPayday(tracks)
   const previous =
     occurrence && bill.frequency !== null
@@ -234,7 +239,7 @@ export function billStatusOf(
         ? 'paid'
         : occurrence <= today
           ? 'due'
-          : setAside + paidOn(occurrence) >= bill.amount
+          : setAside + paidOn(occurrence) >= amount
             ? 'covered'
             : track && track.end < track.start
               ? 'not_set_aside'
@@ -248,7 +253,7 @@ export function billStatusOf(
     billId: bill.id,
     state: billState,
     occurrence,
-    amount: bill.amount,
+    amount,
     setAside,
     behindBy,
     shortBy: Math.round(shortBy),
@@ -259,7 +264,7 @@ export function billStatusOf(
     heldIn: heldLines(held),
     next: open.slice(0, 3).map((o) => ({
       occurrence: o,
-      amount: bill.amount,
+      amount: occurrenceAmount(bill, payments.get(o)),
       setAside: heldFor(o).reduce((sum, a) => sum + a.amount, 0),
     })),
   }

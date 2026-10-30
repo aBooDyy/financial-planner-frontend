@@ -1,8 +1,13 @@
+import { useState } from 'react'
 import type { ReactNode } from 'react'
+import { PillSwitch } from '#/components/dialog/PillSwitch'
 import { Button } from '#/components/ui/button'
 import type { HeldLine } from '#/features/planning/data/status'
 import type { PlanningWallets } from '#/features/planning/hooks/usePlanningWallets'
-import { dayMonth, fullDate, money } from '#/features/planning/view/format'
+import { usePlanningUi } from '#/features/planning/stores/planningUi'
+import { cycleDate } from '#/features/planning/view/billCycles'
+import { dayMonth, money } from '#/features/planning/view/format'
+import { HISTORY_SHOWN } from '#/features/planning/view/history'
 import type { HistoryLine } from '#/features/planning/view/history'
 import type { Chip } from '#/features/planning/view/itemCopy'
 import { cn } from '#/lib/utils'
@@ -133,71 +138,161 @@ export function HeldIn({
   )
 }
 
-/** NEXT 3: a repeating bill's coming occurrences. */
-export function NextOccurrences({
-  next,
-  currency,
+const COMING_SHOWN = 6
+
+/** What the panel shows below its main buttons, one view at a time. */
+export function DetailTabs<T extends string>({
+  options,
+  value,
+  onChange,
 }: {
-  next: ReadonlyArray<{ occurrence: string; amount: number; setAside: number }>
-  currency: string
+  options: ReadonlyArray<{ value: T; label: string }>
+  value: T
+  onChange: (value: T) => void
 }) {
-  if (next.length === 0) return null
   return (
-    <DetailGroup title={`Next ${next.length}`}>
-      <ul className="flex flex-col gap-[7px]">
-        {next.map((n) => (
-          <li
-            key={n.occurrence}
-            className="flex items-center justify-between gap-3 text-[13.5px]"
-          >
-            <span>{fullDate(n.occurrence)}</span>
-            <span className="fp-sensitive font-bold tabular-nums">
-              {money(n.amount, currency)}
-              {n.setAside > 0 ? (
-                <span className="ms-1 text-[11.5px] font-semibold text-fp-transfer">
-                  {money(n.setAside, currency)} set aside
-                </span>
-              ) : null}
-            </span>
+    <PillSwitch
+      label="Show"
+      options={options}
+      value={value}
+      onChange={onChange}
+    />
+  )
+}
+
+/** Planned set-asides still to make: each opens the dialog that confirms, moves or skips it. */
+export function ComingSetAsides({
+  rows,
+  currency,
+  today,
+}: {
+  rows: ReadonlyArray<{ id: string; date: string; amount: number }>
+  currency: string
+  today: string
+}) {
+  const [shown, setShown] = useState(COMING_SHOWN)
+  const openSheet = usePlanningUi((s) => s.openSheet)
+  if (rows.length === 0) return null
+  return (
+    <DetailGroup title="Set-asides coming up">
+      <ul className="flex flex-col gap-[3px]">
+        {rows.slice(0, shown).map((r) => (
+          <li key={r.id}>
+            <button
+              type="button"
+              onClick={() =>
+                openSheet({ kind: 'confirmPlanned', plannedId: r.id })
+              }
+              className="-mx-[6px] flex w-[calc(100%+12px)] items-center justify-between gap-3 rounded-[8px] px-[6px] py-1 text-start text-[13.5px] hover:bg-fp-surface-2"
+            >
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="truncate">{cycleDate(r.date, today)}</span>
+                {r.date <= today ? (
+                  <StatusChip tone="warn">Waiting</StatusChip>
+                ) : null}
+              </span>
+              <span className="fp-sensitive flex-none font-bold tabular-nums">
+                {money(r.amount, currency)}
+              </span>
+            </button>
           </li>
         ))}
       </ul>
+      {rows.length > shown ? (
+        <button
+          type="button"
+          onClick={() => setShown(shown + COMING_SHOWN)}
+          className="self-start text-[12.5px] font-bold text-fp-accent-ink hover:underline"
+        >
+          Show more
+        </button>
+      ) : null}
     </DetailGroup>
   )
 }
 
-/** HISTORY: set-asides, payments, skips — latest first. */
-export function HistoryList({ lines }: { lines: ReadonlyArray<HistoryLine> }) {
+/** HISTORY: set-asides, payments, skips, latest first; each opens where it can be changed. */
+export function HistoryList({
+  lines,
+  today,
+}: {
+  lines: ReadonlyArray<HistoryLine>
+  today: string
+}) {
+  const [shown, setShown] = useState(HISTORY_SHOWN)
+  const openSheet = usePlanningUi((s) => s.openSheet)
+  const open = (target: NonNullable<HistoryLine['target']>) =>
+    openSheet(
+      target.kind === 'setAside'
+        ? { kind: 'setAside', id: target.id }
+        : { kind: 'payment', transactionId: target.id },
+    )
   return (
     <DetailGroup title="History">
       {lines.length === 0 ? (
         <p className="text-[13px] text-fp-text-3">Nothing yet.</p>
       ) : (
-        <ul className="flex flex-col gap-[9px]">
-          {lines.map((l) => (
-            <li key={l.key} className="flex items-center gap-3 text-[13px]">
-              <span className="w-[46px] flex-none text-[12px] font-bold text-fp-text-3">
-                {dayMonth(l.date)}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block font-semibold">{l.label}</span>
-                <span className="block truncate text-[11.5px] text-fp-text-3">
-                  {l.sub}
+        <ul className="flex flex-col gap-[3px]">
+          {lines.slice(0, shown).map((l) => {
+            const { target } = l
+            const body = (
+              <>
+                <span className="w-[46px] flex-none text-[12px] leading-[1.25] font-bold text-fp-text-3">
+                  {dayMonth(l.date)}
+                  {l.date.slice(0, 4) !== today.slice(0, 4) ? (
+                    <span className="block font-semibold">
+                      {l.date.slice(0, 4)}
+                    </span>
+                  ) : null}
                 </span>
-              </span>
-              <span
-                className={cn(
-                  'fp-sensitive flex-none font-bold tabular-nums',
-                  l.tone === 'in' && 'text-fp-transfer',
-                  l.tone === 'none' && 'text-fp-text-3',
+                <span className="min-w-0 flex-1">
+                  <span className="block font-semibold">{l.label}</span>
+                  <span className="block truncate text-[11.5px] text-fp-text-3">
+                    {l.occurrence
+                      ? `For ${cycleDate(l.occurrence, today)} · ${l.sub}`
+                      : l.sub}
+                  </span>
+                </span>
+                <span
+                  className={cn(
+                    'fp-sensitive flex-none font-bold tabular-nums',
+                    l.tone === 'in' && 'text-fp-transfer',
+                    l.tone === 'none' && 'text-fp-text-3',
+                  )}
+                >
+                  {l.amount}
+                </span>
+              </>
+            )
+            const row =
+              '-mx-[6px] flex w-[calc(100%+12px)] items-center gap-3 rounded-[8px] px-[6px] py-[5px] text-start text-[13px]'
+            return (
+              <li key={l.key}>
+                {target ? (
+                  <button
+                    type="button"
+                    onClick={() => open(target)}
+                    className={cn(row, 'hover:bg-fp-surface-2')}
+                  >
+                    {body}
+                  </button>
+                ) : (
+                  <div className={row}>{body}</div>
                 )}
-              >
-                {l.amount}
-              </span>
-            </li>
-          ))}
+              </li>
+            )
+          })}
         </ul>
       )}
+      {lines.length > shown ? (
+        <button
+          type="button"
+          onClick={() => setShown(shown + HISTORY_SHOWN)}
+          className="self-start text-[12.5px] font-bold text-fp-accent-ink hover:underline"
+        >
+          Show more
+        </button>
+      ) : null}
     </DetailGroup>
   )
 }

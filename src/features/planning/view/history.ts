@@ -20,8 +20,16 @@ export type HistoryLine = {
   /** "+SR 300", "−SR 3,000" or "—". */
   amount: string
   tone: 'in' | 'out' | 'none'
+  /** The bill due date it belongs to. */
+  occurrence: string | null
+  /** Where it can be changed; null for what has no record of its own. */
+  target:
+    | { kind: 'setAside'; id: string }
+    | { kind: 'transaction'; id: string }
+    | null
 }
 
+/** How many lines show before "Show more". */
 export const HISTORY_SHOWN = 15
 
 export function historyOf(args: {
@@ -64,6 +72,8 @@ export function historyOf(args: {
         sub: where,
         amount: `+${amount}`,
         tone: 'in',
+        occurrence: a.occurrence,
+        target: { kind: 'setAside', id: a.id },
       })
     if (!a.releasedAt || a.releasedById) continue
     lines.push({
@@ -78,8 +88,11 @@ export function historyOf(args: {
       sub: where,
       amount,
       tone: 'none',
+      occurrence: a.occurrence,
+      target: { kind: 'setAside', id: a.id },
     })
   }
+  const occurrenceOfRow = new Map(args.planned.map((p) => [p.id, p.occurrence]))
   for (const t of args.txns) {
     if (t.deleted !== 0 || t.type !== 'spend' || !mine(t)) continue
     lines.push({
@@ -99,6 +112,10 @@ export function historyOf(args: {
         .join(' · '),
       amount: `−${money(inOwner(t.amount, t.currency), currency)}`,
       tone: 'out',
+      occurrence: t.plannedId
+        ? (occurrenceOfRow.get(t.plannedId) ?? null)
+        : null,
+      target: { kind: 'transaction', id: t.id },
     })
   }
   for (const p of args.planned) {
@@ -116,9 +133,11 @@ export function historyOf(args: {
       sub: 'Not paid',
       amount: '—',
       tone: 'none',
+      occurrence: null,
+      target: null,
     })
   }
-  return lines
-    .sort((x, y) => y.date.localeCompare(x.date) || x.key.localeCompare(y.key))
-    .slice(0, HISTORY_SHOWN)
+  return lines.sort(
+    (x, y) => y.date.localeCompare(x.date) || x.key.localeCompare(y.key),
+  )
 }

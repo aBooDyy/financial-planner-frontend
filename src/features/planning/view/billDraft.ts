@@ -34,6 +34,8 @@ export type BillForm = {
   name: string
   /** As typed. */
   amount: string
+  /** The amount is an estimate. */
+  amountVaries: boolean
   /** "Paid from"; null = decide when paying. */
   walletId: string | null
   repeat: RepeatDraft
@@ -58,6 +60,7 @@ export function newBillForm(over: Partial<BillForm>): BillForm {
   return {
     name: '',
     amount: '',
+    amountVaries: false,
     walletId: null,
     repeat: DEFAULT_REPEAT,
     nextDue: '',
@@ -78,6 +81,7 @@ export function newBillForm(over: Partial<BillForm>): BillForm {
 export const billFormOf = (bill: LocalBill): BillForm => ({
   name: bill.name,
   amount: bill.amount > 0 ? minorToInputValue(bill.amount, bill.currency) : '',
+  amountVaries: bill.amountVaries,
   walletId: bill.walletId,
   repeat: repeatDraftFrom(bill),
   nextDue: bill.nextDue,
@@ -166,6 +170,7 @@ export function billWriteOf(
   return {
     name: form.name.trim(),
     amount: parseAmountToMinor(form.amount, currency) ?? 0,
+    amountVaries: form.amountVaries,
     currency,
     ...repeatOf(form.repeat),
     nextDue: form.nextDue,

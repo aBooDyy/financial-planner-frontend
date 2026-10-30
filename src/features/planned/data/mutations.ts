@@ -130,7 +130,10 @@ export async function replanSettledOccurrence(
   billId: string,
   occurrence: string,
 ): Promise<boolean> {
-  const rows = await db.plannedTransactions.where('billId').equals(billId).toArray()
+  const rows = await db.plannedTransactions
+    .where('billId')
+    .equals(billId)
+    .toArray()
   if (!isSettledOccurrence(paymentRowsOf(billId, rows), occurrence))
     return false
   requestPlanRecalc(billOwner(billId), { quiet: true })
@@ -155,9 +158,7 @@ async function rollToNextOccurrence(item: LocalPlanned): Promise<void> {
     bill,
     payments,
     addMonthsISO(item.occurrence, 24),
-  ).find(
-    (o) => o > item.occurrence && !isSettledOccurrence(payments, o),
-  )
+  ).find((o) => o > item.occurrence && !isSettledOccurrence(payments, o))
   if (!next) return
   await moveSetAsides(
     held.map((a) => ({
@@ -283,6 +284,32 @@ export type ConfirmResult = {
 }
 
 /**
+ * A bill whose amount varies owes what was really paid: its occurrence's row takes the paid
+ * amount and is settled, whatever the estimate said — and goes back to the estimate once
+ * nothing pays it any more. Other rows are left alone.
+ */
+export async function settleVaryingRow(
+  plannedId: string | null | undefined,
+): Promise<void> {
+  const row = plannedId ? await db.plannedTransactions.get(plannedId) : null
+  if (!row || row.deleted !== 0 || row.status === 'skipped') return
+  if (!isBillPayment(row)) return
+  const bill = await billOf(row)
+  if (!bill?.amountVaries) return
+  const paid = Math.round(await settledNow(row))
+  if (paid > 0) {
+    if (row.amount !== paid || row.status !== 'done')
+      await savePlanned({ ...row, amount: paid, pinned: true, status: 'done' })
+  } else
+    await savePlanned({
+      ...row,
+      amount: bill.amount,
+      pinned: false,
+      status: 'open',
+    })
+}
+
+/**
  * Settle a planned item: write the transaction or set-aside it stands for, linked back to
  * it. Settling the whole remainder (or more — the excess still counts) closes it; less
  * leaves it open with a smaller remainder.
@@ -314,6 +341,7 @@ export async function confirmPlanned(
       })
     : [await writePayment(item, { ...input, amount, walletId, date }, rates)]
 
+  await settleVaryingRow(item.id)
   const after = await db.plannedTransactions.get(item.id)
   await syncNextDueOf(item)
   if (isBillPayment(item))
@@ -474,6 +502,13 @@ export async function skipPlanned(id: string): Promise<void> {
   await rollToNextOccurrence(item)
   await syncNextDueOf(item)
   schedulePush()
+}
+
+/** A skipped occurrence being paid after all: it opens with `nextDue` left where it is. */
+export async function reopenToPay(id: string): Promise<void> {
+  const item = await db.plannedTransactions.get(id)
+  if (!item || item.deleted !== 0) throw new PlannedActionError('not_found')
+  if (item.status === 'skipped') await savePlanned({ ...item, status: 'open' })
 }
 
 /** Undo a skip or a close-the-rest: the item waits again. */

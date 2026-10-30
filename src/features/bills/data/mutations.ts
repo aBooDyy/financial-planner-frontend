@@ -38,6 +38,7 @@ export type BillDraft = {
   autopay?: boolean
   /** Defaults to true ("Must pay"). */
   mustPay?: boolean
+  amountVaries?: boolean
   color: string
   setAsideDay?: number | null
 }
@@ -106,6 +107,7 @@ export async function createBill(draft: BillDraft): Promise<string> {
     note: draft.note ?? null,
     autopay: draft.autopay ?? false,
     mustPay: draft.mustPay ?? true,
+    amountVaries: draft.amountVaries ?? false,
     color: draft.color,
     position: await nextPosition(),
     closedAt: null,

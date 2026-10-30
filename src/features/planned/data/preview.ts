@@ -57,14 +57,19 @@ export function previewConfirm(args: {
   const { inputs, state, item, amount, walletId, date } = args
   const settled = settledOf(item, state.index, inputs.rates)
   const remainder = Math.max(0, item.amount - settled)
+  const owesWhatIsPaid =
+    item.role === 'payment' &&
+    inputs.bills.some((b) => b.id === item.billId && b.amountVaries)
   const kind =
     amount <= 0
       ? 'empty'
-      : amount < remainder
-        ? 'partial'
-        : amount > remainder
-          ? 'over'
-          : 'full'
+      : owesWhatIsPaid
+        ? 'full'
+        : amount < remainder
+          ? 'partial'
+          : amount > remainder
+            ? 'over'
+            : 'full'
   const wallet = walletId
     ? args.nodes.find((n) => n.id === walletId && n.kind === 'wallet')
     : undefined

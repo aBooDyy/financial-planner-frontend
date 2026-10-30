@@ -92,6 +92,7 @@ export const bill = (over: Partial<LocalBill> = {}): LocalBill => ({
   note: null,
   autopay: false,
   mustPay: true,
+  amountVaries: false,
   color: '#8B5CF6',
   position: 0,
   closedAt: null,

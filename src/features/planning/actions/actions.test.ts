@@ -207,7 +207,7 @@ describe('Pay now', () => {
   })
 
   it('refuses an occurrence that is not on the bill’s schedule', async () => {
-    for (const occurrence of ['2026-10-06', '2026-09-05', '2027-01-05x'])
+    for (const occurrence of ['2026-10-06', '2026-09-06', '2027-01-05x'])
       await expect(payBill('rent', { occurrence })).rejects.toMatchObject({
         code: 'bad_occurrence',
       })

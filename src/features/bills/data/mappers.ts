@@ -28,6 +28,7 @@ const billBody = (l: LocalBill): Omit<CreateBillWire, 'id'> => ({
   note: l.note,
   autopay: l.autopay,
   must_pay: l.mustPay,
+  amount_varies: l.amountVaries,
   color: l.color,
   position: l.position,
   ...planWire(l),

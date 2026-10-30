@@ -126,6 +126,29 @@ export function occurrenceBefore(
   return occurrenceAt(bill, schedule, n - 1)
 }
 
+/**
+ * The on-schedule dates before `nextDue`, latest first, however many of them were ever owed. A
+ * one-off has none.
+ */
+export function earlierOccurrences(
+  bill: Stepped,
+  payments: ReadonlyMap<string, LocalPlanned>,
+  count: number,
+): string[] {
+  if (bill.frequency === null) return []
+  const schedule = scheduleOf(bill, payments)
+  const out: string[] = []
+  for (let n = 1; n <= Math.min(count, MAX_OCCURRENCES); n++)
+    out.push(occurrenceAt(bill, schedule, -n))
+  return out
+}
+
+/** What an occurrence costs: what its row says once the user set it, else the bill's amount. */
+export const occurrenceAmount = (
+  bill: Pick<LocalBill, 'amount'>,
+  row: LocalPlanned | undefined,
+): number => (row?.pinned ? row.amount : bill.amount)
+
 /** A bill's planned payment rows by occurrence. */
 export function paymentRowsOf(
   billId: string,

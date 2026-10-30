@@ -230,10 +230,13 @@ first, each a Dexie write plus outbox entries; errors are `MoneyActionError` wit
 `code` (`not_found`, `closed`, `no_wallet`, `bad_amount`, `category_required`,
 `no_next_occurrence`, `bad_occurrence`, `signed_out`).
 
-- **`payBill(billId, {occurrence?, amount?, walletId?, date?, note?})`** — Pay now: any open
-  occurrence (default the first open one), in full (default) or in part, early or on time. An
-  `occurrence` must be on the bill's schedule (`billOccurrences` from `nextDue` through it, so
-  within `endsOn`), else `bad_occurrence` — nothing is written. It
+- **`payBill(billId, {occurrence?, amount?, walletId?, date?, note?})`** — Pay now: any
+  occurrence not paid yet (default the first open one), in full (default) or in part, early, on
+  time or late. An `occurrence` must be on the bill's schedule (`billOccurrences` from `nextDue`
+  through it, so within `endsOn`; `earlierOccurrences` before it; or a row it already has), else
+  `bad_occurrence` — nothing is written. A skipped one opens first (`reopenToPay`, `nextDue`
+  stays). One before `nextDue` is a record of the past: whatever is paid closes it (`closeRest`),
+  because an open row before `nextDue` would count as stale. It
   confirms the occurrence's planned payment row — generating it under its deterministic id
   when the occurrence is beyond the planner's horizon — so the payment releases that
   occurrence's set-asides in the paying wallet and `nextDue` moves to the first occurrence
@@ -529,16 +532,28 @@ to Bills and open a bill in one go). Header (both): colour dot, name, "Semi-annu
   each paycheck) / *Saved so far* (goal, its own colour), a note and the chip.
 - `DetailActions`: bill **Pay now** · Add money · Edit; goal **Add money** · Use it · Edit;
   closed **Reopen** · Edit (Mark as done / End this bill / Pause live in the ⋯ menu).
+- `DetailTabs`, below the buttons, shows one view at a time. Bill: **Dates** (default) ·
+  **History** · **Plan**. Goal: **History** (default) · **Plan**.
+- **Dates** (`BillDates`, pure `view/billCycles.ts`): *Overdue*, *Coming up* (Show later dates)
+  and *Past* (Show earlier dates, which also lists dates from before the bill was added). A
+  schedule date before `nextDue` with no row reads *Not recorded*, unless a row sits within half a
+  cycle of it (a moved due day). A row expands to its payments and set-asides, each opening where
+  it can be changed, and to **Pay** · **Skip** · **Close the rest** · **Change amount** ·
+  **Undo skip**. A varying bill offers its recent average as the estimate
+  (`estimateSuggestion`: two or more paid cycles, 5 % or more off).
+- **Plan** holds `HeldIn` + `PlanBox` + `ComingSetAsides` (open planned set-asides; each opens the
+  confirm dialog, which sets aside, moves or skips).
 - `HeldIn` (`BillStatus.heldIn` / `GoalStatus.heldIn`), `PlanBox` (`view/planText.ts`: one
   sentence per shape, *SR X behind / ahead of plan*, and — when `useBillPlan` / `useGoalPlan`
   says the stored plan is off — `planDrift`: *"Your plan says SR 500 a paycheck; today it works
   out to SR 1,000."* when only the per-paycheck figure moved, else the rows as written against a
   recalc's, *"Your plan sets aside SR 1,750 × 2 from Oct 25; today it works out to SR 3,500 on
   Nov 25."* — + **Recalculate**, then *Plan updated · Undo* from the recalc-undo store),
-  `NextOccurrences` (repeating bills), `HistoryList` (`view/history.ts`: Set aside / Moved in /
+  `HistoryList` (every line opens its record: `SetAsideSheet` or the transaction editor;
+  `view/history.ts`: Set aside / Moved in /
   Moved to *wallet* / Taken back (a set-aside released by no transaction — freed, the docs'
   word) / Paid / Paid · auto-pay (the settlement's id is `autoSettlementId`) / Used (sub "Visa
-  fees · Main bank": leaf category · wallet) / Skipped, latest first, 15 shown). **Money a
+  fees · Main bank": leaf category · wallet) / Skipped, latest first, 15 at a time). **Money a
   transfer moved is told once** (`view/setAsideMoves.ts`): both rows of a move carry the
   transfer's id, so they are told apart by wallet — the side holding a live or paid row (failing
   one, the rows created last) is where it arrived; the released rows in the other wallet are the
@@ -565,10 +580,19 @@ Delete**). Reopen / Pause / Resume act at once with a toast; the rest open a she
   (D31). Calls `addMoney`. With `owner: null` and a `walletId` (Wallets' row menu **Set
   aside…**, 03 §3) it is titled *Set aside in {wallet}*, starts in that wallet and asks **For**
   (open bills and goals, grouped) before it can save (`usePlanOwner` takes null).
-- **Pay now** (`PayNowSheet`): *Which one?* (the next three open occurrences), Full amount ↔
-  Different amount, Paid from, and the effect line (`view/payNow.ts`): what leaves the wallet and
+- **Pay now** (`PayNowSheet`): *Which due date?* (`payChoices`: Overdue, Coming up, Earlier),
+  Full amount ↔ Different amount (a varying bill just asks *How much was it?*), Paid from, *When
+  did you pay it?*, and the effect line (`view/payNow.ts`): what leaves the wallet and
   how much the occurrence's set-asides **in that wallet** cover. Calls `payBill`; when the
   result's `leftover` has lines it opens the **leftover prompt** in its place, else toasts.
+- **One set-aside** (`SetAsideSheet`, `view/setAsideState.ts`, `actions/setAsideEdit.ts`): a live
+  one edits amount, wallet or outside label, date, due date and note, or **Take back** (keeps the
+  record) or **Delete** (a mistake, asks first). A freed one offers **Set aside again** and Delete.
+  One a payment used or a move carried off is read-only, since un-releasing it would count the
+  money twice. Each write files a quiet plan rewrite, as Add money does.
+- **One date's amount** (`CycleAmountSheet`, `setOccurrenceAmount`): pins the amount on that
+  occurrence's row; funding, status and fill-then-spill read it through `occurrenceAmount`.
+- **A payment** (`PaymentEditorSheet`): the transaction editor, mounted over Planning.
 - **Leftover** (`LeftoverSheet`, 03 §5, D31): money the occurrence still holds once a payment
   settles it (never after a part payment) — **Move it to {paying wallet}** (a real transfer; only when some is in another
   wallet), **Free it up**, **Keep it for next time** (repeating bills). `resolveLeftover`.

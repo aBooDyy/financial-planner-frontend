@@ -108,6 +108,8 @@ export type PlannedListInput = {
   rates: RatesMap
   base: CurrencyCode
   today: string
+  /** Bills whose amount varies never confirm in one tap: their real amount is asked for. */
+  varyingBillIds?: ReadonlySet<string>
 }
 
 const tagOf = (item: LocalPlanned): PlannedTag => {
@@ -180,7 +182,14 @@ export function buildPlannedList(input: PlannedListInput): PlannedListView {
       isDue,
       walletId: wallet ? item.walletId : null,
       walletName: wallet?.name ?? null,
-      oneTap: !!wallet && settled === 0,
+      oneTap:
+        !!wallet &&
+        settled === 0 &&
+        !(
+          item.role === 'payment' &&
+          item.billId &&
+          input.varyingBillIds?.has(item.billId)
+        ),
       sequence,
     }
   }

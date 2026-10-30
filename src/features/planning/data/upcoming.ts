@@ -76,6 +76,9 @@ export function buildUpcoming(args: {
     rates,
     base,
     today,
+    varyingBillIds: new Set(
+      inputs.bills.filter((b) => b.amountVaries).map((b) => b.id),
+    ),
   })
   const bills = new Map(inputs.bills.map((b) => [b.id, b]))
   const heldFor = (billId: string, occurrence: string, currency: string) =>

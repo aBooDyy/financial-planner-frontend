@@ -9,6 +9,7 @@ import { useItemActions } from '#/features/planning/hooks/useItemActions'
 import { usePlanning } from '#/features/planning/hooks/usePlanning'
 import { usePlanningWallets } from '#/features/planning/hooks/usePlanningWallets'
 import { usePlanningUi } from '#/features/planning/stores/planningUi'
+import { approxMoney } from '#/features/planning/view/billCycles'
 import { dayMonth, money, perPeriod } from '#/features/planning/view/format'
 import { billChip, billMeta } from '#/features/planning/view/itemCopy'
 import type { RankChange, TierKey } from '#/features/planning/view/reorder'
@@ -157,7 +158,7 @@ export function BillsSection() {
                   name={b.name}
                   color={b.color}
                   meta={billMeta(b, s, walletName, calendar, planning.today)}
-                  amount={money(b.amount, b.currency)}
+                  amount={approxMoney(s.amount, b.currency, b.amountVaries)}
                   chip={billChip(s, b.currency, planning.today)}
                   progress={
                     s.cycle === 'save_up' ? (

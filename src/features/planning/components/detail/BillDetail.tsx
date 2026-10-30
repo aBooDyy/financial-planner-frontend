@@ -1,30 +1,42 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useCategoryCatalog } from '#/features/categories/hooks/useCategoryCatalog'
 import { billOwner } from '#/features/planned/data/owners'
 import { useBillPlan } from '#/features/planned/hooks/useBillPlan'
 import { usePlannedData } from '#/features/planned/hooks/usePlannedData'
 import type { BillStatus } from '#/features/planning/data/status'
+import { useComingSetAsides } from '#/features/planning/hooks/useComingSetAsides'
 import { useItemActions } from '#/features/planning/hooks/useItemActions'
 import { usePlanning } from '#/features/planning/hooks/usePlanning'
 import { usePlanningWallets } from '#/features/planning/hooks/usePlanningWallets'
 import { usePlanningUi } from '#/features/planning/stores/planningUi'
+import { approxMoney } from '#/features/planning/view/billCycles'
 import { dueDay, money, perPeriod } from '#/features/planning/view/format'
 import { historyOf } from '#/features/planning/view/history'
 import { billChip } from '#/features/planning/view/itemCopy'
 import { billPlanText } from '#/features/planning/view/planText'
 import { repeatLabel } from '#/features/planning/view/repeat'
+import { BillDates } from './BillDates'
 import { DetailFrame } from './DetailFrame'
 import {
+  ComingSetAsides,
   DetailActions,
   DetailHero,
+  DetailTabs,
   HeldIn,
   HistoryList,
-  NextOccurrences,
 } from './DetailParts'
 import type { DetailAction } from './DetailParts'
 import { PlanBox } from './PlanBox'
 
-/** A bill's detail (04 §6): this occurrence, where its money is held, its plan, what is next. */
+type Tab = 'dates' | 'history' | 'plan'
+
+const TABS: ReadonlyArray<{ value: Tab; label: string }> = [
+  { value: 'dates', label: 'Dates' },
+  { value: 'history', label: 'History' },
+  { value: 'plan', label: 'Plan' },
+]
+
+/** A bill's detail (04 §6): this occurrence, then its due dates, its history or its plan. */
 export function BillDetail({
   billId,
   onClose,
@@ -39,6 +51,9 @@ export function BillDetail({
   const actions = useItemActions()
   const openSheet = usePlanningUi((s) => s.openSheet)
   const plan = useBillPlan(billId)
+  const [tab, setTab] = useState<Tab>('dates')
+  const owner = useMemo(() => billOwner(billId), [billId])
+  const coming = useComingSetAsides(owner)
   const bill = inputs.bills.find((b) => b.id === billId)
   const status = planning.bills[billId] as BillStatus | undefined
   const walletName = (id: string | null) =>
@@ -106,6 +121,7 @@ export function BillDetail({
         repeatLabel(bill),
         catalog.labelOf(bill.categoryId),
         bill.mustPay ? 'Must pay' : 'Nice to have',
+        ...(bill.amountVaries ? ['Amount varies'] : []),
       ].join(' · ')}
       menu={actions.billMenu(bill)}
       onClose={onClose}
@@ -114,8 +130,8 @@ export function BillDetail({
         label={saveUp ? 'Set aside so far' : 'Next payment'}
         value={
           saveUp
-            ? `${money(status.setAside, c)} of ${money(status.amount, c)}`
-            : money(status.amount, c)
+            ? `${money(status.setAside, c)} of ${approxMoney(status.amount, c, bill.amountVaries)}`
+            : approxMoney(status.amount, c, bill.amountVaries)
         }
         progress={
           saveUp
@@ -136,27 +152,33 @@ export function BillDetail({
         chip={billChip(status, c, planning.today)}
       />
       <DetailActions actions={buttons} />
-      <HeldIn lines={status.heldIn} currency={c} wallets={wallets} />
-      <PlanBox
-        text={billPlanText(
-          bill,
-          status,
-          saveWalletId ? walletName(saveWalletId) : null,
-          planning.calendar,
-          planning.today,
-        )}
-        plan={closed ? null : plan.plan}
-        currency={c}
-        calendar={planning.calendar}
-        today={planning.today}
-        lastRecalc={plan.lastRecalc}
-        onRecalc={plan.recalc}
-        onDismiss={plan.dismissRecalc}
-      />
-      {bill.frequency !== null && !closed ? (
-        <NextOccurrences next={status.next} currency={c} />
+      <DetailTabs options={TABS} value={tab} onChange={setTab} />
+      {tab === 'dates' ? <BillDates bill={bill} /> : null}
+      {tab === 'history' ? (
+        <HistoryList lines={history} today={planning.today} />
       ) : null}
-      <HistoryList lines={history} />
+      {tab === 'plan' ? (
+        <>
+          <HeldIn lines={status.heldIn} currency={c} wallets={wallets} />
+          <PlanBox
+            text={billPlanText(
+              bill,
+              status,
+              saveWalletId ? walletName(saveWalletId) : null,
+              planning.calendar,
+              planning.today,
+            )}
+            plan={closed ? null : plan.plan}
+            currency={c}
+            calendar={planning.calendar}
+            today={planning.today}
+            lastRecalc={plan.lastRecalc}
+            onRecalc={plan.recalc}
+            onDismiss={plan.dismissRecalc}
+          />
+          <ComingSetAsides rows={coming} currency={c} today={planning.today} />
+        </>
+      ) : null}
     </DetailFrame>
   )
 }
