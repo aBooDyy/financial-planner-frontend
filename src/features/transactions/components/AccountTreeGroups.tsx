@@ -8,6 +8,7 @@ import {
   SelectLabel,
   SelectSeparator,
 } from '#/components/ui/select'
+import { walletIdOf } from '#/features/transactions/data/selectors'
 import type {
   ScopeOption,
   ScopeSection,
@@ -15,8 +16,6 @@ import type {
 
 type Props = {
   sections: ReadonlyArray<ScopeSection>
-  /** A filter can pick a whole group; an entry is always written to one wallet. */
-  groupsSelectable: boolean
   /** The balances are still being summed; the accounts themselves are listed already. */
   amountsLoading?: boolean
 }
@@ -61,10 +60,12 @@ export function AccountOptionContent({
   )
 }
 
-/** The accounts laid out like the Wallets tree, for a `Select`'s content. */
+/**
+ * The accounts laid out like the Wallets tree, for a `Select`'s content: each item's value is
+ * a wallet id, and a group is a heading with its subtotal since an entry lands in one wallet.
+ */
 export function AccountTreeGroups({
   sections,
-  groupsSelectable,
   amountsLoading = false,
 }: Props) {
   return sections.map((section, i) => (
@@ -78,11 +79,11 @@ export function AccountTreeGroups({
         ) : null}
         {section.options.map((option) => {
           const indent = { paddingInlineStart: 8 + option.depth * INDENT_PX }
-          return option.kind === 'group' && !groupsSelectable ? (
+          return option.kind === 'group' ? (
             <SelectLabel
               key={option.value}
               style={indent}
-              className="flex items-center gap-2 py-[7px] pe-2 text-[13px] text-fp-text"
+              className="flex items-center gap-2 py-[7px] pe-2 text-[13px] tracking-normal text-fp-text normal-case"
             >
               <AccountOptionContent
                 option={option}
@@ -92,7 +93,7 @@ export function AccountTreeGroups({
           ) : (
             <SelectItem
               key={option.value}
-              value={option.value}
+              value={walletIdOf(option)}
               style={indent}
               className="text-[13px] *:[span]:last:min-w-0 *:[span]:last:flex-1"
             >

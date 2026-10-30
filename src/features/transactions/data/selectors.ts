@@ -274,6 +274,10 @@ export const scopeFromPicks = (picks: AccountPick[]): Scope =>
 export const pickValue = (pick: AccountPick): string =>
   `${pick.type}:${pick.id}`
 
+/** A wallet option's wallet id. */
+export const walletIdOf = (option: ScopeOption): string =>
+  option.value.slice('wallet:'.length)
+
 export function pickFromValue(value: string): AccountPick | null {
   if (value.startsWith('group:')) return { type: 'group', id: value.slice(6) }
   if (value.startsWith('wallet:')) return { type: 'wallet', id: value.slice(7) }

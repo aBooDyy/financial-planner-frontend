@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select'
+import { AccountSelect } from '#/features/transactions/components/AccountSelect'
 import type { WalletGroupOption } from '#/features/wallets/data/selectors'
 import type {
   CategoryCatalog,
@@ -81,24 +82,23 @@ export function ConstantInput({
           </SelectContent>
         </Select>
       )
-    case 'wallet':
+    case 'wallet': {
+      const wallets = choices.walletGroups.flatMap((group) => group.wallets)
       return (
-        <Select value={value || undefined} onValueChange={onChange}>
-          {trigger}
-          <SelectContent>
-            {choices.walletGroups.map((group) => (
-              <SelectGroup key={group.label ?? ''}>
-                {group.label ? <SelectLabel>{group.label}</SelectLabel> : null}
-                {group.wallets.map((w) => (
-                  <SelectItem key={w.id} value={w.name}>
-                    {w.name}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            ))}
-          </SelectContent>
-        </Select>
+        <AccountSelect
+          id={id}
+          label={label}
+          describedBy={describedBy}
+          invalid={invalid}
+          wallets={wallets}
+          value={wallets.find((w) => w.name === value)?.id ?? ''}
+          onChange={(walletId) =>
+            onChange(wallets.find((w) => w.id === walletId)?.name ?? '')
+          }
+          placeholder="Choose…"
+        />
       )
+    }
     case 'category':
       return (
         <Select value={value || undefined} onValueChange={onChange}>

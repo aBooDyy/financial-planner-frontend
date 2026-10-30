@@ -1,15 +1,6 @@
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '#/components/ui/select'
 import type { LocalBalanceNode } from '#/db/types'
 import { EXTERNAL } from '#/features/planned/hooks/useConfirmForm'
-import { WalletSelectSections } from '#/features/wallets/components/WalletSelectSections'
-import { sectionByGroup } from '#/features/wallets/data/walletSections'
-import { useWalletGroups } from '#/features/wallets/hooks/useWalletGroups'
+import { AccountSelect } from '#/features/transactions/components/AccountSelect'
 
 type Props = {
   id: string
@@ -21,7 +12,7 @@ type Props = {
   onChange: (source: string) => void
 }
 
-const NONE = '__none__'
+const EXTERNAL_CHOICE = [{ value: EXTERNAL, label: 'External…' }]
 
 /** Where a confirmed item's money came from or went: a wallet, or somewhere external. */
 export function ConfirmWalletSelect({
@@ -32,37 +23,14 @@ export function ConfirmWalletSelect({
   allowExternal,
   onChange,
 }: Props) {
-  const groups = useWalletGroups()
-
   return (
-    <Select
-      value={value || NONE}
-      onValueChange={(v) => onChange(v === NONE ? '' : v)}
-    >
-      <SelectTrigger id={id} aria-label={label}>
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {wallets.length === 0 ? (
-          <SelectItem value={NONE}>No wallets yet</SelectItem>
-        ) : null}
-        <WalletSelectSections
-          sections={sectionByGroup(groups, wallets)}
-          renderItem={(w) => (
-            <SelectItem key={w.id} value={w.id}>
-              <span
-                aria-hidden
-                className="size-[10px] flex-none rounded-[3px]"
-                style={{ background: w.color }}
-              />
-              <span className="truncate">{w.name}</span>
-            </SelectItem>
-          )}
-        />
-        {allowExternal ? (
-          <SelectItem value={EXTERNAL}>External…</SelectItem>
-        ) : null}
-      </SelectContent>
-    </Select>
+    <AccountSelect
+      id={id}
+      label={label}
+      wallets={wallets}
+      value={value}
+      trailing={allowExternal ? EXTERNAL_CHOICE : undefined}
+      onChange={onChange}
+    />
   )
 }

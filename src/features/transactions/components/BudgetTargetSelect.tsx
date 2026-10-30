@@ -8,9 +8,7 @@ import {
 } from '#/components/ui/select'
 import type { LocalBalanceNode } from '#/db/types'
 import { useCategoryCatalog } from '#/features/categories/hooks/useCategoryCatalog'
-import { WalletSelectSections } from '#/features/wallets/components/WalletSelectSections'
-import { sectionByGroup } from '#/features/wallets/data/walletSections'
-import { useWalletGroups } from '#/features/wallets/hooks/useWalletGroups'
+import { AccountSelect } from './AccountSelect'
 
 type Props = {
   id: string
@@ -19,7 +17,35 @@ type Props = {
   value: string
   onChange: (id: string) => void
   wallets: ReadonlyArray<LocalBalanceNode>
-  walletLabel: (w: LocalBalanceNode) => string
+}
+
+function BudgetCategorySelect({
+  id,
+  value,
+  onChange,
+}: Pick<Props, 'id' | 'value' | 'onChange'>) {
+  const catalog = useCategoryCatalog()
+  return (
+    <Select value={value || undefined} onValueChange={onChange}>
+      <SelectTrigger id={id}>
+        <SelectValue placeholder="Pick one" />
+      </SelectTrigger>
+      <SelectContent>
+        {catalog.byType('spend').map((c) => (
+          <SelectItem key={c.id} value={c.id}>
+            <IconChip
+              id={c.icon}
+              color={c.color}
+              size={24}
+              iconSize={13}
+              className="rounded-[7px]"
+            />
+            {c.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
 }
 
 /** The one category or account a budget covers. */
@@ -29,47 +55,10 @@ export function BudgetTargetSelect({
   value,
   onChange,
   wallets,
-  walletLabel,
 }: Props) {
-  const catalog = useCategoryCatalog()
-  const walletGroups = useWalletGroups()
-  return (
-    <Select value={value || undefined} onValueChange={onChange}>
-      <SelectTrigger id={id}>
-        <SelectValue
-          placeholder={scope === 'wallet' ? 'No wallets yet' : 'Pick one'}
-        />
-      </SelectTrigger>
-      <SelectContent>
-        {scope === 'wallet' ? (
-          <WalletSelectSections
-            sections={sectionByGroup(walletGroups, wallets)}
-            renderItem={(w) => (
-              <SelectItem key={w.id} value={w.id}>
-                <span
-                  aria-hidden
-                  className="size-[10px] flex-none rounded-[3px]"
-                  style={{ background: w.color }}
-                />
-                {walletLabel(w)}
-              </SelectItem>
-            )}
-          />
-        ) : (
-          catalog.byType('spend').map((c) => (
-            <SelectItem key={c.id} value={c.id}>
-              <IconChip
-                id={c.icon}
-                color={c.color}
-                size={24}
-                iconSize={13}
-                className="rounded-[7px]"
-              />
-              {c.name}
-            </SelectItem>
-          ))
-        )}
-      </SelectContent>
-    </Select>
+  return scope === 'wallet' ? (
+    <AccountSelect id={id} value={value} onChange={onChange} wallets={wallets} />
+  ) : (
+    <BudgetCategorySelect id={id} value={value} onChange={onChange} />
   )
 }

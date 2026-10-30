@@ -1,15 +1,5 @@
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '#/components/ui/select'
+import { AccountSelect } from '#/features/transactions/components/AccountSelect'
 import type { WalletGroupOption } from '#/features/wallets/data/selectors'
-import { walletSections } from '#/features/wallets/data/walletSections'
-import { WalletSelectSections } from './WalletSelectSections'
-
-const NONE = '__none__'
 
 type Props = {
   id?: string
@@ -32,25 +22,15 @@ export function WalletSelect({
   noneLabel = 'No default account',
 }: Props) {
   return (
-    <Select
-      value={value ?? NONE}
-      onValueChange={(v) => onChange(v === NONE ? null : v)}
+    <AccountSelect
+      id={id}
+      value={value}
+      onChange={(walletId) => onChange(walletId || null)}
+      wallets={walletGroups.flatMap((g) => g.wallets)}
+      noneLabel={noneLabel}
+      invalid={invalid}
       disabled={disabled}
-    >
-      <SelectTrigger id={id} aria-invalid={invalid} className="w-full">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value={NONE}>{noneLabel}</SelectItem>
-        <WalletSelectSections
-          sections={walletSections(walletGroups)}
-          renderItem={(w) => (
-            <SelectItem key={w.id} value={w.id}>
-              {w.name}
-            </SelectItem>
-          )}
-        />
-      </SelectContent>
-    </Select>
+      className="w-full"
+    />
   )
 }

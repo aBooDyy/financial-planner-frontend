@@ -1,8 +1,6 @@
 import { CurrencyPicker } from '#/components/CurrencyPicker'
-import { WalletSelectSections } from '#/features/wallets/components/WalletSelectSections'
+import { AccountSelect } from '#/features/transactions/components/AccountSelect'
 import { setBaseCurrency } from '#/features/wallets/data/mutations'
-import { sectionByGroup } from '#/features/wallets/data/walletSections'
-import { useWalletGroups } from '#/features/wallets/hooks/useWalletGroups'
 import { useWalletBasics } from '#/features/wallets/hooks/useWalletBasics'
 import type { CurrencyCode } from '#/lib/currency'
 import { DATE_FORMAT_OPTIONS } from '#/lib/date'
@@ -27,16 +25,12 @@ const CARD =
   'overflow-hidden rounded-2xl border border-fp-border bg-fp-surface shadow-fp'
 const SELECT = 'w-auto shrink-0'
 
-const DEFAULT_ACCOUNT_NONE = '__none__'
-
 export function PreferencesSection() {
-  const { base, nodes, rates } = useWalletBasics()
+  const { base, rates } = useWalletBasics()
   const preference = useThemeStore((s) => s.preference)
   const setPreference = useThemeStore((s) => s.setPreference)
   const p = usePreferencesStore()
-  const walletGroups = useWalletGroups()
 
-  const wallets = nodes.filter((n) => n.kind === 'wallet')
   const onBaseChange = (code: CurrencyCode) => void setBaseCurrency(code)
 
   return (
@@ -118,27 +112,12 @@ export function PreferencesSection() {
           label="Default account"
           desc="Pre-selected when adding a transaction."
         >
-          <Select
-            value={p.defaultAccountId ?? DEFAULT_ACCOUNT_NONE}
-            onValueChange={(v) =>
-              p.setDefaultAccountId(v === DEFAULT_ACCOUNT_NONE ? null : v)
-            }
-          >
-            <SelectTrigger className={`${SELECT} max-w-[200px] truncate`}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={DEFAULT_ACCOUNT_NONE}>None</SelectItem>
-              <WalletSelectSections
-                sections={sectionByGroup(walletGroups, wallets)}
-                renderItem={(w) => (
-                  <SelectItem key={w.id} value={w.id}>
-                    {w.name}
-                  </SelectItem>
-                )}
-              />
-            </SelectContent>
-          </Select>
+          <AccountSelect
+            value={p.defaultAccountId}
+            onChange={(walletId) => p.setDefaultAccountId(walletId || null)}
+            noneLabel="None"
+            className={`${SELECT} max-w-[200px]`}
+          />
         </SettingRow>
 
         <SettingRow

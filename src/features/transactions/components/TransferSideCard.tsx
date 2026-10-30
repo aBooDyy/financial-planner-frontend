@@ -4,15 +4,13 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu'
-import { WalletMenuSections } from '#/features/wallets/components/WalletMenuSections'
+import { useAccountSections } from '#/features/transactions/hooks/useAccountSections'
 import type { TransferWallet } from '#/features/wallets/data/transferDialog'
-import { sectionByGroup } from '#/features/wallets/data/walletSections'
-import { useWalletGroups } from '#/features/wallets/hooks/useWalletGroups'
 import { formatMoney } from '#/lib/currency'
 import { cn } from '#/lib/utils'
+import { AccountMenuTree } from './AccountMenuTree'
 
 type Props = {
   label: 'FROM' | 'TO'
@@ -86,7 +84,7 @@ export function TransferSideCard({
   invalid,
 }: Props) {
   const name = label === 'FROM' ? 'From account' : 'To account'
-  const groups = useWalletGroups()
+  const { sections, amountsLoading } = useAccountSections(options)
   if (locked) {
     return (
       <div
@@ -121,25 +119,10 @@ export function TransferSideCard({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="start"
-        className="w-(--radix-dropdown-menu-trigger-width)"
+        className="w-(--radix-dropdown-menu-trigger-width) min-w-[260px]"
       >
         <DropdownMenuRadioGroup value={wallet?.id ?? ''} onValueChange={onPick}>
-          <WalletMenuSections
-            sections={sectionByGroup(groups, options)}
-            renderItem={(w) => (
-              <DropdownMenuRadioItem key={w.id} value={w.id} className="gap-2">
-                <span
-                  aria-hidden
-                  className="size-[8px] flex-none rounded-[2px]"
-                  style={{ background: w.color }}
-                />
-                <span className="min-w-0 flex-1 truncate">{w.name}</span>
-                <span className="flex-none text-fp-text-3 tabular-nums">
-                  {formatMoney(w.balance, w.currency)}
-                </span>
-              </DropdownMenuRadioItem>
-            )}
-          />
+          <AccountMenuTree sections={sections} amountsLoading={amountsLoading} />
         </DropdownMenuRadioGroup>
       </DropdownMenuContent>
     </DropdownMenu>

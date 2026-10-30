@@ -68,8 +68,6 @@ export function BudgetEditor({
   const choices = wallets.filter(
     (w) => !archivedWalletIds.has(w.id) || w.id === draft.walletId,
   )
-  const walletLabel = (w: LocalBalanceNode) =>
-    archivedWalletIds.has(w.id) ? `${w.name} (archived)` : w.name
 
   const limitMinor = parseAmountToMinor(draft.limit, draft.currency)
   const hint = budgetBlock({ ...draft, targetId: target, limitMinor })
@@ -147,7 +145,6 @@ export function BudgetEditor({
                 : onField('categoryId', v)
             }
             wallets={choices}
-            walletLabel={walletLabel}
           />
           <FieldMessage
             error={

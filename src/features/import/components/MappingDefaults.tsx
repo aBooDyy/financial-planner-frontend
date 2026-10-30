@@ -3,12 +3,11 @@ import { Label } from '#/components/ui/label'
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select'
+import { AccountSelect } from '#/features/transactions/components/AccountSelect'
 import type { WalletGroupOption } from '#/features/wallets/data/selectors'
 import type { CategoryOption } from '#/features/import/data/matching'
 import type { MappingDefaults as Defaults } from '#/features/import/data/types'
@@ -23,7 +22,6 @@ type Props = {
   onChange: (patch: Partial<Defaults>) => void
 }
 
-const NO_WALLET = 'none'
 const LABEL = 'mb-[6px] block text-[11.5px] font-semibold text-fp-text-2'
 
 const CATEGORY_LABEL: Readonly<Record<TxType, string>> = {
@@ -48,29 +46,13 @@ export function MappingDefaults({
         <Label className={LABEL} htmlFor="default-wallet">
           Account for rows with none
         </Label>
-        <Select
-          value={defaults.walletId ?? NO_WALLET}
-          onValueChange={(value) =>
-            onChange({ walletId: value === NO_WALLET ? null : value })
-          }
-        >
-          <SelectTrigger id="default-wallet">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={NO_WALLET}>No account</SelectItem>
-            {walletGroups.map((group, index) => (
-              <SelectGroup key={group.label ?? `root-${index}`}>
-                {group.label ? <SelectLabel>{group.label}</SelectLabel> : null}
-                {group.wallets.map((wallet) => (
-                  <SelectItem key={wallet.id} value={wallet.id}>
-                    {wallet.name}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            ))}
-          </SelectContent>
-        </Select>
+        <AccountSelect
+          id="default-wallet"
+          value={defaults.walletId}
+          onChange={(walletId) => onChange({ walletId: walletId || null })}
+          wallets={walletGroups.flatMap((group) => group.wallets)}
+          noneLabel="No account"
+        />
       </div>
 
       <div>

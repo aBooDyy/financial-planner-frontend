@@ -4,6 +4,7 @@ import {
   cashflowBlock,
   dialogTitle,
   entryAccountSections,
+  offeredAccountSections,
   submitLabel,
   transferBlock,
 } from './txDialog'
@@ -74,7 +75,7 @@ describe('entryAccountSections', () => {
         { label: null, options: [opt('group:bare', 'group')] },
         { label: 'Not in a group', options: [opt('wallet:cash', 'wallet')] },
       ],
-      null,
+      [],
     )
     expect(sections.map((s) => s.options.map((o) => o.value))).toEqual([
       ['group:bank', 'wallet:main'],
@@ -82,15 +83,46 @@ describe('entryAccountSections', () => {
     ])
   })
 
+  it('narrows to the offered wallets, dropping a group left with none', () => {
+    const sections = entryAccountSections(
+      offeredAccountSections(
+        [
+          {
+            label: null,
+            options: [
+              opt('group:bank', 'group'),
+              opt('wallet:main', 'wallet', 1),
+              opt('wallet:savings', 'wallet', 1),
+            ],
+          },
+          {
+            label: null,
+            options: [opt('group:cards', 'group'), opt('wallet:visa', 'wallet', 1)],
+          },
+        ],
+        new Set(['main']),
+      ),
+      [],
+    )
+    expect(sections.map((s) => s.options.map((o) => o.value))).toEqual([
+      ['group:bank', 'wallet:main'],
+    ])
+  })
+
   it('adds the archived wallet an edited entry still uses', () => {
-    const sections = entryAccountSections([], {
-      id: 'old',
-      name: 'Old card',
-      color: '#999999',
-      icon: 'wallet',
-      currency: 'SAR',
-      balance: 0,
-    })
+    const sections = entryAccountSections(
+      [],
+      [
+        {
+          id: 'old',
+          name: 'Old card',
+          color: '#999999',
+          icon: 'wallet',
+          currency: 'SAR',
+          balance: 0,
+        },
+      ],
+    )
     expect(sections).toEqual([
       expect.objectContaining({
         label: 'Archived',

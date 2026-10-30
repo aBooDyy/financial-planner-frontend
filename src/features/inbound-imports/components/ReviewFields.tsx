@@ -1,29 +1,18 @@
 import { AmountWell } from '#/components/dialog/AmountWell'
 import type { AmountTone } from '#/components/dialog/AmountWell'
 import { FieldLabel } from '#/components/FieldLabel'
-import { IconChip } from '#/components/icons/IconChip'
 import { Input } from '#/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-} from '#/components/ui/select'
 import type { LocalBalanceNode } from '#/db/types'
 import { CategoryPicker } from '#/features/categories/components/CategoryPicker'
 import type { CategoryCatalog } from '#/features/categories/data/catalog'
 import { bodyNoun } from '#/features/inbound-imports/data/sources'
 import type { ReviewCard } from '#/features/inbound-imports/hooks/useReviewQueue'
 import type { TxType } from '#/features/transactions/api/types'
-import { ACCOUNT_PILL } from '#/features/transactions/components/TxAccountPill'
+import { TxAccountPill } from '#/features/transactions/components/TxAccountPill'
 import { AMOUNT_QUESTION } from '#/features/transactions/data/txDialog'
-import { WalletSelectSections } from '#/features/wallets/components/WalletSelectSections'
-import { sectionByGroup } from '#/features/wallets/data/walletSections'
-import { useWalletGroups } from '#/features/wallets/hooks/useWalletGroups'
+import { useAccountSections } from '#/features/transactions/hooks/useAccountSections'
 import { WALLET_ICON, iconIdOr } from '#/lib/icons/fallbacks'
 import { MerchantHint } from './MerchantHint'
-
-const NONE = '__none__'
 
 const AMOUNT_TONE: Record<TxType, AmountTone> = {
   spend: 'spend',
@@ -40,7 +29,7 @@ type Props = {
 export function ReviewFields({ card, wallets, catalog }: Props) {
   const { item, draft, setField } = card
   const id = `import-${item.id}`
-  const groups = useWalletGroups()
+  const { sections, amountsLoading } = useAccountSections(wallets)
   const tapHint = `Enter it, or tap it in the ${bodyNoun(item.bodyFormat, item.source)} below.`
   const wallet = wallets.find((w) => w.id === draft.walletId)
   const accountLabel = draft.type === 'income' ? 'Paid into' : 'Paid from'
@@ -56,55 +45,20 @@ export function ReviewFields({ card, wallets, catalog }: Props) {
           invalid={card.amountMissing}
           tone={AMOUNT_TONE[draft.type]}
         >
-          <Select
-            value={draft.walletId || NONE}
-            onValueChange={(v) => setField('walletId', v === NONE ? '' : v)}
-          >
-            <SelectTrigger
-              aria-label={accountLabel}
-              aria-invalid={draft.walletId ? undefined : true}
-              className={ACCOUNT_PILL}
-            >
-              {wallet ? (
-                <IconChip
-                  id={iconIdOr(wallet.icon, WALLET_ICON)}
-                  color={wallet.color}
-                  size={22}
-                  iconSize={13}
-                  className="rounded-full"
-                />
-              ) : (
-                <span
-                  aria-hidden
-                  className="size-[22px] flex-none rounded-full bg-fp-surface-2"
-                />
-              )}
-              <span className="flex-none font-semibold whitespace-nowrap text-fp-text-3">
-                {accountLabel}
-              </span>
-              <span className="max-w-[200px] truncate">
-                {wallet?.name ?? 'Pick an account'}
-              </span>
-            </SelectTrigger>
-            <SelectContent className="min-w-[260px]">
-              {wallets.length === 0 ? (
-                <SelectItem value={NONE}>No accounts</SelectItem>
-              ) : null}
-              <WalletSelectSections
-                sections={sectionByGroup(groups, wallets)}
-                renderItem={(w) => (
-                  <SelectItem key={w.id} value={w.id}>
-                    <span
-                      aria-hidden
-                      className="size-[10px] flex-none rounded-[3px]"
-                      style={{ background: w.color }}
-                    />
-                    <span className="truncate">{w.name}</span>
-                  </SelectItem>
-                )}
-              />
-            </SelectContent>
-          </Select>
+          <TxAccountPill
+            label={accountLabel}
+            sections={sections}
+            chosen={
+              wallet
+                ? { ...wallet, icon: iconIdOr(wallet.icon, WALLET_ICON) }
+                : null
+            }
+            archived={false}
+            onChange={(walletId) => setField('walletId', walletId)}
+            invalid={!draft.walletId}
+            amountsLoading={amountsLoading}
+            placeholder="Pick an account"
+          />
         </AmountWell>
         {card.amountMissing ? (
           <p

@@ -288,7 +288,7 @@ export function TransactionDialog({
                 label={draft.type === 'income' ? 'Paid into' : 'Paid from'}
                 sections={entryAccountSections(
                   accountSections,
-                  walletArchived ? wallet : null,
+                  walletArchived && wallet ? [wallet] : [],
                 )}
                 chosen={wallet}
                 archived={walletArchived}

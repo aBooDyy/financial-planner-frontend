@@ -245,7 +245,7 @@ tx/budget editor state machine. Components are dumb (`components/`): page compos
   <type>". Top to bottom: `TxTypeSwitch` (pill segmented; the chosen type wears its tint —
   `fp-spend`, the accent, `fp-transfer` — set on the body as `--tx-ink` / `--tx-soft`),
   `TxAmountHero` (the question, currency code and a large centred amount on the tint; for
-  spend/income the `TxAccountPill` "Paid from / Paid into" sits under it and sets the currency; it opens the Spending filter's account tree — `AccountTreeGroups` (its row content, `AccountOptionContent`, is shared with the filter's `ScopeMenuTree`), with groups as headings rather than picks (`entryAccountSections`: no "All accounts", no empty groups, plus an in-use archived wallet)),
+  spend/income the `TxAccountPill` "Paid from / Paid into" sits under it and sets the currency; it opens the Spending filter's account tree — `AccountTreeGroups` (its row content, `AccountOptionContent`, is shared with the filter's `ScopeMenuTree`), with groups as headings rather than picks (`entryAccountSections`: no "All accounts", no empty groups, plus an in-use archived wallet); every other wallet dropdown lists the same tree — see wallets.md),
   then `TxCashflowFields` — "What for?" `TxCategoryChips` (`useQuickChips(type, 5)`, the chosen
   one always among them, "All categories ›"), "Where?" `TxMerchantField` (+ the "Usually X · Use
   it" suggestion), "When?" `TxDateChips` (Today / Yesterday / a `DateField` pill), the

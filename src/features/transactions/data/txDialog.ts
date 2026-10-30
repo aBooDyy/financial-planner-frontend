@@ -2,6 +2,7 @@
  * The transaction dialog's wording and readiness rules: pure, so the dialog only renders them.
  */
 import type { TransferWallet } from '#/features/wallets/data/transferDialog'
+import { walletIdOf } from '#/features/transactions/data/selectors'
 import type {
   ScopeOption,
   ScopeSection,
@@ -70,14 +71,27 @@ export function transferBlock(
     : 'Add an amount to continue'
 }
 
+/** The tree with only the wallets a picker offers; its groups keep their whole balance. */
+export function offeredAccountSections(
+  sections: ReadonlyArray<ScopeSection>,
+  offered: ReadonlySet<string>,
+): ScopeSection[] {
+  return sections.map((s) => ({
+    ...s,
+    options: s.options.filter(
+      (o) => o.kind !== 'wallet' || offered.has(walletIdOf(o)),
+    ),
+  }))
+}
+
 /**
  * The account tree an entry is filed under: the Spending filter's sections without "All
  * accounts", or a group with no wallet under it — an entry lands in one wallet — plus the
- * archived wallet an edited entry still uses.
+ * archived wallets still in use.
  */
 export function entryAccountSections(
   sections: ReadonlyArray<ScopeSection>,
-  archivedInUse: TransferWallet | null,
+  archivedInUse: ReadonlyArray<TransferWallet>,
 ): ScopeSection[] {
   const holdsWallet = (options: ScopeOption[], at: number): boolean => {
     const { depth } = options[at]
@@ -95,23 +109,20 @@ export function entryAccountSections(
       ),
     }))
     .filter((s) => s.options.length > 0)
-  if (!archivedInUse) return out
-  const w = archivedInUse
+  if (archivedInUse.length === 0) return out
   return [
     ...out,
     {
       label: 'Archived',
-      options: [
-        {
-          value: `wallet:${w.id}`,
-          kind: 'wallet',
-          name: w.name,
-          amountStr: formatMoneyRounded(w.balance, w.currency),
-          color: w.color,
-          icon: w.icon,
-          depth: 0,
-        },
-      ],
+      options: archivedInUse.map((w) => ({
+        value: `wallet:${w.id}`,
+        kind: 'wallet',
+        name: w.name,
+        amountStr: formatMoneyRounded(w.balance, w.currency),
+        color: w.color,
+        icon: w.icon,
+        depth: 0,
+      })),
     },
   ]
 }

@@ -4,13 +4,7 @@ import { Checkbox } from '#/components/ui/checkbox'
 import { NoteBox } from '#/components/dialog/NoteBox'
 import { Button } from '#/components/ui/button'
 import { ResponsiveDialog } from '#/components/ui/responsive-dialog'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '#/components/ui/select'
+import { AccountSelect } from '#/features/transactions/components/AccountSelect'
 import type { CurrencyCode } from '#/lib/currency'
 import {
   amountInputProps,
@@ -45,7 +39,6 @@ import {
 } from '#/features/planning/view/format'
 import { cn } from '#/lib/utils'
 import { MicroLabel } from '#/features/planning/components/kit/MicroLabel'
-import { Dot } from '#/features/planning/components/kit/Spine'
 
 const GROUP_TITLE: Record<ReviewGroupKey, string> = {
   bills_before_payday: 'Bills due before next payday',
@@ -330,27 +323,13 @@ function PaydayReviewBody({ payday, onClose }: Props) {
                       {subOf(l)}
                     </span>
                   </span>
-                  <Select
-                    value={d.walletId ?? undefined}
-                    onValueChange={(walletId) =>
-                      setDraft(l.plannedId, { walletId })
-                    }
-                  >
-                    <SelectTrigger
-                      aria-label={`Wallet for ${l.name}`}
-                      className="h-auto w-[150px] rounded-full py-[6px] text-[12.5px]"
-                    >
-                      <SelectValue placeholder="Pick a wallet" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {wallets.list.map((w) => (
-                        <SelectItem key={w.id} value={w.id}>
-                          <Dot color={w.color} />
-                          {w.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <AccountSelect
+                    label={`Wallet for ${l.name}`}
+                    wallets={wallets.list}
+                    value={d.walletId}
+                    onChange={(walletId) => setDraft(l.plannedId, { walletId })}
+                    className="h-auto w-[150px] gap-[6px] rounded-full py-[6px] text-[12.5px]"
+                  />
                   <label className="flex w-[110px] items-center gap-1 rounded-[11px] border border-fp-border bg-fp-surface-2 px-2 py-[6px] focus-within:border-fp-accent">
                     <span className="text-[11px] font-bold text-fp-text-3">
                       {l.currency}

@@ -1,14 +1,8 @@
 import { Plus, X } from 'lucide-react'
 import { FieldLabel } from '#/components/FieldLabel'
 import { Input } from '#/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '#/components/ui/select'
 import { money } from '#/features/planning/view/format'
+import { AccountSelect } from '#/features/transactions/components/AccountSelect'
 import { amountInputProps } from '#/lib/currency'
 import { cn } from '#/lib/utils'
 
@@ -39,24 +33,13 @@ export function SplitRows({
       <FieldLabel>{label}</FieldLabel>
       {rows.map((r, i) => (
         <div key={r.key} className="flex items-center gap-2">
-          <Select
-            value={r.walletId || undefined}
-            onValueChange={(walletId) => update(r.key, { walletId })}
-          >
-            <SelectTrigger
-              aria-label={`Wallet ${i + 1}`}
-              className="min-w-0 flex-1"
-            >
-              <SelectValue placeholder="Pick a wallet" />
-            </SelectTrigger>
-            <SelectContent>
-              {wallets.map((w) => (
-                <SelectItem key={w.id} value={w.id}>
-                  {w.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <AccountSelect
+            label={`Wallet ${i + 1}`}
+            wallets={wallets}
+            value={r.walletId}
+            onChange={(walletId) => update(r.key, { walletId })}
+            className="min-w-0 flex-1"
+          />
           <Input
             aria-label={`Amount ${i + 1}`}
             {...amountInputProps(currency, r.amount, (amount) =>

@@ -52,19 +52,18 @@ those without a coordinated backend + Dexie migration.
 walletDeltas?, setAsideLines?)` builds the flattened tree (honoring collapse), grand total,
   counts, and top-level bars. `groupParentOptions` powers the "Place inside"
   picker (excludes self + descendants). Unit-tested in `selectors.test.ts` / `currency.test.ts`.
-- **Wallet pickers show groups as headings.** A dropdown where only wallets can be picked
-  lists them under their group's name (`Parent › Child` for nested groups). The group is a
-  label, never an option, and wallets outside any group come first with no heading. Build it
-  from `walletGroupOptions` and don't hand-roll a flat list:
-  - `useWalletGroups()` gives the live tree as groups, for a picker that is handed only its
-    wallets.
-  - `sectionByGroup(groups, rows)` (`data/walletSections.ts`) lays that picker's own rows out
-    under their groups, keeping its filter.
-  - `walletSections(groups)` is for a picker that lists every wallet.
-  - Render with `WalletSelectSections` inside a `Select`, or `WalletMenuSections` inside a
-    `DropdownMenu`. Both use the shared `MENU_LABEL` heading style.
-  - Pickers where a group *is* a pick (Spending's scope filter, "Place inside",
-    `TxAccountPill`) keep their own sections.
+- **Every wallet dropdown lists the Spending filter's account tree.** Each row has its chip
+  and live balance; each group is a heading with its subtotal, with its wallets indented
+  under it; wallets outside a group come last. Don't hand-roll a list. All of these read
+  `useAccountSections(offered?)` (`features/transactions/hooks/`), which narrows the tree to
+  the wallets a picker allows and puts an offered archived wallet under an "Archived" heading:
+  - `AccountSelect` — the form field, with `noneLabel` and `trailing` for answers that aren't a
+    wallet ("External…"), and a face showing an archived or deleted pick as such.
+  - `TxAccountPill` — the "Paid from" pill under an amount (`WalletMenuPill` wraps it).
+  - `AccountMenuTree` — the same tree in a `DropdownMenuRadioGroup`, for card triggers.
+  - Spending's multi-pick `ScopeMenuTree` shares the row (`AccountOptionContent`). Exceptions,
+    on purpose: the CSV import's searchable `TargetPicker` (it also lists accounts this import
+    will create), and chip rows (`WalletPills`, Search's `AccountFilter`), which aren't dropdowns.
 - **Icons resolve in the selector, not the row.** A node carries `icon: string | null` — never
   `undefined`, because an update wire is built from the row and a dropped key reads as "clear
   it" ([categories.md](categories.md#local-rows--sync)). `buildWalletsView` hands every row a
