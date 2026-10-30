@@ -16,6 +16,7 @@ import { isAdjustment, isCashflow } from '#/features/transactions/api/types'
 import { AMBER, AT_RISK_RATIO, RED } from '#/features/transactions/constants'
 import type { DateWindow, Period } from './planning'
 import type { PayCalendar } from '#/features/planning/data/payPeriods'
+import { carriedSetAsides } from '#/features/planning/view/setAsideMoves'
 import { DELETED_CATEGORY_ID } from '#/features/categories/data/catalog'
 import type { CategoryCatalog } from '#/features/categories/data/catalog'
 import { liveBalancesFrom } from './ledger'
@@ -324,6 +325,16 @@ const flowTxns = (data: SpendingData, scope: Scope): FlowTxn[] =>
   liveTxns(data, scope).filter(isFlow)
 
 /**
+ * The rows that were new money on their date. A move's source stays (it was set aside then,
+ * whatever happened later); the row a move wrote does not.
+ */
+function newlySetAside(data: SpendingData): LocalSetAside[] {
+  const rows = data.setAsides ?? []
+  const carried = carriedSetAsides(rows)
+  return rows.filter((a) => a.deleted === 0 && !carried.has(a.id))
+}
+
+/**
  * Σ wallet-held set-asides dated in the window, in base currency — the hero's caption. A
  * set-aside keeps the money in its wallet, so it is never an outflow and never part of net; a
  * spend linked to a goal or bill is a payment that left the wallet and counts as Spent.
@@ -334,10 +345,9 @@ function savedInWindow(
   win: DateWindow,
 ): number {
   const matcher = walletMatcher(scope, data.nodes)
-  return (data.setAsides ?? [])
+  return newlySetAside(data)
     .filter(
       (a) =>
-        a.deleted === 0 &&
         a.source === 'wallet' &&
         a.walletId !== null &&
         matcher(a.walletId) &&
@@ -754,9 +764,8 @@ function windowSetAsides(
   scope: Scope,
   inScope: (walletId: string) => boolean,
 ): LocalSetAside[] {
-  return (data.setAsides ?? []).filter(
+  return newlySetAside(data).filter(
     (a) =>
-      a.deleted === 0 &&
       inWindow(a.date, win) &&
       (a.source === 'wallet' && a.walletId
         ? inScope(a.walletId)

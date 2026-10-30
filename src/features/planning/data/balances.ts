@@ -44,6 +44,8 @@ export type BalanceFigures = {
   base: CurrencyCode
   /** Every live wallet, archived ones included (their own row still reads true). */
   wallets: Record<string, WalletFigures>
+  /** The wallets money can go to: neither archived nor inside an archived group. */
+  activeWallets: WalletFigures[]
   /** Every active group, base currency. */
   groups: Record<string, MoneyFigures>
   /** Σ over active wallets, base currency. */
@@ -126,5 +128,8 @@ export function balanceFigures(input: BalanceInput): BalanceFigures {
     (acc, root) => add(acc, total(root)),
     ZERO,
   )
-  return { base, wallets, groups, header }
+  const activeWallets = active.flatMap((n) =>
+    n.kind === 'wallet' ? [wallets[n.id]] : [],
+  )
+  return { base, wallets, activeWallets, groups, header }
 }

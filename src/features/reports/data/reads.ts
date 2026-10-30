@@ -4,7 +4,7 @@ import { walletDeltas } from '#/features/transactions/data/ledger'
 import { mergeRanges } from '#/features/transactions/data/ledgerRange'
 import type { IsoRange } from '#/features/transactions/data/ledgerRange'
 import type { RatesMap } from '#/lib/config/rates'
-import { countsAsGoalSaving } from './goalSaving'
+import { goalSavingRows } from './goalSaving'
 
 /** What one report reads from the ledger. */
 export type ReportLedger = {
@@ -55,10 +55,8 @@ export async function readReportLedger(
         .filter((m) => m.deleted === 0)
         .map((m) => [m.id, m.displayName]),
     ),
-    goalSetAsides: setAsides.filter(
-      (a) =>
-        countsAsGoalSaving(a) &&
-        merged.some(([from, to]) => a.date >= from && a.date <= to),
+    goalSetAsides: goalSavingRows(setAsides).filter((a) =>
+      merged.some(([from, to]) => a.date >= from && a.date <= to),
     ),
   }
 }

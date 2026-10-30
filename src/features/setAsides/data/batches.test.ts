@@ -7,7 +7,7 @@ import type {
   ReleaseWire,
   SetAside,
 } from '#/features/setAsides/api/types'
-import { bill, m, setAside } from '#/features/planned/testing/fixtures'
+import { bill, m, setAside, wallet } from '#/features/planned/testing/fixtures'
 import { ApiError } from '#/lib/apiError'
 import { useAppConfigStore } from '#/lib/config/appConfig'
 
@@ -255,6 +255,107 @@ describe('moveSetAsides', () => {
       plannedId: null,
       amount: m(500),
     })
+  })
+})
+
+describe('moving into a wallet in another currency', () => {
+  beforeEach(async () => {
+    await db.balanceNodes.clear()
+    await db.balanceNodes.bulkPut([
+      wallet({ id: 'dollars', currency: 'USD' }),
+      wallet({ id: 'riyals', currency: 'SAR' }),
+    ])
+    await db.exchangeRates.clear()
+    await db.exchangeRates.bulkPut(
+      [
+        { currency: 'SAR', rate: 1 },
+        { currency: 'USD', rate: 3.75 },
+      ].map((r) => ({ ...r, version: 'v', updatedAt: '', dirty: 0 })),
+    )
+  })
+
+  it('holds the new row in the wallet’s currency and queues its update behind the batch', async () => {
+    await moveSetAsides([
+      { id: 'a1', amount: m(300), to: { walletId: 'dollars' } },
+    ])
+
+    const [batch, update] = await queued()
+    const item = (batch.payload as MoveWire).items[0]
+    expect(item.to).toEqual({ wallet_id: 'dollars' })
+    expect(await db.setAsides.get(item.new_id)).toMatchObject({
+      amount: m(80),
+      currency: 'USD',
+      plannedId: 'p1',
+    })
+    expect(await db.setAsides.get('a1')).toMatchObject({
+      amount: m(300),
+      currency: 'SAR',
+    })
+    expect(update).toMatchObject({ op: 'update', id: item.new_id })
+    expect(update.payload).toMatchObject({ amount: m(80), currency: 'USD' })
+  })
+
+  it('leaves a same-currency move to the batch alone', async () => {
+    await moveSetAsides([{ id: 'a1', to: { walletId: 'riyals' } }])
+    expect((await queued()).map((e) => e.op)).toEqual(['move'])
+  })
+
+  it('keeps the row as it was with no rate to convert by', async () => {
+    await db.balanceNodes.put(wallet({ id: 'odd', currency: 'XYZ' }))
+    await moveSetAsides([{ id: 'a1', to: { walletId: 'odd' } }])
+
+    const [batch] = await queued()
+    const item = (batch.payload as MoveWire).items[0]
+    expect(await db.setAsides.get(item.new_id)).toMatchObject({
+      amount: m(500),
+      currency: 'SAR',
+    })
+    expect((await queued()).map((e) => e.op)).toEqual(['move'])
+  })
+
+  it('reaches the server converted, past what its move wrote', async () => {
+    await moveSetAsides([{ id: 'a1', to: { walletId: 'dollars' } }])
+    const [batch, update] = await queued()
+    const newId = (batch.payload as MoveWire).items[0].new_id
+    const local = (await db.setAsides.get(newId)) as LocalSetAside
+    const asWritten = asServer({ ...local, amount: m(500), currency: 'SAR' })
+    api.move.mockResolvedValue({
+      released: [asServer((await db.setAsides.get('a1')) as LocalSetAside)],
+      created: [asWritten],
+    })
+
+    await pushSetAsidesEntry(batch)
+    expect(await db.setAsides.get(newId)).toMatchObject({
+      amount: m(133) + 33,
+      currency: 'USD',
+      version: 'v2',
+      dirty: 1,
+    })
+
+    api.update.mockRejectedValueOnce(
+      new ApiError({ status: 409, code: 'conflict', message: '' }),
+    )
+    api.list.mockResolvedValue([asWritten])
+    api.update.mockResolvedValueOnce(
+      asServer({ ...local, amount: m(133) + 33 }, 'v3'),
+    )
+    await pushSetAsidesEntry(update)
+
+    expect(api.update).toHaveBeenLastCalledWith(
+      newId,
+      expect.objectContaining({
+        version: 'v2',
+        amount: m(133) + 33,
+        currency: 'USD',
+        wallet_id: 'dollars',
+      }),
+    )
+    expect(await db.setAsides.get(newId)).toMatchObject({
+      currency: 'USD',
+      version: 'v3',
+      dirty: 0,
+    })
+    expect(await queued()).toEqual([])
   })
 })
 

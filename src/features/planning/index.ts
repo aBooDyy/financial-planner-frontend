@@ -18,6 +18,11 @@ export { markGoalSpent, spendFromGoal } from './actions/goalMoney'
 export type { GoalSpendInput } from './actions/goalMoney'
 export { resolveLeftover } from './actions/leftover'
 export type { LeftoverChoice } from './actions/leftover'
+export {
+  applyRebalance,
+  moveHeldTo,
+  moveSetAsideTo,
+} from './actions/moveSetAside'
 export { payBill } from './actions/payBill'
 export type { PayBillInput, PayBillResult } from './actions/payBill'
 

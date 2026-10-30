@@ -5,6 +5,7 @@ import { autoSettlementId } from '#/features/planned/data/autoConfirm'
 import { m, setAside, tx } from '#/features/planned/testing/fixtures'
 import {
   moveSetAsides,
+  moveWithoutTransfer,
   releaseSetAsides,
 } from '#/features/setAsides/data/batches'
 import { historyOf } from './history'
@@ -181,6 +182,18 @@ describe('money a transfer moved', () => {
     expect(await story()).toEqual([
       ['Set aside', 'Savings', '+SR 300'],
       ['Taken back', 'Main bank', 'SR 300'],
+      ['Moved to Main bank', 'Savings', 'SR 300'],
+      ['Set aside', 'Savings', '+SR 300'],
+    ])
+  })
+
+  it('reads a transfer undone with an id of its own as moved there and back', async () => {
+    await moveWithTransfer('held', 'main', 'tr')
+    const [arrived] = await live()
+    await moveWithoutTransfer([{ id: arrived.id, to: { walletId: 'savings' } }])
+
+    expect(await story()).toEqual([
+      ['Moved to Savings', 'Main bank', 'SR 300'],
       ['Moved to Main bank', 'Savings', 'SR 300'],
       ['Set aside', 'Savings', '+SR 300'],
     ])

@@ -10,6 +10,11 @@ export type GoalPreset = {
   mustHave: boolean
 }
 
+/** What the Move sheet moves: one set-aside, or all an owner holds in one wallet. */
+export type MoveFrom =
+  | { kind: 'row'; id: string }
+  | { kind: 'held'; owner: PlanOwner; walletId: string }
+
 /** The one modal the Planning page shows at a time. */
 export type PlanningSheet =
   | { kind: 'chooser' }
@@ -20,6 +25,7 @@ export type PlanningSheet =
   | { kind: 'payNow'; billId: string; occurrence?: string }
   | { kind: 'cycleAmount'; billId: string; occurrence: string }
   | { kind: 'setAside'; id: string }
+  | { kind: 'move'; from: MoveFrom }
   | { kind: 'payment'; transactionId: string }
   | {
       kind: 'leftover'

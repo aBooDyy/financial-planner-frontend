@@ -6,7 +6,7 @@
 import { db } from '#/db/db'
 import type { LocalBalanceNode, LocalSetAside } from '#/db/types'
 import {
-  moveSetAsides,
+  moveWithoutTransfer,
   releaseSetAsides,
 } from '#/features/setAsides/data/batches'
 import { subtreeIds } from './archive'
@@ -44,7 +44,7 @@ export async function moveSetAsidesOutOf(
   toWalletId: string,
 ): Promise<void> {
   const rows = await heldUnder(id)
-  await moveSetAsides(
+  await moveWithoutTransfer(
     rows.map((a) => ({ id: a.id, to: { walletId: toWalletId } })),
   )
 }

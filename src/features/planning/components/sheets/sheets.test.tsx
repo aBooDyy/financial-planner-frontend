@@ -29,10 +29,13 @@ import {
   wallet,
 } from '#/features/planned/testing/fixtures'
 import { seedPlanningDb, stubBrowser } from '#/features/planning/testing/dom'
+import { usePlanningUi } from '#/features/planning/stores/planningUi'
 import { usePlanningToast } from '#/features/planning/stores/toast'
 import { AddMoneySheet } from './AddMoneySheet'
+import { FixOverSheet } from './FixOverSheet'
 import { LeftoverSheet } from './LeftoverSheet'
 import { MarkDoneSheet } from './MarkDoneSheet'
+import { MoveSetAsideSheet } from './MoveSetAsideSheet'
 import { PayNowSheet } from './PayNowSheet'
 import { SetAsideSheet } from './SetAsideSheet'
 import { UseItSheet } from './UseItSheet'
@@ -458,6 +461,279 @@ describe('SetAsideSheet', () => {
     await waitFor(async () =>
       expect((await db.setAsides.get('sa'))?.releasedAt).toBeNull(),
     )
+  })
+})
+
+describe('Moving a set-aside', () => {
+  const liveIn = async (walletId: string) =>
+    (await db.setAsides.where('walletId').equals(walletId).toArray()).filter(
+      (a) => a.releasedAt === null,
+    )
+
+  beforeEach(async () => {
+    await db.goals.put(goal({ id: 'g1', name: 'Car', amount: m(300) }))
+    await db.setAsides.put(
+      setAside({ id: 'sa', goalId: 'g1', walletId: 'main', amount: m(200) }),
+    )
+  })
+
+  it('moves part of a row, leaving the rest where it was', async () => {
+    const onClose = vi.fn()
+    render(
+      <MoveSetAsideSheet from={{ kind: 'row', id: 'sa' }} onClose={onClose} />,
+    )
+    const amount = await screen.findByRole('textbox', { name: 'How much?' })
+    expect((amount as HTMLInputElement).value).toBe('200.00')
+    expect(screen.queryByRole('radio', { name: /Main bank/ })).toBeNull()
+    fireEvent.change(amount, { target: { value: '50' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Move SR 50.00' }))
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect((await liveIn('main')).map((a) => a.amount)).toEqual([m(150)])
+    expect((await liveIn('savings')).map((a) => a.amount)).toEqual([m(50)])
+    expect(toastText()).toBe('SR 50.00 moved to Savings')
+  })
+
+  it('won’t move more than is there', async () => {
+    const onClose = vi.fn()
+    render(
+      <MoveSetAsideSheet from={{ kind: 'row', id: 'sa' }} onClose={onClose} />,
+    )
+    fireEvent.change(
+      await screen.findByRole('textbox', { name: 'How much?' }),
+      { target: { value: '201' } },
+    )
+    expect(screen.getByText('Only SR 200.00 is there')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Move' }))
+    await new Promise((r) => setTimeout(r, 20))
+    expect(onClose).not.toHaveBeenCalled()
+    expect((await liveIn('main')).map((a) => a.amount)).toEqual([m(200)])
+  })
+
+  it('moves what a goal holds in a wallet, whole', async () => {
+    await db.setAsides.put(
+      setAside({ id: 'sb', goalId: 'g1', walletId: 'main', amount: m(100) }),
+    )
+    const onClose = vi.fn()
+    render(
+      <MoveSetAsideSheet
+        from={{
+          kind: 'held',
+          owner: { kind: 'goal', id: 'g1' },
+          walletId: 'main',
+        }}
+        onClose={onClose}
+      />,
+    )
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Move SR 300.00' }),
+    )
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(await liveIn('main')).toEqual([])
+    expect((await liveIn('savings')).map((a) => a.amount).sort()).toEqual([
+      m(100),
+      m(200),
+    ])
+  })
+
+  it('warns and says Move anyway when the target would go over', async () => {
+    await db.balanceNodes.update('savings', { amount: m(100) })
+    const onClose = vi.fn()
+    render(
+      <MoveSetAsideSheet from={{ kind: 'row', id: 'sa' }} onClose={onClose} />,
+    )
+    fireEvent.click(await screen.findByRole('radio', { name: /Savings/ }))
+    expect(screen.getByText(/leaves it SR 100 over-committed/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Move anyway' }))
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect((await liveIn('savings')).map((a) => a.amount)).toEqual([m(200)])
+  })
+
+  it('says what it becomes in another currency', async () => {
+    await db.balanceNodes.put(
+      wallet({
+        id: 'usd',
+        name: 'Dollars',
+        currency: 'USD',
+        amount: m(9000),
+        position: 2,
+      }),
+    )
+    render(
+      <MoveSetAsideSheet from={{ kind: 'row', id: 'sa' }} onClose={vi.fn()} />,
+    )
+    fireEvent.click(await screen.findByRole('radio', { name: /Dollars/ }))
+    expect(screen.getByText(/SR 200.00 becomes .+ in Dollars/)).toBeTruthy()
+  })
+
+  it('shows a refusal instead of failing silently', async () => {
+    const onClose = vi.fn()
+    render(
+      <MoveSetAsideSheet from={{ kind: 'row', id: 'sa' }} onClose={onClose} />,
+    )
+    const button = await screen.findByRole('button', { name: /^Move SR/ })
+    usePlanningToast.setState({ toast: null })
+    const read = vi.spyOn(db.setAsides, 'get').mockResolvedValueOnce(undefined)
+    fireEvent.click(button)
+    expect(await screen.findByText(/has changed since you opened/)).toBeTruthy()
+    read.mockRestore()
+    expect(onClose).not.toHaveBeenCalled()
+    expect(toastText()).toBeUndefined()
+  })
+
+  it('says so when there is no other wallet', async () => {
+    await db.balanceNodes.update('savings', { archivedAt: '2026-10-01' })
+    render(
+      <MoveSetAsideSheet from={{ kind: 'row', id: 'sa' }} onClose={vi.fn()} />,
+    )
+    expect(
+      await screen.findByText(/There’s no other wallet to move this to/),
+    ).toBeTruthy()
+    expect(screen.queryByRole('textbox', { name: 'How much?' })).toBeNull()
+  })
+
+  it('is offered for a live row and opens the Move sheet', async () => {
+    usePlanningUi.setState({ sheet: null })
+    render(<SetAsideSheet id="sa" onClose={vi.fn()} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Move' }))
+    expect(usePlanningUi.getState().sheet).toEqual({
+      kind: 'move',
+      from: { kind: 'row', id: 'sa' },
+    })
+    expect(screen.getByText(/leaves no record/)).toBeTruthy()
+  })
+
+  it('is not offered for money held outside', async () => {
+    await db.setAsides.update('sa', {
+      source: 'outside',
+      walletId: null,
+      externalLabel: 'Cash',
+    })
+    render(<SetAsideSheet id="sa" onClose={vi.fn()} />)
+    expect(
+      await screen.findByRole('button', { name: 'Take back' }),
+    ).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Move' })).toBeNull()
+  })
+})
+
+describe('Fixing an over-committed wallet', () => {
+  const liveIn = async (walletId: string) =>
+    (await db.setAsides.where('walletId').equals(walletId).toArray()).filter(
+      (a) => a.releasedAt === null,
+    )
+
+  /** Main bank has SR 1,000 and SR 1,500 set aside; Savings has SR 5,000 free. */
+  beforeEach(async () => {
+    await db.balanceNodes.update('main', { amount: m(1000) })
+    await db.bills.put(
+      bill({
+        id: 'rent',
+        name: 'Rent',
+        amount: m(3000),
+        nextDue: '2026-12-01',
+        walletId: 'main',
+      }),
+    )
+    await db.setAsides.bulkPut([
+      setAside({
+        id: 'goalrow',
+        goalId: 'umrah',
+        walletId: 'main',
+        amount: m(300),
+      }),
+      setAside({
+        id: 'rentrow',
+        goalId: null,
+        billId: 'rent',
+        occurrence: '2026-12-01',
+        walletId: 'main',
+        amount: m(1200),
+      }),
+    ])
+  })
+
+  it('applies the suggested moves only once confirmed', async () => {
+    const onClose = vi.fn()
+    render(<FixOverSheet walletId="main" onClose={onClose} />)
+    const umrah = await screen.findByRole('checkbox', { name: 'Move Umrah' })
+    expect(umrah).toBeTruthy()
+    expect(screen.getByText('Due Jun 30')).toBeTruthy()
+    expect(screen.getByText('Due Dec 1')).toBeTruthy()
+    expect(screen.getByText(/won’t be over any more/)).toBeTruthy()
+    expect((await liveIn('savings')).length).toBe(0)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Move SR 500.00' }))
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect((await liveIn('savings')).map((a) => a.amount).sort()).toEqual([
+      m(200),
+      m(300),
+    ])
+    expect(toastText()).toBe('SR 500.00 moved off Main bank')
+  })
+
+  it('leaves out an unticked move and says what stays over', async () => {
+    const onClose = vi.fn()
+    render(<FixOverSheet walletId="main" onClose={onClose} />)
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Move Rent' }))
+    expect(screen.getByText(/is still/).textContent).toContain('SR 200.00')
+    fireEvent.click(screen.getByRole('button', { name: 'Move SR 300.00' }))
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect((await liveIn('savings')).map((a) => a.amount)).toEqual([m(300)])
+    expect((await liveIn('main')).map((a) => a.id)).toEqual(['rentrow'])
+  })
+
+  it('warns when a changed target would overfill it', async () => {
+    await db.balanceNodes.put(
+      wallet({ id: 'tiny', name: 'Tiny', amount: m(100), position: 2 }),
+    )
+    const onClose = vi.fn()
+    render(<FixOverSheet walletId="main" onClose={onClose} />)
+    fireEvent.click(
+      await screen.findByRole('combobox', { name: 'Where Umrah moves to' }),
+    )
+    fireEvent.click(await screen.findByRole('option', { name: /Tiny/ }))
+    expect(screen.getByText(/leaves it SR 200 over-committed/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Move anyway' }))
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect((await liveIn('tiny')).map((a) => a.amount)).toEqual([m(300)])
+  })
+
+  it('says the others have no room, and still moves what fits', async () => {
+    await db.balanceNodes.update('savings', { amount: m(200) })
+    const onClose = vi.fn()
+    render(<FixOverSheet walletId="main" onClose={onClose} />)
+    expect(
+      await screen.findByText(
+        /other wallets don’t have enough room, so Main bank stays over by SR 300.00/,
+      ),
+    ).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Move SR 200.00' }))
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect((await liveIn('savings')).map((a) => a.amount)).toEqual([m(200)])
+  })
+
+  it('blames the balance when that is what keeps it over', async () => {
+    await db.balanceNodes.update('main', { amount: -m(100) })
+    render(<FixOverSheet walletId="main" onClose={vi.fn()} />)
+    expect(await screen.findByText(/balance is below zero/)).toBeTruthy()
+    expect(screen.queryByText(/enough room/)).toBeNull()
+  })
+
+  it('says when no other wallet has free money', async () => {
+    await db.balanceNodes.update('savings', { amount: 0 })
+    render(<FixOverSheet walletId="main" onClose={vi.fn()} />)
+    expect(
+      await screen.findByText(/no free money in your other wallets/),
+    ).toBeTruthy()
+    expect(screen.queryByRole('checkbox')).toBeNull()
+  })
+
+  it('does not suggest an archived wallet', async () => {
+    await db.balanceNodes.update('savings', { archivedAt: '2026-10-01' })
+    render(<FixOverSheet walletId="main" onClose={vi.fn()} />)
+    expect(
+      await screen.findByText(/no free money in your other wallets/),
+    ).toBeTruthy()
   })
 })
 

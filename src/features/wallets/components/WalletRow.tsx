@@ -28,6 +28,7 @@ type Props = {
   onAdjust: (id: string) => void
   onDelete: (id: string) => void
   onSetAside: (id: string) => void
+  onFix: (id: string) => void
   onOpenLine: (line: SetAsideLineRow) => void
 }
 
@@ -54,6 +55,7 @@ export function WalletRow({
   onAdjust,
   onDelete,
   onSetAside,
+  onFix,
   onOpenLine,
 }: Props) {
   const held = row.hasSetAside && !loading
@@ -84,7 +86,9 @@ export function WalletRow({
               />
             </span>
           </div>
-          {held ? <WalletSetAsideLine row={row} /> : null}
+          {held ? (
+            <WalletSetAsideLine row={row} onFix={() => onFix(row.id)} />
+          ) : null}
           {row.isForeign && !loading ? (
             <span className="fp-sensitive self-end text-[11.5px] whitespace-nowrap text-fp-text-3 tabular-nums">
               {row.baseStr}

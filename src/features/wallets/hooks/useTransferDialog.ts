@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { db } from '#/db/db'
 import type { LocalSetAside } from '#/db/types'
-import { moveSetAsides } from '#/features/setAsides/data/batches'
+import {
+  moveSetAsides,
+  moveWithoutTransfer,
+} from '#/features/setAsides/data/batches'
 import type { WalletSetAsideLine } from '#/features/setAsides/data/totals'
 import {
   partsForPicks,
@@ -206,7 +209,7 @@ export function useTransferDialog(
             a.walletId === moved.toId,
         )
         .toArray()
-      await moveSetAsides(
+      await moveWithoutTransfer(
         rows.map((a) => ({ id: a.id, to: { walletId: moved.fromId } })),
       )
     }

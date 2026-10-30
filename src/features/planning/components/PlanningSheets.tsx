@@ -14,6 +14,7 @@ import { CycleAmountSheet } from './sheets/CycleAmountSheet'
 import { DeleteItemConfirm } from './sheets/DeleteItemConfirm'
 import { LeftoverSheet } from './sheets/LeftoverSheet'
 import { MarkDoneSheet } from './sheets/MarkDoneSheet'
+import { MoveSetAsideSheet } from './sheets/MoveSetAsideSheet'
 import { PaymentEditorSheet } from './sheets/PaymentEditorSheet'
 import { PayNowSheet } from './sheets/PayNowSheet'
 import { SetAsideSheet } from './sheets/SetAsideSheet'
@@ -114,6 +115,8 @@ export function PlanningSheets() {
       )
     case 'setAside':
       return <SetAsideSheet id={sheet.id} onClose={closeSheet} />
+    case 'move':
+      return <MoveSetAsideSheet from={sheet.from} onClose={closeSheet} />
     case 'payment':
       return (
         <PaymentEditorSheet

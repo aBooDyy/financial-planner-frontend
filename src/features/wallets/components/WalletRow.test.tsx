@@ -74,6 +74,7 @@ const renderRow = (
     onAdjust: vi.fn(),
     onDelete: vi.fn(),
     onSetAside: vi.fn(),
+    onFix: vi.fn(),
     onOpenLine: vi.fn(),
     onToggleLines: vi.fn(),
   }
@@ -142,6 +143,24 @@ describe('WalletRow', () => {
     const over = screen.getByText(/SR 500.00 over/)
     expect(over.parentElement?.className).toContain('text-fp-danger')
     expect(screen.queryByText(/Free to spend/)).toBeNull()
+  })
+
+  it('offers Fix on an over-committed wallet without opening the editor', () => {
+    const { onFix, onEdit } = renderRow(
+      holding({
+        free: -50_000,
+        overCommitted: true,
+        overStr: 'SR 500.00 over',
+      }),
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Fix Main Checking' }))
+    expect(onFix).toHaveBeenCalledWith('w1')
+    expect(onEdit).not.toHaveBeenCalled()
+  })
+
+  it('offers no Fix on a wallet that is not over', () => {
+    renderRow(holding())
+    expect(screen.queryByRole('button', { name: /^Fix/ })).toBeNull()
   })
 
   it('adjusts the balance from its own action without opening the editor', () => {

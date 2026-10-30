@@ -52,6 +52,94 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
+describe('HeldIn', () => {
+  const openPlan = async () => {
+    fireEvent.click(await screen.findByRole('radio', { name: 'Plan' }))
+  }
+
+  it('moves from a bill’s wallet, not from what is held outside', async () => {
+    await db.bills.put(
+      bill({
+        id: 'ins',
+        name: 'Car insurance',
+        amount: m(2400),
+        frequency: 'semi',
+        nextDue: '2027-03-01',
+        walletId: 'main',
+      }),
+    )
+    await db.setAsides.bulkPut([
+      setAside({
+        goalId: null,
+        billId: 'ins',
+        occurrence: '2027-03-01',
+        walletId: 'main',
+        amount: m(800),
+      }),
+      setAside({
+        goalId: null,
+        billId: 'ins',
+        occurrence: '2027-03-01',
+        source: 'outside',
+        walletId: null,
+        externalLabel: 'Cash with mom',
+        amount: m(100),
+      }),
+    ])
+    render(<BillDetail billId="ins" onClose={vi.fn()} />)
+    await openPlan()
+    expect(screen.getByText('Cash with mom')).toBeTruthy()
+    expect(screen.getAllByRole('button', { name: /^Move from/ }).length).toBe(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Move from Main bank' }))
+    expect(usePlanningUi.getState().sheet).toEqual({
+      kind: 'move',
+      from: {
+        kind: 'held',
+        owner: { kind: 'bill', id: 'ins' },
+        walletId: 'main',
+      },
+    })
+  })
+
+  it('moves from a goal’s wallet', async () => {
+    await db.goals.put(goal({ id: 'car', name: 'Car', target: m(5000) }))
+    await db.setAsides.put(
+      setAside({ goalId: 'car', walletId: 'main', amount: m(800) }),
+    )
+    render(<GoalDetail goalId="car" onClose={vi.fn()} />)
+    await openPlan()
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Move from Main bank' }),
+    )
+    expect(usePlanningUi.getState().sheet).toEqual({
+      kind: 'move',
+      from: {
+        kind: 'held',
+        owner: { kind: 'goal', id: 'car' },
+        walletId: 'main',
+      },
+    })
+  })
+
+  it('offers no Move on a closed goal', async () => {
+    await db.goals.put(
+      goal({
+        id: 'car',
+        name: 'Car',
+        target: m(5000),
+        closedAt: '2026-09-30',
+      }),
+    )
+    await db.setAsides.put(
+      setAside({ goalId: 'car', walletId: 'main', amount: m(800) }),
+    )
+    render(<GoalDetail goalId="car" onClose={vi.fn()} />)
+    await openPlan()
+    expect(await screen.findByText('Main bank')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^Move from/ })).toBeNull()
+  })
+})
+
 describe('BillDetail', () => {
   beforeEach(async () => {
     await db.bills.put(

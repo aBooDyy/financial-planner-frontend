@@ -100,6 +100,7 @@ describe('Wallets while the balances load', () => {
         onDelete={noop}
         onAddInside={noop}
         onSetAside={noop}
+        onFix={noop}
         onOpenLine={noop}
         expanded={new Set()}
         onToggleLines={noop}

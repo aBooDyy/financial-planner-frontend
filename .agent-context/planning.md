@@ -128,7 +128,8 @@ occurrence it would roll to (the next one not settled). Pure — the prompt is t
 ## Balance, Set aside, Free to spend — `data/balances.ts`
 
 `balanceFigures({nodes, walletDeltas, setAsides, goals, bills, base, rates})` →
-`{wallets, groups, header}`. Per wallet (its own currency): `balance` (opening amount + ledger
+`{wallets, activeWallets, groups, header}`. `wallets` is keyed by id and holds **every live wallet,
+archived ones included**; `activeWallets` is the list money can go to. Per wallet (its own currency): `balance` (opening amount + ledger
 delta — the bank's number), `setAside` (Σ its live set-aside lines, `walletSetAsides`),
 `free = balance − setAside` (negative = over-committed, `overBy`), its `lines` and the same
 three in base (`inBase`). Groups and the header are Σ of their **active** wallets' `inBase`
@@ -281,6 +282,18 @@ first, each a Dexie write plus outbox entries; errors are `MoneyActionError` wit
   then `closeGoal` with the rest freed (other wallets, money held outside). Never one spend of
   everything from one wallet: that wallet's Balance would stop matching its bank. Returns the
   spends' ids. Not atomic; a failure in between leaves an open goal with payments, harmless.
+- **`moveSetAsideTo(id, toWalletId, amount?)`, `moveHeldTo(owner, fromWalletId, toWalletId, amount?)`,
+  `applyRebalance(moves)`** (`actions/moveSetAside.ts`) — move a label to another wallet by hand: no
+  real money moves, the owner and planned link stay, no plan rewrite (what is owed is unchanged).
+  `no_wallet` for a target missing, archived or equal to the source; `not_found` for a row no
+  longer live; `bad_amount` for an amount outside the row or held, or money that would land as
+  nothing in the target's currency (too small, or no rate). `applyRebalance` checks every move
+  before writing any, then queues **one batch per target wallet** (a batch carries one id, and
+  the id is what tells which wallet the money went to); a row split across wallets moves its
+  remainder in the next batch, so a failure part-way leaves valid moves behind and the plan can be
+  suggested again. `view/rebalance.ts#suggestRebalance` (pure) makes the plan for an over-committed wallet: goals, then
+  bills by the latest occurrence; targets from `figures.activeWallets`, most free first in one
+  currency; relief and room measured through the same per-row rounding the figures use.
 - **Close / reopen / pause / resume** stay in their slices (`bills/data/actions`,
   `goals/data/actions`). Close drops the open unsettled rows after the close date, and the
   planner's orphan pass resolves the rest; pause skips the goal's set-asides already due
@@ -559,9 +572,13 @@ to Bills and open a bill in one go). Header (both): colour dot, name, "Semi-annu
   one, the rows created last) is where it arrived; the released rows in the other wallet are the
   sources. A source reads *Set aside* + *Moved to Main bank* (unsigned, on its release date); the
   arrival adds no line of its own until it is freed (*Taken back*) or moved on (its own *Moved
-  to*). A source whose arrival a second transfer re-stamped is paired with it by wallet, day and
-  amount. *Moved in* is left for an arrival whose source is not among the item's rows. Moves
-  with no transfer keep the plain story: *Taken back* there, *Set aside* in the new row.
+  to*). A source whose arrival a second move re-stamped is paired with it by wallet, day and
+  amount (any amount across currencies, which can't be compared here); part of an arrival moved on is found
+  the same way, by what the arrival's own rows fall short of (same currency only: across
+  currencies that part still shows a *Set aside* line of its own). *Moved in* is left for an
+  arrival whose source is not among the item's rows. A **move with no transfer between wallets**
+  reads the same way, under an id of its own (`moveWithoutTransfer`). Moves between occurrences
+  or owners carry no id and keep the plain story: *Taken back* there, *Set aside* in the new row.
 
 ### Anytime-action sheets — `components/sheets/`
 
@@ -590,6 +607,12 @@ Delete**). Reopen / Pause / Resume act at once with a toast; the rest open a she
   record) or **Delete** (a mistake, asks first). A freed one offers **Set aside again** and Delete.
   One a payment used or a move carried off is read-only, since un-releasing it would count the
   money twice. Each write files a quiet plan rewrite, as Add money does.
+- **Moving set-asides** (`MoveSetAsideSheet`, sheet kind `move`; `FixOverSheet`; `view/moveSetAside.ts`):
+  Move takes one live row (`SetAsideSheet`) or all an owner holds in a wallet (`HeldIn`; for a bill
+  that spans every due date, so it can exceed the line, which shows only the next one). `FixOverSheet`
+  is hosted by the Wallets page and opens only from a wallet row's **Fix**: it reads
+  `suggestRebalance` once on opening, edits are checked by `planOverCommits`, and nothing is written
+  until `applyRebalance` on confirm.
 - **One date's amount** (`CycleAmountSheet`, `setOccurrenceAmount`): pins the amount on that
   occurrence's row; funding, status and fill-then-spill read it through `occurrenceAmount`.
 - **A payment** (`PaymentEditorSheet`): the transaction editor, mounted over Planning.
@@ -613,6 +636,6 @@ Delete**). Reopen / Pause / Resume act at once with a toast; the rest open a she
 `data/{payPeriods,occurrences,funding,leftover,balances,safeToSpend,status,paycheck,views}.test.ts`
 (leftover + fill; views = Upcoming, review, year ahead; `testing/state.ts` builds a planner
 state from rows, `plannedScenario` with the planner's rows written); `hooks/usePlanning.test.tsx`; `actions/actions.test.ts`
-(the testing plan's anytime actions); generation and the runner in
+(the testing plan's anytime actions); `actions/moveSetAside.test.ts`, `view/rebalance.test.ts`; generation and the runner in
 `planned/data/{generate,reconcile,runner}.test.ts`; payments in
 `planned/data/billPayments.test.ts`.

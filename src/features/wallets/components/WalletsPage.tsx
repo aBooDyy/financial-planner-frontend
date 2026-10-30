@@ -11,6 +11,7 @@ import {
 } from '#/features/wallets/data/mutations'
 import { useMoneyFigures } from '#/features/planning'
 import { AddMoneySheet } from '#/features/planning/components/sheets/AddMoneySheet'
+import { FixOverSheet } from '#/features/planning/components/sheets/FixOverSheet'
 import { isoOf } from '#/features/planned/data/dates'
 import { startOfToday } from '#/features/transactions/data/planning'
 import { safeHeaderView } from '#/features/wallets/data/safeHeader'
@@ -97,6 +98,7 @@ export function WalletsPage() {
   const [archivingId, setArchivingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [settingAsideIn, setSettingAsideIn] = useState<string | null>(null)
+  const [fixing, setFixing] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   const targetOf = (id: string | null) =>
     id ? archiveTarget(nodes, id, { deltas, base, rates }) : null
@@ -219,6 +221,7 @@ export function WalletsPage() {
               onDelete={setDeletingId}
               onAddInside={(id) => editor.openAdd('wallet', id)}
               onSetAside={setSettingAsideIn}
+              onFix={setFixing}
               onOpenLine={openLine}
               expanded={expanded}
               onToggleLines={toggleLines}
@@ -243,6 +246,10 @@ export function WalletsPage() {
           walletId={settingAsideIn}
           onClose={() => setSettingAsideIn(null)}
         />
+      ) : null}
+
+      {fixing ? (
+        <FixOverSheet walletId={fixing} onClose={() => setFixing(null)} />
       ) : null}
 
       {editor.editing ? (

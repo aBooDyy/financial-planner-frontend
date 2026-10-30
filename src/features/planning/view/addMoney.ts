@@ -17,6 +17,20 @@ export const leftToPlace = (
   parts: ReadonlyArray<{ amount: number }>,
 ): number => total - parts.reduce((sum, p) => sum + p.amount, 0)
 
+type WalletRoom = { walletId: string; free: number; currency: CurrencyCode }
+
+/** What `overCommits` needs from each wallet's figures. */
+export const freeByWalletOf = (
+  wallets: ReadonlyArray<WalletRoom>,
+): Map<string, { free: number; currency: CurrencyCode }> =>
+  new Map(
+    wallets.map((w) => [w.walletId, { free: w.free, currency: w.currency }]),
+  )
+
+/** "SR 300 free", or nothing free on a wallet already over. */
+export const freeNote = (w: Pick<WalletRoom, 'free' | 'currency'>): string =>
+  `${money(Math.max(0, w.free), w.currency)} free`
+
 export type OverCommit = {
   walletId: string
   /** Wallet currency. */

@@ -21,8 +21,13 @@ import type {
   ReleaseWire,
 } from '#/features/setAsides/api/types'
 import { isoOf } from '#/features/planned/data/dates'
+import { currentRates } from '#/features/planned/data/rows'
 import { configLimits } from '#/lib/config/appConfig'
+import type { RatesMap } from '#/lib/config/rates'
+import { convertMinor } from '#/lib/currency'
+import type { CurrencyCode } from '#/lib/currency'
 import { newId } from '#/lib/uuid'
+import { localSetAsideToUpdateWire } from './mappers'
 import type { SetAsideOwner } from './mutations'
 import { isLiveSetAside } from './totals'
 
@@ -37,6 +42,11 @@ export type MoveTarget = {
 }
 
 export type MovePart = SetAsidePart & { to: MoveTarget }
+
+export type MovedSetAsides = {
+  /** Source id → the live row its unmoved rest was written under. */
+  remainders: ReadonlyMap<string, string>
+}
 
 /** A batch referred to a row that is not live here (gone, or already released). */
 export class SetAsideBatchError extends Error {
@@ -132,6 +142,17 @@ async function queueBatch(
   })
 }
 
+async function queueUpdate(row: LocalSetAside): Promise<void> {
+  await db.outbox.add({
+    op: 'update',
+    entity: 'setAside',
+    id: row.id,
+    payload: localSetAsideToUpdateWire(row),
+    baseVersion: row.version,
+    createdAt: now(),
+  })
+}
+
 /** Consecutive runs of at most `limits.setAsideBatchMax` items. */
 function chunks<T>(items: ReadonlyArray<T>): T[][] {
   const size = Math.max(1, configLimits().setAsideBatchMax)
@@ -212,6 +233,45 @@ async function ownerAfterMove(
   return { goalId: null, billId: owner.billId, occurrence }
 }
 
+/** The currencies of the wallets a move lands in, with the rates to convert into them. */
+type Landing = {
+  currencies: ReadonlyMap<string, CurrencyCode>
+  rates: RatesMap
+}
+
+async function landingOf(parts: ReadonlyArray<MovePart>): Promise<Landing> {
+  const ids = [
+    ...new Set(parts.flatMap((p) => (p.to.walletId ? [p.to.walletId] : []))),
+  ]
+  if (ids.length === 0) return { currencies: new Map(), rates: {} }
+  const currencies = new Map<string, CurrencyCode>()
+  for (const node of await db.balanceNodes.bulkGet(ids))
+    if (node?.currency) currencies.set(node.id, node.currency)
+  return { currencies, rates: await currentRates() }
+}
+
+/**
+ * The money as its new wallet holds it. With no rate to convert by it stays as it was rather
+ * than land as nothing.
+ */
+function landedAs(
+  source: LocalSetAside,
+  amount: number,
+  walletId: string | undefined,
+  landing: Landing,
+): Pick<LocalSetAside, 'amount' | 'currency'> {
+  const currency = walletId ? landing.currencies.get(walletId) : undefined
+  const kept = { amount, currency: source.currency }
+  if (!currency || currency === source.currency) return kept
+  const converted = convertMinor(
+    amount,
+    source.currency,
+    currency,
+    landing.rates,
+  )
+  return converted > 0 ? { amount: converted, currency } : kept
+}
+
 /**
  * A move's new row: the source's money, now for the target. A move that keeps the owner names
  * only the wallet on the wire, so the server keeps the planned link exactly as this row does.
@@ -222,6 +282,7 @@ async function movedCopy(
   to: MoveTarget,
   date: string,
   transferId: string | null,
+  landing: Landing,
   ts: string,
 ): Promise<{ row: LocalSetAside; to: MoveTargetWire }> {
   const owner = await ownerAfterMove(source, to.owner)
@@ -246,7 +307,7 @@ async function movedCopy(
             externalLabel: null,
           }
         : {}),
-      amount,
+      ...landedAs(source, amount, to.walletId, landing),
       date,
       plannedId: owner ? null : source.plannedId,
       releasedAt: null,
@@ -266,17 +327,28 @@ async function movedCopy(
  * source is released on `date` (default today) and a new row written for the target, dated
  * `date`; `transferId` (the transfer the money rode on, possibly still queued) is stamped on
  * both — without one, the source keeps the transfer that brought it. Throws `SetAsideBatchError` for a row that is not live; nothing is written then.
+ *
+ * A new row is held in its wallet's currency. The server's move copies the source's amount and
+ * currency, so a row that landed in another currency also queues its own update behind the batch.
+ *
+ * Answers with the id each split source's remainder took.
  */
 export async function moveSetAsides(
   parts: ReadonlyArray<MovePart>,
   options: { date?: string; transferId?: string | null } = {},
-): Promise<void> {
-  if (parts.length === 0) return
+): Promise<MovedSetAsides> {
+  const remainders = new Map<string, string>()
+  if (parts.length === 0) return { remainders }
   const date = options.date ?? isoOf(new Date())
   const transferId = options.transferId ?? null
+  const landing = await landingOf(parts)
   await db.transaction('rw', db.setAsides, db.bills, db.outbox, async () => {
     const ts = now()
-    const moves: { rows: LocalSetAside[]; item: MoveItemWire }[] = []
+    const moves: {
+      rows: LocalSetAside[]
+      item: MoveItemWire
+      converted: LocalSetAside | null
+    }[] = []
     const sources = await liveRows(parts)
     for (const [i, source] of sources.entries()) {
       const part = parts[i]
@@ -293,11 +365,14 @@ export async function moveSetAsides(
         part.to,
         date,
         transferId,
+        landing,
         ts,
       )
+      if (s.remainder) remainders.set(source.id, s.remainder.id)
       moves.push({
         rows: [s.released, ...(s.remainder ? [s.remainder] : []), copy.row],
         item: { ...s.item, new_id: copy.row.id, to: copy.to },
+        converted: copy.row.currency === source.currency ? null : copy.row,
       })
     }
     for (const chunk of chunks(moves)) {
@@ -310,7 +385,19 @@ export async function moveSetAsides(
           items: chunk.map((mv) => mv.item),
         },
       )
+      for (const { converted } of chunk)
+        if (converted) await queueUpdate(converted)
     }
   })
   schedulePush()
+  return { remainders }
 }
+
+/**
+ * A move no transfer carried, all to one wallet. Both rows of each pair share an id of their own,
+ * so a full pull can still tell the pair apart from money freed and set aside again; the column
+ * has no foreign key, and no transfer has to exist under it.
+ */
+export const moveWithoutTransfer = (
+  parts: ReadonlyArray<MovePart>,
+): Promise<MovedSetAsides> => moveSetAsides(parts, { transferId: newId() })

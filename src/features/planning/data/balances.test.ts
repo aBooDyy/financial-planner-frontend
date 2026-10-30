@@ -65,6 +65,25 @@ describe('balanceFigures', () => {
     ])
   })
 
+  it('lists only the wallets money can go to as active', () => {
+    const f = balanceFigures({
+      nodes: [
+        MAIN,
+        wallet({ id: 'gone', archivedAt: '2026-01-01T00:00:00Z' }),
+        group({ id: 'old', archivedAt: '2026-01-01T00:00:00Z' }),
+        wallet({ id: 'inside', parentId: 'old' }),
+      ],
+      walletDeltas: {},
+      setAsides: [],
+      goals: [],
+      bills: [],
+      base: 'SAR',
+      rates: RATES,
+    })
+    expect(f.activeWallets.map((w) => w.walletId)).toEqual(['main'])
+    expect(Object.keys(f.wallets).sort()).toEqual(['gone', 'inside', 'main'])
+  })
+
   it('flags an over-committed wallet', () => {
     const f = balanceFigures({
       nodes: [MAIN],

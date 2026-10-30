@@ -91,7 +91,8 @@ and `recurrings` went with the planning rebuild: a repeating payment is a **bill
   `buildCashflow` (income / spent / net — **net = income − spent**; set-asides are never an
   outflow, because the money stays in its wallet (F3: subtracting them double counted a goal
   paid later, and disagreed with Wallets' Money in & out). Σ wallet-held set-asides dated in
-  the period and scope is only a caption under the figures, `setAsideNote` — "SR 600 set aside
+  the period and scope, less the rows a move carried ([set-asides.md](set-asides.md#elsewhere)),
+  is only a caption under the figures, `setAsideNote` — "SR 600 set aside
   — still in your wallets" — hidden when 0; no bar segment),
   `buildCalendar` (see below), `buildActivityList` (day groups), `buildBreakdown` (donut),
   `buildBudgetsView` (burn vs cap, health rail). `Scope` = all | wallet | group (group matches

@@ -26,6 +26,8 @@ type Props = {
   onDelete: (id: string) => void
   onAddInside: (id: string) => void
   onSetAside: (walletId: string) => void
+  /** Opens the fix for an over-committed wallet. */
+  onFix: (walletId: string) => void
   onOpenLine: (line: SetAsideLineRow) => void
   /** Wallets whose set-aside list is open. */
   expanded: ReadonlySet<string>
@@ -46,6 +48,7 @@ export function WalletsGroupsCard({
   onDelete,
   onAddInside,
   onSetAside,
+  onFix,
   onOpenLine,
   expanded,
   onToggleLines,
@@ -122,6 +125,7 @@ export function WalletsGroupsCard({
                 onAdjust={onAdjust}
                 onDelete={onDelete}
                 onSetAside={onSetAside}
+                onFix={onFix}
                 onOpenLine={onOpenLine}
                 expanded={expanded.has(row.id)}
                 onToggleLines={onToggleLines}

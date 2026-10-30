@@ -159,7 +159,13 @@ export function BillDetail({
       ) : null}
       {tab === 'plan' ? (
         <>
-          <HeldIn lines={status.heldIn} currency={c} wallets={wallets} />
+          <HeldIn
+            lines={status.heldIn}
+            currency={c}
+            wallets={wallets}
+            owner={{ kind: 'bill', id: bill.id }}
+            closed={closed}
+          />
           <PlanBox
             text={billPlanText(
               bill,

@@ -223,6 +223,7 @@ function LiveSetAside({
   const { inputs, today } = usePlannedData()
   const wallets = usePlanningWallets()
   const { figures } = useMoneyFigures()
+  const openSheet = usePlanningUi((s) => s.openSheet)
   const dateFormat = usePreferencesStore((s) => s.dateFormat)
   const [amount, setAmount] = useState(
     minorToInputValue(row.amount, row.currency),
@@ -317,6 +318,10 @@ function LiveSetAside({
     }
   }
 
+  const owner = row.goalId
+    ? inputs.goals.find((g) => g.id === row.goalId)
+    : bill
+  const canMove = row.source === 'wallet' && owner?.closedAt === null
   const takeBack = (
     <Button
       type="button"
@@ -340,10 +345,29 @@ function LiveSetAside({
         contentClassName="sm:max-w-[480px]"
         footer={
           <div className="flex w-full flex-col gap-2">
+            {canMove ? (
+              <div className="grid grid-cols-2 gap-2">
+                {takeBack}
+                <Button
+                  type="button"
+                  variant="quiet"
+                  size="dialog"
+                  disabled={busy}
+                  onClick={() =>
+                    openSheet({
+                      kind: 'move',
+                      from: { kind: 'row', id: row.id },
+                    })
+                  }
+                >
+                  Move
+                </Button>
+              </div>
+            ) : null}
             <DialogActions
               hint={block}
               onDelete={() => setConfirming(true)}
-              extra={takeBack}
+              extra={canMove ? undefined : takeBack}
               ready={block === null}
               disabled={busy}
               submitLabel={
@@ -403,6 +427,7 @@ function LiveSetAside({
             />
             <p className="text-[12px] leading-[1.45] text-fp-text-3">
               Changing the wallet here corrects a mistake and leaves no record.
+              {canMove ? ' To keep a record, use Move.' : ''}
             </p>
           </div>
         ) : (

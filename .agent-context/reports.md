@@ -37,13 +37,12 @@ start`), so no window ever runs backwards.
 comparison's spans (`inAnyRange` over `mergeRanges`), plus **`before`** — `walletDeltas` over
 every row dated before the period, reduced inside the query so only a per-wallet map reaches
 React — plus merchant names, plus **`goalSetAsides`** — the goal set-asides dated in any of the spans that
-count as saving (`data/goalSaving.ts#countsAsGoalSaving`: live, or later used by a payment
-— `releasedById`; anything released without a payment is left out: freed, closed, or a move's
-source). A release clears `movedByTransferId` (client `split` and the server alike), so a
-moved-in row that is later paid or freed can't be told from an original one; counting only the
-row each move chain ends in keeps moved money counted **once**, dated the last move rather than
-the first set-aside — exact first-date attribution would need a move's new row to keep a link to
-its source. They feed the Needs / Wants / Savings caption. The answer is tagged with `ledgerKey(spans)`; `useReport` only
+count as saving (`data/goalSaving.ts#goalSavingRows`: what is still held or was used by a
+payment; money freed or closed is left out, even after a move). Moved money counts **once, on
+the day it was first set aside**, as Spending's caption does: a move's new rows add nothing
+(`setAsideMoves.carried`), and the original row counts for the share of it that ended up kept,
+followed through `setAsideMoves.arrivals`. It reads the whole table, because a move's two sides
+are dated differently. They feed the Needs / Wants / Savings caption. The answer is tagged with `ledgerKey(spans)`; `useReport` only
 builds a view from an answer whose key matches, and keeps showing the last built view while a
 new period loads (state, not a ref), so switching presets never flashes skeletons or stale sums.
 

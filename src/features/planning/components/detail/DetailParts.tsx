@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { PillSwitch } from '#/components/dialog/PillSwitch'
 import { Button } from '#/components/ui/button'
+import type { PlanOwner } from '#/features/planned/data/owners'
 import type { HeldLine } from '#/features/planning/data/status'
 import type { PlanningWallets } from '#/features/planning/hooks/usePlanningWallets'
 import { usePlanningUi } from '#/features/planning/stores/planningUi'
@@ -99,16 +100,21 @@ export function DetailGroup({
   )
 }
 
-/** HELD IN: one line per wallet, and what is held outside them. */
+/** HELD IN: one line per wallet, and what is held outside them. A wallet's money can be moved. */
 export function HeldIn({
   lines,
   currency,
   wallets,
+  owner,
+  closed,
 }: {
   lines: ReadonlyArray<HeldLine>
   currency: string
   wallets: PlanningWallets
+  owner: PlanOwner
+  closed: boolean
 }) {
+  const openSheet = usePlanningUi((s) => s.openSheet)
   return (
     <DetailGroup title="Held in">
       {lines.length === 0 ? (
@@ -129,6 +135,23 @@ export function HeldIn({
                 <span className="fp-sensitive font-bold tabular-nums">
                   {money(l.amount, currency)}
                 </span>
+                {wallet && !closed ? (
+                  <Button
+                    type="button"
+                    variant="quiet"
+                    size="xs"
+                    aria-label={`Move from ${wallet.name}`}
+                    onClick={() =>
+                      openSheet({
+                        kind: 'move',
+                        from: { kind: 'held', owner, walletId: wallet.id },
+                      })
+                    }
+                    className="rounded-[8px] px-2 text-[12px] font-bold"
+                  >
+                    Move
+                  </Button>
+                ) : null}
               </li>
             )
           })}

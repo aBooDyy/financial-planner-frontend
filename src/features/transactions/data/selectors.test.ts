@@ -1295,3 +1295,128 @@ describe('confirmed planned items in Activity', () => {
     expect(row.tag).toBe('income')
   })
 })
+
+describe('set-asides moved between wallets', () => {
+  const w2 = { ...wallet, id: 'w2', name: 'Savings' }
+  const w3 = { ...wallet, id: 'w3', name: 'Travel', currency: 'USD' as const }
+  const nodes = [wallet, w2, w3]
+  const JUNE = periodOf(ANCHOR, 'month')
+
+  const source = (over: Partial<LocalSetAside> = {}) =>
+    allocationRow({
+      amount: 60_000,
+      date: '2026-05-05',
+      releasedAt: '2026-06-10T09:00:00.000Z',
+      movedByTransferId: 'm1',
+      createdAt: '2026-05-05T09:00:00.000Z',
+      ...over,
+    })
+  const arrival = (over: Partial<LocalSetAside> = {}) =>
+    allocationRow({
+      amount: 60_000,
+      walletId: 'w2',
+      date: '2026-06-10',
+      movedByTransferId: 'm1',
+      createdAt: '2026-06-10T09:00:00.000Z',
+      ...over,
+    })
+
+  const caption = (setAsides: LocalSetAside[], scope: Scope = ALL) =>
+    buildCashflow(data({ nodes, setAsides }), CATALOG, scope, JUNE).setAsideNote
+  const activityAmounts = (setAsides: LocalSetAside[], scope: Scope = ALL) =>
+    buildActivityList(data({ nodes, setAsides }), CATALOG, scope, JUNE, TODAY)
+      .groups.flatMap((g) => g.rows)
+      .filter((r): r is SetAsideRow => r.kind === 'set_aside')
+      .map((r) => r.amountStr)
+
+  it('adds nothing for a move whose source is dated before the window', () => {
+    const rows = [source(), arrival()]
+    expect(caption(rows)).toBeNull()
+    expect(activityAmounts(rows)).toEqual([])
+    expect(caption(rows, { type: 'wallet', id: 'w2' })).toBeNull()
+    expect(activityAmounts(rows, { type: 'wallet', id: 'w2' })).toEqual([])
+  })
+
+  it('keeps a moved source counting on the day it was set aside', () => {
+    const rows = [source({ date: '2026-06-05' }), arrival()]
+    expect(caption(rows)).toBe('SR 600 set aside — still in your wallets')
+    expect(activityAmounts(rows)).toEqual(['SR 600.00'])
+  })
+
+  it('counts a real set-aside beside a move', () => {
+    const rows = [
+      source(),
+      arrival(),
+      allocationRow({ amount: 10_000, walletId: 'w2', date: '2026-06-10' }),
+    ]
+    expect(caption(rows)).toBe('SR 100 set aside — still in your wallets')
+    expect(activityAmounts(rows)).toEqual(['SR 100.00'])
+  })
+
+  it('leaves out what is split off a moved row, and keeps what a partial move left', () => {
+    const rows = [
+      source({ amount: 20_000, date: '2026-06-05' }),
+      allocationRow({ amount: 40_000, date: '2026-06-05' }),
+      arrival({
+        amount: 5_000,
+        releasedAt: '2026-06-11T09:00:00.000Z',
+        releasedById: 'tx1',
+      }),
+      arrival({ amount: 15_000 }),
+    ]
+    expect(caption(rows)).toBe('SR 600 set aside — still in your wallets')
+  })
+
+  it('follows a row moved on again, each move re-stamping it', () => {
+    const rows = [
+      source(),
+      arrival({
+        releasedAt: '2026-06-12T09:00:00.000Z',
+        movedByTransferId: 'm2',
+      }),
+      allocationRow({
+        amount: 60_000,
+        walletId: 'w1',
+        date: '2026-06-12',
+        movedByTransferId: 'm2',
+        createdAt: '2026-06-12T09:00:00.000Z',
+      }),
+    ]
+    expect(caption(rows)).toBeNull()
+    expect(activityAmounts(rows)).toEqual([])
+  })
+
+  it('treats a move across currencies the same way', () => {
+    const usdSource = (over: Partial<LocalSetAside> = {}) =>
+      source({
+        walletId: 'w3',
+        amount: 10_000,
+        currency: 'USD',
+        ...over,
+      })
+    const sarArrival = arrival({ amount: 37_500 })
+
+    const before = [usdSource(), sarArrival]
+    expect(caption(before)).toBeNull()
+    expect(activityAmounts(before)).toEqual([])
+
+    const inWindow = [usdSource({ date: '2026-06-05' }), sarArrival]
+    expect(caption(inWindow)).toBe('SR 375 set aside — still in your wallets')
+    expect(activityAmounts(inWindow)).toEqual(['SR 375.00'])
+  })
+
+  it('pairs within one owner when a transfer carried several', () => {
+    const rows = [
+      source(),
+      arrival(),
+      source({ goalId: null, billId: 'rent', amount: 20_000 }),
+      arrival({ goalId: null, billId: 'rent', amount: 20_000 }),
+    ]
+    expect(caption(rows)).toBeNull()
+  })
+
+  it('counts the new row once its source was deleted as a mistake', () => {
+    const rows = [source({ deleted: 1 }), arrival()]
+    expect(caption(rows)).toBe('SR 600 set aside — still in your wallets')
+  })
+})

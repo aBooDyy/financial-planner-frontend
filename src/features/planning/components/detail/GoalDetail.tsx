@@ -154,7 +154,13 @@ export function GoalDetail({
         <HistoryList lines={history} today={planning.today} />
       ) : (
         <>
-          <HeldIn lines={status.heldIn} currency={c} wallets={wallets} />
+          <HeldIn
+            lines={status.heldIn}
+            currency={c}
+            wallets={wallets}
+            owner={{ kind: 'goal', id: goal.id }}
+            closed={closed}
+          />
           <PlanBox
             text={goalPlanText(goal, status, planning.calendar)}
             plan={closed || paused ? null : plan.view}

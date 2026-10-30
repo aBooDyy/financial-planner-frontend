@@ -25,6 +25,7 @@ vi.mock('#/features/transactions/data/transfers', () => ({
 }))
 vi.mock('#/features/setAsides/data/batches', () => ({
   moveSetAsides: writes.moveSetAsides,
+  moveWithoutTransfer: writes.moveSetAsides,
 }))
 
 beforeAll(() => {

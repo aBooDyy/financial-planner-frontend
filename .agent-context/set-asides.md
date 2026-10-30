@@ -21,9 +21,11 @@ goal allocations and serves bills and goals alike (working docs:
   setting aside again money the transfer already moved; the server takes any of the user's
   transactions and nulls the link if the transfer is deleted (FK `SET NULL`). A row is wholly
   live or wholly released: a partial release splits it. `movedByTransferId` is the transfer
-  that last carried the row's money: stamped on both rows of a move a transfer carried (the
-  source as it is released, the new row from its creation), and kept by every other release —
-  a payment, a free, a close, a move with no transfer — exactly as the server keeps it.
+  that last carried the row's money — or, for a move between wallets with no transfer behind it,
+  an id of that move's own (`moveWithoutTransfer`), which names no transaction; the server only
+  checks it is a UUID, and nothing looks a transfer up from it. Stamped on both rows of the move
+  (the source as it is released, the new row from its creation), and kept by every other release
+  — a payment, a free, a close, a move with no id — exactly as the server keeps it.
 - `plannedId` = the planned SET_ASIDE row it settles. It settles it while **live**, and still
   does once a **payment** released it (`releasedById` — the money was set aside, then used). One
   freed, moved or released by a close does not (`settlesItsRow` in `planned/data/settle.ts`): the
@@ -81,6 +83,14 @@ applies all-or-nothing (`POST /set-asides/release`, `/move`).
   Anything not named keeps the source's. `transferId` is stamped on the released and new rows;
   without one the source keeps its own and the new row has none (the server's rule — the
   device copy must not drift from it, as a later full PATCH would send the drift back).
+  A one-wallet move with no transfer goes through `moveWithoutTransfer`, which stamps a fresh id
+  so it reads back as one move. It answers `{remainders}`: source id → the remainder's id.
+  **A new row is held in its wallet's currency.** The server's `/move` copies the source's amount
+  and currency, so a row that lands in another currency is converted here (`currentRates`) and
+  also queues a plain `update` behind the batch that brings the server's copy into line (its
+  empty base version takes the usual `409` rebase). No rate, or a conversion to nothing: the row
+  stays as the source had it and no update is queued. Rounding can move a converted total by a
+  minor unit; a planned row's status is not re-derived for it.
   **A move to the source's own owner** — its goal, or its bill and occurrence — is a wallet
   move: it keeps the planned link and `to` carries only `wallet_id` (`ownerAfterMove`), so the
   server keeps the link too, whether or not it reads a named same owner as "keep" (it does since
@@ -159,6 +169,10 @@ Goal progress (`goals/data/progress.ts`) = live set-asides + spending from the g
   planned row.
 - Spending's Activity lists set-asides as their own rows (`SetAsideRow`, `ownerId`), kept out of
   every total; the cashflow hero only captions Σ wallet set-asides made in the window (never in net).
+  Both show new money only: a row a stamped move wrote (`carriedSetAsides`, `planning/view/setAsideMoves`,
+  read over the whole table since a move's sides are dated apart) is left out, and its source stays on
+  the day it was set aside, released or not. A move with no stamp, or to another owner, can't be told
+  apart here and still shows on its move day.
 
 ## Tests
 
