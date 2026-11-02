@@ -4,6 +4,7 @@ import { updateGoal } from '#/features/goals/data/mutations'
 import { billOwner } from '#/features/planned/data/owners'
 import { usePlannedData } from '#/features/planned/hooks/usePlannedData'
 import type { Decision } from '#/features/planning/data/paycheck'
+import { useBillsYear } from '#/features/planning/hooks/useBillsYear'
 import { usePlanning } from '#/features/planning/hooks/usePlanning'
 import type { PlanningSection } from '#/features/planning/sections'
 import { usePlanningUi } from '#/features/planning/stores/planningUi'
@@ -23,10 +24,12 @@ import type { DecisionRow } from './DecisionsCard'
 import { Next30Card } from './Next30Card'
 import { PaycheckCard } from './PaycheckCard'
 import { VerdictCard } from './VerdictCard'
+import { YearOfBillsCard } from './YearOfBillsCard'
 
 /** Overview (04 §5): the verdict, each paycheck, the next 30 days and what needs a decision. */
 export function OverviewSection() {
   const planning = usePlanning()
+  const billsYear = useBillsYear()
   const { inputs } = usePlannedData()
   const navigate = useNavigate()
   const openSheet = usePlanningUi((s) => s.openSheet)
@@ -46,6 +49,7 @@ export function OverviewSection() {
           onSeeAll={() => show('upcoming')}
           onEvent={() => undefined}
         />
+        <YearOfBillsCard year={null} base={inputs.base} onSection={show} />
       </>
     )
 
@@ -126,6 +130,7 @@ export function OverviewSection() {
         onSeeAll={() => show('upcoming')}
         onEvent={setOpened}
       />
+      <YearOfBillsCard year={billsYear} base={base} onSection={show} />
       {opened ? (
         <EventDialog
           events={opened}

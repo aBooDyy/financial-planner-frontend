@@ -430,6 +430,12 @@ Copy and shapes in `view/overview.ts`; the cards only draw them.
   its day's events, listed first when there are several (back returns to the list). Bills get
   **Pay now** (the `payNow` sheet for that occurrence) and **View bill** (Bills + its detail);
   a payday **View income**.
+- `YearOfBillsCard` (`useBillsYear`, `data/billsYear.ts`): *Your bills over a year* — a month on
+  average and the year's total, a bar per calendar month from this one (the heaviest read out
+  until another is hovered or tapped), an estimates note, and Income / Bills / Left after
+  bills. A month is what was paid in it (linked spend transactions, whatever their date) plus
+  what is still open in it (less part payments), so paying a bill never shrinks the year: a
+  monthly bill stays twelve payments. Goals are not counted; hidden when no bill falls in the year.
 - `DecisionsCard` (`decisionNote`): goals get **Push out** (to `pushOutTo`, +6 months, with a
   toast) and **Adjust**; bills **Adjust**.
 
