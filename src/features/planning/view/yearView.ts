@@ -13,6 +13,10 @@ import type { CurrencyCode } from '#/lib/currency'
 import { dayMonth, money, monthYear, perPeriod } from './format'
 import { repeatLabel } from './repeat'
 
+/** The lanes' label and month column widths (px): tight enough on a phone for about three months. */
+export const laneWidths = (compact: boolean) =>
+  compact ? { label: 124, month: 68 } : { label: 168, month: 86 }
+
 /** The column of `iso`'s month: −1 before the window, `months.length` after it. */
 export function monthIndex(
   months: ReadonlyArray<YearMonth>,

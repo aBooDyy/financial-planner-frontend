@@ -438,6 +438,9 @@ Copy and shapes in `view/overview.ts`; the cards only draw them.
   monthly bill stays twelve payments. Goals are not counted; hidden when no bill falls in the year.
 - `DecisionsCard` (`decisionNote`): goals get **Push out** (to `pushOutTo`, +6 months, with a
   toast) and **Adjust**; bills **Adjust**.
+- `YearAheadCard` (below `<md` only, last on the page): Upcoming's `YearLanes` with `compact`
+  columns (`laneWidths`) under a *Year ahead* heading, so a phone scrolls the year sideways and
+  taps a month for its breakdown. Upcoming's mobile Year ahead keeps its month cards.
 
 ### Upcoming — `components/upcoming/`
 

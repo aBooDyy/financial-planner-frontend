@@ -84,6 +84,7 @@ describe('Planning while the plan loads', () => {
       <PeriodCardSkeleton key="p" rows={3} />,
       <YearAheadSkeleton key="d" desktop />,
       <YearAheadSkeleton key="m" desktop={false} />,
+      <YearAheadSkeleton key="c" desktop={false} compactLanes />,
     ]) {
       const el = mount(card)
       expect(placeholders(el)).toBeGreaterThan(0)

@@ -25,6 +25,7 @@ import {
   monthHead,
   monthLines,
   monthlyBillLanes,
+  laneWidths,
 } from '#/features/planning/view/yearView'
 import { cn } from '#/lib/utils'
 import { Dot } from '#/features/planning/components/kit/Spine'
@@ -39,10 +40,14 @@ type Props = {
   goalStatus: Readonly<Record<string, GoalStatus | undefined>>
   onOpen: (kind: 'bill' | 'goal', id: string) => void
   onReview: () => void
+  /** Narrower columns, so a phone shows a few months beside the labels. */
+  compact?: boolean
+  /** Sits above the grid, inside the card and outside its sideways scroll. */
+  header?: ReactNode
 }
 
 const LABEL =
-  'sticky start-0 z-[2] flex min-w-0 flex-col justify-center border-e border-fp-border bg-fp-surface px-3 py-2'
+  'sticky start-0 z-[2] flex min-w-0 flex-col justify-center border-e border-fp-border bg-fp-surface py-2'
 
 /**
  * Grid placement for month column `i` (0-based) spanning `span` columns, on grid row `row`.
@@ -54,7 +59,7 @@ const at = (row: number, i: number, span = 1): CSSProperties => ({
 })
 
 /**
- * Year ahead as lanes (desktop, design §5.1): month columns, income, monthly bills, a lane per
+ * Year ahead as lanes (design §5.1): month columns, income, monthly bills, a lane per
  * bill saved up for (ramp, then a marker on its due month), a bar per goal to its finish, and
  * what is set aside each month. Scrolls sideways; the label column sticks.
  */
@@ -68,14 +73,17 @@ export function YearLanes({
   goalStatus,
   onOpen,
   onReview,
+  compact = false,
+  header,
 }: Props) {
   const [openMonth, setOpenMonth] = useState<number | null>(null)
   const [monthlyOpen, setMonthlyOpen] = useState(false)
   const { months } = ahead
   const n = months.length
+  const { label: labelWidth, month: monthWidth } = laneWidths(compact)
   const grid: CSSProperties = {
-    gridTemplateColumns: `168px repeat(${n}, minmax(86px, 1fr))`,
-    minWidth: 168 + n * 86,
+    gridTemplateColumns: `${labelWidth}px repeat(${n}, minmax(${monthWidth}px, 1fr))`,
+    minWidth: labelWidth + n * monthWidth,
   }
   const bigLanes = billLanes(ahead, bills, calendar)
   const monthlyLanes = monthlyBillLanes(ahead, bills)
@@ -93,7 +101,10 @@ export function YearLanes({
     const r = next++
     return (
       <div key={key} className="contents">
-        <div className={LABEL} style={{ gridRow: r, gridColumn: 1 }}>
+        <div
+          className={cn(LABEL, compact ? 'px-[10px]' : 'px-3')}
+          style={{ gridRow: r, gridColumn: 1 }}
+        >
           {label}
         </div>
         {cells((i, span) => at(r, i, span))}
@@ -120,7 +131,8 @@ export function YearLanes({
 
   return (
     <div className="overflow-hidden rounded-[16px] border border-fp-border bg-fp-surface shadow-fp">
-      <div className="overflow-x-auto">
+      {header}
+      <div className="overflow-x-auto overscroll-x-contain">
         <div className="isolate grid" style={grid}>
           {row(
             <span className="text-[11px] font-extrabold text-fp-text-3 uppercase">

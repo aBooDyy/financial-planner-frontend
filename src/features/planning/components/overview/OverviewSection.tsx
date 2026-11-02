@@ -24,9 +24,13 @@ import type { DecisionRow } from './DecisionsCard'
 import { Next30Card } from './Next30Card'
 import { PaycheckCard } from './PaycheckCard'
 import { VerdictCard } from './VerdictCard'
+import { YearAheadCard } from './YearAheadCard'
 import { YearOfBillsCard } from './YearOfBillsCard'
 
-/** Overview (04 §5): the verdict, each paycheck, the next 30 days and what needs a decision. */
+/**
+ * Overview (04 §5): the verdict, each paycheck, the next 30 days, what needs a decision and, on
+ * phones, the year ahead.
+ */
 export function OverviewSection() {
   const planning = usePlanning()
   const billsYear = useBillsYear()
@@ -50,6 +54,7 @@ export function OverviewSection() {
           onEvent={() => undefined}
         />
         <YearOfBillsCard year={null} base={inputs.base} onSection={show} />
+        <YearAheadCard planning={planning} />
       </>
     )
 
@@ -154,6 +159,7 @@ export function OverviewSection() {
         />
       ) : null}
       <DecisionsCard rows={decisions} />
+      <YearAheadCard planning={planning} />
     </>
   )
 }
