@@ -16,6 +16,7 @@ import { dropSetAsidesOf } from '#/features/setAsides/data/mutations'
 import { unlinkLedgerFrom } from '#/features/transactions/data/mutations'
 import type { CurrencyCode } from '#/lib/currency'
 import { newId } from '#/lib/uuid'
+import { billRowOf, shaped } from './billRow'
 import { localBillToCreateWire, localBillToUpdateWire } from './mappers'
 
 export type BillDraft = {
@@ -54,17 +55,6 @@ export type BillPatch = Partial<BillDraft> &
 
 const now = () => new Date().toISOString()
 
-/** The repeat fields as the server keeps them: an interval only with 'custom', an end only when repeating. */
-function shaped(bill: LocalBill): LocalBill {
-  const custom = bill.frequency === 'custom'
-  return {
-    ...bill,
-    customInterval: custom ? bill.customInterval : null,
-    customUnit: custom ? bill.customUnit : null,
-    endsOn: bill.frequency ? bill.endsOn : null,
-  }
-}
-
 async function nextPosition(): Promise<number> {
   return (
     (await db.bills.toArray())
@@ -90,39 +80,7 @@ async function persist(bill: LocalBill): Promise<void> {
 export async function createBill(draft: BillDraft): Promise<string> {
   const id = newId()
   const ts = now()
-  const bill = shaped({
-    id,
-    name: draft.name,
-    amount: draft.amount,
-    currency: draft.currency,
-    frequency: draft.frequency,
-    customInterval: draft.customInterval ?? null,
-    customUnit: draft.customUnit ?? null,
-    nextDue: draft.nextDue,
-    endsOn: draft.endsOn ?? null,
-    walletId: draft.walletId,
-    saveWalletId: draft.saveWalletId ?? null,
-    categoryId: draft.categoryId,
-    merchantId: draft.merchantId ?? null,
-    note: draft.note ?? null,
-    autopay: draft.autopay ?? false,
-    mustPay: draft.mustPay ?? true,
-    amountVaries: draft.amountVaries ?? false,
-    color: draft.color,
-    position: await nextPosition(),
-    closedAt: null,
-    plannedAt: null,
-    planAmount: null,
-    planCount: null,
-    planStart: null,
-    setAsideDay: draft.setAsideDay ?? null,
-    createdAt: ts,
-    updatedAt: ts,
-    // Placeholder until the first sync returns the server's sha256 version.
-    version: '',
-    dirty: 1,
-    deleted: 0,
-  })
+  const bill = billRowOf(draft, { id, position: await nextPosition(), ts })
   await db.transaction('rw', db.bills, db.outbox, async () => {
     await db.bills.put(bill)
     await enqueueCreate('bill', id, localBillToCreateWire(bill))

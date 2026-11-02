@@ -18,6 +18,7 @@ import { unlinkLedgerFrom } from '#/features/transactions/data/mutations'
 import { forgetMainIncomeStream } from '#/features/wallets/data/mutations'
 import type { CurrencyCode } from '#/lib/currency'
 import { newId } from '#/lib/uuid'
+import { goalRowOf } from './goalRow'
 import {
   localGoalToCreateWire,
   localGoalToUpdateWire,
@@ -195,31 +196,11 @@ async function persistGoal(goal: LocalGoal): Promise<void> {
 export async function createGoal(draft: GoalDraft): Promise<string> {
   const id = newId()
   const ts = now()
-  const goal: LocalGoal = {
+  const goal = goalRowOf(draft, {
     id,
-    name: draft.name,
-    currency: draft.currency,
-    color: draft.color,
     position: await nextPosition(db.goals),
-    target: draft.target,
-    amount: draft.amount,
-    dueDate: draft.dueDate,
-    mustHave: draft.mustHave ?? false,
-    saveWalletId: draft.saveWalletId ?? null,
-    useCategoryId: draft.useCategoryId ?? null,
-    closedAt: null,
-    pausedAt: null,
-    plannedAt: null,
-    planAmount: null,
-    planCount: null,
-    planStart: null,
-    setAsideDay: draft.setAsideDay ?? null,
-    createdAt: ts,
-    updatedAt: ts,
-    version: '',
-    dirty: 1,
-    deleted: 0,
-  }
+    ts,
+  })
   await db.transaction('rw', db.goals, db.outbox, async () => {
     await db.goals.put(goal)
     await enqueueCreate('goal', id, localGoalToCreateWire(goal))
