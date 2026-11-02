@@ -1,4 +1,5 @@
 import { clearLocalDb } from '#/db/db'
+import { useWhatIf } from '#/features/planning/stores/whatIf'
 import { useSessionStore } from '#/stores/session'
 
 /**
@@ -9,6 +10,7 @@ import { useSessionStore } from '#/stores/session'
  */
 export async function endSession(): Promise<void> {
   useSessionStore.getState().clear()
+  useWhatIf.getState().clear()
   // Wipe local data so the next user on this device starts clean.
   await clearLocalDb().catch(() => undefined)
 }

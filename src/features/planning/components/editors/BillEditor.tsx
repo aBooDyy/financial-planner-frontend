@@ -11,6 +11,7 @@ import { Input } from '#/components/ui/input'
 import { ResponsiveDialog } from '#/components/ui/responsive-dialog'
 import { CategoryPicker } from '#/features/categories/components/CategoryPicker'
 import { useBillEditor } from '#/features/planning/hooks/useBillEditor'
+import type { TrialTarget } from '#/features/planning/stores/planningUi'
 import { usePlanningReady } from '#/features/planning/hooks/usePlanningReady'
 import { ITEM_COLORS } from '#/features/planning/view/colors'
 import { perYearOf } from '#/features/planning/view/repeat'
@@ -38,6 +39,8 @@ type Props = {
   id: string | null
   onClose: () => void
   onDelete: (id: string) => void
+  /** Tries the bill out in What if; nothing reaches the plan. */
+  trial?: TrialTarget
 }
 
 /** New bill / Edit bill (04 §4): short by default, the rest behind More options. */
@@ -45,8 +48,8 @@ export function BillEditor(props: Props) {
   return usePlanningReady() ? <BillEditorForm {...props} /> : null
 }
 
-function BillEditorForm({ id, onClose, onDelete }: Props) {
-  const e = useBillEditor(id, onClose)
+function BillEditorForm({ id, onClose, onDelete, trial }: Props) {
+  const e = useBillEditor(id, onClose, trial)
   const dateFormat = usePreferencesStore((s) => s.dateFormat)
   const guard = useDiscardGuard({ dirty: e.dirty, close: onClose })
   const { form, set } = e
@@ -60,14 +63,20 @@ function BillEditorForm({ id, onClose, onDelete }: Props) {
         onOpenChange={(open) => {
           if (!open) guard.requestClose()
         }}
-        title={e.bill ? `Edit ${e.bill.name}` : 'New bill'}
-        description="Something you pay, once or on repeat."
+        title={trial ? 'Try a bill' : e.bill ? `Edit ${e.bill.name}` : 'New bill'}
+        description={
+          trial
+            ? 'See how it fits. Nothing is added to your plan yet.'
+            : 'Something you pay, once or on repeat.'
+        }
         footer={
           <DialogActions
             hint={e.block}
             onDelete={e.bill ? () => onDelete(e.bill?.id ?? '') : undefined}
             onCancel={guard.requestClose}
-            submitLabel={e.bill ? 'Save changes' : 'Add bill'}
+            submitLabel={
+              trial ? 'See how it fits' : e.bill ? 'Save changes' : 'Add bill'
+            }
             ready={e.block === null}
             onSubmit={() => void e.save()}
           />

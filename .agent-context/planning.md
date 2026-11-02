@@ -118,6 +118,23 @@ a second; `removeEveryday` clears `inPlan` and keeps the cap. Editor: `EverydayE
 `useEverydayEditor` and `view/everydayDraft.ts` (it always saves `excludesBills`, since the plan
 has the bills already). Only category budgets count: an account or overall cap overlaps them.
 
+## What if — `data/whatIf.ts`, `stores/whatIf.ts`
+
+`whatIf({inputs, state, items, userId, today})` → `{before, after, items, knockOns}`.
+`inputsWith` adds the switched-on items as stored-shape rows (`billRowOf`, `goalRowOf`,
+`budgetRowOf`, the same builders the writes use; a tried category replaces that category's
+budget), then `derivePlannerState` runs the real engine, so the answer is what the plan would
+say. `knockOns` compares statuses for what was already planned: `short`, else `later` (a goal's
+finish), else `slower` (a goal's per-paycheck pace). Pure; nothing is written.
+
+The store holds **drafts** (`BillDraft`, `GoalDraft`, `BudgetDraft`), not forms, so adding one is
+just `createBill` / `createGoal` / `saveEveryday` (`actions/addTryout.ts`). Persisted to
+localStorage (`fp-what-if`) so a decision can wait; `endSession` clears it, because it isn't a
+Dexie table and `clearLocalDb` wouldn't. The editors take `trial: {itemId}` on their sheet: save
+goes to the store and closing returns to the What if sheet (`components/whatIf/`). Copy and the
+one-scale comparison live in `view/whatIf.ts`. Tries new items only: not changing or dropping
+something already planned, and not extra income.
+
 ## Stranded set-asides — `data/rekey.ts`
 
 A bill's set-aside covers one occurrence by its exact date, so a moved due date, a new repeat or
@@ -379,7 +396,8 @@ Nice to have for bills, **Must have** / Nice to have for goals, "Left for spendi
 
 ### Plan something and the editors
 
-- `PlanChooser`: A bill · Everyday spending · A goal · Income, and — while there is no open goal — **Start an emergency fund**:
+- `PlanChooser`: A bill · Everyday spending · A goal · Income, "Not sure yet? See how it fits
+  first →" (What if), and — while there is no open goal — **Start an emergency fund**:
   a must-have goal targeting 3 × the monthly must-pay bills (`emergencyFundPreset`; no target
   before there are bills). Section headers' **+ Add bill / goal / income** skip it.
 - Editors (and every sheet) mount their body only once the planner's inputs and the category

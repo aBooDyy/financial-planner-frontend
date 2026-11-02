@@ -8,7 +8,9 @@ import {
   averageMonthlySpend,
   averageWindow,
 } from '#/features/planning/data/everyday'
+import type { TrialTarget } from '#/features/planning/stores/planningUi'
 import { toast } from '#/features/planning/stores/toast'
+import { useWhatIf } from '#/features/planning/stores/whatIf'
 import {
   everydayBlock,
   everydayFormOf,
@@ -17,26 +19,36 @@ import {
   suggestedAmount,
 } from '#/features/planning/view/everydayDraft'
 import type { EverydayForm } from '#/features/planning/view/everydayDraft'
+import { budgetRowOf } from '#/features/transactions/data/budgetRow'
 import { minorToInputValue } from '#/lib/currency'
 
 /** The everyday spending editor's state: the form, the recent average, the preview and save. */
-export function useEverydayEditor(id: string | null, onDone: () => void) {
+export function useEverydayEditor(
+  id: string | null,
+  onDone: () => void,
+  trial?: TrialTarget,
+) {
   const { inputs, state, today } = usePlannedData()
   const catalog = useCategoryCatalog()
   const { base, rates, budgets } = inputs
   const calendar = state.funding.calendar
   const budget = id ? budgets.find((b) => b.id === id) : undefined
+  const tried = useWhatIf((s) =>
+    s.items.find((i) => i.id === trial?.itemId && i.kind === 'everyday'),
+  )
 
   const [initial] = useState<EverydayForm>(() =>
     budget
       ? everydayFormOf(budget)
-      : {
-          categoryId: catalog.bySlug('groceries')?.id ?? '',
-          amount: '',
-          currency: base,
-          period: 'monthly',
-          customDays: '30',
-        },
+      : tried?.kind === 'everyday'
+        ? everydayFormOf(budgetRowOf(tried.id, tried.draft, ''))
+        : {
+            categoryId: catalog.bySlug('groceries')?.id ?? '',
+            amount: '',
+            currency: base,
+            period: 'monthly',
+            customDays: '30',
+          },
   )
   const [form, setForm] = useState(initial)
   const [submitted, setSubmitted] = useState(false)
@@ -97,12 +109,18 @@ export function useEverydayEditor(id: string | null, onDone: () => void) {
     setSubmitted(true)
     if (block) return
     const write = everydayWriteOf(form)
-    await saveEveryday(id, write)
-    toast(
-      budget
-        ? 'Saved'
-        : `${catalog.get(form.categoryId).name} added to your plan`,
-    )
+    if (trial) {
+      useWhatIf
+        .getState()
+        .save(trial.itemId, { kind: 'everyday', draft: write })
+    } else {
+      await saveEveryday(id, write)
+      toast(
+        budget
+          ? 'Saved'
+          : `${catalog.get(form.categoryId).name} added to your plan`,
+      )
+    }
     onDone()
   }
   const removeFromPlan = budget

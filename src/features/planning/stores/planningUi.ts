@@ -15,12 +15,16 @@ export type MoveFrom =
   | { kind: 'row'; id: string }
   | { kind: 'held'; owner: PlanOwner; walletId: string }
 
+/** An editor trying something out: the item it edits in What if, or null for a new one. */
+export type TrialTarget = { itemId: string | null }
+
 /** The one modal the Planning page shows at a time. */
 export type PlanningSheet =
   | { kind: 'chooser' }
-  | { kind: 'bill'; id: string | null }
-  | { kind: 'goal'; id: string | null; preset?: GoalPreset }
-  | { kind: 'everyday'; id: string | null }
+  | { kind: 'bill'; id: string | null; trial?: TrialTarget }
+  | { kind: 'goal'; id: string | null; preset?: GoalPreset; trial?: TrialTarget }
+  | { kind: 'everyday'; id: string | null; trial?: TrialTarget }
+  | { kind: 'whatIf' }
   | { kind: 'income'; id: string | null }
   | { kind: 'addMoney'; owner: PlanOwner }
   | { kind: 'payNow'; billId: string; occurrence?: string }

@@ -6,6 +6,7 @@ import { FieldLabel } from '#/components/FieldLabel'
 import { ResponsiveDialog } from '#/components/ui/responsive-dialog'
 import { useEverydayEditor } from '#/features/planning/hooks/useEverydayEditor'
 import { usePlanningReady } from '#/features/planning/hooks/usePlanningReady'
+import type { TrialTarget } from '#/features/planning/stores/planningUi'
 import { InfoLine } from '#/features/planning/components/kit/InfoLine'
 import { money } from '#/features/planning/view/format'
 import { BudgetPeriodFields } from '#/features/transactions/components/BudgetPeriodFields'
@@ -19,6 +20,8 @@ type Props = {
   /** The budget it edits; null for a new one. */
   id: string | null
   onClose: () => void
+  /** Tries it out in What if; nothing reaches the plan. */
+  trial?: TrialTarget
 }
 
 const NO_WALLETS: never[] = []
@@ -28,8 +31,8 @@ export function EverydayEditor(props: Props) {
   return usePlanningReady() ? <EverydayEditorForm {...props} /> : null
 }
 
-function EverydayEditorForm({ id, onClose }: Props) {
-  const e = useEverydayEditor(id, onClose)
+function EverydayEditorForm({ id, onClose, trial }: Props) {
+  const e = useEverydayEditor(id, onClose, trial)
   const guard = useDiscardGuard({ dirty: e.dirty, close: onClose })
   const { form, set } = e
   const amountMissing = e.showErrors && e.block === 'Enter about how much'
@@ -41,8 +44,18 @@ function EverydayEditorForm({ id, onClose }: Props) {
         onOpenChange={(open) => {
           if (!open) guard.requestClose()
         }}
-        title={e.budget ? 'Edit everyday spending' : 'Everyday spending'}
-        description="Spending that varies, so your plan can leave room for it."
+        title={
+          trial
+            ? 'Try everyday spending'
+            : e.budget
+              ? 'Edit everyday spending'
+              : 'Everyday spending'
+        }
+        description={
+          trial
+            ? 'See how it fits. Nothing is added to your plan yet.'
+            : 'Spending that varies, so your plan can leave room for it.'
+        }
         footer={
           <DialogActions
             hint={e.block}
@@ -51,7 +64,9 @@ function EverydayEditorForm({ id, onClose }: Props) {
             }
             deleteLabel="Take out of plan"
             onCancel={guard.requestClose}
-            submitLabel={e.budget ? 'Save changes' : 'Add to plan'}
+            submitLabel={
+              trial ? 'See how it fits' : e.budget ? 'Save changes' : 'Add to plan'
+            }
             ready={e.block === null}
             onSubmit={() => void e.save()}
           />

@@ -10,7 +10,10 @@ import { Input } from '#/components/ui/input'
 import { ResponsiveDialog } from '#/components/ui/responsive-dialog'
 import { usePlanningReady } from '#/features/planning/hooks/usePlanningReady'
 import { useGoalEditor } from '#/features/planning/hooks/useGoalEditor'
-import type { GoalPreset } from '#/features/planning/stores/planningUi'
+import type {
+  GoalPreset,
+  TrialTarget,
+} from '#/features/planning/stores/planningUi'
 import { ITEM_COLORS } from '#/features/planning/view/colors'
 import { amountInputProps, currencySymbol } from '#/lib/currency'
 import { usePreferencesStore } from '#/stores/preferences'
@@ -23,6 +26,8 @@ type Props = {
   preset?: GoalPreset
   onClose: () => void
   onDelete: (id: string) => void
+  /** Tries the goal out in What if; nothing reaches the plan. */
+  trial?: TrialTarget
 }
 
 /** New goal / Edit goal (04 §4): a target and a date, or a monthly amount. */
@@ -30,8 +35,8 @@ export function GoalEditor(props: Props) {
   return usePlanningReady() ? <GoalEditorForm {...props} /> : null
 }
 
-function GoalEditorForm({ id, preset, onClose, onDelete }: Props) {
-  const e = useGoalEditor(id, preset, onClose)
+function GoalEditorForm({ id, preset, onClose, onDelete, trial }: Props) {
+  const e = useGoalEditor(id, preset, onClose, trial)
   const dateFormat = usePreferencesStore((s) => s.dateFormat)
   const guard = useDiscardGuard({ dirty: e.dirty, close: onClose })
   const { form, set } = e
@@ -46,14 +51,20 @@ function GoalEditorForm({ id, preset, onClose, onDelete }: Props) {
         onOpenChange={(open) => {
           if (!open) guard.requestClose()
         }}
-        title={e.goal ? `Edit ${e.goal.name}` : 'New goal'}
-        description="Something you are saving up for."
+        title={trial ? 'Try a goal' : e.goal ? `Edit ${e.goal.name}` : 'New goal'}
+        description={
+          trial
+            ? 'See how it fits. Nothing is added to your plan yet.'
+            : 'Something you are saving up for.'
+        }
         footer={
           <DialogActions
             hint={e.block}
             onDelete={e.goal ? () => onDelete(e.goal?.id ?? '') : undefined}
             onCancel={guard.requestClose}
-            submitLabel={e.goal ? 'Save changes' : 'Add goal'}
+            submitLabel={
+              trial ? 'See how it fits' : e.goal ? 'Save changes' : 'Add goal'
+            }
             ready={e.block === null}
             onSubmit={() => void e.save()}
           />

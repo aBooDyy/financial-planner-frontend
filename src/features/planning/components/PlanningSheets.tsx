@@ -20,6 +20,7 @@ import { PaymentEditorSheet } from './sheets/PaymentEditorSheet'
 import { PayNowSheet } from './sheets/PayNowSheet'
 import { SetAsideSheet } from './sheets/SetAsideSheet'
 import { UseItSheet } from './sheets/UseItSheet'
+import { WhatIfSheet } from './whatIf/WhatIfSheet'
 
 /** The one sheet the Planning page has open, by kind. */
 export function PlanningSheets() {
@@ -40,6 +41,8 @@ export function PlanningSheets() {
     [inputs.goals, inputs.bills, inputs.base, inputs.rates],
   )
 
+  const backToWhatIf = () => openSheet({ kind: 'whatIf' })
+
   if (!sheet) return null
   switch (sheet.kind) {
     case 'chooser':
@@ -48,6 +51,7 @@ export function PlanningSheets() {
           open
           onClose={closeSheet}
           onPick={(kind) => openSheet({ kind, id: null })}
+          onTry={backToWhatIf}
           suggestion={suggestion}
           onSuggestion={(preset) =>
             openSheet({ kind: 'goal', id: null, preset })
@@ -57,9 +61,10 @@ export function PlanningSheets() {
     case 'bill':
       return (
         <BillEditor
-          key={sheet.id ?? 'new'}
+          key={sheet.trial?.itemId ?? sheet.id ?? 'new'}
           id={sheet.id}
-          onClose={closeSheet}
+          trial={sheet.trial}
+          onClose={sheet.trial ? backToWhatIf : closeSheet}
           onDelete={(id) =>
             openSheet({ kind: 'delete', target: { kind: 'bill', id } })
           }
@@ -68,10 +73,11 @@ export function PlanningSheets() {
     case 'goal':
       return (
         <GoalEditor
-          key={sheet.id ?? 'new'}
+          key={sheet.trial?.itemId ?? sheet.id ?? 'new'}
           id={sheet.id}
           preset={sheet.preset}
-          onClose={closeSheet}
+          trial={sheet.trial}
+          onClose={sheet.trial ? backToWhatIf : closeSheet}
           onDelete={(id) =>
             openSheet({ kind: 'delete', target: { kind: 'goal', id } })
           }
@@ -80,11 +86,14 @@ export function PlanningSheets() {
     case 'everyday':
       return (
         <EverydayEditor
-          key={sheet.id ?? 'new'}
+          key={sheet.trial?.itemId ?? sheet.id ?? 'new'}
           id={sheet.id}
-          onClose={closeSheet}
+          trial={sheet.trial}
+          onClose={sheet.trial ? backToWhatIf : closeSheet}
         />
       )
+    case 'whatIf':
+      return <WhatIfSheet onClose={closeSheet} />
     case 'income':
       return (
         <IncomeEditor

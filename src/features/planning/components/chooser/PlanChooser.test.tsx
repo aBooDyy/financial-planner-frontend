@@ -26,6 +26,7 @@ function renderChooser(suggestion: typeof preset | null = null) {
   const onPick = vi.fn()
   const onClose = vi.fn()
   const onSuggestion = vi.fn()
+  const onTry = vi.fn()
   render(
     <PlanChooser
       open
@@ -33,9 +34,10 @@ function renderChooser(suggestion: typeof preset | null = null) {
       onPick={onPick}
       suggestion={suggestion}
       onSuggestion={onSuggestion}
+      onTry={onTry}
     />,
   )
-  return { onPick, onClose, onSuggestion }
+  return { onPick, onClose, onSuggestion, onTry }
 }
 
 describe('PlanChooser', () => {
@@ -52,6 +54,12 @@ describe('PlanChooser', () => {
       'goal',
       'income',
     ])
+  })
+
+  it('offers to try something out first', () => {
+    const { onTry } = renderChooser()
+    fireEvent.click(screen.getByRole('button', { name: /See how it fits first/ }))
+    expect(onTry).toHaveBeenCalled()
   })
 
   it('suggests an emergency fund only when one is offered', () => {

@@ -1,9 +1,12 @@
 import { useMemo, useState } from 'react'
+import { billRowOf } from '#/features/bills/data/billRow'
 import { createBill, updateBill } from '#/features/bills/data/mutations'
 import { useCategoryCatalog } from '#/features/categories/hooks/useCategoryCatalog'
 import { usePlannedData } from '#/features/planned/hooks/usePlannedData'
 import { paymentRowsOf } from '#/features/planning/data/occurrences'
+import type { TrialTarget } from '#/features/planning/stores/planningUi'
 import { toast } from '#/features/planning/stores/toast'
+import { useWhatIf } from '#/features/planning/stores/whatIf'
 import {
   billBlock,
   billFormOf,
@@ -18,7 +21,11 @@ import { nextColor } from '#/features/planning/view/colors'
 import { usePlanningWallets } from './usePlanningWallets'
 
 /** The bill editor's state: the form, what blocks saving, the preview line and save. */
-export function useBillEditor(id: string | null, onDone: () => void) {
+export function useBillEditor(
+  id: string | null,
+  onDone: () => void,
+  trial?: TrialTarget,
+) {
   const { inputs, state, today } = usePlannedData()
   const wallets = usePlanningWallets()
   const catalog = useCategoryCatalog()
@@ -29,17 +36,24 @@ export function useBillEditor(id: string | null, onDone: () => void) {
     [billId, inputs.planned],
   )
 
+  const tried = useWhatIf((s) =>
+    s.items.find((i) => i.id === trial?.itemId && i.kind === 'bill'),
+  )
   const [initial] = useState<BillForm>(() =>
     bill
       ? billFormOf(bill)
-      : newBillForm({
-          walletId: wallets.list.at(0)?.id ?? null,
-          categoryId:
-            catalog.bySlug('housing')?.id ??
-            catalog.fallbackFor('spend')?.id ??
-            null,
-          color: nextColor(inputs.bills.map((b) => b.color)),
-        }),
+      : tried?.kind === 'bill'
+        ? billFormOf(
+            billRowOf(tried.draft, { id: tried.id, position: 0, ts: '' }),
+          )
+        : newBillForm({
+            walletId: wallets.list.at(0)?.id ?? null,
+            categoryId:
+              catalog.bySlug('housing')?.id ??
+              catalog.fallbackFor('spend')?.id ??
+              null,
+            color: nextColor(inputs.bills.map((b) => b.color)),
+          }),
   )
   const [form, setForm] = useState(initial)
   const [submitted, setSubmitted] = useState(false)
@@ -68,7 +82,9 @@ export function useBillEditor(id: string | null, onDone: () => void) {
     setSubmitted(true)
     if (block) return
     const write = billWriteOf(form, currency, payments)
-    if (bill) {
+    if (trial) {
+      useWhatIf.getState().save(trial.itemId, { kind: 'bill', draft: write })
+    } else if (bill) {
       await updateBill(bill.id, write)
       toast('Saved')
     } else {

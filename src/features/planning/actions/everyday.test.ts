@@ -1,11 +1,14 @@
 import 'fake-indexeddb/auto'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '#/db/db'
+import type { WhatIfItem } from '#/features/planning/data/whatIf'
+import { useWhatIf } from '#/features/planning/stores/whatIf'
 import type { BudgetDraft } from '#/features/transactions/data/mutations'
 
 vi.mock('#/db/sync', () => ({ schedulePush: vi.fn() }))
 
 const { removeEveryday, saveEveryday } = await import('./everyday')
+const { addTryoutToPlan } = await import('./addTryout')
 const { createBudget } = await import('#/features/transactions/data/mutations')
 
 const draft: BudgetDraft = {
@@ -22,7 +25,9 @@ const draft: BudgetDraft = {
 
 beforeEach(async () => {
   await db.budgets.clear()
+  await db.bills.clear()
   await db.outbox.clear()
+  useWhatIf.getState().clear()
 })
 
 describe('saveEveryday', () => {
@@ -65,5 +70,38 @@ describe('removeEveryday', () => {
       excludesBills: true,
       deleted: 0,
     })
+  })
+})
+
+describe('addTryoutToPlan', () => {
+  const add = (item: WhatIfItem) => addTryoutToPlan(item)
+
+  it('makes a tried bill real and stops trying it', async () => {
+    useWhatIf.getState().save(null, {
+      kind: 'bill',
+      draft: {
+        name: 'Car payment',
+        amount: 200000,
+        currency: 'SAR',
+        frequency: 'monthly',
+        nextDue: '2026-12-15',
+        walletId: null,
+        categoryId: 'car',
+        color: '#123456',
+      },
+    })
+    const [item] = useWhatIf.getState().items
+    expect(await db.bills.count()).toBe(0)
+    await add(item)
+    expect(await db.bills.toArray()).toMatchObject([{ name: 'Car payment' }])
+    expect(useWhatIf.getState().items).toEqual([])
+  })
+
+  it('writes nothing while something is only being tried', async () => {
+    useWhatIf.getState().save(null, { kind: 'everyday', draft })
+    useWhatIf.getState().toggle(useWhatIf.getState().items[0].id)
+    expect(useWhatIf.getState().items[0].on).toBe(false)
+    expect(await db.budgets.count()).toBe(0)
+    expect(await db.outbox.count()).toBe(0)
   })
 })

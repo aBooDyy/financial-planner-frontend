@@ -1,8 +1,13 @@
 import { useMemo, useState } from 'react'
+import { goalRowOf } from '#/features/goals/data/goalRow'
 import { createGoal, updateGoal } from '#/features/goals/data/mutations'
 import { usePlannedData } from '#/features/planned/hooks/usePlannedData'
-import type { GoalPreset } from '#/features/planning/stores/planningUi'
+import type {
+  GoalPreset,
+  TrialTarget,
+} from '#/features/planning/stores/planningUi'
 import { toast } from '#/features/planning/stores/toast'
+import { useWhatIf } from '#/features/planning/stores/whatIf'
 import { nextColor } from '#/features/planning/view/colors'
 import {
   goalBlock,
@@ -19,22 +24,30 @@ export function useGoalEditor(
   id: string | null,
   preset: GoalPreset | undefined,
   onDone: () => void,
+  trial?: TrialTarget,
 ) {
   const { inputs, state, today } = usePlannedData()
   const wallets = usePlanningWallets()
   const goal = id ? inputs.goals.find((g) => g.id === id) : undefined
 
+  const tried = useWhatIf((s) =>
+    s.items.find((i) => i.id === trial?.itemId && i.kind === 'goal'),
+  )
   const [initial] = useState<GoalForm>(() =>
     goal
       ? goalFormOf(goal)
-      : newGoalForm(
-          {
-            saveWalletId: wallets.list.at(0)?.id ?? null,
-            color: nextColor(inputs.goals.map((g) => g.color)),
-          },
-          preset,
-          wallets.base,
-        ),
+      : tried?.kind === 'goal'
+        ? goalFormOf(
+            goalRowOf(tried.draft, { id: tried.id, position: 0, ts: '' }),
+          )
+        : newGoalForm(
+            {
+              saveWalletId: wallets.list.at(0)?.id ?? null,
+              color: nextColor(inputs.goals.map((g) => g.color)),
+            },
+            preset,
+            wallets.base,
+          ),
   )
   const [form, setForm] = useState(initial)
   const [submitted, setSubmitted] = useState(false)
@@ -65,7 +78,9 @@ export function useGoalEditor(
     setSubmitted(true)
     if (block) return
     const write = goalWriteOf(form, currency)
-    if (goal) {
+    if (trial) {
+      useWhatIf.getState().save(trial.itemId, { kind: 'goal', draft: write })
+    } else if (goal) {
       await updateGoal(goal.id, write)
       toast('Saved')
     } else {

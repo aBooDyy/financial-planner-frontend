@@ -19,6 +19,8 @@ type Props = {
   /** The one-tap Emergency fund goal, offered while the user has no goals. */
   suggestion: GoalPreset | null
   onSuggestion: (preset: GoalPreset) => void
+  /** See how something fits before adding it. */
+  onTry: () => void
 }
 
 const OPTIONS: ReadonlyArray<{
@@ -58,13 +60,14 @@ const OPTIONS: ReadonlyArray<{
   },
 ]
 
-/** "+ Plan something": a bill, everyday spending, a goal or income. */
+/** "+ Plan something": a bill, everyday spending, a goal or income, or just trying one out. */
 export function PlanChooser({
   open,
   onClose,
   onPick,
   suggestion,
   onSuggestion,
+  onTry,
 }: Props) {
   return (
     <ResponsiveDialog
@@ -118,6 +121,17 @@ export function PlanChooser({
           Start an emergency fund
         </button>
       ) : null}
+      <p className="text-center text-[13px] text-fp-text-2">
+        Not sure yet?{' '}
+        <button
+          type="button"
+          onClick={onTry}
+          className="font-bold text-fp-accent-ink hover:underline"
+        >
+          See how it fits first{' '}
+          <span className="inline-block rtl:-scale-x-100">→</span>
+        </button>
+      </p>
     </ResponsiveDialog>
   )
 }

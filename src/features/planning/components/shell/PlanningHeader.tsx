@@ -1,8 +1,17 @@
-import { Plus } from 'lucide-react'
+import { FlaskConical, Plus } from 'lucide-react'
 import { Button } from '#/components/ui/button'
 
-/** The page's title row: "Planning", what it answers, and + Plan something. */
-export function PlanningHeader({ onPlan }: { onPlan: () => void }) {
+/** The page's title row: "Planning", what it answers, What if and + Plan something. */
+export function PlanningHeader({
+  onPlan,
+  onWhatIf,
+  tryouts,
+}: {
+  onPlan: () => void
+  onWhatIf: () => void
+  /** How many things are being tried out. */
+  tryouts: number
+}) {
   return (
     <div className="flex items-center gap-3">
       <div className="min-w-0 flex-1">
@@ -13,6 +22,15 @@ export function PlanningHeader({ onPlan }: { onPlan: () => void }) {
           What&rsquo;s coming, and whether you&rsquo;re ready for it.
         </p>
       </div>
+      <Button
+        type="button"
+        variant="quiet"
+        onClick={onWhatIf}
+        className="h-[34px] rounded-full px-[13px] text-[13px] md:h-auto md:rounded-[11px] md:px-[15px] md:py-[9px]"
+      >
+        <FlaskConical size={15} strokeWidth={2.2} aria-hidden />
+        What if{tryouts > 0 ? ` · ${tryouts}` : ''}
+      </Button>
       <Button
         type="button"
         onClick={onPlan}

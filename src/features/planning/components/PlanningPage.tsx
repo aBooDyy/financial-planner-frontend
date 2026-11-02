@@ -12,6 +12,7 @@ import { useSessionStore } from '#/stores/session'
 import { DetailHost } from './detail/DetailHost'
 import { PlanningSheets } from './PlanningSheets'
 import { SectionView } from './SectionView'
+import { useWhatIf } from '#/features/planning/stores/whatIf'
 import { PlanningHeader } from './shell/PlanningHeader'
 import { PlanningSectionStrip } from './shell/PlanningSectionStrip'
 import { PlanningTabCard } from './shell/PlanningTabCard'
@@ -26,6 +27,7 @@ export function PlanningPage() {
   const planning = usePlanning()
   useOpenFromPlanningSearch(!planning.loading)
   const openSheet = usePlanningUi((s) => s.openSheet)
+  const tryouts = useWhatIf((s) => s.items.length)
   const reset = usePlanningUi((s) => s.closeDetail)
 
   // The page's panels belong to this visit; leaving Planning closes them.
@@ -50,7 +52,11 @@ export function PlanningPage() {
             aria-busy={planning.loading}
             className="mx-auto flex w-full max-w-[1180px] flex-col gap-[14px] px-[14px] pt-[14px] pb-[30px] md:px-6 md:pt-[22px] md:pb-[60px]"
           >
-            <PlanningHeader onPlan={() => openSheet({ kind: 'chooser' })} />
+            <PlanningHeader
+              onPlan={() => openSheet({ kind: 'chooser' })}
+              onWhatIf={() => openSheet({ kind: 'whatIf' })}
+              tryouts={tryouts}
+            />
             <PlanningTabCard section={section} badges={badges} />
             <SectionView section={section} />
           </div>
