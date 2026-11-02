@@ -6,6 +6,7 @@
  */
 import type {
   LocalBill,
+  LocalBudget,
   LocalGoal,
   LocalIncomeStream,
   LocalPlanned,
@@ -33,6 +34,8 @@ export type PlannerInputs = {
   /** Only transactions linked to a goal, a bill or a planned row. */
   txns: LocalTransaction[]
   setAsides: LocalSetAside[]
+  /** Those counted in the plan are everyday spending. */
+  budgets: LocalBudget[]
   settings: PlanningSettings
   base: CurrencyCode
   rates: RatesMap
@@ -57,6 +60,7 @@ export const liveInputs = (inputs: PlannerInputs): PlannerInputs => ({
   planned: live(inputs.planned),
   txns: live(inputs.txns),
   setAsides: live(inputs.setAsides),
+  budgets: live(inputs.budgets),
 })
 
 export function derivePlannerState(
@@ -74,6 +78,7 @@ export function derivePlannerState(
     income,
     planned: inputs.planned,
     setAsides,
+    budgets: inputs.budgets,
     progress: progressByGoal(progress),
     index,
     settings: inputs.settings,

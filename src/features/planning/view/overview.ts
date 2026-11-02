@@ -73,7 +73,7 @@ export function verdictCopy(args: {
       return {
         tone: 'ok',
         title: 'You’re covered',
-        sub: `Every bill and goal in your plan fits in your pay. ${money(v.left, base)} is left for spending ${per}.`,
+        sub: `Everything in your plan fits in your pay. ${money(v.left, base)} is left for spending ${per}.`,
         action: { label: 'See what’s coming', primary: false, to: 'upcoming' },
       }
     case 'tight':
@@ -90,7 +90,7 @@ export function verdictCopy(args: {
           ? `${owner.name} needs ${money(decision.requiredPerPaycheck, owner.currency)} ${per} to be ready by ${monthYear(decision.deadline)}. Push it out or lower the target.`
           : owner
             ? `${owner.name} can’t be fully covered in time. Set aside more or change the plan.`
-            : 'Push a goal out or lower what it needs.'
+            : 'Lower your everyday spending, or push a goal out.'
       return v.per === 'paycheck'
         ? {
             tone: 'danger',
@@ -108,7 +108,12 @@ export function verdictCopy(args: {
   }
 }
 
-export type PaycheckPartKey = 'bills' | 'savingUp' | 'goals' | 'left'
+export type PaycheckPartKey =
+  | 'bills'
+  | 'savingUp'
+  | 'everyday'
+  | 'goals'
+  | 'left'
 
 export type PaycheckSegment = {
   key: PaycheckPartKey
@@ -135,6 +140,7 @@ export type PaycheckBar = {
 export const PART_COLOR: Record<PaycheckPartKey, string> = {
   bills: 'var(--fp-text-3)',
   savingUp: 'var(--fp-chart-set-aside)',
+  everyday: 'var(--fp-spend)',
   goals: 'var(--fp-goal)',
   left: 'var(--fp-accent)',
 }
@@ -179,6 +185,13 @@ export function paycheckBar(
       'bills',
     ),
     part(
+      'everyday',
+      'Everyday spending',
+      plural(p.everyday.count, 'estimate'),
+      p.everyday.total,
+      'bills',
+    ),
+    part(
       'goals',
       'Goals',
       plural(p.goals.count, 'goal'),
@@ -190,7 +203,9 @@ export function paycheckBar(
           part(
             'left',
             'Left for spending',
-            'groceries, fuel, eating out',
+            p.everyday.count > 0
+              ? 'after everything above'
+              : 'groceries, fuel, eating out',
             left,
             'upcoming',
           ),

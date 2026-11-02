@@ -60,6 +60,7 @@ export function periodSummary(p: UpcomingPeriod, base: CurrencyCode): string {
   return [
     `Bills ${money(p.paymentsOut, base)}`,
     `Set aside ${money(p.setAsideOut, base)}`,
+    ...(p.everyday > 0 ? [`Everyday ${money(p.everyday, base)}`] : []),
     `Left ${money(p.left, base)}`,
     ...p.payments
       .filter((r) => r.savedUp)

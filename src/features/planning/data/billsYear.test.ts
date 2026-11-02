@@ -24,6 +24,7 @@ const inputsOf = (over: {
   planned: over.planned ?? [],
   txns: over.txns ?? [],
   setAsides: [],
+  budgets: [],
   settings: plannedScenario({ today: TODAY }).inputs.settings,
   base: 'SAR',
   rates: RATES,

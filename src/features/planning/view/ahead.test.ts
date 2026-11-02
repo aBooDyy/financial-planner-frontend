@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { UpcomingRow } from '#/features/planning/data/upcoming'
 import { m, planned } from '#/features/planned/testing/fixtures'
-import { balanceAhead } from './ahead'
+import { balanceAhead, everydayPerDay } from './ahead'
 
 const TODAY = '2026-10-02'
 
@@ -35,6 +35,7 @@ describe('Balance ahead', () => {
       ],
       balance: m(5000),
       setAside: m(1200),
+      everydayDaily: 0,
       base: 'SAR',
       rates: { SAR: 1 },
       today: TODAY,
@@ -74,6 +75,7 @@ describe('Balance ahead', () => {
       ],
       balance: m(4000),
       setAside: 0,
+      everydayDaily: 0,
       base: 'SAR',
       rates: { SAR: 1 },
       today: TODAY,
@@ -83,5 +85,41 @@ describe('Balance ahead', () => {
     expect(view.days[23]).toMatchObject({ balance: m(13000), free: m(12000) })
     expect(view.low).toBe(18)
     expect(view.note).toBe('Free to spend is lowest on Oct 20 at SR 1,000.')
+  })
+
+  it('takes everyday spending off a little each day, from tomorrow', () => {
+    const view = balanceAhead({
+      rows: [],
+      balance: m(1000),
+      setAside: m(200),
+      everydayDaily: m(10),
+      base: 'SAR',
+      rates: { SAR: 1 },
+      today: TODAY,
+    })
+    expect(view.days[0]).toMatchObject({ balance: m(1000), free: m(800) })
+    expect(view.days[5]).toMatchObject({ balance: m(950), free: m(750) })
+    expect(view.days[30]).toMatchObject({ balance: m(700), free: m(500) })
+    expect(view.estimateNote).toBe(
+      'An estimate: includes about SR 10 a day of everyday spending.',
+    )
+  })
+
+  it('says nothing about an estimate when there is none', () => {
+    const view = balanceAhead({
+      rows: [],
+      balance: m(1000),
+      setAside: 0,
+      everydayDaily: 0,
+      base: 'SAR',
+      rates: { SAR: 1 },
+      today: TODAY,
+    })
+    expect(view.days[30].balance).toBe(m(1000))
+    expect(view.estimateNote).toBeNull()
+  })
+
+  it('spreads a paycheck’s estimate over the year', () => {
+    expect(everydayPerDay(m(1800), 12)).toBeCloseTo((m(1800) * 12) / 365.25)
   })
 })

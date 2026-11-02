@@ -94,7 +94,7 @@ function serialized<T>(task: () => Promise<T>): Promise<T> {
 }
 
 export async function loadPlannerInputs(): Promise<PlannerInputs> {
-  const [goals, income, bills, planned, txns, setAsides, settings] =
+  const [goals, income, bills, planned, txns, setAsides, budgets, settings] =
     await Promise.all([
       db.goals.toArray(),
       db.incomeStreams.toArray(),
@@ -102,6 +102,7 @@ export async function loadPlannerInputs(): Promise<PlannerInputs> {
       db.plannedTransactions.toArray(),
       linkedTransactions(),
       db.setAsides.toArray(),
+      db.budgets.toArray(),
       db.balanceSettings.get(SETTINGS_KEY),
     ])
   return liveInputs({
@@ -111,6 +112,7 @@ export async function loadPlannerInputs(): Promise<PlannerInputs> {
     planned,
     txns,
     setAsides,
+    budgets,
     settings: planningSettingsOf(settings),
     base: settings?.baseCurrency ?? DEFAULT_BASE_CURRENCY,
     rates: await currentRates(),

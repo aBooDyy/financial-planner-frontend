@@ -12,6 +12,7 @@ type Props = {
   daysInvalid: boolean
   /** Under the chips while Per paycheck is chosen: its window, or why it is monthly. */
   paycheckHint: string | null
+  label?: string
   onPeriod: (period: BudgetPeriod) => void
   onCustomDays: (days: string) => void
 }
@@ -24,12 +25,13 @@ export function BudgetPeriodFields({
   customDays,
   daysInvalid,
   paycheckHint,
+  label = 'How often does it reset?',
   onPeriod,
   onCustomDays,
 }: Props) {
   return (
     <>
-      <TxSection label="How often does it reset?">
+      <TxSection label={label}>
         <ChipRow label="Period">
           {BUDGET_PERIODS.map((p) => (
             <Chip

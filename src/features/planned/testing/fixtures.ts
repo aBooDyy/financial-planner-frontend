@@ -4,6 +4,7 @@
 import type {
   LocalBalanceNode,
   LocalBill,
+  LocalBudget,
   LocalGoal,
   LocalIncomeStream,
   LocalPlanned,
@@ -39,6 +40,25 @@ export const goal = (over: Partial<LocalGoal> = {}): LocalGoal => ({
   planCount: null,
   planStart: null,
   setAsideDay: null,
+  createdAt: '',
+  updatedAt: '',
+  version: '',
+  dirty: 0,
+  deleted: 0,
+  ...over,
+})
+
+export const budget = (over: Partial<LocalBudget> = {}): LocalBudget => ({
+  id: 'groceries',
+  scopeType: 'category',
+  categoryId: 'cat-groceries',
+  walletId: null,
+  period: 'monthly',
+  customDays: null,
+  limit: m(2000),
+  currency: 'SAR',
+  excludesBills: true,
+  inPlan: true,
   createdAt: '',
   updatedAt: '',
   version: '',

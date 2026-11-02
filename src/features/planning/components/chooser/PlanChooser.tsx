@@ -1,11 +1,16 @@
-import { useNavigate } from '@tanstack/react-router'
-import { ArrowUp, ChevronRight, ReceiptText, Target } from 'lucide-react'
+import {
+  ArrowUp,
+  ChevronRight,
+  ReceiptText,
+  ShoppingBasket,
+  Target,
+} from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { ResponsiveDialog } from '#/components/ui/responsive-dialog'
 import { cn } from '#/lib/utils'
 import type { GoalPreset } from '#/features/planning/stores/planningUi'
 
-type Choice = 'bill' | 'goal' | 'income'
+type Choice = 'bill' | 'everyday' | 'goal' | 'income'
 
 type Props = {
   open: boolean
@@ -31,6 +36,13 @@ const OPTIONS: ReadonlyArray<{
     tile: 'bg-fp-surface-2 text-fp-text-2',
   },
   {
+    key: 'everyday',
+    title: 'Everyday spending',
+    sub: 'Groceries, fuel, eating out — an estimate, not a fixed amount.',
+    icon: ShoppingBasket,
+    tile: 'bg-fp-spend-soft text-fp-spend',
+  },
+  {
     key: 'goal',
     title: 'A goal',
     sub: 'Emergency fund, a trip, a car — something you’re saving for.',
@@ -46,7 +58,7 @@ const OPTIONS: ReadonlyArray<{
   },
 ]
 
-/** "+ Plan something": a bill, a goal or income; regular spending points to budgets. */
+/** "+ Plan something": a bill, everyday spending, a goal or income. */
 export function PlanChooser({
   open,
   onClose,
@@ -54,7 +66,6 @@ export function PlanChooser({
   suggestion,
   onSuggestion,
 }: Props) {
-  const navigate = useNavigate()
   return (
     <ResponsiveDialog
       open={open}
@@ -107,22 +118,6 @@ export function PlanChooser({
           Start an emergency fund
         </button>
       ) : null}
-      <p className="text-center text-[13px] text-fp-text-2">
-        Regular spending like groceries?{' '}
-        <button
-          type="button"
-          onClick={() => {
-            onClose()
-            void navigate({
-              to: '/transactions/$view',
-              params: { view: 'budgets' },
-            })
-          }}
-          className="font-bold text-fp-accent-ink hover:underline"
-        >
-          Set a budget <span className="inline-block rtl:-scale-x-100">→</span>
-        </button>
-      </p>
     </ResponsiveDialog>
   )
 }

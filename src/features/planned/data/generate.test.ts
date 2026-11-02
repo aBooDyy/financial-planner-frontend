@@ -40,6 +40,7 @@ const generate = (
     goals,
     income: streams,
     planned: [],
+    budgets: [],
     setAsides: [],
     progress: opts.progress ?? { umrah: m(1000) },
     index: new Map(),

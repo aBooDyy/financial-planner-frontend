@@ -147,6 +147,8 @@ export type Budget = {
   currency: CurrencyCode
   /** "Leave out planned bills": payments for a bill (a `billId`) don't count against it. */
   excludesBills: boolean
+  /** Everyday spending: a category budget Planning takes out of each paycheck. */
+  inPlan: boolean
   createdAt: string
   updatedAt: string
   version: string
@@ -184,6 +186,7 @@ export type BudgetWire = {
   limit_amount: number
   currency: string
   excludes_bills?: boolean
+  in_plan?: boolean
   created_at: string
   updated_at: string
   version: string
@@ -343,6 +346,7 @@ export type CreateBudgetWire = {
   limit_amount: number
   currency: string
   excludes_bills: boolean
+  in_plan: boolean
 }
 export type UpdateBudgetWire = Omit<CreateBudgetWire, 'id'> & {
   version: string
@@ -426,6 +430,7 @@ export const toBudget = (w: BudgetWire): Budget => ({
   limit: w.limit_amount,
   currency: fromWireCurrency(w.currency),
   excludesBills: w.excludes_bills ?? false,
+  inPlan: w.in_plan ?? false,
   createdAt: w.created_at,
   updatedAt: w.updated_at,
   version: w.version,

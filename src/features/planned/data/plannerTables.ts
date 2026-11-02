@@ -12,6 +12,7 @@ import type {
   LocalBalanceNode,
   LocalBalanceSettings,
   LocalBill,
+  LocalBudget,
   LocalExchangeRate,
   LocalGoal,
   LocalIncomeStream,
@@ -30,6 +31,7 @@ export type PlannerTables = {
   /** Only the linked transactions, never the whole ledger. */
   txns?: LocalTransaction[]
   setAsides?: LocalSetAside[]
+  budgets?: LocalBudget[]
   nodes?: LocalBalanceNode[]
   settings?: LocalBalanceSettings | null
   rateRows?: LocalExchangeRate[]
@@ -42,6 +44,7 @@ const QUERIES: Record<keyof PlannerTables, () => Promise<unknown>> = {
   planned: () => db.plannedTransactions.toArray(),
   txns: linkedTransactions,
   setAsides: () => db.setAsides.toArray(),
+  budgets: () => db.budgets.toArray(),
   nodes: () => db.balanceNodes.toArray(),
   settings: async () => (await db.balanceSettings.get(SETTINGS_KEY)) ?? null,
   rateRows: () => db.exchangeRates.toArray(),

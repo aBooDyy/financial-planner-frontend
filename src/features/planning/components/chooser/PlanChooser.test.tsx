@@ -3,9 +3,6 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { PlanChooser } from './PlanChooser'
 
-const navigate = vi.fn()
-vi.mock('@tanstack/react-router', () => ({ useNavigate: () => navigate }))
-
 beforeAll(() => {
   window.matchMedia = (query: string) =>
     ({
@@ -16,10 +13,7 @@ beforeAll(() => {
     }) as unknown as MediaQueryList
 })
 
-afterEach(() => {
-  cleanup()
-  navigate.mockReset()
-})
+afterEach(cleanup)
 
 const preset = {
   name: 'Emergency fund',
@@ -45,27 +39,19 @@ function renderChooser(suggestion: typeof preset | null = null) {
 }
 
 describe('PlanChooser', () => {
-  it('offers a bill, a goal and income', () => {
+  it('offers a bill, everyday spending, a goal and income', () => {
     const { onPick } = renderChooser()
     expect(screen.getByText('What are you planning for?')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /A bill/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Everyday spending/ }))
     fireEvent.click(screen.getByRole('button', { name: /A goal/ }))
     fireEvent.click(screen.getByRole('button', { name: /Income/ }))
     expect(onPick.mock.calls.map((c) => c[0])).toEqual([
       'bill',
+      'everyday',
       'goal',
       'income',
     ])
-  })
-
-  it('points regular spending to budgets', () => {
-    const { onClose } = renderChooser()
-    fireEvent.click(screen.getByRole('button', { name: /Set a budget/ }))
-    expect(onClose).toHaveBeenCalled()
-    expect(navigate).toHaveBeenCalledWith({
-      to: '/transactions/$view',
-      params: { view: 'budgets' },
-    })
   })
 
   it('suggests an emergency fund only when one is offered', () => {

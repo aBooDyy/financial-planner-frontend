@@ -170,6 +170,17 @@ export function BudgetEditor({
       />
 
       <div className="flex flex-col gap-2">
+        {draft.scopeType === 'category' ? (
+          <ToggleCard
+            title="Count it in my plan"
+            description="Planning takes this out of each paycheck as everyday spending."
+            checked={draft.inPlan}
+            onCheckedChange={(on) => {
+              onField('inPlan', on)
+              if (on) onField('excludesBills', true)
+            }}
+          />
+        ) : null}
         <ToggleCard
           title="Leave out planned bills"
           description="Only count spending you didn’t plan for."

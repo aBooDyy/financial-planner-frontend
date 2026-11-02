@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { usePlannedData } from '#/features/planned/hooks/usePlannedData'
 import type { PlanningView } from '#/features/planning/hooks/usePlanning'
 import { useMoneyFigures } from '#/features/planning/hooks/useMoneyFigures'
-import { balanceAhead } from '#/features/planning/view/ahead'
+import { balanceAhead, everydayPerDay } from '#/features/planning/view/ahead'
 import { paycheckBar } from '#/features/planning/view/overview'
 import { BalanceAheadCard } from './BalanceAheadCard'
 import { HeadedCard } from './HeadedCard'
@@ -20,11 +20,23 @@ export function UpcomingRail({ planning }: { planning: PlanningView }) {
             rows: [...upcoming.due, ...upcoming.periods.flatMap((p) => p.rows)],
             balance: money.figures.header.balance,
             setAside: money.figures.header.setAside,
+            everydayDaily: everydayPerDay(
+              planning.funding.everydayPerSlot,
+              planning.calendar.perYear,
+            ),
             base: inputs.base,
             rates: inputs.rates,
             today,
           }),
-    [money, upcoming, inputs.base, inputs.rates, today],
+    [
+      money,
+      upcoming,
+      planning.funding.everydayPerSlot,
+      planning.calendar.perYear,
+      inputs.base,
+      inputs.rates,
+      today,
+    ],
   )
   return (
     <div className="flex flex-col gap-4">

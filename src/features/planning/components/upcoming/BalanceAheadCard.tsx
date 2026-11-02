@@ -52,6 +52,9 @@ function Chart({
     view.days.map((d, i) => `${x(i)},${y(d[key])}`).join(' ')
   const shown = view.days[picked ?? view.low]
   const firstPayday = view.paydays.at(0)
+  // Today's figures are real; only the days after it lean on the estimate.
+  const about =
+    view.estimateNote !== null && shown.date !== view.days[0].date ? '≈ ' : ''
 
   const pick = (e: PointerEvent<SVGSVGElement>) => {
     const box = e.currentTarget.getBoundingClientRect()
@@ -76,7 +79,8 @@ function Chart({
         aria-live="polite"
       >
         <span className="font-bold text-fp-text">{dayMonth(shown.date)}</span> ·
-        Balance {signedMoney(shown.balance, base)} · Free{' '}
+        Balance {about}
+        {signedMoney(shown.balance, base)} · Free{' '}
         <span
           className={
             shown.free < 0
@@ -84,6 +88,7 @@ function Chart({
               : 'font-bold text-fp-accent-ink'
           }
         >
+          {about}
           {signedMoney(shown.free, base)}
         </span>
       </p>
@@ -155,6 +160,11 @@ function Chart({
       </div>
       <p className="fp-sensitive border-t border-fp-border pt-2 text-[12.5px] text-fp-text-2">
         {view.note}
+        {view.estimateNote ? (
+          <span className="mt-1 block text-[11.5px] text-fp-text-3">
+            {view.estimateNote}
+          </span>
+        ) : null}
       </p>
     </div>
   )

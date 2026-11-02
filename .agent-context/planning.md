@@ -97,6 +97,27 @@ view read the same plan.
   conversion factor the engine uses; `isPlannableGoal`, `isDatedTargetGoal`, `isGoalReached`
   are the shared goal predicates.
 
+## Everyday spending — `data/everyday.ts`
+
+A category budget with `inPlan` (`isPlannedBudget`) is an estimate the plan leaves room for: no
+tracks, no set-asides, no planned rows. `PlannerInputs.budgets` carries the budgets, so the
+runner and the views derive the same plan. `perSlotOf` annualises its period onto the pay
+calendar (weekly 365.25/7, monthly 12, paycheck as is, custom 365.25/days, all ÷ `perYear`).
+`funding.simulate` and `laterRoom` take the total out of a slot **once, on reaching the first
+track past tier 1**, so must-pay bills are never short because of it; the `required` run takes
+it too, and `FundingSlot.capacity` stays the income. `EachPaycheck.everyday` adds to `planned`,
+so `left` and the verdict follow, and `UpcomingPeriod.left` subtracts it. A stored plan isn't
+rewritten when an estimate changes: a goal that now gets less shows as drift with Recalculate.
+Balance ahead counts it as a steady daily estimate (`view/ahead.ts#everydayPerDay`). Not in it:
+Safe to spend, which the user confirmed stays as it is (D18; the budgets caption still shows it),
+and the Year ahead lanes, which show set-aside money. `averageMonthlySpend` is the editor's *You've spent
+about…*: the last 3 full months with such spending, bill payments left out.
+
+`actions/everyday.ts`: `saveEveryday` updates the category's existing budget rather than adding
+a second; `removeEveryday` clears `inPlan` and keeps the cap. Editor: `EverydayEditor` over
+`useEverydayEditor` and `view/everydayDraft.ts` (it always saves `excludesBills`, since the plan
+has the bills already). Only category budgets count: an account or overall cap overlaps them.
+
 ## Stranded set-asides — `data/rekey.ts`
 
 A bill's set-aside covers one occurrence by its exact date, so a moved due date, a new repeat or
@@ -358,8 +379,7 @@ Nice to have for bills, **Must have** / Nice to have for goals, "Left for spendi
 
 ### Plan something and the editors
 
-- `PlanChooser`: A bill · A goal · Income, "Regular spending like groceries? Set a budget →"
-  (Spending › Budgets), and — while there is no open goal — **Start an emergency fund**:
+- `PlanChooser`: A bill · Everyday spending · A goal · Income, and — while there is no open goal — **Start an emergency fund**:
   a must-have goal targeting 3 × the monthly must-pay bills (`emergencyFundPreset`; no target
   before there are bills). Section headers' **+ Add bill / goal / income** skip it.
 - Editors (and every sheet) mount their body only once the planner's inputs and the category
@@ -489,7 +509,8 @@ review for the oldest waiting payday, else the next one), then the view.
   reserve and cried "Dips into goal money" on a bill that was saved for), planned set-asides
   earmark more. Overdue rows land today. Dashed lines on paydays, a hover/drag readout, and a
   note: *"Free to spend is lowest on Oct 20 at SR X, just before pay arrives."* / *"…goes below
-  zero on …"*. The SVG is `dir="ltr"` (time runs left to right in both directions).
+  zero on …"*. Everyday spending leaves as a steady amount each day from tomorrow, whatever has
+  been spent this period; the readout then reads ≈ and a line says it is an estimate. The SVG is `dir="ltr"` (time runs left to right in both directions).
   **Where it's headed** (`HeadedCard`) — the next paycheck's Bills / Saving up for bills / Goals as
   bars (share of pay) and *Left for spending*, from the same `paycheckBar` as Overview.
 

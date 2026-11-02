@@ -4,6 +4,7 @@
  */
 import type {
   LocalBill,
+  LocalBudget,
   LocalGoal,
   LocalIncomeStream,
   LocalPlanned,
@@ -24,6 +25,7 @@ export type Scenario = {
   planned?: LocalPlanned[]
   setAsides?: LocalSetAside[]
   txns?: LocalTransaction[]
+  budgets?: LocalBudget[]
   settings?: Partial<PlanningSettings>
   /** ISO date. */
   today: string
@@ -41,6 +43,7 @@ export function scenario(s: Scenario): {
     planned: s.planned ?? [],
     txns: s.txns ?? [],
     setAsides: s.setAsides ?? [],
+    budgets: s.budgets ?? [],
     settings: { ...DEFAULT_PLANNING_SETTINGS, ...s.settings },
     base: 'SAR',
     rates: RATES,

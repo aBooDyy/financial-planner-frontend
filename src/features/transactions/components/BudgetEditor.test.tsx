@@ -91,6 +91,7 @@ const draft = (over: Partial<TxEditorDraft> = {}): TxEditorDraft => ({
   limit: '1500',
   currency: 'SAR',
   excludesBills: false,
+  inPlan: false,
   ...over,
 })
 

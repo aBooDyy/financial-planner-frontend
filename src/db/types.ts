@@ -354,6 +354,8 @@ export type LocalBudget = {
    * the field existed lack it, which reads as off.
    */
   excludesBills?: boolean
+  /** Everyday spending: Planning takes it out of each paycheck. Absent reads as off. */
+  inPlan?: boolean
   createdAt: string
   updatedAt: string
   version: string

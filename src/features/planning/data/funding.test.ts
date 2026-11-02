@@ -48,6 +48,7 @@ const plan = (o: Opts = {}): FundingPlan => {
     income: o.income ?? [SALARY],
     planned: o.planned ?? [],
     setAsides,
+    budgets: [],
     progress: o.progress ?? {},
     index: indexSettlements(txns, setAsides),
     settings: { ...DEFAULT_PLANNING_SETTINGS, ...o.settings },

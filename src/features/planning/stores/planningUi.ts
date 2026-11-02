@@ -20,6 +20,7 @@ export type PlanningSheet =
   | { kind: 'chooser' }
   | { kind: 'bill'; id: string | null }
   | { kind: 'goal'; id: string | null; preset?: GoalPreset }
+  | { kind: 'everyday'; id: string | null }
   | { kind: 'income'; id: string | null }
   | { kind: 'addMoney'; owner: PlanOwner }
   | { kind: 'payNow'; billId: string; occurrence?: string }

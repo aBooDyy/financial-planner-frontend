@@ -89,6 +89,7 @@ const draft = (over: Partial<TxEditorDraft>): TxEditorDraft => ({
   limit: '',
   currency: 'SAR',
   excludesBills: false,
+  inPlan: false,
   ...over,
 })
 

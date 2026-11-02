@@ -44,10 +44,12 @@ export type UpcomingPeriod = {
   incomeIn: number
   paymentsOut: number
   setAsideOut: number
+  /** Everyday spending the plan leaves room for each period. */
+  everyday: number
   /**
-   * What pay leaves for spending, as Safe to spend counts it: `incomeIn` less the payments'
-   * parts nothing is set aside for yet, less the set-asides for what falls due after the
-   * period (one for a payment inside it is that payment, counted once). May be negative.
+   * What pay leaves for spending: `incomeIn` less the payments' parts nothing is set aside for
+   * yet, less the set-asides for what falls due after the period (one for a payment inside it
+   * is that payment, counted once), less everyday spending. May be negative.
    */
   left: number
 }
@@ -162,6 +164,7 @@ export function buildUpcoming(args: {
       const incomeIn = sum(income)
       const paymentsOut = sum(payments)
       const setAsideOut = sum(setAsides)
+      const everyday = Math.round(state.funding.everydayPerSlot)
       const forLater = setAsides.filter((r) => {
         const covers = coversOf(r)
         return covers === null || covers > period.end
@@ -176,7 +179,8 @@ export function buildUpcoming(args: {
         incomeIn,
         paymentsOut,
         setAsideOut,
-        left: incomeIn - uncovered(payments) - sum(forLater),
+        everyday,
+        left: incomeIn - uncovered(payments) - sum(forLater) - everyday,
       }
     })
   return {

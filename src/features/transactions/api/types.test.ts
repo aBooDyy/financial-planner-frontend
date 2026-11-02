@@ -70,6 +70,7 @@ describe('spending mappers', () => {
     expect(toWirePeriod('paycheck')).toBe('PAYCHECK')
     // An older server leaves the field out: it reads as off.
     expect(toBudget(aBudgetWire('SAR')).excludesBills).toBe(false)
+    expect(toBudget(aBudgetWire('SAR')).inPlan).toBe(false)
   })
 
   it('accepts any ISO code the config lists', () => {

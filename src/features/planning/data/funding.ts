@@ -23,11 +23,16 @@
  *   must-have goal with a deadline takes at least what later slots could no longer cover
  *   (`laterRoom`), so pay that is about to stop goes to it before a nice-to-have.
  *
+ * **Everyday spending** (budgets counted in the plan) is estimated money nothing is set aside
+ * for: it comes out of each slot after must-pay bills and before everything else, so goals only
+ * plan with what is really left.
+ *
  * The plan runs twice: once against income (`funded`) and once unlimited (`required` — what
  * the plan needs, which the "Each paycheck" picture and the verdict compare to income).
  */
 import type {
   LocalBill,
+  LocalBudget,
   LocalGoal,
   LocalIncomeStream,
   LocalPlanned,
@@ -41,6 +46,8 @@ import type { PlanningSettings } from '#/features/wallets/api/types'
 import { convertMinor } from '#/lib/currency'
 import type { CurrencyCode } from '#/lib/currency'
 import type { RatesMap } from '#/lib/config/rates'
+import { everydayItems, everydayTotal } from './everyday'
+import type { EverydayItem } from './everyday'
 import {
   billOccurrences,
   isSettledOccurrence,
@@ -103,6 +110,10 @@ export type FundingPlan = {
   calendar: PayCalendar
   slots: FundingSlot[]
   tracks: TrackPlan[]
+  /** Everyday spending the plan leaves room for in each slot. */
+  everyday: EverydayItem[]
+  /** Their total per slot, base minor units. */
+  everydayPerSlot: number
   /** No income to plan against: every track is funded as required. */
   unlimited: boolean
   /** The last day the plan looks at. */
@@ -115,6 +126,7 @@ export type FundingInput = {
   income: ReadonlyArray<LocalIncomeStream>
   planned: ReadonlyArray<LocalPlanned>
   setAsides: ReadonlyArray<LocalSetAside>
+  budgets: ReadonlyArray<LocalBudget>
   /** Each goal's progress so far (live set-asides + used), goal currency. */
   progress: Readonly<Record<string, number>>
   index: SettlementIndex
@@ -347,10 +359,16 @@ function laterRoom(
   tracks: ReadonlyArray<FundingTrack>,
   capacities: ReadonlyArray<number>,
   toBase: ReadonlyArray<number>,
+  everyday: number,
 ): Array<number[] | null> {
   const n = capacities.length
   const room = [...capacities]
+  let everydayTaken = false
   return tracks.map((t, i) => {
+    if (!everydayTaken && t.tier > 1) {
+      everydayTaken = true
+      for (let k = 0; k < n; k++) room[k] = Math.max(0, room[k] - everyday)
+    }
     if (
       t.tier === 3 ||
       t.perSlot !== null ||
@@ -382,16 +400,22 @@ function simulate(
   tracks: ReadonlyArray<FundingTrack>,
   capacities: ReadonlyArray<number>,
   toBase: ReadonlyArray<number>,
+  everyday: number,
 ): Run {
   const n = capacities.length
   const schedule = tracks.map(() => new Array<number>(n).fill(0))
   const left = tracks.map((t) => t.need)
   const completesAt: Array<number | null> = tracks.map(() => null)
-  const later = laterRoom(tracks, capacities, toBase)
+  const later = laterRoom(tracks, capacities, toBase, everyday)
   for (let k = 0; k < n; k++) {
     let cap = capacities[k]
+    let everydayTaken = false
     for (let i = 0; i < tracks.length; i++) {
       const t = tracks[i]
+      if (!everydayTaken && t.tier > 1) {
+        everydayTaken = true
+        cap = Math.max(0, cap - everyday)
+      }
       if (k < t.start || k > t.end || left[i] <= EPS) continue
       if (cap <= EPS) break
       const even =
@@ -435,13 +459,16 @@ export function planFunding(input: FundingInput): FundingPlan {
   tracks.sort(byPriority)
 
   const toBase = tracks.map((t) => rateOf(t.currency, base, rates))
-  const funded = simulate(tracks, capacities, toBase)
+  const everyday = everydayItems(input.budgets, calendar, base, rates)
+  const everydayPerSlot = everydayTotal(everyday)
+  const funded = simulate(tracks, capacities, toBase, everydayPerSlot)
   const required = unlimited
     ? funded
     : simulate(
         tracks,
         capacities.map(() => Infinity),
         toBase,
+        everydayPerSlot,
       )
 
   return {
@@ -457,6 +484,8 @@ export function planFunding(input: FundingInput): FundingPlan {
           : 0,
       completesAt: funded.completesAt[i],
     })),
+    everyday,
+    everydayPerSlot,
     unlimited,
     horizonEnd,
   }

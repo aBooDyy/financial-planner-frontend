@@ -5,6 +5,7 @@ import { usePlanningUi } from '#/features/planning/stores/planningUi'
 import { emergencyFundPreset } from '#/features/planning/view/emergencyFund'
 import { PlanChooser } from './chooser/PlanChooser'
 import { BillEditor } from './editors/BillEditor'
+import { EverydayEditor } from './editors/EverydayEditor'
 import { GoalEditor } from './editors/GoalEditor'
 import { IncomeEditor } from './editors/IncomeEditor'
 import { ConfirmPlannedDialog } from '#/features/planned/components/ConfirmPlannedDialog'
@@ -74,6 +75,14 @@ export function PlanningSheets() {
           onDelete={(id) =>
             openSheet({ kind: 'delete', target: { kind: 'goal', id } })
           }
+        />
+      )
+    case 'everyday':
+      return (
+        <EverydayEditor
+          key={sheet.id ?? 'new'}
+          id={sheet.id}
+          onClose={closeSheet}
         />
       )
     case 'income':

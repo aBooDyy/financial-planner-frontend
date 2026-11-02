@@ -3,6 +3,7 @@ import { requeued } from '#/db/syncFailure'
 import { schedulePush } from '#/db/sync'
 import { newId } from '#/lib/uuid'
 import type { LocalBudget, LocalTransaction, OutboxEntity } from '#/db/types'
+import { budgetRowOf } from './budgetRow'
 import type { CurrencyCode } from '#/lib/currency'
 import { closeCovered, reopenUnderSettled } from '#/features/planned/data/rows'
 import {
@@ -374,34 +375,14 @@ export type BudgetDraft = {
   currency: CurrencyCode
   /** "Leave out planned bills"; undefined keeps the stored choice (a new budget: off). */
   excludesBills?: boolean
+  /** Everyday spending; undefined keeps the stored choice (a new budget: off). */
+  inPlan?: boolean
 }
-
-const buildBudget = (
-  id: string,
-  d: BudgetDraft,
-  ts: string,
-  excludesBills = false,
-): LocalBudget => ({
-  id,
-  scopeType: d.scopeType,
-  categoryId: d.scopeType === 'category' ? d.categoryId : null,
-  walletId: d.scopeType === 'wallet' ? d.walletId : null,
-  period: d.period,
-  customDays: d.period === 'custom' ? d.customDays : null,
-  limit: d.limit,
-  currency: d.currency,
-  excludesBills: d.excludesBills ?? excludesBills,
-  createdAt: ts,
-  updatedAt: ts,
-  version: '',
-  dirty: 1,
-  deleted: 0,
-})
 
 export async function createBudget(draft: BudgetDraft): Promise<string> {
   const id = newId()
   const ts = now()
-  const budget = buildBudget(id, draft, ts)
+  const budget = budgetRowOf(id, draft, ts)
   await db.transaction('rw', db.budgets, db.outbox, async () => {
     await db.budgets.put(budget)
     await db.outbox.add({
@@ -424,12 +405,7 @@ export async function updateBudget(
   const existing = await db.budgets.get(id)
   if (!existing) return
   const budget: LocalBudget = {
-    ...buildBudget(
-      id,
-      draft,
-      existing.createdAt,
-      existing.excludesBills ?? false,
-    ),
+    ...budgetRowOf(id, draft, existing.createdAt, existing),
     createdAt: existing.createdAt,
     version: existing.version,
     updatedAt: now(),

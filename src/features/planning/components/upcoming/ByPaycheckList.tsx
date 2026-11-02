@@ -198,7 +198,10 @@ export function ByPaycheckList({ planning }: { planning: PlanningView }) {
                   value: money(stillToPay(p, base, inputs.rates), base),
                 }
               : {
-                  label: 'Left for spending',
+                  label:
+                    p.everyday > 0
+                      ? `Left after ${money(p.everyday, base)} everyday spending`
+                      : 'Left for spending',
                   value: signedMoney(p.left, base),
                   tone: p.left < 0 ? 'danger' : 'ok',
                 }

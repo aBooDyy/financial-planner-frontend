@@ -81,6 +81,7 @@ export type TxEditorDraft = {
   currency: CurrencyCode
   /** "Leave out planned bills" — off by default. */
   excludesBills: boolean
+  inPlan: boolean
 }
 
 /** What a spend counts toward, as picked from the list; null is "Nothing". */
@@ -185,6 +186,7 @@ export function useTxEditor(
     limit: '',
     currency: base,
     excludesBills: false,
+    inPlan: false,
   })
 
   // --- Transactions ---
@@ -257,6 +259,7 @@ export function useTxEditor(
         limit: minorToInputValue(b.limit, b.currency),
         currency: b.currency,
         excludesBills: b.excludesBills ?? false,
+        inPlan: b.inPlan ?? false,
       },
     })
 
@@ -508,6 +511,7 @@ export function useTxEditor(
       limit,
       currency: draft.currency,
       excludesBills: draft.excludesBills,
+      inPlan: draft.inPlan,
     }
     if (id) await updateBudget(id, payload)
     else await createBudget(payload)

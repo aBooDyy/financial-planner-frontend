@@ -132,7 +132,10 @@ and `recurrings` went with the planning rebuild: a repeating payment is a **bill
   carrying a `billId` (a bill's payment, however it was recorded). `excludesBills` (wire `excludes_bills`, default off) marks a
   budget that skips payments for a bill (rows with a `billId`); it is stored and synced, and
   `BudgetDraft.excludesBills` left undefined keeps the stored choice. It is optional on
-  `LocalBudget` because rows stored before it existed lack it (read as off).
+  `LocalBudget` because rows stored before it existed lack it (read as off). **`inPlan`** (wire
+  `in_plan`, category budgets only, same optional shape) makes it [everyday
+  spending](planning.md#everyday-spending--dataeverydayts) on Planning; the editor's *Count it in my
+  plan* switch sets it and turns on `excludesBills`.
 - **planning.ts** — date math (`windowOf`, `budgetWindow`, the calendar grid), parameterized
   by `today` for testability. A bill's due dates step in `planning/data/occurrences.ts`
   (`stepOccurrence`). **`fmtK` takes minor units and a currency code** — every caller holds

@@ -9,6 +9,8 @@ import type { LocalBill } from '#/db/types'
 import { addMonthsISO } from '#/features/planned/data/dates'
 import type { PlannerInputs, PlannerState } from '#/features/planned/data/state'
 import { convertMinor } from '#/lib/currency'
+import { isPlannedBudget } from './everyday'
+import type { EverydayItem } from './everyday'
 import { isPlannableGoal, roundedSchedule } from './funding'
 import type { FundingPlan, OwnerKind, TrackPlan } from './funding'
 
@@ -36,7 +38,9 @@ export type EachPaycheck = {
   /** Bills due later, saved up for in installments. */
   savingUp: PaycheckPart
   goals: PaycheckPart
-  /** `bills + savingUp + goals`. */
+  /** Everyday spending the plan leaves room for; nothing is set aside for it. */
+  everyday: { total: number; count: number; items: EverydayItem[] }
+  /** `bills + savingUp + goals + everyday`. */
   planned: number
   /** `income − planned`; may be negative. Null without income. */
   left: number | null
@@ -116,7 +120,13 @@ export function eachPaycheck(
   const billsPart = part(bills)
   const savingPart = part(savingUp)
   const goalsPart = part(goals)
-  const planned = billsPart.total + savingPart.total + goalsPart.total
+  const everyday = {
+    total: Math.round(funding.everydayPerSlot),
+    count: funding.everyday.length,
+    items: funding.everyday,
+  }
+  const planned =
+    billsPart.total + savingPart.total + goalsPart.total + everyday.total
   const income =
     first && !funding.unlimited && Number.isFinite(first.capacity)
       ? first.capacity
@@ -127,6 +137,7 @@ export function eachPaycheck(
     bills: billsPart,
     savingUp: savingPart,
     goals: goalsPart,
+    everyday,
     planned,
     left: income === null ? null : income - planned,
   }
@@ -167,7 +178,11 @@ export function verdictOf(
   state: PlannerState,
   paycheck: EachPaycheck = eachPaycheck(inputs, state),
 ): Verdict {
-  if (!inputs.bills.some(isPlannedBill) && !inputs.goals.some(isPlannableGoal))
+  if (
+    !inputs.bills.some(isPlannedBill) &&
+    !inputs.goals.some(isPlannableGoal) &&
+    !inputs.budgets.some(isPlannedBudget)
+  )
     return { kind: 'start', reason: 'empty' }
   if (paycheck.left === null || paycheck.income === null)
     return { kind: 'start', reason: 'no_income' }

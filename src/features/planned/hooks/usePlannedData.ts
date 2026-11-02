@@ -65,6 +65,7 @@ const sharedInputs = memoLast(
     planned: PlannerInputs['planned'],
     txns: PlannerInputs['txns'],
     setAsides: PlannerInputs['setAsides'],
+    budgets: PlannerInputs['budgets'],
     settings: LocalBalanceSettings | null,
     base: CurrencyCode,
     rates: RatesMap,
@@ -76,6 +77,7 @@ const sharedInputs = memoLast(
       planned,
       txns,
       setAsides,
+      budgets,
       settings: planningSettingsOf(settings),
       base,
       rates,
@@ -113,6 +115,7 @@ export function usePlannedData(): PlannedData {
     tables.planned ?? NONE,
     tables.txns ?? NONE,
     tables.setAsides ?? NONE,
+    tables.budgets ?? NONE,
     tables.settings ?? null,
     base,
     sharedRates(JSON.stringify(rates)),
@@ -126,6 +129,7 @@ export function usePlannedData(): PlannedData {
       tables.planned === undefined ||
       tables.txns === undefined ||
       tables.setAsides === undefined ||
+      tables.budgets === undefined ||
       tables.nodes === undefined ||
       tables.settings === undefined ||
       tables.rateRows === undefined,

@@ -16,6 +16,7 @@ import type { RankChange, TierKey } from '#/features/planning/view/reorder'
 import { convertMinor } from '#/lib/currency'
 import { ProgressBar } from '#/features/planning/components/kit/ProgressBar'
 import { DoneCard } from './DoneCard'
+import { EverydayCard } from './EverydayCard'
 import { EmptyPlanCard } from './EmptyPlanCard'
 import { LoadingList } from './LoadingList'
 import { ItemRow } from './ItemRow'
@@ -93,6 +94,7 @@ export function BillsSection() {
           addLabel="Add bill"
           onAdd={add}
         />
+        <EverydayCard />
         {doneCard}
       </>
     )
@@ -185,6 +187,7 @@ export function BillsSection() {
           </TierCard>
         ),
       )}
+      <EverydayCard />
       {doneCard}
     </>
   )

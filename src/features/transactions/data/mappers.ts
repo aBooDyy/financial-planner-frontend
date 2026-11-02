@@ -129,6 +129,7 @@ export const localBudgetToCreateWire = (l: LocalBudget): CreateBudgetWire => ({
   limit_amount: l.limit,
   currency: l.currency,
   excludes_bills: l.excludesBills ?? false,
+  in_plan: l.inPlan ?? false,
 })
 
 export const localBudgetToUpdateWire = (l: LocalBudget): UpdateBudgetWire => ({
@@ -141,4 +142,5 @@ export const localBudgetToUpdateWire = (l: LocalBudget): UpdateBudgetWire => ({
   limit_amount: l.limit,
   currency: l.currency,
   excludes_bills: l.excludesBills ?? false,
+  in_plan: l.inPlan ?? false,
 })

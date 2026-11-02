@@ -27,13 +27,23 @@ export type BalanceAhead = {
   /** The day Free to spend is lowest. */
   low: number
   note: string
+  /** Says the figures lean on everyday spending's estimate; null when there is none. */
+  estimateNote: string | null
 }
+
+const DAYS_PER_YEAR = 365.25
+
+/** Everyday spending as a steady daily amount: real spending has no dates to forecast from. */
+export const everydayPerDay = (perSlot: number, slotsPerYear: number): number =>
+  (perSlot * slotsPerYear) / DAYS_PER_YEAR
 
 export function balanceAhead(args: {
   rows: ReadonlyArray<UpcomingRow>
   /** Base currency, active wallets, now. */
   balance: number
   setAside: number
+  /** Everyday spending per day, base; it leaves from tomorrow on. */
+  everydayDaily: number
   base: CurrencyCode
   rates: RatesMap
   today: string
@@ -54,6 +64,7 @@ export function balanceAhead(args: {
   const days: AheadDay[] = []
   const paydays: number[] = []
   for (let d = 0; d <= AHEAD_DAYS; d++) {
+    if (d > 0) balance -= args.everydayDaily
     for (const r of byDay.get(d) ?? []) {
       const amount = inBase(r.remainder, r.currency)
       if (r.item.role === 'income') {
@@ -83,5 +94,9 @@ export function balanceAhead(args: {
     short >= 0
       ? `Free to spend goes below zero on ${dayMonth(days[short].date)} — ${money(-lowDay.free, base)} short at its lowest.`
       : `Free to spend is lowest on ${dayMonth(lowDay.date)} at ${money(lowDay.free, base)}${beforePay ? ', just before pay arrives' : ''}.`
-  return { days, paydays, low, note }
+  const estimateNote =
+    args.everydayDaily > 0
+      ? `An estimate: includes about ${money(args.everydayDaily, base)} a day of everyday spending.`
+      : null
+  return { days, paydays, low, note, estimateNote }
 }

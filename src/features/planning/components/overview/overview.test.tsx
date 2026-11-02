@@ -93,7 +93,7 @@ describe('Overview', () => {
     expect(await screen.findByText('You’re covered')).toBeTruthy()
     expect(
       screen.getByText(
-        'Every bill and goal in your plan fits in your pay. SR 9,000 is left for spending a paycheck.',
+        'Everything in your plan fits in your pay. SR 9,000 is left for spending a paycheck.',
       ),
     ).toBeTruthy()
     expect(screen.getByText('SR 12,000 · paid on the 25th')).toBeTruthy()
