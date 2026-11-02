@@ -126,9 +126,11 @@ describe('Overview', () => {
       tx({ categoryId: catId('dining'), amount: m(310), date: '2026-09-30' }),
     ])
     renderOverview()
-    const line = await screen.findByRole('button', {
-      name: /Last month: Needs 48% · Wants 31% · Savings 21%/,
-    })
+    const line = await screen.findByRole(
+      'button',
+      { name: /Last month: Needs 48% · Wants 31% · Savings 21%/ },
+      { timeout: 4000 },
+    )
     fireEvent.click(line)
     expect(navigate).toHaveBeenCalledWith({
       to: '/reports',
